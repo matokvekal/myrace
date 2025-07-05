@@ -1,0 +1,43 @@
+.raceInfo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 13px;
+}
+
+.infoTop {
+  border: 1px solid rgb(13, 0, 255);
+  justify-content: space-between;
+}
+.row {
+  height: 20px;
+  display: flex;
+  padding-left: 16px;
+  font-size: 12px;
+  color: rgba(41, 48, 66, 0.6);
+}
+.rowHead,.row {
+  height: 20px;
+  display: flex;
+  font-size: 12px;
+  color: rgba(41, 48, 66, 0.6);
+}
+.header {
+  height: 30px;
+}
+.left,
+.right {
+  display: flex;
+  flex: 1;
+  gap: 5px;
+  color: rgba(41, 48, 66, 1);
+}
+.bottom {
+  margin-top: 16px;
+}
+.header {
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-right: 16px;
+  color: rgba(41, 48, 66, 1);
+}

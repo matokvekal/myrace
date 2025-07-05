@@ -1,0 +1,82 @@
+.raceCard {
+  position: relative;
+  width: 235px; /* Match the Image width */
+  height: 154px; /* Match the Image height */
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ccc;
+  border-radius: 12px;
+}
+
+.raceCardOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+  color: white;
+  padding: 12px 0;
+  border-radius: 12px;
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+
+.name,
+.date,
+.details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 0 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+.name {
+  font-size: 16px;
+  font-weight: 500;
+
+}
+.time{
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.date{
+  justify-content: flex-start;
+}
+.raceCardImage {
+  border-radius: 12px; /* Match the card's border radius */
+  object-fit: cover; /* Ensures the image fills the container without distortion */
+  height: 154px;
+  width: 235px;
+}
+.managerace {
+  position: absolute;
+  top: 0;
+  width: 235px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  color: #3edda4;
+  z-index: 2; /* Ensure it is above the image */
+  background-color: white; /* Fully opaque color */
+}
+
+.managerace::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(62, 221, 164, 0.28); /* Optional translucent effect */
+  z-index: -1; /* Place behind the content */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}

@@ -1,0 +1,113 @@
+.riderCard {
+  height: 75px;
+  display: flex;
+  border-radius: 12px;
+  background-color: white;
+}
+
+.imageRider {
+  font-weight: bold;
+  border-radius: 50%;
+  border: 1px solid #63a6fc;
+  border-radius: 50%;
+  padding: 3px;
+  display: inline-block;
+  box-sizing: border-box;
+}
+.imageWrapper {
+  position: relative;
+}
+.imageFlag {
+  position: absolute;
+  left: 23px;
+  top: 25px;
+}
+.number{
+  font-weight: bolder;
+  font-size: 17px;
+}
+.left {
+  flex: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* border:1px solid red; */
+}
+
+.right {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  /* border: 1px solid rgb(38, 0, 255); */
+}
+.name {
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+}
+
+.linespace {
+  color: rgba (41, 48, 66, 10);
+  width: 1px;
+  height: 20px;
+}
+.point {
+  width: 5px;
+  height: 5px;
+  /* background-color: #63a6fc; */
+  border-radius: 1px;
+}
+.middle {
+  flex: 9;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items:flex-start;
+  width: 100%;
+
+  /* gap: 12px; */
+}
+.middleCenter {
+  font-size: 13px;
+  width: 100%;
+  display: flex;
+  /* justify-content: space-between; */
+  align-items: center;
+  display: flex;
+  gap: 8px;
+
+  margin-top: 5px;
+}
+.middleBottom{
+  width: 100%; 
+  font-size: 13px;  display: flex;
+  gap:8px;
+  align-items: center;
+}
+.middleTop {
+  font-size: 13px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+
+}
+.riderStatus {
+  min-width: 60px;
+  max-width: 83px;
+  border-radius: 4px;
+  margin-top: 15px;
+  height: 20px;
+  padding: 4px 8px;
+  font-size: 11px;
+  text-align: center;
+}
+.finishcolor {
+  color: #63a6fc;
+  background-color: rgba(99, 166, 252, 0.17);
+}

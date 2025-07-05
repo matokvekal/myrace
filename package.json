@@ -1,0 +1,47 @@
+{
+  "name": "commissaire",
+  "version": "0.1.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@mui/lab": "^5.0.0-alpha.173",
+    "@mui/material": "^5.16.7",
+    "@mui/x-date-pickers": "^7.11.1",
+    "@react-google-maps/api": "^2.19.3",
+    "@types/axios": "^0.14.0",
+    "@types/google.maps": "^3.55.12",
+    "axios": "^1.7.2",
+    "dayjs": "^1.11.12",
+    "js-cookie": "^3.0.5",
+    "next": "^15.1.7",
+    "papaparse": "^5.5.2",
+    "react": "^18.3.1",
+    "react-circular-progressbar": "^2.1.0",
+    "react-color": "^2.19.3",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.3.5",
+    "react-toastify": "^10.0.5",
+    "sharp": "^0.33.5",
+    "zod": "^3.24.2",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^20",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "typescript": "^5",
+    "workbox-webpack-plugin": "^7.1.0"
+  }
+}

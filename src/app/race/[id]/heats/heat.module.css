@@ -1,0 +1,86 @@
+.heat {
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, sans-serif;
+  background-color: #f6f8fa;
+  height: 100vh;
+  overflow: hidden;
+}
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 0 16px;
+}
+.timer {
+  font-size: 20px;
+  font-weight: bold;
+  height: 60px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  letter-spacing: 10px;
+}
+.inputContainer {
+  position: relative;
+  width: 100%;
+}
+.info {
+  font-size: 14px;
+  color: var(--primary/60);
+  margin-top: 32px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  padding-right: 40px; /* Space for the icon */
+  font-size: 13px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  height: 48px;
+  border-color: transparent;
+}
+
+.inputIcon {
+  position: absolute;
+  top: 50%;
+  right: 12px; /* Adjust based on your design */
+  transform: translateY(-50%);
+  pointer-events: none; /* Prevent the icon from blocking input clicks */
+}
+.info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  margin-top: 8px 0;
+  width: 100%;
+}
+
+.riderGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.finishers {
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.ridersWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Space between grids */
+  margin-top: 16px;
+  /* height: 100svh; */
+  height: 450px;
+  overflow-y: auto;
+}
+.tabCount{font-weight: 400;
+  font-size: 12px;
+  color:rgba(41, 48, 66, 0.6);
+  }

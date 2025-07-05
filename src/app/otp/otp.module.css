@@ -1,0 +1,101 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+}
+.logowrapper {
+  display: flex;
+  margin-top: 2.5rem;
+}
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.signup {
+  display: flex;
+  text-align: center;
+  justify-content: center;
+  /* width: 100%; */
+  font-size: 2rem;
+  font-weight: 400;
+  color: var(--temp-color1);
+  flex: 1;
+  /* margin-top: 1rem; */
+}
+
+.otpbox {
+  display: flex;
+  width: 100%;
+}
+
+.sendagain {
+  display: flex;
+  width: 100%;
+  font-size: 0.75rem;
+  justify-content: center;
+  align-items: center;
+  margin-top: 2rem;
+
+  /* height: 9.68rem; */
+}
+.sendagain strong {
+  text-decoration: underline;
+  margin-left: 0.25rem;
+  color: var(--primary-green);
+  font-size: 0.8rem;
+}
+.titlewrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 12.65rem;
+  height: 7rem;
+  margin-top: 1rem;
+  color: var(--dark-blue);
+  font-size: 0.75rem;
+}
+
+.titleUp {
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-top: 1rem;
+}
+
+.titleMiddle {
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.1rem;
+}
+.bottom1 {
+  color: var(--darkgray-text);
+  letter-spacing: 0.09rem;
+  margin-top: 0.5rem;
+}
+.bottom2 {
+  color: var(--darkgray-text);
+  letter-spacing: 0.08rem;
+  /* margin-top: 0.2rem; */
+}
+.backButton {
+  width: 100%;
+  height: 3.5rem;
+  display: flex;
+  justify-content: flex-start;
+  align-items: left;
+  align-items: center;
+  padding-left: 1rem;
+}
+
+@media (min-width: 31.25rem) {
+  .wrapper {
+    max-width: 30rem;
+  }
+}

@@ -1,0 +1,159 @@
+.modal {
+  background: white;
+  border-radius: 16px 16px 0px 0px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.modalHeader {
+  display: flex;
+  color: rgba(41, 48, 66, 1);
+  /* flex-direction: column; */
+  align-items: center;
+  padding: 13px;
+  border-bottom: 1px solid rgba(41, 48, 66, 1);
+  font-weight: 600;
+  text-align: center;
+}
+.laps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.lapsInput {
+  width: 50%;
+  height: 56px;
+  background-color: rgba(246, 248, 250, 1);
+  border-color: rgba(246, 248, 250, 1);
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 6px;
+  outline: none;
+  border-color: transparent;
+}
+.modalTime {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+  /* max-height: 300px; */
+  overflow-y: auto;
+  gap: 12px;
+}
+
+.modalBody label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.modalTimeInput {
+  width: 50%;
+  height: 56px;
+  background-color: rgba(246, 248, 250, 1);
+  border-color: rgba(246, 248, 250, 1);
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 6px;
+  outline: none;
+  border-color: transparent;
+}
+.modalBody input:focus {
+  border: 1px solid #66a6fc;
+}
+.colorLabel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.selectedColorPreview {
+  width: 100px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+/* Color Picker Grid */
+.colorGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.colorSquare {
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s, border 0.2s;
+  border: 1px solid lightgray;
+}
+
+.colorSquare:hover {
+  transform: scale(1.1);
+  border: 2px solid #000;
+}
+
+.selectedColor {
+  border: 3px solid black;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+  border-top: 1px solid #e5e5e5;
+  gap: 12px;
+}
+
+.cancel,
+.save {
+  /* flex: 1; */
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.cancel {
+  background: white;
+  border: 1px solid rgba(99, 166, 252, 1);
+  color: rgba(99, 166, 252, 1);
+  height: 40px;
+  width: 86px;
+}
+
+.save {
+  background-color: rgba(99, 166, 252, 1);
+  border-bottom: 1px solid rgba(99, 166, 252, 1);
+  color: white;
+  border: none;
+  height: 40px;
+  width: 86px;
+}
+
+.cancel:hover {
+  background: #e5e5e5;
+}
+
+.save:hover {
+  background: #5592e0;
+}

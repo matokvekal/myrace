@@ -1,0 +1,21 @@
+.headerRace {
+  height: 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: white;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 0 8px;
+}
+.time {
+  font-size: 13px;
+  /* color: lightblue; */
+  font-weight: 500;
+}
+.left {
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}

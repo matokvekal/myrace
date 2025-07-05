@@ -1,0 +1,24 @@
+.rider {
+  width: 76px;
+  height: 76px;
+  border-radius: 8px;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  /* justify-content: center; */
+  align-items: center;
+  border-top: 4px solid #f174f7;
+  padding-top: 5px;
+}
+
+.bib {
+  font-size: 15px;
+  font-weight: bold;
+}
+.time {
+  font-size: 10px;
+  margin: 6px 0;
+}
+.lap {
+  font-size: 10px;
+}

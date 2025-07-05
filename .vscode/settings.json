@@ -1,0 +1,15 @@
+{
+  "typescript.tsdk": "node_modules\\typescript\\lib",
+
+  "files.defaultLanguage": "javascript",
+  "files.associations": {
+    "*.css": "css",
+    "*.js": "javascript",
+    "*.jsx": "javascriptreact",
+    "*.ts": "typescript",
+    "*.tsx": "typescriptreact",
+    "*.html": "html",
+    "*.json": "json",
+    "*.module.css": "css"
+  }
+}

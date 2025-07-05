@@ -1,0 +1,24 @@
+.myRacesContainer {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  /* padding: 16px 0; */
+  width: 100%;
+  height: 195px;
+  margin: 16px 0 0 16px;
+}
+.cards {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  /* padding: 0 16px; */
+  margin-top: 12px;
+  overflow-x: scroll;
+  padding-right: 19px;
+}
+.myRacesHeader{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 32PX;
+}

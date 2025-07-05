@@ -1,0 +1,6 @@
+.allRaces{
+    height: 100vh;
+    border:1px solid lightblue;
+    flex: 1;
+margin: 24px 16px 7px 16px;
+}

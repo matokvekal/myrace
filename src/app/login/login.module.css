@@ -1,0 +1,141 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.title {
+  text-align: center;
+  width: 100%;
+  font-size: 2.25rem;
+  font-weight: 400;
+  color: var(--temp-color1);
+  margin-top: 1rem;
+}
+
+.logowrapper {
+  display: flex;
+  margin-top: 2.5rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 0 2.06rem;
+  margin-left: 2.5rem;
+  margin-right: 2.5rem;
+}
+
+.formControler {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--light-text-secondary);
+  margin-bottom: 1rem;
+}
+
+.checkboxLabel input {
+  margin-right: 0.5rem;
+  width: 1rem; /* 16px -> 1rem */
+  height: 1rem; /* 16px -> 1rem */
+  border: 0.125rem solid var(--light-text-secondary); /* 2px -> 0.125rem */
+  border-radius: 0.1875rem; /* 3px -> 0.1875rem */
+  appearance: none; /* Removes default styling of the checkbox */
+  cursor: pointer;
+  position: relative;
+}
+
+.checkboxLabel input:checked {
+  background-color: var(--primary-green); /* Fill color when checked */
+  border-color: var(--primary-green); /* Ensure border matches the fill color */
+}
+
+.checkboxLabel input:checked::after {
+  content: "";
+  position: absolute;
+  left: 0.1875rem; /* 3px -> 0.1875rem */
+  width: 0.25rem; /* 4px -> 0.25rem */
+  height: 0.5rem; /* 8px -> 0.5rem */
+  border: solid white;
+  border-width: 0 0.125rem 0.125rem 0; /* 2px -> 0.125rem */
+  transform: rotate(45deg);
+}
+
+.agreeColor {
+  color: var(--primary-green);
+}
+
+.submit {
+  padding: 0.625rem 1.3rem;
+  width: 100%;
+  height: 2.65rem;
+  border: none;
+  border-radius: 6.25rem;
+  cursor: pointer;
+  margin-top: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.submitNotReady {
+  background-color: var(--primary-green-secondary);
+  color: var(--primary-green);
+}
+.submitReady {
+  background-color: var(--primary-green);
+  color: var(--Light-Primary-Contrast);
+}
+
+.error {
+  color: red;
+  font-size: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 31.25rem) {
+  .form {
+    max-width: 30rem;
+  }
+}
+.checkboxLabel span {
+  margin-left: 0.2rem;
+}
+.inputContainer {
+  position: relative;
+  margin-top: 1.25rem; /* 20px -> 1.25rem */
+  width: 100%;
+}
+
+.titlewrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 2.5rem;
+}
+
+.titleUp {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--dark-blue);
+  margin-top: 1rem;
+}
+
+.titleBottom {
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--dark-blue);
+  margin-top: 1rem;
+}

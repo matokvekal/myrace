@@ -1,0 +1,127 @@
+.card {
+  display: flex;
+  /* border-radius: 12px; */
+  background-color: white;
+  border-bottom-width: 70%;
+  color: rgba(41, 48, 66, 0.5);
+  background-color: rgb(246, 248, 250);
+  border-radius: 6px;
+}
+
+.imageRider {
+  font-weight: bold;
+  border-radius: 50%;
+  border: 1px solid #63a6fc;
+  border-radius: 50%;
+  padding: 3px;
+  display: inline-block;
+  box-sizing: border-box;
+}
+.imageWrapper {
+  position: relative;
+}
+.imageFlag {
+  position: absolute;
+  left: 23px;
+  top: 25px;
+}
+.number {
+  font-weight: bolder;
+  font-size: 17px;
+}
+.left {
+  flex: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.right {
+  flex: 2;
+  width: 50px;
+  display: flex;
+  justify-content: space-between;
+  padding-left:8px;
+  padding-right: 16px;
+  align-items: center;
+}
+.name {
+  font-size: 13px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  color: rgba(41, 48, 66, 0.8);
+}
+
+.linespace {
+  color: rgba (41, 48, 66, 10);
+  width: 1px;
+  height: 20px;
+}
+.point {
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+}
+.middle {
+  flex: 9;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: flex-start;
+  width: 100%;
+
+  /* gap: 12px; */
+}
+.middleCenter {
+  font-size: 13px;
+  width: 100%;
+  display: flex;
+  /* justify-content: space-between; */
+  align-items: center;
+  display: flex;
+  gap: 8px;
+
+  margin-top: 5px;
+}
+.middleBottom {
+  width: 100%;
+  font-size: 13px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.middleTop {
+  font-size: 13px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+}
+.riderStatus {
+  min-width: 60px;
+  max-width: 83px;
+  border-radius: 4px;
+  margin-top: 15px;
+  height: 20px;
+  padding: 4px 8px;
+  font-size: 11px;
+  text-align: center;
+}
+.finishcolor {
+  color: #63a6fc;
+  background-color: rgba(99, 166, 252, 0.17);
+}
+.hide {
+  visibility: hidden;
+}
+.dns,
+.dsq {
+  color:rgb(243, 154, 148);
+  font-size: 14px;
+  font-weight: bold;
+  /* background-color: rgba(244, 67, 54, 0.17); */
+}
