@@ -1,11 +1,8 @@
-"use client";
-
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams } from "react-router-dom";
 import styles from "./heat.module.css";
 import { toast } from "react-toastify";
 import HeaderHeats from "../../../components/headerHeat/HeaderHeat";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import RacingRider from "../../categories/racingRider/RacingRider";
 import FinishRider from "../../categories/finishRider/FinishRider";
@@ -145,7 +142,7 @@ const Heat: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <Image
+            <img
               src={Icons.search}
               alt="search"
               width={16}
@@ -162,7 +159,7 @@ const Heat: React.FC = () => {
                 Racing ({activeRiders.length})
               </div>
             )}
-            <Image src={Icons.filter} alt="filter" width={12} height={12} />
+            <img src={Icons.filter} alt="filter" width={12} height={12} />
           </div>
 
           <div className={styles.ridersWrapper}>

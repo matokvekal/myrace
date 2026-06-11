@@ -1,0 +1,145 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px 32px;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  color: #1a1a2e;
+}
+
+.sortBtns {
+  display: flex;
+  gap: 6px;
+}
+
+.sortBtn {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.sortBtn.active {
+  background: #1a1a2e;
+  border-color: #1a1a2e;
+  color: #fff;
+}
+
+/* Category block */
+.categoryBlock {
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: #b0b0c8;
+}
+
+/* Row */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-top: 1px solid #f4f4fb;
+  font-size: 13px;
+}
+
+.row.active {
+  background: rgba(62, 221, 164, 0.05);
+}
+
+.row.out {
+  opacity: 0.5;
+}
+
+.pos {
+  width: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.bib {
+  width: 36px;
+  font-size: 11px;
+  color: #7a7a9a;
+  flex-shrink: 0;
+}
+
+.name {
+  flex: 1;
+  font-weight: 500;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laps {
+  font-size: 11px;
+  color: #7a7a9a;
+  flex-shrink: 0;
+}
+
+.time {
+  font-size: 11px;
+  color: #7a7a9a;
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.statusIcon {
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #7a7a9a;
+  flex-shrink: 0;
+}
+
+.statusIcon.done { color: #3edda4; }
+.statusIcon.outIcon { color: #e05585; }

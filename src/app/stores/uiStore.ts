@@ -12,6 +12,11 @@ export interface UIState {
   filters: {
     filterStandingCategory: boolean;
   };
+
+  activeTab: string;
+  setActiveTab?: (tab: string) => void;
+  isRaceMode: boolean;
+  setRaceMode: (v: boolean) => void;
   openFilters: (filter: any) => void;
   closeFilters: (filter: any) => void;
 
@@ -33,6 +38,9 @@ const useUIStore = create<UIState>((set) => ({
   filters: {
     filterStandingCategory: false,
   },
+  activeTab: 'schedule',
+  isRaceMode: false,
+  setRaceMode: (v) => set({ isRaceMode: v }),
   openFilters: (filter: keyof UIState["filters"]) =>
     set((state) => ({
       filters: { ...state.filters, [filter]: true },
@@ -41,7 +49,7 @@ const useUIStore = create<UIState>((set) => ({
     set((state) => ({
       filters: { ...state.filters, [filter]: false },
     })),
-
+  // initial persisted tab
   modalData: null,
 
   openModal: (modalName: keyof UIState["modals"], data: any = null) =>
@@ -63,6 +71,8 @@ const useUIStore = create<UIState>((set) => ({
       modals: { modalStatus: false, modalAddRider: false, showSplash: false, showModalCategory: false, showModalTeam: false, modalCategorySettings: false },
       modalData: null,
     }),
+  // tab state
+  setActiveTab: (tab) => set({ activeTab: tab }),
 }));
 
 export default useUIStore;

@@ -11,11 +11,32 @@ interface RiderState {
   lastFetchedRaceUuid: string;
   getRidersOld: (raceUuid: string) => Promise<RiderProps[]>;
   getRiders: (raceUuid: string) => Promise<RiderProps[]>;
+  getRidersByHeat: (raceUuid: string, heat: number) => RiderProps[];
+  getRidersByCategory: (raceUuid: string, category: string) => RiderProps[];
   updateRider: (updatedRider: RiderProps) => Promise<void>;
   updateAllRiders: (updatedRiders: RiderProps[]) => Promise<void>;
   insertRiders: (newRiders: RiderProps[]) => Promise<void>;
   addNewRider: (newRider: RiderProps) => Promise<void>;
+  deleteRider: (riderId: number) => Promise<void>;
 }
+
+/**
+ * Rider Store with enhanced filtering capabilities
+ * 
+ * Usage examples:
+ * 
+ * // Get all riders for a race
+ * const { riders, getRiders } = useRiderStore();
+ * await getRiders("race-uuid-123");
+ * 
+ * // Get riders by race and heat
+ * const { getRidersByRaceAndHeat } = useRiderStore();
+ * const heatRiders = getRidersByRaceAndHeat("race-uuid-123", 2);
+ * 
+ * // Get riders by race and category
+ * const { getRidersByRaceAndCategory } = useRiderStore();
+ * const categoryRiders = getRidersByRaceAndCategory("race-uuid-123", "Men Elite");
+ */
 
 const useRiderStore = create<RiderState>()(
   persist(
@@ -103,6 +124,20 @@ const useRiderStore = create<RiderState>()(
         }
       },
 
+      getRidersByHeat: (raceUuid: string, heat: number) => {
+        const { riders } = get();
+        return riders.filter(rider =>
+          rider.raceUuid === raceUuid && rider.heat === heat
+        );
+      },
+
+      getRidersByCategory: (raceUuid: string, category: string) => {
+        const { riders } = get();
+        return riders.filter(rider =>
+          rider.raceUuid === raceUuid && rider.category === category
+        );
+      },
+
       addNewRider: async (newRider) => {
         try {
           set((state) => ({
@@ -174,6 +209,22 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error updating all riders in IDB:", error);
+        }
+      },
+
+      deleteRider: async (riderId) => {
+        try {
+          set((state) => ({
+            ...state,
+            riders: state.riders.filter((r) => r.id !== riderId),
+          }));
+          const db = await initIndexedDB();
+          const tx = db.transaction("riders", "readwrite");
+          await tx.objectStore("riders").delete(riderId);
+          await tx.done;
+          db.close();
+        } catch (error) {
+          console.error("Error deleting rider:", error);
         }
       },
     }),

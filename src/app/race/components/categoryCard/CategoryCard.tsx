@@ -1,13 +1,10 @@
 import React, { useState } from "react";
 import styles from "./categoryCard.module.css";
 import ButtonStart from "../buttons/ButtonStart";
-import { useRouter } from "next/navigation";
 import Icons from "@/constants/Icons";
-import Image from "next/image";
 import useUIStore from "@/stores/uiStore";
 
 const CategoryCard = ({ category, setSelectedCategory }: any) => {
-  // const router = useRouter();
   const { openModal } = useUIStore();
 
 
@@ -31,13 +28,7 @@ const CategoryCard = ({ category, setSelectedCategory }: any) => {
             <div className={styles.categoryName}> {category.name}</div>
             <div className={styles.dot}></div>
             <div className={styles.participents}>
-              <Image
-                src={Icons.bike}
-                alt="bike"
-                width={12}
-                height={12}
-                className={styles.icon}
-              />
+              <img src={Icons.bike} alt="bike" width={12} height={12} className={styles.icon} />
               {category.riders}
             </div>
           </div>
@@ -51,14 +42,7 @@ const CategoryCard = ({ category, setSelectedCategory }: any) => {
           </div>
         </div>
         <div className={styles.buttons}>
-          <Image
-            src={Icons.setting}
-            alt="setting"
-            width={20}
-            height={20}
-            className={styles.setting}
-            onClick={ handleClick }
-          />
+          <img src={Icons.setting} alt="setting" width={20} height={20} className={styles.setting} onClick={handleClick} />
           {/* <ButtonStart category={category} /> */}
           <div>Running</div>
         </div>

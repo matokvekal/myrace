@@ -2,65 +2,100 @@ import React from "react";
 import styles from "./raceCard.module.css";
 import { RaceCardProps } from "@/types/types";
 import Images from "@/constants/Images";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
+
+const STATUS_LABEL: Record<string, string> = {
+  running: "Live",
+  upcoming: "Upcoming",
+  finished: "Finished",
+};
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  israel: "🇮🇱", france: "🇫🇷", italy: "🇮🇹", spain: "🇪🇸",
+  belgium: "🇧🇪", netherlands: "🇳🇱", usa: "🇺🇸", "united states": "🇺🇸",
+  uk: "🇬🇧", germany: "🇩🇪", australia: "🇦🇺", canada: "🇨🇦",
+  switzerland: "🇨🇭", austria: "🇦🇹", portugal: "🇵🇹",
+};
+
+const getFlag = (location: string): string | null => {
+  const lower = location.toLowerCase();
+  for (const [key, flag] of Object.entries(COUNTRY_FLAGS)) {
+    if (lower.includes(key)) return flag;
+  }
+  return null;
+};
 
 const RaceCard: React.FC<RaceCardProps> = ({
-  id,
-  uuid,
-  name,
-  time,
-  image,
-  date,
-  status
+  uuid, name, time, image, date, status, location, ridersCount, isFavorite, onToggleFavorite,
 }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
 
-  const resolvedImage = (() => {
-    if (Images[image as keyof typeof Images]?.src) {
-      return Images[image as keyof typeof Images].src; // Local image
-    } else if (Images[image as keyof typeof Images]?.src) {
-      return Images[image as keyof typeof Images].src; // ✅ Local image from Images
-    } else {
-      return Images.defaultRaceBike.src; // Fallback image
-    }
-  })();
-  const handleClick = () => {
-    router.push(`/race/${uuid}`);
+  const resolvedImage =
+    image?.startsWith("data:") || image?.startsWith("/") || image?.startsWith("http")
+      ? image
+      : (Images[image as keyof typeof Images] ?? Images.defaultRaceBike);
+
+  const statusKey = status ?? "upcoming";
+  const flag = getFlag(location ?? "");
+
+  const handleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFavorite?.(uuid);
   };
-  // const resolvedImage =
-  //   "https://assets.usacycling.org/prod/assets/_1440xAUTO_crop_center-center_none/540233/Road-Racing.webp";
+
   return (
-    <div key={id} className={styles.raceCard}>
-      {/* Optimized Image */}
-      <Image
-        src={resolvedImage}
-        alt={name}
-        width={219}
-        height={147}
-        quality={70}
-        className={styles.raceCardImage}
-      />
-      {status !== "finished" && (
-        <div className={styles.managerace} onClick={handleClick}>
-          Manage race
-          <Image src={Icons.lc} alt="lc" className={styles.lc} />
+    <div className={styles.card} onClick={() => navigate(`/race/${uuid}`)}>
+      <div className={styles.thumb}>
+        <img src={resolvedImage} alt={name} className={styles.thumbImg} />
+        {status === "running" && <span className={styles.liveDot} />}
+      </div>
+
+      <div className={styles.info}>
+        <div className={styles.nameRow}>
+          <span className={styles.name}>{name}</span>
+          <span className={`${styles.badge} ${styles[statusKey]}`}>
+            {STATUS_LABEL[statusKey]}
+          </span>
         </div>
-      )}
-      <div className={styles.raceCardOverlay}>
-        <div className={styles.name}>{name}</div>
-        <div className={styles.date}>
-          <Image src={Icons.calander} alt="time" width={14} height={14} />{" "}
-          {date}
-        </div>
-        <div className={styles.details}>
-          <div className={styles.time}>
-            <Image src={Icons.time} alt="time" width={14} height={14} />
+
+        <div className={styles.metaRow}>
+          <span className={styles.metaItem}>
+            <img src={Icons.calander} alt="" width={11} height={11} />
+            {date}
+          </span>
+          <span className={styles.metaItem}>
+            <img src={Icons.time} alt="" width={11} height={11} />
             {time}
-          </div>
-          <div>Heats: {11}</div>
+          </span>
         </div>
+
+        <div className={styles.metaRow}>
+          {location ? (
+            <span className={styles.metaItem}>
+              <img src={Icons.earth} alt="" width={11} height={11} />
+              <span className={styles.locationText}>{location}</span>
+              {flag && <span className={styles.flag}>{flag}</span>}
+            </span>
+          ) : null}
+          {ridersCount > 0 && (
+            <span className={styles.metaItem}>
+              <img src={Icons.rider1} alt="" width={11} height={11} />
+              {ridersCount}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.actions}>
+        <button className={styles.heartBtn} onClick={handleFavorite}>
+          <span className={isFavorite ? styles.heartFilled : styles.heartEmpty}>
+            {isFavorite ? "♥" : "♡"}
+          </span>
+        </button>
+        {status !== "finished" && (
+          <img src={Icons.arrowback} alt="" className={styles.arrow} />
+        )}
       </div>
     </div>
   );

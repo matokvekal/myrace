@@ -1,9 +1,6 @@
-"use client";
-
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import styles from "./otp.module.css";
-import Image from "next/image";
 import HeaderLogo from "@/components/headerLogo/HeaderLogo";
 import Footer from "@/components/Footer/Footer";
 import OtpBox from "@/components/otpbox/OtpBox";
@@ -13,26 +10,22 @@ import Loader from "@/components/Loader";
 import { useDataStore } from "@/stores/appStore";
 
 const Otp = () => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [message, setMessage] = useState("");
   const user = useDataStore((state) => state.user);
   const [hiddenPhone, setHiddenPhone] = useState("*********");
 
   useEffect(() => {
     if (user && user.phone) {
-      // Format the phone number to hide some digits
       const formattedPhone = user.phone.replace(
         /(\d{3})(\d{2})(\d{2})(\d{2})/,
         "$1****$4"
       );
       setHiddenPhone(formattedPhone);
-    } else {
-      // If no phone number, redirect to login
-      // router.push("/login");
-    }  
-    router.push("/main");
-  }, [user, router]);
+    }
+    navigate("/main");
+  }, [user, navigate]);
 
   useEffect(() => {
     if (searchParams) {
@@ -43,8 +36,8 @@ const Otp = () => {
     }
   }, [searchParams]);
 
-  const handleBack = () => {  
-    router.push("/main"); // Navigate to the main page
+  const handleBack = () => {
+    navigate("/main");
   };
 
   return (
@@ -55,20 +48,18 @@ const Otp = () => {
         width: "100%",
         height: "100vh",
         background: "rgba(255, 255, 255, 0.9)",
-        backgroundImage: `url(${bg.src})`,
+        backgroundImage: `url(${bg})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         display: "flex",
-        // alignItems: "flex-end",
         justifyContent: "center",
         overflow: "hidden"
       }}
     >
       <div className={styles.backButton} onClick={handleBack}>
-        <Image src={Icons.arrowback} alt="Back" width={24} height={24} />
+        <img src={Icons.arrowback} alt="Back" width={24} height={24} />
       </div>
-      {/* <div className={styles.wrapper}> */}
       <div className={styles.logowrapper}>
         <HeaderLogo />
       </div>
@@ -86,7 +77,6 @@ const Otp = () => {
       </div>
       <Footer />
     </div>
-    // </div>
   );
 };
 

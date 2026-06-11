@@ -21,17 +21,20 @@ interface AppState {
   user: User | null;
   token: string | null;
   loginState: string | null;
+  activeTab: string;
   handleSignUp: (credentials: SignUpCredentials) => Promise<{ status: number; data: string }>;
   handleSendOtp: (otp: string) => Promise<{ status: number; data: string }>;
   getUser: () => Promise<{ user: User | null; token: string | null } | null>;
   setLoginState: (state: string | null) => void;
   checkLogin: () => Promise<boolean>;
+  setActiveTab: (tab: string) => void;
 }
 
 export const useDataStore = create<AppState>((set, get) => ({
   user: null,
   token: null,
   loginState: null,
+  activeTab: 'riders', // Default tab
 
   handleSignUp: async ({ familyName, parentPhone, email, readAndAgreeTerms }) => {
     try {
@@ -111,7 +114,7 @@ export const useDataStore = create<AppState>((set, get) => ({
 
       const tokenCookie = Cookies.get("token");
 
-      if ( tokenCookie) {
+      if (tokenCookie) {
         set({
           token: tokenCookie,
           loginState: "main",
@@ -124,6 +127,10 @@ export const useDataStore = create<AppState>((set, get) => ({
       console.error("Error in checkLogin:", error);
       return false;
     }
+  },
+
+  setActiveTab: (tab: string) => {
+    set({ activeTab: tab });
   },
 
 }));

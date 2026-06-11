@@ -57,7 +57,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-
 }
 
 .leftBottom {
@@ -68,7 +67,7 @@
   gap: 12px;
   color: rgba(41, 48, 66, 0.6);
 }
-.laps{
+.laps {
   display: flex;
   align-items: center;
   gap: 1px;
@@ -101,7 +100,7 @@
   border-radius: 6px;
   font-size: 13px;
 }
-.standing{
+.standing {
   color: rgb(219, 244, 32);
   background-color: rgb(84, 127, 236);
   padding: 8px;
@@ -119,6 +118,9 @@
   border-radius: 0;
   border-top-color: transparent;
   border-bottom-color: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .last {

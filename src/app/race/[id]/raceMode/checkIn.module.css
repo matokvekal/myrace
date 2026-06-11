@@ -1,0 +1,151 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 32px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.searchWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+
+.searchWrap img { opacity: 0.4; flex-shrink: 0; }
+
+.search {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+}
+
+.catSelect {
+  padding: 7px 8px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 8px;
+  font-size: 12px;
+  background: #fff;
+  color: #1a1a2e;
+}
+
+.counts {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.countItem {
+  font-size: 12px;
+  color: #7a7a9a;
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.row.checked {
+  background: rgba(62, 221, 164, 0.06);
+}
+
+.row.out {
+  opacity: 0.5;
+}
+
+.checkBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid #e0e0ef;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3edda4;
+}
+
+.bib {
+  font-size: 11px;
+  color: #7a7a9a;
+  width: 34px;
+  flex-shrink: 0;
+}
+
+.name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat {
+  font-size: 10px;
+  color: #b0b0c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70px;
+}
+
+.statusBtns {
+  flex-shrink: 0;
+}
+
+.statusBtn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 6px;
+  background: #fff;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.statusBtn.dnsActive {
+  border-color: #e05585;
+  color: #e05585;
+}
+
+.addBtn {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1.5px dashed #e0e0ef;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #63a6fc;
+  cursor: pointer;
+  text-align: center;
+}

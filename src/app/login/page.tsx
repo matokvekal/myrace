@@ -1,9 +1,7 @@
-"use client";
-
 import styles from "./login.module.css";
 import HeaderLogo from "@/components/headerLogo/HeaderLogo";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
 import { validateForm } from "@/utils/loginValidation";
 import Footer from "@/components/Footer/Footer";
@@ -11,7 +9,7 @@ import bg from "../assets/images/loginBg.png";
 import LoginInput from "./LoginInput";
 
 const LoginPage = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const signUp = useDataStore((state) => state.handleSignUp);
   const setLoginState = useDataStore((state) => state.setLoginState);
   const getUser = useDataStore((state) => state.getUser);
@@ -41,7 +39,7 @@ const LoginPage = () => {
   useEffect(() => {
     const checkUser = async () => {
       if (await getUser()) {
-        router.push("/main");
+        navigate("/main");
       }
     };
     checkUser();
@@ -75,19 +73,19 @@ const LoginPage = () => {
       const res = await signUp(formData);
       if (res.status === 200) {
         setLoginState("otp");
-        router.push(`/otp?message=${encodeURIComponent("OTP was sent")}`);
+        navigate(`/otp?message=${encodeURIComponent("OTP was sent")}`);
       } else if (res.status === 429) {
         setError(
           "Too many OTP attempts. Please wait 15 minutes before trying again."
         );
       } else {
         setError(res?.data || "Sign up failed");
-        router.push(`/loginerror?message=${encodeURIComponent(error)}`);
+        navigate(`/loginerror?message=${encodeURIComponent(error)}`);
       }
     } catch (err) {
       console.error("Sign up failed", err);
       setError("Sign up failed. Please check your details and try again.");
-      router.push(
+      navigate(
         `/loginerror?message=${encodeURIComponent(
           "Sign up failed. Please check your details and try again."
         )}`
@@ -103,7 +101,7 @@ const LoginPage = () => {
         width: "100%",
         height: "100vh",
         background: "rgba(255, 255, 255, 0.9)",
-        backgroundImage: `url(${bg.src})`,
+        backgroundImage: `url(${bg})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

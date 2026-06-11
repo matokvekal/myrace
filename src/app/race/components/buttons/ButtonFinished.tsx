@@ -1,7 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
 import styles from "./buttonFinished.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 
 const ButtonActive = () => {

@@ -1,7 +1,6 @@
 import React from "react";
 import { RiderProps } from "@/types/types";
 import styles from "./riderCard.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import Images from "@/constants/Images";
 
@@ -10,20 +9,8 @@ const RiderCard: React.FC<RiderProps> = (rider) => {
     <div className={styles.riderCard}>
       <div className={styles.left}>
         <div className={styles.imageWrapper}>
-          <Image
-            className={styles.imageRider}
-            src={Images.user}
-            alt="Rider Image"
-            width={36}
-            height={36}
-          />
-          <Image
-            className={styles.imageFlag}
-            src={Icons.flag_us}
-            alt="Rider Image"
-            width={14}
-            height={14}
-          />
+          <img className={styles.imageRider} src={Images.user} alt="Rider Image" width={36} height={36} />
+          <img className={styles.imageFlag} src={Icons.flag_us} alt="Rider Image" width={14} height={14} />
         </div>
       </div>
       <div className={styles.middle}>

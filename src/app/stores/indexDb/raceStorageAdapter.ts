@@ -1,55 +1,31 @@
-import { openDB } from "idb";
 import { PersistStorage } from "zustand/middleware";
+import { initIndexedDB } from "./indexedDbHelper";
 
 const raceStorageAdapter = (): PersistStorage<any> => ({
-  getItem: async (name: string) => {
-    const db = await openDB("commissireDb", 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("races")) {
-          db.createObjectStore("races", { keyPath: "id" });  // Set keyPath to 'id'
-        }
-      },
-    });
-    const result = await db.get("races", name);
+  getItem: async (_name: string) => {
+    const db = await initIndexedDB();
+    const races = await db.getAll("races");
     db.close();
-    return result ?? null;
+    if (!races.length) return null;
+    return { state: { races } };
   },
-  setItem: async (name: string, value: any) => {
-
-    if (!value || !value.state?.races) {
-      console.warn("Invalid data structure, 'races' is missing.");
-      return;
+  setItem: async (_name: string, value: any) => {
+    const races = value?.state?.races;
+    if (!Array.isArray(races) || !races.length) return;
+    const db = await initIndexedDB();
+    const tx = db.transaction("races", "readwrite");
+    const store = tx.objectStore("races");
+    for (const race of races) {
+      if (race.id != null) await store.put(race);
     }
-    const db = await openDB("commissireDb", 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("races")) {
-          db.createObjectStore("races", { keyPath: "id" });
-        }
-      },
-    });
-    // Remove the extra key parameter and ensure 'value' contains 'id'
-    if (Array.isArray(value.state.races)) {
-
-      for (const race of value.state.races) {
-        if (race.id) {
-          await db.put("races", race);  
-        } else {
-          console.warn("Skipping race with missing 'id'", race);
-        }
-      }
-    }
+    await tx.done;
     db.close();
   },
-  removeItem: async (name: string) => {
-
-    const db = await openDB("commissireDb", 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("races")) {
-          db.createObjectStore("races", { keyPath: "id" });
-        }
-      },
-    });
-    await db.delete("races", name);
+  removeItem: async (_name: string) => {
+    const db = await initIndexedDB();
+    const tx = db.transaction("races", "readwrite");
+    await tx.objectStore("races").clear();
+    await tx.done;
     db.close();
   },
 });

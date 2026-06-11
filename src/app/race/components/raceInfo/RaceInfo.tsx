@@ -1,7 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
 import styles from "./raceInfo.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import ButtonActive from "../buttons/ButtonRunning";
 import {RaceProps} from "@/types/types";
@@ -20,21 +19,21 @@ const category = "TEST CATEGORY";
 
       <div className={styles.row}>
         <div className={styles.left}>
-          <Image src={Icons.date} alt="menu" width={14} height={14} />
+          <img src={Icons.date} alt="menu" width={14} height={14} />
           <div className={styles.rowData}>{date}</div>
         </div>
         <div className={styles.right}>
-          <Image src={Icons.earth} alt="menu" width={14} height={14} />
+          <img src={Icons.earth} alt="menu" width={14} height={14} />
           <div className={styles.rowData}>israel </div>
         </div>
       </div>
       <div className={styles.row}>
         <div className={styles.left}>
-          <Image src={Icons.road} alt="menu" width={14} height={14} />
+          <img src={Icons.road} alt="menu" width={14} height={14} />
           <div className={styles.rowData}>flat</div>
         </div>
         <div className={styles.right}>
-          <Image src={Icons.bike} alt="menu" width={14} height={14} />
+          <img src={Icons.bike} alt="menu" width={14} height={14} />
           <div className={styles.rowData}>102</div>
         </div>
       </div>
@@ -48,11 +47,11 @@ const category = "TEST CATEGORY";
       </div>
       <div className={styles.row}>
         <div className={styles.left}>
-          <Image src={Icons.rider1} alt="menu" width={14} height={14} />
+          <img src={Icons.rider1} alt="menu" width={14} height={14} />
           <div className={styles.rowData}>dan peled</div>
         </div>
         <div className={styles.right}>
-          <Image src={Icons.calander} alt="menu" width={14} height={14} />
+          <img src={Icons.calander} alt="menu" width={14} height={14} />
           <div className={styles.rowData}>GFNY terms</div>
         </div>
       </div>

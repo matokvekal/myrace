@@ -1,4 +1,3 @@
-"use client";
 
 import React from "react";
 import styles from "./statusModal.module.css";
@@ -6,7 +5,9 @@ import useUIStore from "@/stores/uiStore";
 
 interface StatusModalProps {
   rider: any;
-  onStatusChange: (status: "finished" | "running" | "standing" | "DNF" | "DSQ" | "DNS") => void;
+  onStatusChange: (
+    status: "finished" | "running" | "standing" | "DNF" | "DSQ" | "DNS"
+  ) => void;
 }
 
 const StatusModal: React.FC<StatusModalProps> = ({ rider, onStatusChange }) => {
@@ -18,9 +19,13 @@ const StatusModal: React.FC<StatusModalProps> = ({ rider, onStatusChange }) => {
 
   return (
     <div className={styles.modal}>
-      <div className={styles.modalheader} onClick={() => closeModal("modalStatus")}>
-        Status
+      <div
+        className={styles.modalheader}
+        onClick={() => closeModal("modalStatus")}
+      >
+        Status X
       </div>
+
       <div className={styles.modalbottom}>
         {statuses.map((status) => (
           <div

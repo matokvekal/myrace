@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import styles from "./riders.module.css";
 import useRiderStore from "@/stores/ridersStore";

@@ -1,0 +1,141 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px 32px;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #7a7a9a;
+  font-size: 14px;
+}
+
+/* Wave block */
+.wave {
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.waveHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.waveLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3edda4;
+}
+
+.waveTime {
+  font-size: 13px;
+  color: #b0b0c8;
+  flex: 1;
+}
+
+.liveBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  background: #3edda4;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+/* Start group */
+.startGroup {
+  border-top: 1px solid #f0f0f8;
+}
+
+.startHeader {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a7a9a;
+  background: #f8f8fe;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.startTime {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Category row */
+.categoryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid #f4f4fb;
+}
+
+.colorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.catInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.catName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catMeta {
+  font-size: 11px;
+  color: #7a7a9a;
+}
+
+.statusBadge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.catActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.standingsBtn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 6px;
+  background: transparent;
+  color: #7a7a9a;
+  cursor: pointer;
+}

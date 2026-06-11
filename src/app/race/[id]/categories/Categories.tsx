@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import styles from "./categories.module.css";
 import useCategoryStore from "@/stores/categoryStore";

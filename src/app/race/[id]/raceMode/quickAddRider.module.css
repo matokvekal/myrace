@@ -1,0 +1,74 @@
+.form {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.formTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #f0f0f8;
+}
+
+.row2 {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #f8f8fe;
+  color: #1a1a2e;
+  outline: none;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cancelBtn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.saveBtn {
+  flex: 2;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #3edda4;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  cursor: pointer;
+}

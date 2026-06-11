@@ -53,11 +53,18 @@
 
 html,
 body {
+  width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
   font-size: 16px;
   font-family: var(--font-sans);
-  /* overflow: hidden; */
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 body {

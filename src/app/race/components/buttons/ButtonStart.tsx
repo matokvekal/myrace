@@ -1,7 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
 import styles from "./buttonStart.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
@@ -49,7 +48,7 @@ const ButtonStart: React.FC<{ category: any }> = ({ category }) => {
 
   return (
     <div className={styles.wrapper} onClick={startCategory}>
-      <Image src={Icons.buttonStart} alt="menu" width={18} height={18} />
+      <img src={Icons.buttonStart} alt="menu" width={18} height={18} />
       Start
     </div>
   );

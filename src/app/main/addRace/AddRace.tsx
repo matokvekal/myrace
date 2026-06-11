@@ -1,24 +1,36 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import styles from "./addRace.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
-import { useRouter } from "next/navigation";
+import Images from "@/constants/Images";
 import { saveRace } from "@/utils/saveRace";
+import useRaceStore from "@/stores/racesStore";
 // import Papa from "papaparse";
 
 interface Props {
   setAddNewwRace: (value: boolean) => void;
 }
 
+const today = new Date().toISOString().split("T")[0];
+
+const DEFAULT_IMAGES = [
+  Images.bikeMountainSplash,
+  Images.bikeSplash,
+  Images.peloton1,
+  Images.racebefore,
+  Images.defaultRaceBike,
+];
+
 const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
-  const router = useRouter();
-  const [raceName, setRaceName] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [location, setLocation] = useState("");
+  const { races } = useRaceStore();
+  const defaultCover = useMemo(
+    () => DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)],
+    []
+  );
+  const [raceName, setRaceName] = useState(`Race ${races.length + 1}`);
+  const [startDate, setStartDate] = useState(today);
+  const [location, setLocation] = useState("TBD");
   const [status, setStatus] = useState("");
-  const [image, setImage] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [ridersFile, setRidersFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,16 +40,15 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setImage(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => setImageUrl(e.target?.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setRidersFile(file);
-    }
+    if (file) setRidersFile(file);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -51,7 +62,8 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
         startDate,
         location,
         status,
-        ridersFile, // Ensure correct file reference
+        imageUrl,
+        ridersFile,
         setAddNewwRace
       );
     } catch (error) {
@@ -65,13 +77,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     <div className={styles.addRace}>
       <header className={styles.header}>
         <div className={styles.headerleft}>
-          <Image
-            src={Icons.arrowback}
-            alt="back"
-            width={34}
-            height={34}
-            onClick={handleBack}
-          />
+          <img src={Icons.arrowback} alt="back" width={34} height={34} onClick={handleBack} />
         </div>
         <div className={styles.headercenter}>Add Race</div>
         <div className={styles.headerright}></div>
@@ -80,11 +86,8 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.imageUpload}>
           <label htmlFor="coverUpload">
-            {image ? (
-              <Image src={URL.createObjectURL(image)} alt="Cover" width={200} height={100} />
-            ) : (
-              <div className={styles.imagePlaceholder}>Edit Cover</div>
-            )}
+            <img src={imageUrl ?? defaultCover} alt="Cover" className={styles.coverImage} />
+            <div className={styles.coverOverlay}>Change Cover</div>
           </label>
           <input
             id="coverUpload"

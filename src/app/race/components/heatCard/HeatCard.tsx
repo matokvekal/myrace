@@ -1,23 +1,22 @@
-"use client";
-
 import React, { useState } from "react";
 import styles from "./heatCard.module.css";
 import ButtonStart from "../buttons/ButtonStart";
 import ButtonRunning from "../buttons/ButtonRunning";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import Icons from "@/constants/Icons";
-import Image from "next/image";
 
 const HeatCard = ({ category, prevHeat, nextHeat, raceId }: any) => {
   // const [isPaused, setIsPaused] = useState(false);
-  const router = useRouter();
-
-
+  const navigate = useNavigate();
   const manageHeat = () => {
-    router.push(`/race/${raceId}/heat/${category.heat}`);
+    navigate(`/race/${raceId}/heat/${category.heat}`);
   };
   const manageStanding = () => {
-    router.push(`/race/${raceId}/standing/${category.heat}`);
+    navigate(
+      `/race/${raceId}/standing/${category.heat}?category=${encodeURIComponent(
+        category.name
+      )}`
+    );
   };
 
   const totalLaps = category.laps;
@@ -56,9 +55,9 @@ const HeatCard = ({ category, prevHeat, nextHeat, raceId }: any) => {
         <div className={`${styles.heat} ${styles[heatClass]} `}>
           <div>Heat {category.heat}</div>
 
-          <div className={styles.standing} onClick={manageStanding}>
+          {/* <div className={styles.standing} onClick={manageStanding}>
             Standing
-          </div>
+          </div> */}
           <div className={styles.manage} onClick={manageHeat}>
             Manage heat
           </div>
@@ -76,13 +75,7 @@ const HeatCard = ({ category, prevHeat, nextHeat, raceId }: any) => {
               <div className={styles.categoryName}> {category.name}</div>
               <div className={styles.dot}></div>
               <div className={styles.participents}>
-                <Image
-                  src={Icons.bike}
-                  alt="bike"
-                  width={16}
-                  height={16}
-                  className={styles.icon}
-                />
+                <img src={Icons.bike} alt="bike" width={16} height={16} className={styles.icon} />
 
                 {category.riders}
               </div>
@@ -93,8 +86,13 @@ const HeatCard = ({ category, prevHeat, nextHeat, raceId }: any) => {
               </div>
               <div className={styles.dot}></div>
               <div className={styles.start}>
-                {category.startTime || "00:00"}
+                {category.startTime || "upcoming"}
               </div>
+            </div>
+          </div>
+          <div className={styles.middle}>
+            <div className={styles.standing} onClick={manageStanding}>
+              Standing
             </div>
           </div>
           <div className={styles.button}>

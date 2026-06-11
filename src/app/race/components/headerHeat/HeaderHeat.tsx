@@ -1,13 +1,10 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { useNavigate } from "react-router-dom";
 import Icons from "@/constants/Icons";
 import styles from "./headerHeat.module.css";
 
 function HeaderHeat({ raceId }: { raceId: string }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState<string>("");
 
   useEffect(() => {
@@ -24,18 +21,18 @@ function HeaderHeat({ raceId }: { raceId: string }) {
   }, []);
 
   const handleBack = () => {
-    router.push(`/race/${raceId}`); // Navigate back to the race page
+    navigate(`/race/${raceId}`); // Navigate back to the race page
   };
 
   return (
     <div className={styles.headerRace}>
       <div className={styles.left} onClick={handleBack}>
-        <Image src={Icons.arrowBackBlack} alt="back" width={14} height={14} />
+        <img src={Icons.arrowBackBlack} alt="back" width={14} height={14} />
       </div>
       <div>Manage heat</div>
       <div className={styles.time}>{currentTime}</div>
       <div className={styles.menu}>
-        <Image src={Icons.threedotsBlack} alt="menu" width={20} height={20} />
+        <img src={Icons.threedotsBlack} alt="menu" width={20} height={20} />
       </div>
     </div>
   );

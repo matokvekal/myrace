@@ -1,23 +1,70 @@
 .riders {
-  /* background-color: rgba(41, 48, 66, 0.16); */
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-.goUp {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 50;
+  gap: 8px;
+  padding-bottom: 32px;
 }
 
-.show {
-  opacity: 1;
+.sortBar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 
-.hide {
-  opacity: 0;
-  pointer-events: none;
+.sortBtn {
+  padding: 5px 10px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.sortActive {
+  border-color: #1a1a2e;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.wavePills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
+
+.pill {
+  padding: 5px 12px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.pillActive {
+  border-color: #3edda4;
+  background: #3edda4;
+  color: #1a1a2e;
+}
+
+.pillNow {
+  border-color: #63a6fc;
+  color: #63a6fc;
+}
+
+.pillNow.pillActive {
+  background: #63a6fc;
+  border-color: #63a6fc;
+  color: #fff;
 }
 
 .tabCount {
@@ -25,3 +72,37 @@
   font-size: 12px;
   color: rgba(41, 48, 66, 0.6);
 }
+
+.catGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.catGroupHeader {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  padding: 4px 10px;
+  background: #f4f4fb;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empty {
+  text-align: center;
+  color: #7a7a9a;
+  font-size: 13px;
+  padding: 24px 0;
+}
+
+.goUp {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 50;
+}
+
+.show { opacity: 1; }
+.hide { opacity: 0; pointer-events: none; }

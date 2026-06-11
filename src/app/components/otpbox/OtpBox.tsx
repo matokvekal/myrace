@@ -1,5 +1,3 @@
-"use client";
-
 import React, {
   useState,
   useRef,
@@ -9,7 +7,7 @@ import React, {
 } from "react";
 import styles from "./otpbox.module.css";
 import { useDataStore } from "@/stores/appStore";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 
 const ERROR_MESSAGES = {
   INCOMPLETE: "Please enter all 4 digits",
@@ -30,7 +28,7 @@ const OtpBox: React.FC = () => {
   const handleSendOtp = useDataStore((state) => state.handleSendOtp);
   const setLoginState = useDataStore((state) => state.setLoginState);
   const loginState = useDataStore((state) => state.loginState);
-  const router = useRouter();
+  const navigate = useNavigate();
   const [counter, setCounter] = useState(0);
   const [submitButtonClass, setSubmitButtonClass] = useState(
     styles.submitNotReady
@@ -40,12 +38,12 @@ const OtpBox: React.FC = () => {
   //TODO hide just for develop time if need otp error
   useEffect(() => {
     if (loginState === "main") { 
-      router.push("/main");
+      navigate("/main");
     } else if (loginState === "login" || !loginState) {
       // router.push("/login");
     }  
     router.push("/main");
-  }, [loginState, router]);
+  }, [loginState, navigate]);
 
   useEffect(() => {
     if (otp.includes("") || isLoading) {

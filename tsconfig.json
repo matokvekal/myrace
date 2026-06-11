@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -15,57 +11,25 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "jsx": "react-jsx",
     "paths": {
-      "@/components/*": [
-        "src/app/components/*"
-      ],
-      "@/pages/*": [
-        "src/app/pages/*"
-      ],
-      "@/services/*": [
-        "src/app/services/*"
-      ],
-      "@/stores/*": [
-        "src/app/stores/*"
-      ],
-      "@/styles/*": [
-        "src/app/styles/*"
-      ],
-      "@/utils/*": [
-        "src/app/utils/*"
-      ],
-      "@/constants/*": [
-        "src/app/constants/*"
-      ],
-      "@/types/*": [
-        "src/app/types/*"
-      ],
-      "@/helpers/*": [
-        "src/app/stores/indexDb/*"
-      ]
+      "@/components/*": ["src/app/components/*"],
+      "@/pages/*": ["src/app/pages/*"],
+      "@/services/*": ["src/app/services/*"],
+      "@/stores/*": ["src/app/stores/*"],
+      "@/styles/*": ["src/app/styles/*"],
+      "@/utils/*": ["src/app/utils/*"],
+      "@/constants/*": ["src/app/constants/*"],
+      "@/types/*": ["src/app/types/*"],
+      "@/helpers/*": ["src/app/stores/indexDb/*"]
     },
     "target": "ES2017"
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".env.ts",
-    "src/app/main/components/kids/AddKids.tsx",
-    "src/app/stores/indexedDbHelper.ts"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
   "exclude": [
     "node_modules",
-    "playwright.config.ts", // Exclude Playwright config
-    "**/*.test.ts", // Exclude test files
+    "playwright.config.ts",
+    "**/*.test.ts",
     "**/*.test.js",
     "**/__tests__/**"
   ]

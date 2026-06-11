@@ -1,0 +1,74 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 60vh;
+}
+
+.waveBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 6px;
+}
+
+.waveBarLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7a7a9a;
+  flex-shrink: 0;
+}
+
+.wavePills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wavePill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #e0e0ef;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.wavePillActive {
+  background: #1a1a2e;
+  border-color: #1a1a2e;
+  color: #fff;
+}
+
+.subTabs {
+  display: flex;
+  gap: 4px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  margin-bottom: 10px;
+}
+
+.subTab {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a7a9a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.subTabActive {
+  background: #3edda4;
+  color: #1a1a2e;
+}
+
+.content {
+  flex: 1;
+}

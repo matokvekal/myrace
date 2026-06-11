@@ -1,0 +1,109 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 32px;
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: #7a7a9a;
+  font-size: 14px;
+}
+
+.catBlock {
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.catHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.catDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.catName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.catStats {
+  display: flex;
+  gap: 8px;
+}
+
+.stat {
+  font-size: 11px;
+  color: #b0b0c8;
+  font-weight: 600;
+}
+
+.outStat { color: #e05585; }
+
+.noData {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #b0b0c8;
+  text-align: center;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #f4f4fb;
+  font-size: 12px;
+}
+
+.row.running {
+  background: rgba(62, 221, 164, 0.04);
+}
+
+.pos {
+  width: 18px;
+  font-weight: 800;
+  color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+.bib {
+  width: 32px;
+  color: #7a7a9a;
+  flex-shrink: 0;
+}
+
+.name {
+  flex: 1;
+  font-weight: 500;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laps {
+  color: #7a7a9a;
+  flex-shrink: 0;
+}
+
+.time {
+  width: 60px;
+  text-align: right;
+  color: #7a7a9a;
+  flex-shrink: 0;
+}

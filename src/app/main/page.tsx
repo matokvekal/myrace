@@ -1,54 +1,133 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import Cookies from "js-cookie";
 import styles from "./main.module.css";
 import AddRace from "./addRace/AddRace";
-import { useRouter } from "next/navigation";
-import MyRaces from "./myRaces/MyRaces";
-import AllRaces from "./allRaces/AllRaces";
 import HeaderMain from "./components/headerMain/HeaderMain";
+import EmptyRaces from "./components/emptyRaces/EmptyRaces";
+import RaceCard from "./components/raceCard/RaceCard";
+import useRaceStore from "@/stores/racesStore";
+import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
+import Icons from "@/constants/Icons";
 
-// const Messages = dynamic(() => import("@/components/messeges/Messages"), {
-//   ssr: false,
-// });
-// import CircularProgress from "@mui/material/CircularProgress";
+type SortKey = "date" | "status";
+const STATUS_ORDER: Record<string, number> = { running: 0, upcoming: 1, finished: 2 };
 
-import {} from "@/types/types";
 const MainPage = () => {
-  const [loading, setLoading] = useState(false);
-  const [addNewwRace, setAddNewwRace] = useState(false);
+  const [addNewRace, setAddNewRace] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("date");
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [riderCounts, setRiderCounts] = useState<Record<string, number>>({});
+  const [loaded, setLoaded] = useState(false);
+  const { races, getRaces, updateRace } = useRaceStore();
 
-  const router = useRouter();
+  useEffect(() => {
+    getRaces().then(() => setLoaded(true));
+  }, [getRaces]);
 
-  // if (loading) {
-  //   return (
-  //     <CircularProgress
-  //       sx={{
-  //         color: "var(--primary-green)"
-  //       }}
-  //     />
-  //   );
-  // }
+  // Load rider counts for all races once
+  useEffect(() => {
+    if (!loaded || races.length === 0) return;
+    initIndexedDB().then((db) =>
+      db.getAll("riders").then((all) => {
+        const counts: Record<string, number> = {};
+        for (const rider of all) {
+          counts[rider.raceUuid] = (counts[rider.raceUuid] ?? 0) + 1;
+        }
+        setRiderCounts(counts);
+        db.close();
+      })
+    );
+  }, [loaded, races.length]);
+
+  const handleToggleFavorite = (uuid: string) => {
+    const race = races.find((r) => r.uuid === uuid);
+    if (race) updateRace({ ...race, isFavorite: !race.isFavorite });
+  };
+
+  const isEmpty = loaded && races.length === 0;
+
+  const displayed = races
+    .filter((r) => {
+      if (showFavoritesOnly && !r.isFavorite) return false;
+      return r.name.toLowerCase().includes(search.toLowerCase());
+    })
+    .sort((a, b) =>
+      sortBy === "date"
+        ? b.id - a.id
+        : (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) - (STATUS_ORDER[b.status ?? "upcoming"] ?? 1)
+    );
 
   return (
-    <>
-      {loading ? (
-        <div>Loading</div>
+    <div className={styles.main}>
+      {addNewRace ? (
+        <AddRace setAddNewwRace={setAddNewRace} />
       ) : (
-        <div className={styles.main}>
-          {addNewwRace ? (
-            <AddRace setAddNewwRace={setAddNewwRace} />
+        <>
+          <HeaderMain />
+          {isEmpty ? (
+            <EmptyRaces onCreateRace={() => setAddNewRace(true)} />
           ) : (
-            <>
-              <HeaderMain />
-              <MyRaces setAddNewwRace={setAddNewwRace} />
-              <AllRaces />
-            </>
+            <div className={styles.content}>
+              <div className={styles.toolbar}>
+                <div className={styles.searchWrap}>
+                  <img src={Icons.search} alt="" className={styles.searchIcon} />
+                  <input
+                    className={styles.search}
+                    placeholder="Search races..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className={styles.toolbarActions}>
+                  <div className={styles.toolbarLeft}>
+                    <button className={styles.iconBtn}>
+                      <img src={Icons.filter} alt="filter" width={16} height={16} />
+                    </button>
+                    <button
+                      className={styles.iconBtn}
+                      onClick={() => setSortBy(sortBy === "date" ? "status" : "date")}
+                    >
+                      <img src={Icons.goup} alt="sort" width={16} height={16} />
+                      <span>{sortBy === "date" ? "Date" : "Status"}</span>
+                    </button>
+                    <button
+                      className={`${styles.iconBtn} ${showFavoritesOnly ? styles.heartActive : ""}`}
+                      onClick={() => setShowFavoritesOnly((v) => !v)}
+                    >
+                      <span className={styles.heartIcon}>{showFavoritesOnly ? "♥" : "♡"}</span>
+                    </button>
+                  </div>
+                  <button className={styles.addBtn} onClick={() => setAddNewRace(true)}>
+                    <img src={Icons.plus} alt="" />
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.list}>
+                {displayed.map((race) => (
+                  <RaceCard
+                    key={race.uuid}
+                    id={race.id}
+                    uuid={race.uuid}
+                    name={race.name}
+                    time={race.time}
+                    date={race.date}
+                    image={race.image}
+                    location={race.location}
+                    ridersCount={riderCounts[race.uuid] ?? 0}
+                    status={race.status}
+                    curentHeat={race.heat}
+                    isFavorite={race.isFavorite}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-        </div>
+        </>
       )}
-    </>
+    </div>
   );
 };
 

@@ -1,26 +1,35 @@
-
 import { openDB, IDBPDatabase } from "idb";
 import { RiderProps, RaceProps, CategoryProps } from "@/types/types";
 
 const DB_NAME = "commissireDb";
-const DB_VERSION = 5;
-
+const DB_VERSION = 7;
 
 export const initIndexedDB = async (): Promise<IDBPDatabase> => {
-  return openDB("commissireDb", DB_VERSION, {
-    upgrade(db, oldVersion, newVersion, transaction) {
-
-      if (!db.objectStoreNames.contains("riders")) {
-        db.createObjectStore("riders", { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains("categories")) {
-        db.createObjectStore("categories", { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains("races")) {
-        db.createObjectStore("races", { keyPath: "id" });
-      }
-    },
-  });
+  try {
+    return await openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains("riders")) {
+          db.createObjectStore("riders", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("categories")) {
+          db.createObjectStore("categories", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("races")) {
+          db.createObjectStore("races", { keyPath: "id" });
+        }
+      },
+    });
+  } catch (err: any) {
+    if (err.name === "VersionError") {
+      await new Promise<void>((resolve, reject) => {
+        const del = indexedDB.deleteDatabase(DB_NAME);
+        del.onerror = () => reject(del.error);
+        del.onsuccess = () => resolve();
+      });
+      return initIndexedDB();
+    }
+    throw err;
+  }
 };
 // Fetch all races from IndexedDB
 export const getAllRacesFromDb = async (): Promise<RaceProps[]> => {

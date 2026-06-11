@@ -2,9 +2,17 @@ import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import useRaceStore from "@/stores/racesStore";
 import { RaceProps } from "@/types/types";
 import { FormEvent } from "react";
-import { raceValidateText } from "@/utils/textValidation";
 import { saveRidersFromCsv } from "./insertRidersCsv";
 import { clearRaceState } from "@/utils/clearRaceState";
+import Images from "@/constants/Images";
+
+const DEFAULT_IMAGES = [
+  Images.bikeMountainSplash,
+  Images.bikeSplash,
+  Images.peloton1,
+  Images.racebefore,
+  Images.defaultRaceBike,
+];
 // const validateText = (text: string): string | null => {
 //   const trimmedText = text.trim();
 //   if (trimmedText.length < 3 || trimmedText.length > 100) {
@@ -26,25 +34,32 @@ export const saveRace = async (
   startDate: string,
   location: string,
   status: string,
+  imageUrl: string | null,
   file: File | null,
   setAddNewwRace: (value: boolean) => void
 ) => {
   event.preventDefault();
 
-
   try {
-    const errorMessage = raceValidateText(raceName);
     clearRaceState();
+
+    const resolvedName = raceName.trim() || `Race ${Date.now()}`;
+    const resolvedDate = startDate || new Date().toISOString().split("T")[0];
+    const resolvedLocation = location.trim() || "TBD";
+    const resolvedImage = imageUrl || DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
 
     const newRace: RaceProps = {
       id: Date.now(),
-      uuid: crypto.randomUUID(),
-      owner: "1", // This should be dynamically assigned based on the user
-      name: raceName,
-      location,
-      time: "08:00", // Default or user-inputted
-      date: startDate,
-      image: "default-race.png", // Placeholder for an actual image
+      uuid: (crypto.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      })),
+      owner: "1",
+      name: resolvedName,
+      location: resolvedLocation,
+      time: "08:00",
+      date: resolvedDate,
+      image: resolvedImage,
       heat: "1",
       status: "upcoming",
       type: "Competition",

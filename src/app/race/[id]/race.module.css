@@ -59,32 +59,38 @@
 .tabs {
   display: flex;
   margin-top: 25px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 
-.tabs button {
+.button {
   flex: 1;
-  padding: 10px;
+  padding: 8px 2px;
   border: none;
-  background: #f0f0f0;
+  background: transparent;
   cursor: pointer;
-
+  font-size: 11px;
+  font-weight: 600;
+  color: #7a7a9a;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
-/* .button{
-  font-size: 13px;
-  color: rgba(41, 48, 66, 1);
-
-} */
 
 .button.activeTab {
-  color: rgba(99,166,252,1);
-  border-bottom:1px solid rgba(99,166,252,1);
+  background: #1a1a2e;
+  color: #fff;
 }
 
-.tabHeat {
+.tabContent {
   margin-top: 10px;
 }
+
 .bottom {
-  padding: 0 16px;
+  padding: 0 12px;
 }
 
 .loading{

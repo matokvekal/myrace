@@ -1,8 +1,6 @@
-"use client";
 import React, { useState, useEffect, useMemo } from "react";
 import styles from "./addRider.module.css";
 import useRiderStore from "@/stores/ridersStore";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import useUIStore from "@/stores/uiStore";
 import useCategoryStore from "@/stores/categoryStore";
@@ -174,21 +172,11 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
             <div {...getRootProps()} className={styles.camera}>
               <input {...getInputProps()} />
               {image ? (
-                <Image src={image} alt="Uploaded" width={50} height={50} />
+                <img src={image} alt="Uploaded" width={50} height={50} />
               ) : (
                 <>
-                  <Image
-                    src={Icons.photo}
-                    alt="photo"
-                    className={styles.photo}
-                  />
-                  <Image
-                    src={Icons.photoInner}
-                    alt="photoInner"
-                    width={20}
-                    height={20}
-                    className={styles.photoInner}
-                  />
+                  <img src={Icons.photo} alt="photo" className={styles.photo} />
+                  <img src={Icons.photoInner} alt="photoInner" width={20} height={20} className={styles.photoInner} />
                 </>
               )}
             </div>

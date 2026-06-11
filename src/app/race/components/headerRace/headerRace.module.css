@@ -5,5 +5,65 @@
   justify-content: space-between;
   align-items: center;
   background-color: rgba(128, 128, 128, 0.3);
-  /* border: 1px solid green; */
+  padding: 0 8px;
+  transition: background-color 0.3s;
+}
+
+.raceModeActive {
+  background-color: rgba(26, 26, 46, 0.85);
+}
+
+.left,
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 80px;
+}
+
+.right {
+  justify-content: flex-end;
+}
+
+.center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.raceModeLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3edda4;
+  letter-spacing: 0.06em;
+}
+
+.exitBtn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.raceModeBtn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(62, 221, 164, 0.6);
+  background: transparent;
+  color: #3edda4;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.raceModeBtnActive {
+  background: rgba(62, 221, 164, 0.15);
+  color: #fff;
+  border-color: transparent;
 }

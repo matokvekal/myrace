@@ -1,13 +1,15 @@
+// components/standing/Standing.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo, use } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { shallow } from "zustand/shallow";
 import styles from "./standing.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import useRaceStore from "@/stores/racesStore";
-import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
+import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
 import { RiderProps } from "@/types/types";
 import StandingCard from "../../../components/standingCard/StandingCard";
@@ -17,212 +19,151 @@ import StatusModal from "../../../components/modals/StatusModal";
 
 const Standing: React.FC = () => {
   const params = useParams();
-  const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const raceUuid = params?.id as string;
   const heatId = parseInt(params?.heatId as string, 10);
+  const categoryName = searchParams?.get("category") || "";
 
-  const { races, getRaces } = useRaceStore();
-  const { riders, getRiders, updateRider } = useRiderStore();
-  const { categories, getCategories } = useCategoryStore();
+  // UI store
+  const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const openModal = useUIStore((s) => s.openModal);
+  const closeModal = useUIStore((s) => s.closeModal);
+  const modals = useUIStore((s) => s.modals);
+  const isFilterSelected = useUIStore((s) => s.filters.filterStandingCategory);
 
-  const openModal = useUIStore((state) => state.openModal);
-  const closeModal = useUIStore((state) => state.closeModal);
-  const modals = useUIStore((state) => state.modals);
-  const isFilterSelected = useUIStore(
-    (state) => state.filters.filterStandingCategory
-  );
+  // Race & Category stores
+  const { getRaces, races } = useRaceStore();
+  const { getCategories, categories } = useCategoryStore();
 
-  const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  // Rider store actions
+  const getRiders = useRiderStore((s) => s.getRiders);
+  const updateRider = useRiderStore((s) => s.updateRider);
+
+  // Fetch initial data
   const [loading, setLoading] = useState(true);
-
-  const handleFilerModal = () => {
-    openModal("showModalCategory");
-  };
-  const handleSelectCategory = (category: string) => {
-    setSelectedCategory(category === "All" ? null : category);
-    closeModal("showModalCategory");
-  };
-
   useEffect(() => {
-    const fetchData = async () => {
+    (async () => {
       setLoading(true);
       if (races.length === 0) await getRaces();
       await getCategories(raceUuid);
       await getRiders(raceUuid);
       setLoading(false);
-    };
-    fetchData();
-  }, [raceUuid, races.length, getRaces, getCategories, getRiders]);
+    })();
+  }, [raceUuid]);
 
-  const heatCategories = useMemo(
-    () =>
-      categories
-        .filter(
-          (cat) => cat.raceUuid === raceUuid && Number(cat.heat) === heatId
-        )
-        .map((cat) => cat.name),
-    [categories, raceUuid, heatId]
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
+
+  // Subscribe & filter riders from store directly
+  const filteredRiders = useRiderStore(
+    (s) =>
+      s
+        .getRidersByCategory(raceUuid, categoryName)
+        .filter((r) =>
+          [
+            r.bibNumber.toString(),
+            r.firstName.toLowerCase(),
+            r.lastName.toLowerCase()
+          ].some((f) => f.includes(searchTerm.toLowerCase()))
+        ),
+    shallow
   );
-  const filteredRiders = useMemo(() => {
-    return riders.filter(
-      (rider) =>
-        rider.raceUuid === raceUuid &&
-        heatCategories.includes(rider.category) &&
-        (selectedCategory ? rider.category === selectedCategory : true) &&
-        (rider.bibNumber.toString().includes(searchTerm.toLowerCase()) ||
-          rider.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          rider.firstName.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [riders, raceUuid, heatCategories, searchTerm, selectedCategory]);
 
-  const handleStatusChange = async (
-    newStatus: "finished" | "running" | "standing" | "DNF" | "DSQ" | "DNS"
-  ) => {
+  const markStanding = async (rider: RiderProps) => {
+    await updateRider({ ...rider, status: "standing" });
+  };
+
+  const handleStatusChange = async (status: RiderProps["status"]) => {
     if (selectedRider) {
-      const updatedRider = { ...selectedRider, status: newStatus };
-      await updateRider(updatedRider);
+      await updateRider({ ...selectedRider, status });
       closeModal("modalStatus");
     }
   };
 
   const handleGoBack = () => {
-    router.back();
+    setActiveTab?.("heats");
+    navigate(-1);
   };
+  const handleFilter = () => openModal("showModalCategory");
+  const handleAddRider = () => openModal("modalAddRider");
 
-  const handleAddRider = () => {
-    openModal("modalAddRider");
-  };
-
-  if (loading) {
-    return <div className={styles.loading}>Loading...</div>;
-  }
+  if (loading) return <div className={styles.loading}>Loading...</div>;
 
   return (
     <>
       {(modals.showModalCategory ||
         modals.modalStatus ||
-        modals.modalAddRider) && <div className={styles.overlay}></div>}
+        modals.modalAddRider) && <div className={styles.overlay} />}
 
       <div className={styles.wrapper}>
         <div className={styles.left} onClick={handleGoBack}>
-          <Image src={Icons.arrowBackBlack} alt="back" width={14} height={14} />
-          <div>Manage standing Heat:{heatId}</div>
+          <img src={Icons.arrowBackBlack} alt="back" width={14} height={14} />
+          <div>Category: {categoryName}</div>
         </div>
 
         <div className={styles.standing}>
-          <div className={styles.upperLine}></div>
           <div className={styles.header}>
             <div className={styles.headerText}>
               Riders ({filteredRiders.length})
             </div>
             <div className={styles.headerAdd}>
-              <Image
+              <img
                 src={isFilterSelected ? Icons.filterRed : Icons.filter}
                 alt="filter"
-                width={13.5}
-                height={13.5}
-                onClick={handleFilerModal}
+                width={14}
+                height={14}
+                onClick={handleFilter}
               />
-              <div className={styles.rightAdd}>
-                <Image
-                  src={Icons.plusBlue}
-                  alt="add"
-                  width={13.5}
-                  height={13.5}
-                />
-                <div onClick={handleAddRider}>Add Rider</div>
+              <div className={styles.rightAdd} onClick={handleAddRider}>
+                <img src={Icons.plusBlue} alt="add" width={14} height={14} />
+                <span>Add Rider</span>
               </div>
             </div>
           </div>
 
           <div className={styles.searchWrapper}>
-            <div className={styles.inputContainer}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder="Search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Image
-                src={Icons.search}
-                alt="search"
-                width={16}
-                height={16}
-                className={styles.inputIcon}
-              />
-            </div>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <img
+              src={Icons.search}
+              alt="search"
+              width={16}
+              height={16}
+              className={styles.inputIcon}
+            />
           </div>
 
           <div className={styles.standingList}>
             {filteredRiders.length > 0 ? (
-              <>
-                {filteredRiders.map((rider: RiderProps) => (
-                  <StandingCard
-                    key={rider.bibNumber}
-                    rider={rider}
-                    // setShowModal={() => openModal("modalStatus")}
-                    setSelectedRider={setSelectedRider}
-                  />
-                ))}
-              </>
+              filteredRiders.map((r) => (
+                <StandingCard
+                  key={r.id}
+                  rider={r}
+                  setSelectedRider={setSelectedRider}
+                  markStanding={markStanding}
+                />
+              ))
             ) : (
-              <p>No riders found for this heat!</p>
+              <p>No riders in this category.</p>
             )}
           </div>
         </div>
       </div>
-      {/* {modals.showModalFilter &&<div className={styles.modal111}> */}
-      {modals.showModalCategory && (
-        <>
-          <CategoryModal
-            categories={["All", ...heatCategories]}
-            selectCategory={handleSelectCategory}
-          />
-          <div className={styles.modalLayout}></div>
-        </>
-      )}
+
+      {modals.showModalCategory && <CategoryModal />}
       {modals.modalStatus && selectedRider && (
-        <>
-          <StatusModal
-            rider={selectedRider}
-            onStatusChange={handleStatusChange}
-          />
-          <div className={styles.modalLayout}></div>
-        </>
-      )}
-      {/* {modals.modalStatus && selectedRider && (
-        <div className={styles.modal}>
-          <div
-            className={styles.line}
-            onClick={() => handleStatusChange("DNS")}
-          >
-            DNS
-          </div>
-          <div
-            className={styles.line}
-            onClick={() => handleStatusChange("DSQ")}
-          >
-            DSQ
-          </div>
-          <div
-            className={styles.line}
-            onClick={() => handleStatusChange("standing")}
-          >
-            Standing
-          </div>
-        </div>
-      )} */}
-      {modals.modalAddRider && (
-        <AddRider
-          raceUuid={raceUuid}
-          heatId={heatId}
-          // onClose={() => closeModal("modalAddRider")}
+        <StatusModal
+          rider={selectedRider}
+          onStatusChange={handleStatusChange}
         />
       )}
+      {modals.modalAddRider && <AddRider raceUuid={raceUuid} />}
     </>
   );
 };

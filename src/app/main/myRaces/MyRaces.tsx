@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import RaceCard from "../components/raceCard/RaceCard";
 import styles from "./myRaces.module.css";
-import Image from "next/image";
 import Icons from "@/constants/Icons";
 import useRaceStore from "@/stores/racesStore";
 import { RaceProps } from "@/types/types"; // Import the RaceProps type
@@ -31,7 +30,7 @@ const MyRaces: React.FC<props> = ({ setAddNewwRace }) => {
       <div className={styles.myRacesHeader}>
         <div className={styles.left}>My races ({races.length})</div>
         <div className={styles.right} onClick={handleNewRace}>
-          <Image src={Icons.plus} alt="plus" width={16} height={16} />
+          <img src={Icons.plus} alt="plus" width={16} height={16} />
         </div>
       </div>
       <div className={styles.cards}>

@@ -1,43 +1,34 @@
-import { openDB } from "idb";
 import { PersistStorage } from "zustand/middleware";
+import { initIndexedDB } from "./indexedDbHelper";
 
 const categoryStorageAdapter = (): PersistStorage<any> => ({
-   getItem: async (name: string) => {
-      const db = await openDB("commissireDb", 3, {
-         upgrade(db) {
-            if (!db.objectStoreNames.contains("categories")) {
-               db.createObjectStore("categories", { keyPath: "id" });
-            }
-         },
-      });
-      const result = await db.get("categories", name);
-      db.close();
-      return result ?? null;
-   },
-   setItem: async (name: string, value: any) => {
-      const db = await openDB("commissireDb", 3, {
-         upgrade(db) {
-            if (!db.objectStoreNames.contains("categories")) {
-               db.createObjectStore("categories", { keyPath: "id" });
-            }
-         },
-      });
-
-      // Remove the extra 'name' key parameter
-      await db.put("categories", value); 
-      db.close();
-   },
-   removeItem: async (name: string) => {
-      const db = await openDB("commissireDb", 3, {
-         upgrade(db) {
-            if (!db.objectStoreNames.contains("categories")) {
-               db.createObjectStore("categories", { keyPath: "id" });
-            }
-         },
-      });
-      await db.delete("categories", name);
-      db.close();
-   },
+  getItem: async (_name: string) => {
+    const db = await initIndexedDB();
+    const categories = await db.getAll("categories");
+    db.close();
+    if (!categories.length) return null;
+    return { state: { categories } };
+  },
+  setItem: async (_name: string, value: any) => {
+    const db = await initIndexedDB();
+    const categories = value?.state?.categories;
+    if (Array.isArray(categories)) {
+      const tx = db.transaction("categories", "readwrite");
+      const store = tx.objectStore("categories");
+      for (const cat of categories) {
+        if (cat.id != null) await store.put(cat);
+      }
+      await tx.done;
+    }
+    db.close();
+  },
+  removeItem: async (_name: string) => {
+    const db = await initIndexedDB();
+    const tx = db.transaction("categories", "readwrite");
+    await tx.objectStore("categories").clear();
+    await tx.done;
+    db.close();
+  },
 });
 
 export default categoryStorageAdapter;

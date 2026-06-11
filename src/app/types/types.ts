@@ -1,16 +1,16 @@
-// src/types.ts
-
-import { StaticImageData } from "next/image";
-
 export interface RaceCardProps {
   id: number;
   uuid: string;
   name: string;
   time: string;
   date: string;
-  image: string | StaticImageData;
+  image: string;
+  location: string;
+  ridersCount: number;
   status?: "finished" | "running" | "upcoming";
   curentHeat: string | null;
+  isFavorite?: boolean;
+  onToggleFavorite?: (uuid: string) => void;
 }
 
 
@@ -24,7 +24,7 @@ export interface RaceProps {
   location: string;
   time: string;
   date: string;
-  image: string | StaticImageData;
+  image: string;
   heat: string;
   status?: "finished" | "running" | "upcoming";
   type: string;
@@ -37,6 +37,7 @@ export interface RaceProps {
   createdAt: Date;
   lastUpdateAt: Date;
   isActive: boolean;
+  isFavorite?: boolean;
   map: string;
   distance: number;
 }
@@ -95,4 +96,5 @@ export interface RiderProps {
   color: string | null;
   image: string | StaticImageData | null;
   comment: string | null;
+  chipNumber?: string;
 }

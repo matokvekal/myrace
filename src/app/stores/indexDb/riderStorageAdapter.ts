@@ -1,52 +1,31 @@
-import { openDB } from "idb";
 import { PersistStorage } from "zustand/middleware";
+import { initIndexedDB } from "./indexedDbHelper";
 
 const riderStorageAdapter = (): PersistStorage<any> => ({
-  getItem: async (name: string) => {
-    const db = await openDB("commissireDb", 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("riders")) {
-          db.createObjectStore("riders", { keyPath: "id" });
-        }
-      },
-    });
-    const result = await db.get("riders", name);
+  getItem: async (_name: string) => {
+    const db = await initIndexedDB();
+    const riders = await db.getAll("riders");
     db.close();
-    return result ?? null;
+    if (!riders.length) return null;
+    return { state: { riders } };
   },
-  setItem: async (name: string, value: any) => {
-
-    if (!value.state.races?.length) return;
-    const db = await openDB("commissireDb", 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("riders")) {
-          db.createObjectStore("riders", { keyPath: "id" });
-        }
-      },
-    });
-
-
-    if (Array.isArray(value.state?.races)) {
-      // Store each rider separately
-      for (const rider of value.state.races) {
-        if (rider.id) {
-          await db.put("riders", rider); 
-        } else {
-          console.warn("Skipping rider with missing 'id'", rider);
-        }
-      }
+  setItem: async (_name: string, value: any) => {
+    const riders = value?.state?.riders;
+    if (!Array.isArray(riders) || !riders.length) return;
+    const db = await initIndexedDB();
+    const tx = db.transaction("riders", "readwrite");
+    const store = tx.objectStore("riders");
+    for (const rider of riders) {
+      if (rider.id != null) await store.put(rider);
     }
+    await tx.done;
     db.close();
   },
-  removeItem: async (name: string) => {
-    const db = await openDB("commissireDb", 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("riders")) {
-          db.createObjectStore("riders", { keyPath: "id" });
-        }
-      },
-    });
-    await db.delete("riders", name);
+  removeItem: async (_name: string) => {
+    const db = await initIndexedDB();
+    const tx = db.transaction("riders", "readwrite");
+    await tx.objectStore("riders").clear();
+    await tx.done;
     db.close();
   },
 });

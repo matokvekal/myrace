@@ -1,0 +1,157 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 32px;
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: #7a7a9a;
+  font-size: 14px;
+}
+
+.startBlock {
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.startHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f8f8fe;
+  border-bottom: 1px solid #f0f0f8;
+}
+
+.startLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.startTime {
+  font-size: 12px;
+  color: #7a7a9a;
+}
+
+.catList {
+  padding: 6px 0;
+}
+
+.catRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f4f4fb;
+}
+
+.colorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.catName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.statusTag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #7a7a9a;
+}
+.statusTag.running  { color: #1a8a5a; }
+.statusTag.finished { color: #7a7a9a; }
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.countdownBtn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #e0e0ef;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7a7a9a;
+  cursor: pointer;
+}
+
+.startBtn {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #3edda4;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  cursor: pointer;
+}
+
+.liveBtn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #63a6fc;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Countdown overlay */
+.countdownOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.countdownNum {
+  font-size: 120px;
+  font-weight: 900;
+  color: #3edda4;
+  line-height: 1;
+}
+
+.countdownLabel {
+  font-size: 18px;
+  color: #b0b0c8;
+  margin-top: 8px;
+}
+
+.countdownCancel {
+  margin-top: 32px;
+  padding: 10px 32px;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}

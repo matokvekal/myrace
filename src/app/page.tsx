@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import useUIStore from "@/stores/uiStore";
 import SplashScreen from "./splash/page";
@@ -11,7 +9,7 @@ export default function HomePage() {
   const openModal = useUIStore((state) => state.openModal);
   const closeModal = useUIStore((state) => state.closeModal);
   const modals = useUIStore((state) => state.modals);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     openModal("showSplash");
@@ -38,7 +36,7 @@ export default function HomePage() {
 
       if (!token) {
       } else {
-        router.push("/main");
+        navigate("/main");
       }
 
       setInitialCheckCompleted(true);

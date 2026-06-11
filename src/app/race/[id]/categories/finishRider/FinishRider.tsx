@@ -1,8 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
 import styles from "./finishRider.module.css";
-import Image from "next/image";
-import Icons from "@/constants/Icons";
 import { RiderProps } from "@/types/types";
 
 interface GRacingRiderProps {

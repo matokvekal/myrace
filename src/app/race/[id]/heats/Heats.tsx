@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import styles from "./heat.module.css";
 import HeatCard from "../../components/heatCard/HeatCard";
