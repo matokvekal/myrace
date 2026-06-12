@@ -1,28 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./headerMain.module.css";
-import Icons from "@/constants/Icons";
 import Images from "@/constants/Images";
+import Button from "@/components/ui/Button";
 import { useNavigate } from "react-router-dom";
+import { useDataStore } from "@/stores/appStore";
+import Cookies from "js-cookie";
+import { Bike, LogOut, Menu, MessageCircle, UserRound, X } from "lucide-react";
 
 function HeaderMain() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, getUser } = useDataStore();
+
+  useEffect(() => {
+    getUser();
+  }, []);
+
+  const handleLogout = () => {
+    Cookies.remove("token");
+    Cookies.remove("user");
+    useDataStore.setState({ user: null, token: null });
+    setDrawerOpen(false);
+  };
 
   return (
     <>
       <div className={styles.main}>
-        <img
-          src={Icons.mainNav}
-          alt="menu"
-          width={24}
-          height={24}
+        <Button
+          variant="icon"
+          size="md"
+          iconOnly
+          aria-label="Open menu"
           onClick={() => setDrawerOpen(true)}
-          className={styles.navIcon}
-        />
+          className={styles.navIconBtn}
+        >
+          <Menu className={styles.navIcon} aria-hidden="true" />
+        </Button>
         <div className={styles.head}>commissaire</div>
         <div className={styles.right}>
-          <img src={Icons.mainMsg} alt="messages" width={24} height={24} />
-          <img src={Images.user} alt="user" width={40} height={40} className={styles.user} />
+          <Button
+            variant="icon"
+            size="md"
+            iconOnly
+            aria-label="Messages"
+            className={styles.msgBtn}
+          >
+            <MessageCircle className={styles.msgIcon} aria-hidden="true" />
+          </Button>
+          <img
+            src={Images.user}
+            alt="user"
+            width={40}
+            height={40}
+            className={styles.user}
+          />
         </div>
       </div>
 
@@ -32,47 +63,89 @@ function HeaderMain() {
       )}
 
       {/* Drawer */}
-      <div className={`${styles.drawer} ${drawerOpen ? styles.drawerOpen : ""}`}>
+      <div
+        className={`${styles.drawer} ${drawerOpen ? styles.drawerOpen : ""}`}
+      >
         <div className={styles.drawerHeader}>
           <div className={styles.drawerTitle}>commissaire</div>
-          <img
-            src={Icons.closetip}
-            alt="close"
-            width={20}
-            height={20}
+          <Button
+            variant="icon"
+            size="md"
+            iconOnly
+            aria-label="Close menu"
             onClick={() => setDrawerOpen(false)}
             className={styles.closeBtn}
-          />
+          >
+            <X className={styles.closeIcon} aria-hidden="true" />
+          </Button>
         </div>
 
         <div className={styles.drawerAvatar}>
           <img src={Images.user} alt="user" className={styles.avatarImg} />
-          <div className={styles.avatarName}>Guest</div>
-          <div className={styles.avatarSub}>Not signed in</div>
+          {user ? (
+            <>
+              <div className={styles.avatarName}>
+                {user.familyName || user.name}
+              </div>
+              <div className={styles.avatarSub}>{user.phone}</div>
+            </>
+          ) : (
+            <>
+              <div className={styles.avatarName}>Guest</div>
+              <div className={styles.avatarSub}>Not signed in</div>
+            </>
+          )}
         </div>
 
         <nav className={styles.drawerNav}>
-          <button
+          {user ? (
+            <Button
+              variant="ghost"
+              size="lg"
+              className={styles.navItem}
+              onClick={handleLogout}
+            >
+              <LogOut className={styles.navItemIcon} aria-hidden="true" />
+              Logout
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="lg"
+              className={styles.navItem}
+              onClick={() => {
+                setDrawerOpen(false);
+                navigate("/login");
+              }}
+            >
+              <UserRound className={styles.navItemIcon} aria-hidden="true" />
+              Register / Login
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="lg"
             className={styles.navItem}
-            onClick={() => { setDrawerOpen(false); navigate("/login"); }}
+            onClick={() => {
+              setDrawerOpen(false);
+              navigate("/contact");
+            }}
           >
-            <img src={Icons.rider1} alt="" width={20} height={20} />
-            Register / Login
-          </button>
-          <button
-            className={styles.navItem}
-            onClick={() => { setDrawerOpen(false); navigate("/contact"); }}
-          >
-            <img src={Icons.mainMsg} alt="" width={20} height={20} />
+            <MessageCircle className={styles.navItemIcon} aria-hidden="true" />
             Contact
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
             className={styles.navItem}
-            onClick={() => { setDrawerOpen(false); navigate("/main"); }}
+            onClick={() => {
+              setDrawerOpen(false);
+              navigate("/main");
+            }}
           >
-            <img src={Icons.bike} alt="" width={20} height={20} />
+            <Bike className={styles.navItemIcon} aria-hidden="true" />
             My Races
-          </button>
+          </Button>
         </nav>
       </div>
     </>

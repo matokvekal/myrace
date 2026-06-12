@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import styles from "./riders.module.css";
+import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import RiderCard from "../../components/riderCard/RiderCard";
@@ -31,7 +32,10 @@ function getNowWave(categories: CategoryProps[]): number | null {
   let minDiff = Infinity;
   waveMap.forEach((dt, heat) => {
     const diff = Math.abs(dt.getTime() - now.getTime());
-    if (diff < minDiff) { minDiff = diff; closest = heat; }
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = heat;
+    }
   });
   return closest;
 }
@@ -58,24 +62,38 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
   useEffect(() => {
     const handleScroll = debounce(() => setIsVisible(window.scrollY > 50), 100);
     window.addEventListener("scroll", handleScroll);
-    return () => { window.removeEventListener("scroll", handleScroll); handleScroll.cancel(); };
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      handleScroll.cancel();
+    };
   }, []);
 
   const waves = useMemo(
-    () => [...new Set(categories.map((c) => c.heat).filter((h): h is number => h != null))].sort((a, b) => a - b),
+    () =>
+      [
+        ...new Set(
+          categories.map((c) => c.heat).filter((h): h is number => h != null)
+        )
+      ].sort((a, b) => a - b),
     [categories]
   );
 
   const filteredAndSorted = useMemo(() => {
-    const activeHeat = waveFilter === "now"
-      ? getNowWave(categories)
-      : typeof waveFilter === "number" ? waveFilter : null;
+    const activeHeat =
+      waveFilter === "now"
+        ? getNowWave(categories)
+        : typeof waveFilter === "number"
+          ? waveFilter
+          : null;
 
     let list = riders.filter((r) => r.raceUuid === raceUuid);
     if (activeHeat != null) list = list.filter((r) => r.heat === activeHeat);
 
     return [...list].sort((a, b) => {
-      if (sortBy === "name") return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+      if (sortBy === "name")
+        return `${a.lastName} ${a.firstName}`.localeCompare(
+          `${b.lastName} ${b.firstName}`
+        );
       if (sortBy === "bib") return a.bibNumber - b.bibNumber;
       if (sortBy === "club") return (a.team ?? "").localeCompare(b.team ?? "");
       return 0;
@@ -96,50 +114,62 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
     <div className={styles.riders}>
       <div className={styles.sortBar}>
         {(["name", "bib", "club"] as SortKey[]).map((key) => (
-          <button
+          <Button
             key={key}
+            variant={sortBy === key ? "primary" : "secondary"}
+            size="sm"
             className={`${styles.sortBtn} ${sortBy === key ? styles.sortActive : ""}`}
             onClick={() => setSortBy(key)}
           >
             {key === "name" ? "Name A–Z" : key === "bib" ? "Bib #" : "Club A–Z"}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
+          variant={groupByCategory ? "primary" : "secondary"}
+          size="sm"
           className={`${styles.sortBtn} ${groupByCategory ? styles.sortActive : ""}`}
           onClick={() => setGroupByCategory((v) => !v)}
         >
           Group
-        </button>
+        </Button>
       </div>
 
       {waves.length > 1 && (
         <div className={styles.wavePills}>
-          <button
+          <Button
+            variant={waveFilter === "all" ? "primary" : "secondary"}
+            size="sm"
             className={`${styles.pill} ${waveFilter === "all" ? styles.pillActive : ""}`}
             onClick={() => setWaveFilter("all")}
           >
             All
-          </button>
+          </Button>
           {waves.map((w) => (
-            <button
+            <Button
               key={w}
+              variant={waveFilter === w ? "primary" : "secondary"}
+              size="sm"
               className={`${styles.pill} ${waveFilter === w ? styles.pillActive : ""}`}
               onClick={() => setWaveFilter(w)}
             >
               Wave {w}
-            </button>
+            </Button>
           ))}
-          <button
+          <Button
+            variant={waveFilter === "now" ? "success" : "secondary"}
+            size="sm"
             className={`${styles.pill} ${styles.pillNow} ${waveFilter === "now" ? styles.pillActive : ""}`}
             onClick={() => setWaveFilter("now")}
           >
             NOW
-          </button>
+          </Button>
         </div>
       )}
 
       {filteredAndSorted.length > 0 && (
-        <div className={styles.tabCount}>Riders ({filteredAndSorted.length})</div>
+        <div className={styles.tabCount}>
+          Riders ({filteredAndSorted.length})
+        </div>
       )}
 
       {filteredAndSorted.length > 0 ? (
@@ -148,13 +178,18 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
             ? [...grouped.entries()].map(([catName, catRiders]) => (
                 <div key={catName} className={styles.catGroup}>
                   <div className={styles.catGroupHeader}>{catName}</div>
-                  {catRiders.map((rider) => <RiderCard key={rider.id} {...rider} />)}
+                  {catRiders.map((rider) => (
+                    <RiderCard key={rider.id} {...rider} />
+                  ))}
                 </div>
               ))
-            : filteredAndSorted.map((rider) => <RiderCard key={rider.id} {...rider} />)
-          }
+            : filteredAndSorted.map((rider) => (
+                <RiderCard key={rider.id} {...rider} />
+              ))}
 
-          <div className={`${styles.goUp} ${isVisible ? styles.show : styles.hide}`}>
+          <div
+            className={`${styles.goUp} ${isVisible ? styles.show : styles.hide}`}
+          >
             <img
               src={Icons.goup}
               alt="go up"

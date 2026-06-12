@@ -1,10 +1,11 @@
 import React from "react";
 import styles from "./schedule.module.css";
+import Button from "@/components/ui/Button";
 import ButtonStart from "../../components/buttons/ButtonStart";
 import ButtonRunning from "../../components/buttons/ButtonRunning";
 import { useNavigate } from "react-router-dom";
 import { CategoryProps } from "@/types/types";
-import Icons from "@/constants/Icons";
+import { Radio, Trophy } from "lucide-react";
 
 interface Props {
   raceUuid: string;
@@ -33,7 +34,7 @@ function buildSchedule(categories: CategoryProps[]) {
 const STATUS_COLOR: Record<string, string> = {
   running: "#3edda4",
   upcoming: "#63a6fc",
-  finished: "#aaa",
+  finished: "#aaa"
 };
 
 const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
@@ -41,7 +42,11 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const schedule = buildSchedule(categories);
 
   if (!categories.length) {
-    return <div className={styles.empty}>No categories yet. Import riders to generate them.</div>;
+    return (
+      <div className={styles.empty}>
+        No categories yet. Import riders to generate them.
+      </div>
+    );
   }
 
   return (
@@ -52,30 +57,40 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           <div key={waveNum} className={styles.wave}>
             <div className={styles.waveHeader}>
               <span className={styles.waveLabel}>Wave {waveNum}</span>
-              {firstTime !== "TBD" && <span className={styles.waveTime}>{firstTime}</span>}
-              <button
+              {firstTime !== "TBD" && (
+                <span className={styles.waveTime}>{firstTime}</span>
+              )}
+              <Button
+                variant="success"
+                size="sm"
                 className={styles.liveBtn}
                 onClick={() => navigate(`/race/${raceUuid}/heat/${waveNum}`)}
               >
-                <img src={Icons.buttonStart} alt="" width={12} height={12} />
+                <Radio size={13} />
                 Go Live
-              </button>
+              </Button>
             </div>
 
             {[...startMap.entries()].map(([startTime, cats], si) => (
               <div key={startTime} className={styles.startGroup}>
                 <div className={styles.startHeader}>
                   Start {si + 1}
-                  {startTime !== "TBD" && <span className={styles.startTime}> · {startTime}</span>}
+                  {startTime !== "TBD" && (
+                    <span className={styles.startTime}> · {startTime}</span>
+                  )}
                 </div>
 
                 {cats.map((cat) => (
                   <div key={cat.id} className={styles.categoryRow}>
-                    <div className={styles.colorDot} style={{ background: cat.color ?? "#ccc" }} />
+                    <div
+                      className={styles.colorDot}
+                      style={{ background: cat.color ?? "#ccc" }}
+                    />
                     <div className={styles.catInfo}>
                       <span className={styles.catName}>{cat.name}</span>
                       <span className={styles.catMeta}>
-                        {cat.riders ?? 0} riders · {cat.lapsCounter ?? 0}/{cat.laps ?? 0} laps
+                        {cat.riders ?? 0} riders · {cat.lapsCounter ?? 0}/
+                        {cat.laps ?? 0} laps
                       </span>
                     </div>
                     <span
@@ -85,9 +100,15 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                       {cat.status ?? "upcoming"}
                     </span>
                     <div className={styles.catActions}>
-                      {cat.status === "upcoming" && <ButtonStart category={cat} />}
-                      {cat.status === "running" && <ButtonRunning category={cat} />}
-                      <button
+                      {cat.status === "upcoming" && (
+                        <ButtonStart category={cat} />
+                      )}
+                      {cat.status === "running" && (
+                        <ButtonRunning category={cat} />
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         className={styles.standingsBtn}
                         onClick={() =>
                           navigate(
@@ -95,8 +116,9 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                           )
                         }
                       >
+                        <Trophy size={12} />
                         Standings
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}

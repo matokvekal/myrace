@@ -72,26 +72,32 @@ const useCategoryStore = create<CategoryState>()(
           riders.forEach((rider) => {
             if (!rider.category) return; // Ensure rider has a category
 
-            if (!categoryMap[rider.category]) {
+            // Create unique key for category + subCategory combination
+            const categoryKey = rider.subCategory
+              ? `${rider.category}::${rider.subCategory}`
+              : rider.category;
+
+            if (!categoryMap[categoryKey]) {
               const colorIndex = Object.keys(categoryMap).length % COLORS.length;
-              categoryMap[rider.category] = {
-                  id: Date.now() + Object.keys(categoryMap).length,
-                  raceUuid,
-                  name: rider.category,
-                  laps: rider.totalLaps || 0,
-                  lapsCounter: 0,
-                  riders: 0, // ✅ Always initialize to 0
-                  startTime: rider.timeStartRace || null,
-                  isConnected: false,
-                  color: COLORS[colorIndex].code, // ✅ Assign color from COLORS array
-                  heat: rider.heat || null,
-                  status: "upcoming",
+              categoryMap[categoryKey] = {
+                id: Date.now() + Object.keys(categoryMap).length,
+                raceUuid,
+                name: rider.category,
+                subCategory: rider.subCategory || null,
+                laps: rider.totalLaps || 0,
+                lapsCounter: 0,
+                riders: 0, // ✅ Always initialize to 0
+                startTime: rider.timeStartRace || null,
+                isConnected: false,
+                color: COLORS[colorIndex].code, // ✅ Assign color from COLORS array
+                heat: rider.heat || null,
+                status: "upcoming",
               };
-          }
-          categoryMap[rider.category].riders = (categoryMap[rider.category]?.riders ?? 0) + 1;
+            }
+            categoryMap[categoryKey].riders = (categoryMap[categoryKey]?.riders ?? 0) + 1;
 
             // ✅ Ensure riders get the correct color
-            riderUpdates.push({ ...rider, color: categoryMap[rider.category].color });
+            riderUpdates.push({ ...rider, color: categoryMap[categoryKey].color });
 
           });
 
@@ -149,12 +155,23 @@ const useCategoryStore = create<CategoryState>()(
       updateCategory: async (updatedCategory: CategoryProps) => {
         try {
           const { categories } = get();
-          const updatedCategories = categories.map((c) =>
-            c.id === updatedCategory.id ? updatedCategory : c
-          );
-      
+
+          // Check if category exists
+          const existingIndex = categories.findIndex((c) => c.id === updatedCategory.id);
+
+          let updatedCategories;
+          if (existingIndex >= 0) {
+            // Update existing category
+            updatedCategories = categories.map((c) =>
+              c.id === updatedCategory.id ? updatedCategory : c
+            );
+          } else {
+            // Add new category
+            updatedCategories = [...categories, updatedCategory];
+          }
+
           set({ categories: updatedCategories });
-      
+
           const db = await initIndexedDB();
           const tx = db.transaction("categories", "readwrite");
           const store = tx.objectStore("categories");

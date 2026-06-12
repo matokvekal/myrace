@@ -1,16 +1,27 @@
 .headerRace {
   width: 100%;
-  height: 48px;
+  height: 56px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: rgba(128, 128, 128, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgba(20, 31, 50, 0.55),
+    rgba(20, 31, 50, 0.38)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
   padding: 0 8px;
   transition: background-color 0.3s;
 }
 
 .raceModeActive {
-  background-color: rgba(26, 26, 46, 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(17, 26, 42, 0.85),
+    rgba(17, 26, 42, 0.72)
+  );
 }
 
 .left,
@@ -32,38 +43,33 @@
 }
 
 .raceModeLabel {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   font-weight: 700;
   color: #3edda4;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .exitBtn {
-  background: rgba(255,255,255,0.15);
-  border: none;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 6px;
-  cursor: pointer;
+  min-height: 34px;
+}
+
+.backBtn,
+.menuBtn {
+  width: 36px;
+  min-width: 36px;
 }
 
 .raceModeBtn {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1.5px solid rgba(62, 221, 164, 0.6);
-  background: transparent;
-  color: #3edda4;
-  cursor: pointer;
+  min-height: 34px;
   white-space: nowrap;
-  transition: background 0.2s;
 }
 
 .raceModeBtnActive {
-  background: rgba(62, 221, 164, 0.15);
-  color: #fff;
-  border-color: transparent;
+  color: #3f86e7;
 }

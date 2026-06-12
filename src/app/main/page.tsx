@@ -4,15 +4,29 @@ import AddRace from "./addRace/AddRace";
 import HeaderMain from "./components/headerMain/HeaderMain";
 import EmptyRaces from "./components/emptyRaces/EmptyRaces";
 import RaceCard from "./components/raceCard/RaceCard";
+import DownloadRace from "./components/downloadRace/DownloadRace";
+import Button from "@/components/ui/Button";
 import useRaceStore from "@/stores/racesStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
-import Icons from "@/constants/Icons";
+import {
+  ArrowUpDown,
+  Heart,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Download
+} from "lucide-react";
 
 type SortKey = "date" | "status";
-const STATUS_ORDER: Record<string, number> = { running: 0, upcoming: 1, finished: 2 };
+const STATUS_ORDER: Record<string, number> = {
+  running: 0,
+  upcoming: 1,
+  finished: 2
+};
 
 const MainPage = () => {
   const [addNewRace, setAddNewRace] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("date");
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -54,7 +68,8 @@ const MainPage = () => {
     .sort((a, b) =>
       sortBy === "date"
         ? b.id - a.id
-        : (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) - (STATUS_ORDER[b.status ?? "upcoming"] ?? 1)
+        : (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) -
+          (STATUS_ORDER[b.status ?? "upcoming"] ?? 1)
     );
 
   return (
@@ -70,7 +85,7 @@ const MainPage = () => {
             <div className={styles.content}>
               <div className={styles.toolbar}>
                 <div className={styles.searchWrap}>
-                  <img src={Icons.search} alt="" className={styles.searchIcon} />
+                  <Search className={styles.searchIcon} aria-hidden="true" />
                   <input
                     className={styles.search}
                     placeholder="Search races..."
@@ -80,27 +95,65 @@ const MainPage = () => {
                 </div>
                 <div className={styles.toolbarActions}>
                   <div className={styles.toolbarLeft}>
-                    <button className={styles.iconBtn}>
-                      <img src={Icons.filter} alt="filter" width={16} height={16} />
-                    </button>
-                    <button
+                    <Button
+                      variant="icon"
+                      size="md"
+                      iconOnly
                       className={styles.iconBtn}
-                      onClick={() => setSortBy(sortBy === "date" ? "status" : "date")}
+                      aria-label="Filter races"
                     >
-                      <img src={Icons.goup} alt="sort" width={16} height={16} />
+                      <SlidersHorizontal
+                        className={styles.iconGlyph}
+                        aria-hidden="true"
+                      />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      className={styles.iconBtn}
+                      onClick={() =>
+                        setSortBy(sortBy === "date" ? "status" : "date")
+                      }
+                    >
+                      <ArrowUpDown
+                        className={styles.iconGlyph}
+                        aria-hidden="true"
+                      />
                       <span>{sortBy === "date" ? "Date" : "Status"}</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="icon"
+                      size="md"
+                      iconOnly
                       className={`${styles.iconBtn} ${showFavoritesOnly ? styles.heartActive : ""}`}
                       onClick={() => setShowFavoritesOnly((v) => !v)}
+                      aria-label="Show favorites"
                     >
-                      <span className={styles.heartIcon}>{showFavoritesOnly ? "♥" : "♡"}</span>
-                    </button>
+                      <Heart
+                        className={styles.heartIcon}
+                        aria-hidden="true"
+                        fill={showFavoritesOnly ? "currentColor" : "none"}
+                      />
+                    </Button>
                   </div>
-                  <button className={styles.addBtn} onClick={() => setAddNewRace(true)}>
-                    <img src={Icons.plus} alt="" />
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className={styles.downloadBtn}
+                    onClick={() => setShowDownload(true)}
+                  >
+                    <Download className={styles.iconGlyph} aria-hidden="true" />
+                    Download
+                  </Button>
+                  <Button
+                    variant="success"
+                    size="md"
+                    className={styles.addBtn}
+                    onClick={() => setAddNewRace(true)}
+                  >
+                    <Plus className={styles.iconGlyph} aria-hidden="true" />
                     Add
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -126,6 +179,16 @@ const MainPage = () => {
             </div>
           )}
         </>
+      )}
+
+      {showDownload && (
+        <DownloadRace
+          onClose={() => setShowDownload(false)}
+          onSuccess={() => {
+            getRaces();
+            setShowDownload(false);
+          }}
+        />
       )}
     </div>
   );

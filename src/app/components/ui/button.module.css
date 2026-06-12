@@ -1,0 +1,131 @@
+.btn {
+  --btn-radius: 12px;
+  --btn-shadow: 0 8px 18px rgba(99, 166, 252, 0.18);
+
+  border: 1px solid transparent;
+  border-radius: var(--btn-radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 140ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+  box-shadow: var(--btn-shadow);
+}
+
+.btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.primary {
+  background: linear-gradient(145deg, #63a6fc, #4a8ee7);
+  border-color: rgba(73, 127, 210, 0.34);
+  color: #ffffff;
+}
+
+.primary:not(:disabled):hover {
+  background: linear-gradient(145deg, #74b1ff, #5b9bf0);
+}
+
+.success {
+  background: linear-gradient(145deg, #3edda4, #2fce95);
+  border-color: rgba(24, 143, 102, 0.25);
+  color: #f8fffb;
+  box-shadow:
+    0 10px 20px rgba(62, 221, 164, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.32) inset;
+}
+
+.success:not(:disabled):hover {
+  background: linear-gradient(145deg, #4be1ad, #38d79f);
+}
+
+.secondary {
+  background: linear-gradient(180deg, #ffffff, #f1f7ff);
+  border-color: #c6ddfc;
+  color: #4a74ae;
+  box-shadow:
+    0 8px 16px rgba(99, 166, 252, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.72) inset;
+}
+
+.secondary:not(:disabled):hover {
+  border-color: #9dc7fa;
+  background: linear-gradient(180deg, #ffffff, #e6f1ff);
+}
+
+.icon {
+  background: linear-gradient(180deg, #ffffff, #e8f2ff);
+  border-color: #bfdafb;
+  color: #4a7dc4;
+  box-shadow:
+    0 8px 16px rgba(86, 145, 231, 0.19),
+    0 1px 0 rgba(255, 255, 255, 0.76) inset;
+}
+
+.icon:not(:disabled):hover {
+  border-color: #99c5fb;
+  background: linear-gradient(180deg, #ffffff, #dcebff);
+}
+
+.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #1a304f;
+  box-shadow: none;
+}
+
+.ghost:not(:disabled):hover {
+  background: #e2efff;
+}
+
+.sm {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.md {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.lg {
+  min-height: 42px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.iconOnly {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.slotIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.label {
+  line-height: 1;
+}

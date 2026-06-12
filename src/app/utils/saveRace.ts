@@ -5,6 +5,7 @@ import { FormEvent } from "react";
 import { saveRidersFromCsv } from "./insertRidersCsv";
 import { clearRaceState } from "@/utils/clearRaceState";
 import Images from "@/constants/Images";
+import { generateRaceId } from "@/services/RaceSync";
 
 const DEFAULT_IMAGES = [
   Images.bikeMountainSplash,
@@ -48,12 +49,16 @@ export const saveRace = async (
     const resolvedLocation = location.trim() || "TBD";
     const resolvedImage = imageUrl || DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
 
+    // Generate formatted race ID
+    const raceId = generateRaceId(resolvedDate, resolvedName);
+
     const newRace: RaceProps = {
       id: Date.now(),
       uuid: (crypto.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = (Math.random() * 16) | 0;
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
       })),
+      raceId,
       owner: "1",
       name: resolvedName,
       location: resolvedLocation,

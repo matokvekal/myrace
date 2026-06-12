@@ -156,14 +156,24 @@ const Standing: React.FC = () => {
         </div>
       </div>
 
-      {modals.showModalCategory && <CategoryModal />}
+      {modals.showModalCategory && (
+        <CategoryModal
+          categories={[
+            "All",
+            ...Array.from(new Set(filteredRiders.map((r) => r.category)))
+          ]}
+          selectCategory={(cat) => {
+            useUIStore.getState().closeModal("showModalCategory");
+          }}
+        />
+      )}
       {modals.modalStatus && selectedRider && (
         <StatusModal
           rider={selectedRider}
           onStatusChange={handleStatusChange}
         />
       )}
-      {modals.modalAddRider && <AddRider raceUuid={raceUuid} />}
+      {modals.modalAddRider && <AddRider raceUuid={raceUuid} heatId={heatId} />}
     </>
   );
 };

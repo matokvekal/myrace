@@ -48,6 +48,9 @@ const MyRaces: React.FC<props> = ({ setAddNewwRace }) => {
                 date={race.date}
                 image={race.image}
                 status={race.status}
+                location={race.location ?? ""}
+                ridersCount={0}
+                curentHeat={null}
               />
             ))}
       </div>

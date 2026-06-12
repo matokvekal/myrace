@@ -1,14 +1,18 @@
 .wrapper {
-  /* border: 1px solid rgba(99, 166, 252, 1);
-   color: rgba(99, 166, 252, 1); */
-  width: 50px;
-  height: 20px;
+  min-width: 72px;
+  height: 32px;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 4px;
-  justify-content: space-around;
-  font-size: 13px;
-  background-color: #3edda417;
-  color: #3edda4;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(
+    180deg,
+    rgba(62, 221, 164, 0.2),
+    rgba(62, 221, 164, 0.12)
+  );
+  border: 1px solid rgba(62, 221, 164, 0.38);
+  color: #0a8e5d;
 }

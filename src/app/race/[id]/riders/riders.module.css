@@ -7,64 +7,44 @@
 
 .sortBar {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  background: #fff;
-  border-radius: 10px;
-  padding: 8px 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  background: linear-gradient(180deg, #ffffff, #f2f7ff);
+  border: 1px solid #c9defc;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 18px rgba(99, 166, 252, 0.14);
 }
 
 .sortBtn {
-  padding: 5px 10px;
-  border: 1.5px solid #e0e0ef;
-  border-radius: 20px;
-  background: #fff;
   font-size: 11px;
-  font-weight: 600;
-  color: #7a7a9a;
-  cursor: pointer;
 }
 
 .sortActive {
-  border-color: #1a1a2e;
-  background: #1a1a2e;
-  color: #fff;
+  letter-spacing: 0.01em;
 }
 
 .wavePills {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 2px 0;
+  padding: 4px 0;
 }
 
 .pill {
-  padding: 5px 12px;
-  border: 1.5px solid #e0e0ef;
-  border-radius: 20px;
-  background: #fff;
   font-size: 11px;
-  font-weight: 600;
-  color: #7a7a9a;
-  cursor: pointer;
 }
 
 .pillActive {
-  border-color: #3edda4;
-  background: #3edda4;
-  color: #1a1a2e;
+  letter-spacing: 0.01em;
 }
 
 .pillNow {
-  border-color: #63a6fc;
-  color: #63a6fc;
+  /* styled via variant="success" */
 }
 
 .pillNow.pillActive {
-  background: #63a6fc;
-  border-color: #63a6fc;
-  color: #fff;
+  /* styled via variant="success" */
 }
 
 .tabCount {
@@ -82,10 +62,11 @@
 .catGroupHeader {
   font-size: 11px;
   font-weight: 700;
-  color: #1a1a2e;
-  padding: 4px 10px;
-  background: #f4f4fb;
-  border-radius: 6px;
+  color: #1a304f;
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #f2f7ff, #eef4ff);
+  border: 1px solid #d5e4fb;
+  border-radius: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -104,5 +85,10 @@
   z-index: 50;
 }
 
-.show { opacity: 1; }
-.hide { opacity: 0; pointer-events: none; }
+.show {
+  opacity: 1;
+}
+.hide {
+  opacity: 0;
+  pointer-events: none;
+}

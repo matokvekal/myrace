@@ -25,7 +25,12 @@
     },
     "target": "ES2017"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vite.config.ts",
+    "src/vite-env.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "playwright.config.ts",

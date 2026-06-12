@@ -1,5 +1,5 @@
 .main {
-  background: var(--main-background);
+  background: transparent;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -15,28 +15,35 @@
 .toolbar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 16px 8px;
-  background: var(--main-background);
+  gap: 12px;
+  padding: 14px 16px 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(245, 250, 255, 0.95),
+    rgba(245, 250, 255, 0.78)
+  );
+  border-bottom: 1px solid rgba(99, 166, 252, 0.14);
+  backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 15;
 }
 
 .searchWrap {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: #fff;
-  border-radius: 10px;
-  padding: 8px 12px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  gap: 10px;
+  background: linear-gradient(180deg, #ffffff, #f6fbff);
+  border: 1px solid #c9defc;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 14px rgba(17, 66, 133, 0.08);
 }
 
 .searchIcon {
-  width: 16px;
-  height: 16px;
-  opacity: 0.4;
+  width: 17px;
+  height: 17px;
+  color: #5d8fcd;
   flex-shrink: 0;
 }
 
@@ -46,11 +53,12 @@
   outline: none;
   background: transparent;
   font-size: 14px;
-  color: #1a1a2e;
+  font-weight: 500;
+  color: #14243c;
 }
 
 .search::placeholder {
-  color: #b0b0c8;
+  color: #8b9ebf;
 }
 
 .toolbarActions {
@@ -62,87 +70,142 @@
 .toolbarLeft {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .iconBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 7px 10px;
-  background: #fff;
-  border: 1.5px solid #e0e0ef;
-  border-radius: 8px;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #ffffff, #f1f7ff);
+  border: 1px solid #bdd9fc;
+  border-radius: 12px;
   cursor: pointer;
-  color: #7a7a9a;
+  color: #3f6ca8;
   font-size: 12px;
   font-weight: 600;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
   -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 8px 16px rgba(73, 126, 210, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.iconBtn:hover {
+  border-color: #8ec0fb;
+  background: linear-gradient(180deg, #ffffff, #e5f0ff);
+  box-shadow:
+    0 10px 20px rgba(86, 145, 231, 0.2),
+    0 1px 0 rgba(255, 255, 255, 0.75) inset;
 }
 
 .iconBtn:active {
-  background: #f0f0f8;
+  transform: translateY(1px);
+  background: #deecff;
 }
 
-.iconBtn img {
-  opacity: 0.6;
+.iconGlyph {
+  width: 15px;
+  height: 15px;
 }
 
 .sortIconBtn span {
   font-size: 12px;
   font-weight: 600;
-  color: #7a7a9a;
+  color: #4a74ae;
 }
 
 .heartIcon {
-  font-size: 16px;
-  color: #c0c0d8;
-  line-height: 1;
+  width: 16px;
+  height: 16px;
+  color: #8ea9d4;
 }
 
 .heartActive .heartIcon {
-  color: #e05585;
+  color: #df4b7b;
 }
 
 .heartActive {
-  border-color: rgba(224, 85, 133, 0.4);
+  border-color: rgba(223, 75, 123, 0.45);
+  background: linear-gradient(180deg, #fff6f9, #fff0f6);
 }
 
 .addBtn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  background: #3edda4;
-  border: none;
-  border-radius: 8px;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  background: linear-gradient(150deg, #3edda4, #2fcf95);
+  border: 1px solid rgba(24, 143, 102, 0.22);
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 700;
-  color: #1a1a2e;
+  color: #f7fffc;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
   -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 10px 20px rgba(39, 191, 136, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.34) inset;
+}
+
+.addBtn:hover {
+  background: linear-gradient(150deg, #47e0aa, #35d39a);
 }
 
 .addBtn:active {
-  background: #2ec990;
+  transform: translateY(1px);
+  background: linear-gradient(150deg, #2fd198, #25be88);
 }
 
-.addBtn img {
-  width: 14px;
-  height: 14px;
+.downloadBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  background: linear-gradient(150deg, #63a6fc, #4a8ee8);
+  border: 1px solid rgba(74, 142, 232, 0.3);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f7ffff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 10px 20px rgba(99, 166, 252, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.34) inset;
+}
+
+.downloadBtn:hover {
+  background: linear-gradient(150deg, #70affe, #5596eb);
+}
+
+.downloadBtn:active {
+  transform: translateY(1px);
+  background: linear-gradient(150deg, #5295ed, #3e82d6);
 }
 
 /* Race list */
 .list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 8px 16px 24px;
-  overflow-y: auto;
+  gap: 12px;
+  padding: 8px 16px 32px;
 }
 
 .version {

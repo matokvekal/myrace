@@ -1,7 +1,8 @@
 import React from "react";
 import PropTypes from "prop-types";
 import styles from "./buttonStart.module.css";
-import Icons from "@/constants/Icons";
+import Button from "@/components/ui/Button";
+import { Play } from "lucide-react";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
@@ -37,7 +38,7 @@ const ButtonStart: React.FC<{ category: any }> = ({ category }) => {
     // 4. Update riders
     const updatedRiders = categoryRiders.map((rider, index) => ({
       ...rider,
-      raceStatus: "running",
+      raceStatus: "running" as const,
       timeStartRace: now,
       lapsCounter: 0,
       viewOrder: rider.position_start ?? index + 1
@@ -47,10 +48,15 @@ const ButtonStart: React.FC<{ category: any }> = ({ category }) => {
   };
 
   return (
-    <div className={styles.wrapper} onClick={startCategory}>
-      <img src={Icons.buttonStart} alt="menu" width={18} height={18} />
+    <Button
+      className={styles.wrapper}
+      variant="primary"
+      size="sm"
+      onClick={startCategory}
+    >
+      <Play size={12} />
       Start
-    </div>
+    </Button>
   );
 };
 

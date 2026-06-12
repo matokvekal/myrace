@@ -19,6 +19,7 @@ export interface RaceCardProps {
 export interface RaceProps {
   id: number;
   uuid: string;
+  raceId?: string;  // Formatted ID: YYYY-MM-DD-name (e.g., "2026-06-12-mountain-race")
   owner: string;
   name: string;
   location: string;
@@ -40,6 +41,10 @@ export interface RaceProps {
   isFavorite?: boolean;
   map: string;
   distance: number;
+  isPrivate?: boolean;  // If true, requires password to download
+  password?: string;    // Password for private races
+  syncedAt?: Date;      // Last sync timestamp
+  serverVersion?: number;  // Version control for conflict resolution
 }
 
 
@@ -57,6 +62,7 @@ export interface CategoryProps {
   id: number;
   raceUuid: string;
   name: string;
+  subCategory?: string | null;  // Optional sub-category (e.g., age groups: "19-29", "30-39")
   laps: number | null;
   lapsCounter: number | 0;
   riders: number | null;
@@ -67,9 +73,20 @@ export interface CategoryProps {
   status?: "finished" | "running" | "upcoming";
 }
 
+// Template for reusable categories across races
+export interface CategoryTemplate {
+  id: string;
+  name: string;
+  subCategories: string[];  // List of sub-categories (empty if not applicable)
+  color: string;
+  createdAt: Date;
+  lastUsed: Date;
+}
+
 export interface RiderProps {
   bibNumber: number;
   category: string;
+  subCategory?: string | null;  // Optional sub-category
   checked: boolean;
   distance: number | null;
   elapsedLastLap: string | null;      // Duration of last lap
@@ -94,7 +111,7 @@ export interface RiderProps {
   totalLaps: number;
   heat: number;
   color: string | null;
-  image: string | StaticImageData | null;
+  image: string | null;
   comment: string | null;
   chipNumber?: string;
 }

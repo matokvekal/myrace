@@ -43,7 +43,7 @@ const LoginPage = () => {
       }
     };
     checkUser();
-  }, [getUser, router]);
+  }, [getUser, navigate]);
 
   // ✅ Centralized change handler to update form state dynamically
   const handleChange = useCallback(

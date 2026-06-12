@@ -121,7 +121,7 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
       position_category: 0,
       position_race: 0,
       raceStatus: "upcoming",
-      status: "",
+      status: "standing" as RiderProps["status"],
       viewOrder: 0,
       comment: "add new rider at standing",
       color: maxStandingRider?.color || "#000000"
@@ -176,7 +176,13 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
               ) : (
                 <>
                   <img src={Icons.photo} alt="photo" className={styles.photo} />
-                  <img src={Icons.photoInner} alt="photoInner" width={20} height={20} className={styles.photoInner} />
+                  <img
+                    src={Icons.photoInner}
+                    alt="photoInner"
+                    width={20}
+                    height={20}
+                    className={styles.photoInner}
+                  />
                 </>
               )}
             </div>

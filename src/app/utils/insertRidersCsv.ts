@@ -58,7 +58,7 @@ export const saveRidersFromCsv = async (csvData: string, raceUuid: string) => {
          viewOrder: 0,
          color: null,
          elapsedLastLap: null,
-         status: "",
+         status: "standing" as const,
          image: null,
          comment: null,
       }));

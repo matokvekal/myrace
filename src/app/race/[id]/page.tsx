@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import styles from "./race.module.css";
 import HeaderRace from "../components/headerRace/HeaderRace";
+import Button from "@/components/ui/Button";
 import Images from "@/constants/Images";
 import RaceInfo from "../components/raceInfo/RaceInfo";
 import useCategoryStore from "@/stores/categoryStore";
@@ -9,6 +10,7 @@ import useUIStore from "@/stores/uiStore";
 import Riders from "./riders/Riders";
 import Map from "./map/Map";
 import Schedule from "./schedule/Schedule";
+import Categories from "./categories/Categories";
 import Results from "./results/Results";
 import Info from "./info/Info";
 import RaceMode from "./raceMode/RaceMode";
@@ -16,8 +18,16 @@ import EditRiders from "./editRiders/EditRiders";
 import { useParams } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
 
-const TABS = ["schedule", "riders", "results", "edit", "map", "info"] as const;
-type Tab = typeof TABS[number];
+const TABS = [
+  "schedule",
+  "categories",
+  "riders",
+  "results",
+  "edit",
+  "map",
+  "info"
+] as const;
+type Tab = (typeof TABS)[number];
 
 const Race: React.FC = () => {
   const params = useParams();
@@ -27,7 +37,9 @@ const Race: React.FC = () => {
   const getRaces = useRaceStore((s) => s.getRaces);
   const races = useRaceStore((s) => s.races);
   const getCategories = useCategoryStore((s) => s.getCategories);
-  const createCategoriesFromRiders = useCategoryStore((s) => s.createCategoriesFromRiders);
+  const createCategoriesFromRiders = useCategoryStore(
+    (s) => s.createCategoriesFromRiders
+  );
   const categories = useCategoryStore((s) => s.categories);
   const filteredCategories = categories.filter((c) => c.raceUuid === raceUuid);
 
@@ -56,18 +68,22 @@ const Race: React.FC = () => {
   }, [loading, race, raceUuid, getCategories, createCategoriesFromRiders]);
 
   const resolvedImage = useMemo(
-    () => race
-      ? (race.image?.startsWith("data:") || race.image?.startsWith("http")
+    () =>
+      race
+        ? race.image?.startsWith("data:") || race.image?.startsWith("http")
           ? race.image
-          : (Images[race.image as keyof typeof Images] ?? Images.defaultRaceBike))
-      : Images.defaultRaceBike,
+          : (Images[race.image as keyof typeof Images] ??
+            Images.defaultRaceBike)
+        : Images.defaultRaceBike,
     [race]
   );
 
   if (loading) return <div className={styles.loading}>Loading race...</div>;
   if (!race) return <div className={styles.loading}>Race not found.</div>;
 
-  const activeTabSafe = (TABS.includes(activeTab as Tab) ? activeTab : "schedule") as Tab;
+  const activeTabSafe = (
+    TABS.includes(activeTab as Tab) ? activeTab : "schedule"
+  ) as Tab;
 
   return (
     <div className={styles.race}>
@@ -79,7 +95,13 @@ const Race: React.FC = () => {
           <img
             src={resolvedImage}
             alt="Race"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover"
+            }}
           />
         </div>
         <div className={styles.raceInfo}>
@@ -94,13 +116,15 @@ const Race: React.FC = () => {
           <>
             <div className={styles.tabs}>
               {TABS.map((tab) => (
-                <button
+                <Button
                   key={tab}
+                  variant={activeTabSafe === tab ? "primary" : "secondary"}
+                  size="sm"
                   className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
+                </Button>
               ))}
             </div>
 
@@ -108,9 +132,19 @@ const Race: React.FC = () => {
               {activeTabSafe === "schedule" && (
                 <Schedule raceUuid={raceUuid} categories={filteredCategories} />
               )}
-              {activeTabSafe === "riders" && <Riders raceUuid={raceUuid} categories={filteredCategories} />}
+              {activeTabSafe === "categories" && (
+                <Categories raceUuid={raceUuid} />
+              )}
+              {activeTabSafe === "riders" && (
+                <Riders raceUuid={raceUuid} categories={filteredCategories} />
+              )}
               {activeTabSafe === "results" && <Results raceUuid={raceUuid} />}
-              {activeTabSafe === "edit" && <EditRiders raceUuid={raceUuid} categories={filteredCategories} />}
+              {activeTabSafe === "edit" && (
+                <EditRiders
+                  raceUuid={raceUuid}
+                  categories={filteredCategories}
+                />
+              )}
               {activeTabSafe === "map" && <Map raceUuid={raceUuid} />}
               {activeTabSafe === "info" && <Info race={race} />}
             </div>

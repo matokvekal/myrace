@@ -1,6 +1,7 @@
 import React from "react";
 import styles from "./EmptyRaces.module.css";
 import Icons from "@/constants/Icons";
+import Button from "@/components/ui/Button";
 
 interface EmptyRacesProps {
   onCreateRace: () => void;
@@ -19,18 +20,28 @@ const EmptyRaces: React.FC<EmptyRacesProps> = ({ onCreateRace }) => {
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.btnPrimary} onClick={onCreateRace}>
+        <Button
+          variant="success"
+          size="lg"
+          className={styles.btnPrimary}
+          onClick={onCreateRace}
+        >
           <img src={Icons.plus} alt="" />
           Create new race
-        </button>
+        </Button>
 
         <div className={styles.divider}>or</div>
 
-        <button className={styles.btnSecondary} disabled>
+        <Button
+          variant="secondary"
+          size="lg"
+          className={styles.btnSecondary}
+          disabled
+        >
           <img src={Icons.mainMsg} alt="" />
           Browse server races
           <span className={styles.soon}>Soon</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

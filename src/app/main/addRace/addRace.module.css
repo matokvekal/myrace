@@ -14,6 +14,8 @@
   padding: 12px 16px;
   font-size: 17px;
   font-weight: 700;
+  border-bottom: 1px solid rgba(99, 166, 252, 0.16);
+  background: linear-gradient(180deg, #ffffff, #f5f9ff);
 }
 .headerleft,
 .headerright {
@@ -34,9 +36,21 @@
 
 .backButton {
   font-size: 18px;
-  background: none;
-  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid #c6ddfc;
+  background: linear-gradient(180deg, #ffffff, #ebf3ff);
   cursor: pointer;
+  color: #4f8fe8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(99, 166, 252, 0.16);
+}
+
+.backButton:active {
+  transform: translateY(1px);
 }
 
 .imageUpload {
@@ -98,7 +112,7 @@
 
 .fileLabel {
   font-size: 14px;
-  color: #007bff;
+  color: #4f8fe8;
   cursor: pointer;
 }
 
@@ -111,16 +125,30 @@
   width: 100px;
   height: 40px;
   padding: 12px;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 700;
   color: white;
-  background-color: #007bff;
-  border: none;
-  border-radius: 8px;
+  background: linear-gradient(145deg, #3edda4, #2fce95);
+  border: 1px solid rgba(23, 138, 98, 0.25);
+  border-radius: 12px;
   cursor: pointer;
+  box-shadow:
+    0 12px 20px rgba(62, 221, 164, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.submitButton:hover {
+  background: linear-gradient(145deg, #4ae0ac, #38d59d);
+}
+
+.submitButton:active {
+  transform: translateY(1px);
 }
 
 .submitButton:disabled {
-  background-color: #ccc;
+  background: #b7d6c9;
+  border-color: #b7d6c9;
+  box-shadow: none;
   cursor: not-allowed;
 }
 .form {

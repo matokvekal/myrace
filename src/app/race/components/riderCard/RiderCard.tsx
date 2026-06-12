@@ -9,8 +9,20 @@ const RiderCard: React.FC<RiderProps> = (rider) => {
     <div className={styles.riderCard}>
       <div className={styles.left}>
         <div className={styles.imageWrapper}>
-          <img className={styles.imageRider} src={Images.user} alt="Rider Image" width={36} height={36} />
-          <img className={styles.imageFlag} src={Icons.flag_us} alt="Rider Image" width={14} height={14} />
+          <img
+            className={styles.imageRider}
+            src={Images.user}
+            alt="Rider Image"
+            width={36}
+            height={36}
+          />
+          <img
+            className={styles.imageFlag}
+            src={Icons.flag_us}
+            alt="Rider Image"
+            width={14}
+            height={14}
+          />
         </div>
       </div>
       <div className={styles.middle}>
@@ -27,7 +39,12 @@ const RiderCard: React.FC<RiderProps> = (rider) => {
             className={styles.point}
             style={{ background: `${rider.color || "lightgray"}` }}
           ></div>
-          <div className={styles.category}>{rider.category}</div>
+          <div className={styles.category}>
+            {rider.category}
+            {rider.subCategory && (
+              <span className={styles.subCategory}> · {rider.subCategory}</span>
+            )}
+          </div>
         </div>
         <div className={styles.middleBottom}>
           <div className={styles.laps}>

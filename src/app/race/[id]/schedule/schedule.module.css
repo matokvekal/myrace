@@ -1,7 +1,7 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   padding: 12px 12px 32px;
 }
 
@@ -14,10 +14,11 @@
 
 /* Wave block */
 .wave {
-  background: #fff;
-  border-radius: 14px;
+  background: linear-gradient(160deg, #ffffff, #f5f9ff);
+  border-radius: 16px;
+  border: 1px solid #cfe1fb;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 12px 20px rgba(99, 166, 252, 0.14);
 }
 
 .waveHeader {
@@ -25,47 +26,39 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: #1a1a2e;
+  background: linear-gradient(140deg, #1f3558, #162640);
   color: #fff;
 }
 
 .waveLabel {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #3edda4;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .waveTime {
-  font-size: 13px;
-  color: #b0b0c8;
+  font-size: 12px;
+  color: #bfd1ea;
   flex: 1;
 }
 
 .liveBtn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #1a1a2e;
-  background: #3edda4;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
+  min-height: 32px;
 }
 
 /* Start group */
 .startGroup {
-  border-top: 1px solid #f0f0f8;
+  border-top: 1px solid #e3ecfb;
 }
 
 .startHeader {
   padding: 6px 14px;
   font-size: 11px;
   font-weight: 700;
-  color: #7a7a9a;
-  background: #f8f8fe;
+  color: #5f7ba5;
+  background: #f2f7ff;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -82,7 +75,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-top: 1px solid #f4f4fb;
+  border-top: 1px solid #ecf2fc;
 }
 
 .colorDot {
@@ -102,8 +95,8 @@
 
 .catName {
   font-size: 13px;
-  font-weight: 600;
-  color: #1a1a2e;
+  font-weight: 700;
+  color: #1a304f;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -111,7 +104,7 @@
 
 .catMeta {
   font-size: 11px;
-  color: #7a7a9a;
+  color: #6d87af;
 }
 
 .statusBadge {
@@ -130,12 +123,5 @@
 }
 
 .standingsBtn {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border: 1.5px solid #e0e0ef;
-  border-radius: 6px;
-  background: transparent;
-  color: #7a7a9a;
-  cursor: pointer;
+  min-height: 32px;
 }

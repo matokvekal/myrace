@@ -3,7 +3,7 @@ import React, {
   useRef,
   useCallback,
   useMemo,
-  useEffect,
+  useEffect
 } from "react";
 import styles from "./otpbox.module.css";
 import { useDataStore } from "@/stores/appStore";
@@ -14,7 +14,7 @@ const ERROR_MESSAGES = {
   SERVER_ERROR: "Server error",
   TIME_PASSED: "Confirmation code time passed",
   INCORRECT_CODE: "Confirmation code is not correct",
-  NO_USER: "No user found",
+  NO_USER: "No user found"
 };
 
 const COOLDOWN_TIME = 30; // 30 seconds cooldown
@@ -35,14 +35,12 @@ const OtpBox: React.FC = () => {
   );
   const [isFormIncomplete, setIsFormIncomplete] = useState(true);
 
-  //TODO hide just for develop time if need otp error
   useEffect(() => {
-    if (loginState === "main") { 
+    if (loginState === "main") {
       navigate("/main");
     } else if (loginState === "login" || !loginState) {
-      // router.push("/login");
-    }  
-    router.push("/main");
+      navigate("/login");
+    }
   }, [loginState, navigate]);
 
   useEffect(() => {

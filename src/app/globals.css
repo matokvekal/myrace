@@ -18,16 +18,28 @@
 
 :root {
   --max-width: 24.875rem;
-  --border-radius: 0.75rem;
-  --font-mono: ui-monospace, "Roboto", "Cascadia Mono", "Segoe UI Mono",
-    "Roboto Mono", "Oxygen Mono", "Ubuntu Monospace", "Source Code Pro",
-    "Fira Mono", "Droid Sans Mono", "Courier New", monospace;
+  --border-radius: 1rem;
+  --font-mono:
+    ui-monospace, "Roboto", "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
+    "Oxygen Mono", "Ubuntu Monospace", "Source Code Pro", "Fira Mono",
+    "Droid Sans Mono", "Courier New", monospace;
   --font-sans: "Assistant", "Roboto", Arial, sans-serif;
 
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: rgba(242, 242, 242, 0.04);
-  --background-end-rgb: 255, 255, 255;
-  --main-background: #f8f8fe;
+  --foreground-rgb: 12, 18, 28;
+  --background-start-rgb: 242, 246, 252;
+  --background-end-rgb: 252, 254, 255;
+  --main-background: #f5f8fc;
+  --surface-1: #ffffff;
+  --surface-2: #f5f8ff;
+  --surface-3: #edf3ff;
+  --border-soft: #d8e3f6;
+  --brand: #63a6fc;
+  --brand-strong: #3f86e7;
+  --ok: #3edda4;
+  --ok-strong: #2fcf95;
+  --danger: #df4b7b;
+  --shadow-soft: 0 8px 28px rgba(26, 61, 116, 0.12);
+  --shadow-glow: 0 2px 0 rgba(255, 255, 255, 0.6) inset;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -69,8 +81,46 @@ body {
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
-  /* font-family: roboto; */
+  background:
+    radial-gradient(
+      120% 90% at 5% -20%,
+      rgba(99, 166, 252, 0.14),
+      transparent 58%
+    ),
+    radial-gradient(
+      120% 90% at 100% 0%,
+      rgba(62, 221, 164, 0.1),
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(var(--background-start-rgb)) 0%,
+      rgb(var(--background-end-rgb)) 100%
+    );
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  transition:
+    transform 140ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(99, 166, 252, 0.62);
+  outline-offset: 2px;
 }
 
 a {

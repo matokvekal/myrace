@@ -2,8 +2,10 @@ import React, { useMemo, useState } from "react";
 import styles from "./addRace.module.css";
 import Icons from "@/constants/Icons";
 import Images from "@/constants/Images";
+import Button from "@/components/ui/Button";
 import { saveRace } from "@/utils/saveRace";
 import useRaceStore from "@/stores/racesStore";
+import { ArrowLeft } from "lucide-react";
 // import Papa from "papaparse";
 
 interface Props {
@@ -17,7 +19,7 @@ const DEFAULT_IMAGES = [
   Images.bikeSplash,
   Images.peloton1,
   Images.racebefore,
-  Images.defaultRaceBike,
+  Images.defaultRaceBike
 ];
 
 const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
@@ -77,16 +79,30 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     <div className={styles.addRace}>
       <header className={styles.header}>
         <div className={styles.headerleft}>
-          <img src={Icons.arrowback} alt="back" width={34} height={34} onClick={handleBack} />
+          <Button
+            variant="icon"
+            size="md"
+            iconOnly
+            className={styles.backButton}
+            onClick={handleBack}
+            aria-label="Go back"
+            type="button"
+          >
+            <ArrowLeft size={18} />
+          </Button>
         </div>
         <div className={styles.headercenter}>Add Race</div>
         <div className={styles.headerright}></div>
       </header>
-      
+
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.imageUpload}>
           <label htmlFor="coverUpload">
-            <img src={imageUrl ?? defaultCover} alt="Cover" className={styles.coverImage} />
+            <img
+              src={imageUrl ?? defaultCover}
+              alt="Cover"
+              className={styles.coverImage}
+            />
             <div className={styles.coverOverlay}>Change Cover</div>
           </label>
           <input
@@ -147,9 +163,14 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
             {ridersFile && <p>{ridersFile.name}</p>}
           </div>
 
-          <button type="submit" className={styles.submitButton}>
+          <Button
+            type="submit"
+            variant="success"
+            size="md"
+            className={styles.submitButton}
+          >
             {loading ? "Saving..." : "Done"}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
