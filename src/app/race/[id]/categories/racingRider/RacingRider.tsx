@@ -16,10 +16,6 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isLeade
 
   const isPenultimate = forceBell || (rider.totalLaps > 0 && rider.lapsCounter === rider.totalLaps - 1);
 
-  const bgStyle = isPenultimate
-    ? `repeating-linear-gradient(-45deg, ${color} 0px, ${color} 6px, rgba(255,255,255,0.4) 6px, rgba(255,255,255,0.4) 10px)`
-    : color;
-
   const handleTouchEnd = (e: React.TouchEvent) => {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
@@ -34,7 +30,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isLeade
   return (
     <div
       className={`${styles.rider} ${isPenultimate ? styles.penultimate : ""} ${isLeaderInCategory ? styles.leaderInCategory : ""}`}
-      style={{ background: bgStyle }}
+      style={{ background: color }}
       onClick={onClick}
       onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
       onTouchEnd={handleTouchEnd}
