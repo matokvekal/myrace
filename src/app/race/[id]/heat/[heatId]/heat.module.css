@@ -445,3 +445,148 @@
    align-items: center;
  }
   */
+
+/* ── Timer actions row ── */
+.timerActions {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.arrivalHistoryBtn {
+  background: rgba(255, 255, 255, 0.6);
+  border: none;
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  transition: background 0.2s;
+}
+
+.arrivalHistoryBtn:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* ── Arrival history modal ── */
+.arrivalHistoryModal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+}
+
+.arrivalHistoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f8;
+}
+
+.arrivalHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.noArrivals {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  padding: 32px 16px;
+}
+
+.arrivalRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  background: #f8f9fc;
+  border-radius: 10px;
+  border-left: 3px solid #4a8ee7;
+}
+
+.arrivalOrder {
+  font-size: 14px;
+  font-weight: 800;
+  color: #4a8ee7;
+  min-width: 32px;
+  text-align: center;
+}
+
+.arrivalInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.arrivalName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.arrivalBib {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1a1a2e;
+}
+
+.arrivalRiderName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.arrivalCategory {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.arrivalDetails {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.arrivalLap {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.arrivalTime {
+  background: #fff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.arrivalPos {
+  background: #f0f0f8;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}

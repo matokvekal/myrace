@@ -79,6 +79,7 @@ const Heat: React.FC = () => {
   const [now, setNow] = useState(new Date());
   const [contextRider, setContextRider] = useState<RiderProps | null>(null);
   const [showWaveInfo, setShowWaveInfo] = useState(false);
+  const [showArrivalHistory, setShowArrivalHistory] = useState(false);
   const [displayOrder, setDisplayOrder] = useState<number[]>([]);
   const lastClickRef = useRef<number>(0);
   const sortTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -338,6 +339,16 @@ const Heat: React.FC = () => {
     return formatTimeWithLeadingZeroes(Math.max(0, now.getTime() - startDate.getTime()) / 1000);
   }, [filteredRiders, now]);
 
+  const arrivalHistory = useMemo(() => {
+    return [...filteredRiders]
+      .filter((r) => r.timeArrive && r.lapsCounter > 0)
+      .sort((a, b) => {
+        const timeA = new Date(a.timeArrive ?? 0).getTime();
+        const timeB = new Date(b.timeArrive ?? 0).getTime();
+        return timeB - timeA; // Most recent first
+      });
+  }, [filteredRiders]);
+
   return (
     <div className={styles.heat}>
       <HeaderHeats raceId={raceUuid} />
@@ -373,15 +384,61 @@ const Heat: React.FC = () => {
         </div>
       )}
 
+      {/* Arrival history modal */}
+      {showArrivalHistory && (
+        <div className={styles.contextOverlay} onClick={() => setShowArrivalHistory(false)}>
+          <div className={styles.arrivalHistoryModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.arrivalHistoryHeader}>
+              <span>Arrival History (Latest First)</span>
+              <button className={styles.contextClose} onClick={() => setShowArrivalHistory(false)}>✕</button>
+            </div>
+            <div className={styles.arrivalHistoryList}>
+              {arrivalHistory.length === 0 ? (
+                <div className={styles.noArrivals}>No arrivals yet</div>
+              ) : (
+                arrivalHistory.map((rider, idx) => (
+                  <div key={`${rider.id}-${idx}`} className={styles.arrivalRow}>
+                    <div className={styles.arrivalOrder}>#{idx + 1}</div>
+                    <div className={styles.arrivalInfo}>
+                      <div className={styles.arrivalName}>
+                        <span className={styles.arrivalBib}>#{rider.bibNumber}</span>
+                        <span className={styles.arrivalRiderName}>{rider.firstName} {rider.lastName}</span>
+                        <span className={styles.arrivalCategory} style={{ background: getCatColor(rider) }}>
+                          {rider.category}
+                        </span>
+                      </div>
+                      <div className={styles.arrivalDetails}>
+                        <span className={styles.arrivalLap}>Lap {rider.lapsCounter}/{rider.totalLaps}</span>
+                        <span className={styles.arrivalTime}>{rider.elapsedLastLap}</span>
+                        <span className={styles.arrivalPos}>P{rider.position_category ?? "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.wrapper}>
-        {/* Timer row with wave-info icon */}
+        {/* Timer row with wave-info icon and arrival history button */}
         <div className={styles.timerRow}>
           <p className={styles.timerText}>{elapsedTime}</p>
-          <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
-            {waveCategories.slice(0, 4).map((cat) => (
-              <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
-            ))}
-          </button>
+          <div className={styles.timerActions}>
+            <button
+              className={styles.arrivalHistoryBtn}
+              onClick={() => setShowArrivalHistory(true)}
+              title={`Last arrivals (${arrivalHistory.length})`}
+            >
+              🏁 {arrivalHistory.length}
+            </button>
+            <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
+              {waveCategories.slice(0, 4).map((cat) => (
+                <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
+              ))}
+            </button>
+          </div>
         </div>
 
         <div className={styles.searchWrapper}>
