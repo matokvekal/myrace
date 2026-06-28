@@ -64,6 +64,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isLeade
       onTouchEnd={handleTouchEnd}
     >
       {showBell && <div className={styles.bellBadge}>🔔</div>}
+      {showDiagonals && <div className={styles.finalLapBadge}>FINAL</div>}
       {isFinished && <div className={styles.finishedFlag}>🏁</div>}
       <div className={styles.bib}>{rider.bibNumber}</div>
       <div className={styles.laps}>

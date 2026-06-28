@@ -66,6 +66,22 @@
   75% { transform: rotate(5deg); }
 }
 
+/* Final lap badge */
+.finalLapBadge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: linear-gradient(135deg, #ff6b35, #ff4500);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgba(255, 75, 0, 0.4);
+  letter-spacing: 0.5px;
+}
+
 /* Finished flag sits top-left */
 .finishedFlag {
   position: absolute;
