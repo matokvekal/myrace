@@ -28,7 +28,13 @@ const getLuminance = (hexColor: string): number => {
 const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isLeaderInCategory = false, onClick, onDoubleClick }) => {
   const lastTapRef = useRef<number>(0);
 
-  const isPenultimate = forceBell || (rider.totalLaps > 0 && rider.lapsCounter === rider.totalLaps - 1);
+  // Show bell when ENTERING penultimate lap (one lap before last)
+  const showBell = forceBell || (rider.totalLaps > 0 && rider.lapsCounter === rider.totalLaps - 2);
+
+  // Show diagonal lines when ON the last lap
+  const showDiagonals = rider.totalLaps > 0 && rider.lapsCounter === rider.totalLaps - 1;
+
+  const isFinished = rider.raceStatus === "finished";
 
   const isDarkBg = useMemo(() => {
     try {
@@ -51,13 +57,14 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isLeade
 
   return (
     <div
-      className={`${styles.rider} ${isPenultimate ? styles.penultimate : ""} ${isLeaderInCategory ? styles.leaderInCategory : ""} ${isDarkBg ? styles.darkBg : ""}`}
+      className={`${styles.rider} ${showDiagonals ? styles.penultimate : ""} ${isLeaderInCategory ? styles.leaderInCategory : ""} ${isDarkBg ? styles.darkBg : ""} ${isFinished ? styles.finished : ""}`}
       style={{ background: color }}
       onClick={onClick}
       onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
       onTouchEnd={handleTouchEnd}
     >
-      {isPenultimate && <div className={styles.bellBadge}>🔔</div>}
+      {showBell && <div className={styles.bellBadge}>🔔</div>}
+      {isFinished && <div className={styles.finishedFlag}>🏁</div>}
       <div className={styles.bib}>{rider.bibNumber}</div>
       <div className={styles.laps}>
         {rider.lapsCounter}/{rider.totalLaps}
