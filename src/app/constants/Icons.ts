@@ -15,7 +15,7 @@ import bike from '../assets/icons/bike.png';
 import rider1 from '../assets/icons/rider1.png';
 import calander from '../assets/icons/calander.png';
 import buttonStart from '../assets/icons/buttonStart.png';
-import threeDots from '../assets/icons/threeDots.png';
+// import threeDots from '../assets/icons/threeDots.png'; // File not found
 import arrowBackBlack from '../assets/icons/arrowBackBlack.png';
 import search from '../assets/icons/search.png';
 import filter from '../assets/icons/filter.png';
@@ -54,7 +54,7 @@ const Icons = {
   rider1,
   calander,
   buttonStart,
-  threeDots,
+  // threeDots, // File not found
   arrowBackBlack,
   search,
   filter,
