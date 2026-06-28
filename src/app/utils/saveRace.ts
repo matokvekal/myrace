@@ -83,7 +83,6 @@ export const saveRace = async (
     //save to db
     const db = await initIndexedDB();
     await db.add("races", newRace);
-    db.close();
     //save to state
     const { insertRace } = useRaceStore.getState();
     await insertRace(newRace);

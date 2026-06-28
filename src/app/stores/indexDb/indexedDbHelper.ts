@@ -541,10 +541,6 @@ export const createDatabaseWrapper = (database: IDBDatabase) => {
           tx.onerror = () => reject(tx.error);
         })
       };
-    },
-
-    close: () => {
-      database.close();
     }
   };
 };

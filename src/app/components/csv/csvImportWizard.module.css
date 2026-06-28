@@ -105,4 +105,81 @@
   padding: 32px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .wizard {
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .header {
+    padding: 16px 20px;
+  }
+
+  .header h2 {
+    font-size: 18px;
+  }
+
+  .progressBar {
+    padding: 20px 16px;
+    gap: 8px;
+  }
+
+  .progressBar::before {
+    left: 16px;
+    right: 16px;
+  }
+
+  .step {
+    gap: 6px;
+  }
+
+  .stepNumber {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .stepLabel {
+    font-size: 11px;
+    text-align: center;
+    max-width: 60px;
+  }
+
+  .content {
+    padding: 16px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .header h2 {
+    font-size: 16px;
+  }
+
+  .progressBar {
+    padding: 16px 8px;
+    gap: 4px;
+  }
+
+  .stepLabel {
+    display: none;
+  }
+
+  .stepNumber {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+
+  .content {
+    padding: 12px 8px;
+  }
 }

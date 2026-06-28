@@ -63,6 +63,66 @@
   min-width: 800px;
 }
 
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .tableHeader {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px 12px;
+    min-width: auto;
+  }
+
+  .mappingRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+    min-width: auto;
+  }
+
+  .colCSV,
+  .colSample,
+  .colArrow,
+  .colField,
+  .colConfidence {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .colArrow {
+    text-align: left;
+    font-size: 16px;
+  }
+
+  .sampleItem {
+    font-size: 12px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .stats {
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .backButton,
+  .confirmButton {
+    padding: 10px 20px;
+    font-size: 14px;
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
 .colCSV strong {
   color: #333;
 }

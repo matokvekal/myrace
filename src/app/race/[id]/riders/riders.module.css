@@ -197,10 +197,10 @@
 }
 
 .colName {
-  flex: 3;
+  flex: 4;
   font-weight: 600;
   color: #1a304f;
-  min-width: 0;
+  min-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -244,6 +244,124 @@
   flex-shrink: 0;
   text-align: right;
   font-size: 11px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .dataRow {
+    gap: 6px;
+    padding: 8px 8px;
+    flex-wrap: wrap;
+  }
+
+  .dataTableHeader {
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .colRow {
+    width: 24px;
+    font-size: 10px;
+  }
+
+  .colBib {
+    width: 44px;
+    font-size: 12px;
+  }
+
+  .colName {
+    flex: 1;
+    min-width: 100px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .colCat {
+    flex: 1;
+    min-width: 80px;
+    font-size: 11px;
+  }
+
+  .colWave {
+    width: 36px;
+    font-size: 12px;
+  }
+
+  .colClub {
+    display: none;
+  }
+
+  .colStatus {
+    width: 60px;
+    font-size: 10px;
+  }
+
+  .dataTable {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dataRow {
+    gap: 4px;
+    padding: 6px 6px;
+    font-size: 11px;
+  }
+
+  .dataTableHeader {
+    gap: 4px;
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+
+  .colRow {
+    width: 20px;
+  }
+
+  .colBib {
+    width: 40px;
+    font-size: 11px;
+  }
+
+  .colName {
+    flex: 1;
+    min-width: 90px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .colCat {
+    display: none;
+  }
+
+  .colWave {
+    width: 32px;
+    font-size: 11px;
+  }
+
+  .colClub {
+    display: none;
+  }
+
+  .colStatus {
+    width: 50px;
+    font-size: 9px;
+  }
+
+  .sortBar {
+    padding: 8px 8px;
+  }
+
+  .sortBtn {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .emptyImportBtn {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
 }
 
 /* Row state highlights */

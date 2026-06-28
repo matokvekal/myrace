@@ -49,7 +49,6 @@ const MainPage = () => {
           counts[rider.raceUuid] = (counts[rider.raceUuid] ?? 0) + 1;
         }
         setRiderCounts(counts);
-        db.close();
       })
     );
   }, [loaded, races.length]);

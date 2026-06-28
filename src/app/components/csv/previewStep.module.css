@@ -342,6 +342,7 @@
   padding-top: 16px;
   padding-bottom: 4px;
   z-index: 5;
+  flex-wrap: wrap;
 }
 
 .backButton,
@@ -353,6 +354,122 @@
   cursor: pointer;
   border: none;
   transition: all 0.2s;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .previewStep {
+    max-height: 100vh;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .headerLeft,
+  .headerRight {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .header h3 {
+    font-size: 16px;
+  }
+
+  .validationSummary {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .summaryItem {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .previewTable {
+    font-size: 12px;
+  }
+
+  .previewTable th,
+  .previewTable td {
+    padding: 8px;
+    font-size: 12px;
+    min-width: 60px;
+  }
+
+  .actions {
+    gap: 8px;
+    padding-top: 12px;
+    padding-bottom: 8px;
+  }
+
+  .backButton,
+  .importButton {
+    padding: 10px 16px;
+    font-size: 14px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .errorLogButton {
+    padding: 6px 12px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .backButtonTop {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  .closeButton {
+    padding: 4px 6px;
+    min-width: 28px;
+    min-height: 28px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    gap: 6px;
+  }
+
+  .header h3 {
+    font-size: 14px;
+  }
+
+  .validationSummary {
+    gap: 6px;
+    flex-direction: column;
+  }
+
+  .previewTable th,
+  .previewTable td {
+    padding: 6px;
+    font-size: 11px;
+    min-width: 50px;
+  }
+
+  .backButton,
+  .importButton {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-width: auto;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .backButton,
+  .importButton {
+    width: 100%;
+  }
 }
 
 .backButton {

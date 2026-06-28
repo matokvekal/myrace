@@ -67,7 +67,6 @@ export const saveRidersFromCsv = async (csvData: string, raceUuid: string) => {
       for (const rider of riders) {
          await db.add("riders", rider);
       }
-      db.close();
 
       const { insertRiders } = useRiderStore.getState();
       await insertRiders(riders);

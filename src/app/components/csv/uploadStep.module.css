@@ -64,6 +64,99 @@
   background: #fafafa;
 }
 
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .uploadStep {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .instructions {
+    min-width: auto;
+  }
+
+  .instructions h3 {
+    font-size: 16px;
+  }
+
+  .instructions p {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .supportedFields {
+    margin: 16px 0;
+  }
+
+  .supportedFields h4 {
+    font-size: 14px;
+  }
+
+  .supportedFields ul {
+    line-height: 1.8;
+    font-size: 13px;
+  }
+
+  .dropZone {
+    min-width: auto;
+    flex-basis: 100%;
+    padding: 32px 24px;
+  }
+
+  .browseButton {
+    padding: 10px 24px;
+    font-size: 14px;
+  }
+
+  .templateCards {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .templateCard {
+    min-width: 120px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .cardName {
+    max-width: 120px;
+  }
+
+  .exampleNote {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .instructions h3 {
+    font-size: 14px;
+  }
+
+  .supportedFields h4 {
+    font-size: 13px;
+  }
+
+  .dropZone {
+    padding: 24px 16px;
+  }
+
+  .dropText {
+    font-size: 14px;
+  }
+
+  .browseButton {
+    padding: 8px 16px;
+    font-size: 13px;
+    width: 100%;
+  }
+
+  .uploadIcon {
+    font-size: 32px;
+  }
+}
+
 .dropZone:hover {
   border-color: #4caf50;
   background: #f0f7f0;
