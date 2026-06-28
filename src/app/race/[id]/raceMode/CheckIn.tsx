@@ -49,9 +49,11 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
   };
 
   const checkAll = async () => {
-    const riderIds = new Set(filtered.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status)).map((r) => r.id));
-    for (const riderId of riderIds) {
-      const current = riders.find((r) => r.id === riderId);
+    const toCheck = filtered.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status));
+    if (toCheck.length === 0) return;
+
+    for (const rider of toCheck) {
+      const current = riders.find((r) => r.id === rider.id);
       if (current && !current.checked) {
         await updateRider({ ...current, checked: true });
       }
