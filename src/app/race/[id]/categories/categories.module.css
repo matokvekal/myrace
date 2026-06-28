@@ -139,9 +139,36 @@
   box-shadow: 0 6px 16px rgba(62, 180, 120, 0.15);
 }
 
+.categoryCardIssue {
+  background: linear-gradient(135deg, #fff5f5, #ffe8e8);
+  border: 1.5px solid #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+}
+
+.categoryCardIssue:hover {
+  border-color: #dc2626;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.2);
+}
+
 .finishedFlag {
   margin-right: 5px;
   font-size: 15px;
+}
+
+.issueFlag {
+  margin-right: 5px;
+  font-size: 14px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.issueText {
+  color: #dc2626;
+  font-weight: 700;
 }
 
 .categoryInfo {

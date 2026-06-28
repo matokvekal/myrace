@@ -411,8 +411,12 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
               riderCounts.find((rc) => rc.id === cat.id)?.count || 0;
 
             const isDone = cat.status === "finished";
+            const hasNoRiders = riderCount === 0;
+            const hasNoLaps = !cat.laps || cat.laps === 0;
+            const hasIssue = hasNoRiders || hasNoLaps;
+
             return (
-              <div key={cat.id} className={`${styles.categoryCard} ${isDone ? styles.categoryCardDone : ""} ${quickLapsMode ? styles.categoryCardQuickLaps : ""}`}>
+              <div key={cat.id} className={`${styles.categoryCard} ${isDone ? styles.categoryCardDone : ""} ${quickLapsMode ? styles.categoryCardQuickLaps : ""} ${hasIssue ? styles.categoryCardIssue : ""}`}>
                 {quickLapsMode ? (
                   <div className={styles.quickLapsForm}>
                     <div className={styles.quickLapsLabel}>
@@ -530,6 +534,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                       <div className={styles.categoryDetails}>
                         <div className={styles.categoryName}>
                           {isDone && <span className={styles.finishedFlag}>🏁</span>}
+                          {hasIssue && <span className={styles.issueFlag}>⚠️</span>}
                           {cat.name}
                           {cat.subCategory && (
                             <span className={styles.subCategory}>
@@ -539,8 +544,13 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                           )}
                         </div>
                         <div className={styles.categoryMeta}>
-                          {cat.laps ? `${cat.laps} laps` : "No laps set"} · Wave{" "}
-                          {cat.heat || 1} · {riderCount} riders
+                          <span className={hasNoLaps ? styles.issueText : ""}>
+                            {cat.laps ? `${cat.laps} laps` : "No laps set"}
+                          </span>
+                          · Wave {cat.heat || 1} ·{" "}
+                          <span className={hasNoRiders ? styles.issueText : ""}>
+                            {riderCount} riders
+                          </span>
                           {cat.linkedFinish && <span className={styles.linkedBadge}>🔔 linked</span>}
                         </div>
                       </div>
