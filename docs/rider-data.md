@@ -74,10 +74,12 @@ interface RiderProps {
 **Provider:** Zustand with IndexedDB persistence
 
 **Key Methods:**
-- `insertRiders(riders)` - Bulk insert
-- `updateRider(uuid, updates)` - Single update
-- `getRidersByRace(raceUuid)` - Get all riders for race
-- `deleteRider(uuid)` - Remove rider
+- `insertRiders(riders)` — Bulk upsert to IDB + Zustand
+- `updateRider(rider)` — Single rider update, writes to IDB
+- `updateAllRiders(riders)` — Batch update (merge by id); prefer over `updateRider` for sorted writes
+- `getRiders(raceUuid)` — Load riders; returns from Zustand cache if `lastFetchedRaceUuid` matches
+- `getRidersByHeat(raceUuid, heat)` — Synchronous selector (filter from Zustand)
+- `getRidersByCategory(raceUuid, category)` — Synchronous selector (filter from Zustand)
 
 ## CSV Import Flow
 

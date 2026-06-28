@@ -70,7 +70,7 @@ When CSV contains "raceDay" field:
 
 ## Categories
 
-Linked via `raceUuid`. See `docs/category-data.md` (if exists).
+Linked via `raceUuid`. See `docs/category-data.md`.
 
 Related type: `CategoryProps` in types.ts
 
