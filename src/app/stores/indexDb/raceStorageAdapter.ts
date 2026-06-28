@@ -13,7 +13,7 @@ const raceStorageAdapter = (): PersistStorage<any> => ({
     const races = value?.state?.races;
     if (!Array.isArray(races) || !races.length) return;
     const db = await initIndexedDB();
-    const tx = db.transaction("races", "readwrite");
+    const tx = db.transaction(["races"], "readwrite");
     const store = tx.objectStore("races");
     for (const race of races) {
       if (race.id != null) await store.put(race);
@@ -23,7 +23,7 @@ const raceStorageAdapter = (): PersistStorage<any> => ({
   },
   removeItem: async (_name: string) => {
     const db = await initIndexedDB();
-    const tx = db.transaction("races", "readwrite");
+    const tx = db.transaction(["races"], "readwrite");
     await tx.objectStore("races").clear();
     await tx.done;
     db.close();

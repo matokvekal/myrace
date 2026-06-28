@@ -13,7 +13,7 @@ const categoryStorageAdapter = (): PersistStorage<any> => ({
     const db = await initIndexedDB();
     const categories = value?.state?.categories;
     if (Array.isArray(categories)) {
-      const tx = db.transaction("categories", "readwrite");
+      const tx = db.transaction(["categories"], "readwrite");
       const store = tx.objectStore("categories");
       for (const cat of categories) {
         if (cat.id != null) await store.put(cat);
@@ -24,7 +24,7 @@ const categoryStorageAdapter = (): PersistStorage<any> => ({
   },
   removeItem: async (_name: string) => {
     const db = await initIndexedDB();
-    const tx = db.transaction("categories", "readwrite");
+    const tx = db.transaction(["categories"], "readwrite");
     await tx.objectStore("categories").clear();
     await tx.done;
     db.close();
