@@ -63,6 +63,7 @@ export default function PreviewStep({
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [activeTab, setActiveTab] = useState<"mapped" | "original">("mapped");
+  const [showErrorLog, setShowErrorLog] = useState(false);
 
   useEffect(() => {
     validateData();
@@ -362,6 +363,15 @@ export default function PreviewStep({
       {/* Actions */}
       <div className={styles.actions}>
         <button onClick={onBack} className={styles.backButton}>← Back to Mapping</button>
+        {validation && validation.summary.errors > 0 && (
+          <button
+            onClick={() => setShowErrorLog(true)}
+            className={styles.errorLogButton}
+            title="View error details"
+          >
+            📋 View {validation.summary.errors} Errors
+          </button>
+        )}
         <button
           onClick={handleStartImport}
           className={styles.importButton}
@@ -374,6 +384,35 @@ export default function PreviewStep({
           Import {validation && validation.summary.total - validation.summary.errors} Riders →
         </button>
       </div>
+
+      {/* Error Log Modal */}
+      {showErrorLog && validation && validation.summary.errors > 0 && (
+        <div className={styles.errorLogOverlay} onClick={() => setShowErrorLog(false)}>
+          <div className={styles.errorLogModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.errorLogHeader}>
+              <h3>Error Log</h3>
+              <button className={styles.errorLogClose} onClick={() => setShowErrorLog(false)}>✕</button>
+            </div>
+            <div className={styles.errorLogContent}>
+              {validation.issues
+                .filter((i) => i.severity === "error")
+                .map((issue, idx) => (
+                  <div key={idx} className={styles.errorLogItem}>
+                    <div className={styles.errorLogRow}>
+                      <span className={styles.errorIcon}>❌</span>
+                      <span className={styles.errorRowNum}>Row {issue.row}</span>
+                      <span className={styles.errorField}>{FIELD_LABELS[issue.field as RiderFieldKey] || issue.field}</span>
+                    </div>
+                    <div className={styles.errorMessage}>{issue.message}</div>
+                    {issue.value && (
+                      <div className={styles.errorValue}>Value: <code>{issue.value}</code></div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
