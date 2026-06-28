@@ -422,8 +422,16 @@ const Heat: React.FC = () => {
       )}
 
       <div className={styles.wrapper}>
-        {/* Timer row with arrival history button */}
+        {/* Timer row with wave info and arrival history button */}
         <div className={styles.timerRow}>
+          <div className={styles.waveInfo}>
+            <div className={styles.waveLabel}>Wave {heatId}</div>
+            <div className={styles.waveStart}>
+              {waveCategories.length > 0 && waveCategories[0].startTime
+                ? `Start: ${waveCategories[0].startTime}`
+                : ""}
+            </div>
+          </div>
           <p className={styles.timerText}>{elapsedTime}</p>
           <button
             className={styles.arrivalHistoryBtn}
