@@ -88,15 +88,15 @@
 
 /* Text info below image */
 .info {
-  padding: 8px 9px 10px;
+  padding: 9px 10px 11px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .name {
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   color: #1a304f;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -106,13 +106,75 @@
 }
 
 .date {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  color: #7b95b8;
+  color: #5a7a9e;
 }
 
 .riders {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  color: #9eb5d4;
+  color: #6b8bc1;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .tile {
+    width: 140px;
+  }
+
+  .imgWrap {
+    height: 120px;
+  }
+
+  .info {
+    padding: 10px 11px 12px;
+    gap: 5px;
+  }
+
+  .name {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .date {
+    font-size: 12px;
+  }
+
+  .riders {
+    font-size: 12px;
+  }
+
+  .statusBadge {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .favBtn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tile {
+    width: 145px;
+  }
+
+  .imgWrap {
+    height: 125px;
+  }
+
+  .info {
+    padding: 10px 12px 13px;
+  }
+
+  .name {
+    font-size: 15px;
+  }
+
+  .date,
+  .riders {
+    font-size: 13px;
+  }
 }
