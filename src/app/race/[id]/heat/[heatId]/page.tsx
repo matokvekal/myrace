@@ -137,7 +137,7 @@ const Heat: React.FC = () => {
     return map;
   }, [filteredRiders]);
 
-  const handleRiderClick = (rider: RiderProps) => {
+  const handleRiderClick = async (rider: RiderProps) => {
     if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
 
     const clickTime = new Date();
@@ -190,18 +190,18 @@ const Heat: React.FC = () => {
 
     const finalSorted = sorted.map((r) => (r.id === updatedRider.id ? updatedRider : r));
     lastClickRef.current = now_ms; // marks this as a lap-click for delayed sort
-    updateRider(updatedRider);
-    updateAllRiders(finalSorted);
+    await updateRider(updatedRider);
+    await updateAllRiders(finalSorted);
     setSearchTerm(""); // clear search after registering a lap
   };
 
-  const handleRevertLap = (rider: RiderProps) => {
+  const handleRevertLap = async (rider: RiderProps) => {
     if (rider.lapsCounter <= 0) { setContextRider(null); return; }
     const newDetails = (rider.lapsDetails ?? []).slice(0, -1);
     const prevArrive = newDetails.length > 0
       ? new Date(newDetails[newDetails.length - 1].endTime).toISOString()
       : null;
-    updateRider({
+    await updateRider({
       ...rider,
       lapsCounter: rider.lapsCounter - 1,
       lapsDetails: newDetails,
@@ -212,9 +212,9 @@ const Heat: React.FC = () => {
     setContextRider(null);
   };
 
-  const handleStatusChange = (rider: RiderProps, status: RiderProps["status"]) => {
+  const handleStatusChange = async (rider: RiderProps, status: RiderProps["status"]) => {
     const isOut = ["DNF", "DSQ", "DNS"].includes(status);
-    updateRider({
+    await updateRider({
       ...rider,
       status,
       raceStatus: isOut ? "finished" : "running",
@@ -222,8 +222,8 @@ const Heat: React.FC = () => {
     setContextRider(null);
   };
 
-  const handleSaveComment = (rider: RiderProps, comment: string) => {
-    updateRider({ ...rider, comment });
+  const handleSaveComment = async (rider: RiderProps, comment: string) => {
+    await updateRider({ ...rider, comment });
   };
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
