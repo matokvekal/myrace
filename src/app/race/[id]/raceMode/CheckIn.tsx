@@ -42,13 +42,19 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
   const catNames = [...new Set(waveRiders.map((r) => r.category))].sort();
 
   const toggleCheck = async (rider: RiderProps) => {
-    await updateRider({ ...rider, checked: !rider.checked });
+    const current = riders.find((r) => r.id === rider.id);
+    if (current) {
+      await updateRider({ ...current, checked: !current.checked });
+    }
   };
 
   const checkAll = async () => {
-    const unchecked = filtered.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status));
-    for (const rider of unchecked) {
-      await updateRider({ ...rider, checked: true });
+    const riderIds = new Set(filtered.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status)).map((r) => r.id));
+    for (const riderId of riderIds) {
+      const current = riders.find((r) => r.id === riderId);
+      if (current && !current.checked) {
+        await updateRider({ ...current, checked: true });
+      }
     }
   };
 
@@ -61,7 +67,10 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
   );
 
   const handleStatusChange = async (status: any) => {
-    if (selectedRider) await updateRider({ ...selectedRider, status });
+    if (selectedRider) {
+      const current = riders.find((r) => r.id === selectedRider.id);
+      if (current) await updateRider({ ...current, status });
+    }
   };
 
   return (
