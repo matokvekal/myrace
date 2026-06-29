@@ -73,16 +73,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   color: #1a304f;
-  padding: 6px 12px;
+  padding: 8px 12px;
   background: linear-gradient(180deg, #f2f7ff, #eef4ff);
   border: 1px solid #d5e4fb;
-  border-left: 3px solid #ccc;
+  border-left: 3px solid #63a6fc;
   border-radius: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   margin-top: 6px;
 }
 
@@ -94,15 +94,15 @@
 }
 
 .catGroupHeader {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: #1a304f;
-  padding: 6px 12px;
+  padding: 8px 12px;
   background: linear-gradient(180deg, #f2f7ff, #eef4ff);
   border: 1px solid #d5e4fb;
   border-radius: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
 .empty {
