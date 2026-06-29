@@ -381,3 +381,59 @@
 .clearSearch:hover {
   color: var(--text-primary);
 }
+
+/* ── Voice input controls ── */
+.voiceContainer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  z-index: 100;
+}
+
+.micButton {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid var(--border-card);
+  font-size: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-soft);
+  transition: all 0.2s ease;
+}
+
+.micButton:hover {
+  background: var(--bg-surface);
+  border-color: var(--text-secondary);
+}
+
+.micButton.micButtonActive {
+  background: #10b981;
+  border-color: #059669;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.micButton.micButtonActive:hover {
+  background: #059669;
+  border-color: #047857;
+}
+
+@media (max-width: 640px) {
+  .voiceContainer {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .micButton {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+}

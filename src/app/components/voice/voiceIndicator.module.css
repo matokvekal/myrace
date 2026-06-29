@@ -1,0 +1,97 @@
+.voiceIndicator {
+  background: white;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.voiceIndicator.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.voiceIndicator.error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(185, 28, 28, 0.08) 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.indicatorDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d0d0d0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 transparent;
+}
+
+.indicatorDot.listening {
+  background: #10b981;
+  animation: listeningPulse 1s infinite;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+}
+
+@keyframes listeningPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.indicatorText {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  flex: 1;
+  transition: color 0.2s ease;
+}
+
+.voiceIndicator.active .indicatorText {
+  color: #10b981;
+}
+
+.voiceIndicator.error .indicatorText {
+  color: #ef4444;
+  font-size: 11px;
+}
+
+.voiceMeter {
+  width: 60px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.voiceMeterFill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  border-radius: 2px;
+  transition: width 0.05s ease;
+  min-width: 2px;
+}
+
+@media (max-width: 600px) {
+  .voiceIndicator {
+    padding: 10px 12px;
+  }
+
+  .indicatorText {
+    font-size: 11px;
+  }
+
+  .voiceMeter {
+    width: 50px;
+  }
+}

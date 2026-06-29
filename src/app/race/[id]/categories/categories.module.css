@@ -179,7 +179,7 @@
 .colorDot {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: 3px;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -247,7 +247,7 @@
 .quickLapsDot {
   width: 10px;
   height: 10px;
-  border-radius: 5px;
+  border-radius: 3px;
   flex-shrink: 0;
 }
 
@@ -634,7 +634,7 @@
 .templateColorDot {
   width: 16px;
   height: 16px;
-  border-radius: 5px;
+  border-radius: 3px;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);

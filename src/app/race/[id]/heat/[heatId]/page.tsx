@@ -9,11 +9,15 @@ import FinishRider from "../../categories/finishRider/FinishRider";
 import useRaceStore from "@/stores/racesStore";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
+import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { RiderProps } from "@/types/types";
 import { formatTime, formatTimeWithLeadingZeroes } from "../../../../utils/timeUtils";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../../schedule/Schedule";
 import RiderLiveModal from "./RiderLiveModal";
+import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
+import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
+import { VoiceSettingsModal } from "./VoiceSettingsModal";
 
 function parseTimeStr(t: string | null | undefined): Date | null {
   if (!t) return null;
@@ -73,6 +77,7 @@ const Heat: React.FC = () => {
   const { races, getRaces } = useRaceStore();
   const { riders, getRiders, updateRider, updateAllRiders } = useRiderStore();
   const { categories, getCategories } = useCategoryStore();
+  const { settings: voiceSettings } = useVoiceSettingsStore();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCats, setFilterCats] = useState<Set<string>>(new Set());
@@ -80,6 +85,8 @@ const Heat: React.FC = () => {
   const [contextRider, setContextRider] = useState<RiderProps | null>(null);
   const [showWaveInfo, setShowWaveInfo] = useState(false);
   const [displayOrder, setDisplayOrder] = useState<number[]>([]);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const lastClickRef = useRef<number>(0);
   const sortTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -316,6 +323,37 @@ const Heat: React.FC = () => {
       });
   }, [filteredRiders, filterCats]);
 
+  const validBibs = useMemo(() => {
+    const set = new Set<string>();
+    filteredRiders.forEach((r) => {
+      if (r.raceStatus === "running") {
+        set.add(String(r.bibNumber));
+      }
+    });
+    return set;
+  }, [filteredRiders]);
+
+  useVoiceRecognition({
+    language: voiceSettings.language,
+    validBibs,
+    commands: [],
+    onBibDetected: (bib) => {
+      const rider = filteredRiders.find((r) => String(r.bibNumber) === bib);
+      if (!rider) return;
+      if (voiceSettings.autoConfirm) {
+        handleRiderClick(rider);
+      } else {
+        setSearchTerm(bib);
+      }
+    },
+    onCommand: (action) => {
+      if (action === 'cancel') {
+        setSearchTerm("");
+      }
+    },
+    enabled: voiceActive && voiceSettings.enabled,
+  });
+
   const elapsedTime = useMemo(() => {
     const startRider = filteredRiders.find((r) => r.raceStatus === "running" && r.timeStartRace);
     const startDate = parseTimeStr(startRider?.timeStartRace);
@@ -325,7 +363,7 @@ const Heat: React.FC = () => {
 
   return (
     <div className={styles.heat}>
-      <HeaderHeats raceId={raceUuid} />
+      <HeaderHeats raceId={raceUuid} onSettingsClick={() => setShowVoiceSettings(true)} />
 
       {/* Rider detail modal (double-click) */}
       {contextRider && (
@@ -337,6 +375,11 @@ const Heat: React.FC = () => {
           onStatusChange={handleStatusChange}
           onSaveComment={handleSaveComment}
         />
+      )}
+
+      {/* Voice settings modal */}
+      {showVoiceSettings && (
+        <VoiceSettingsModal onClose={() => setShowVoiceSettings(false)} />
       )}
 
       {/* Wave info modal */}
@@ -467,6 +510,18 @@ const Heat: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Floating mic button and voice indicator */}
+      <div className={styles.voiceContainer}>
+        {voiceActive && <VoiceIndicator />}
+        <button
+          className={`${styles.micButton} ${voiceActive ? styles.micButtonActive : ""}`}
+          onClick={() => setVoiceActive(!voiceActive)}
+          title={voiceActive ? "Disable voice input" : "Enable voice input"}
+        >
+          🎤
+        </button>
       </div>
     </div>
   );

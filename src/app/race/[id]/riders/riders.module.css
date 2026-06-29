@@ -184,7 +184,7 @@
 .colDot {
   width: 8px;
   height: 8px;
-  border-radius: 5px;
+  border-radius: 3px;
   flex-shrink: 0;
   background: #ddd;
 }

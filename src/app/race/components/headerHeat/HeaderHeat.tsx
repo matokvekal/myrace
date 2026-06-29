@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Icons from "@/constants/Icons";
 import styles from "./headerHeat.module.css";
 
-function HeaderHeat({ raceId }: { raceId: string }) {
+function HeaderHeat({ raceId, onSettingsClick }: { raceId: string; onSettingsClick?: () => void }) {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState<string>("");
 
@@ -31,7 +31,7 @@ function HeaderHeat({ raceId }: { raceId: string }) {
       </div>
       <div>Manage heat</div>
       <div className={styles.time}>{currentTime}</div>
-      <div className={styles.menu}>
+      <div className={styles.menu} onClick={onSettingsClick}>
         <img src={Icons.threedotsBlack} alt="menu" width={20} height={20} />
       </div>
     </div>
