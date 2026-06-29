@@ -108,6 +108,9 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
                         <div className={styles.riderName}>
                           {riderName(action.rider)}
                         </div>
+                        {action.rider.team && (
+                          <div className={styles.club}>{action.rider.team}</div>
+                        )}
                         <div className={styles.meta}>
                           <span className={styles.time}>{formatTime(action.timestamp)}</span>
                           <span className={`${styles.source} ${styles[action.source]}`}>

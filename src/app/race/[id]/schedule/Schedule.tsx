@@ -440,7 +440,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
 
               return (
                 <div key={startTime} className={styles.startGroup}>
-                  <div className={styles.startHeader}>
+                  <div className={styles.startHeader} data-wave-running={anyRunning ? "true" : "false"}>
                     <div className={styles.startInfo}>
                       <span>Start {si + 1}</span>
                       {si === 0 && firstTime !== "TBD" && (

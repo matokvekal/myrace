@@ -72,6 +72,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: background 0.2s ease;
+}
+
+/* ── Lighter yellow when wave is running ── */
+.startHeader[data-wave-running="true"] {
+  background: linear-gradient(135deg, #fffae6, #fff9d9);
+  border-bottom-color: #f0e6c0;
+  color: #5a4a2a;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
 }
 
 .startInfo {
@@ -743,6 +752,42 @@
   .editActions {
     width: 100%;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .startHeader {
+    padding: 10px 12px;
+    font-size: 12px;
+    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .startInfo {
+    width: 100%;
+  }
+
+  .startActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .startTime {
+    font-size: 16px;
+  }
+
+  .container {
+    padding: 8px 8px 32px;
+    gap: 10px;
+  }
+
+  .wave {
+    border-radius: 12px;
+  }
+
+  .catName {
+    max-width: 120px;
   }
 }
 

@@ -10,6 +10,7 @@ import { Edit2, Check, X, ExternalLink, Download, Upload } from "lucide-react";
 import { exportRaceToXlsx } from "@/utils/raceExport";
 import { importRaceFromXlsx, replaceCategoriesForRace } from "@/utils/raceImport";
 import { toast } from "react-toastify";
+import RaceMap from "@/components/map/RaceMap";
 
 interface Props {
   race: RaceProps;
@@ -187,6 +188,8 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
             <Row icon={Icons.setting}  label="Type"     value={race.type} />
             <Row icon={Icons.setting}  label="Level"    value={race.level} />
           </div>
+
+          <RaceMap location={race.location} />
 
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Organisation</div>

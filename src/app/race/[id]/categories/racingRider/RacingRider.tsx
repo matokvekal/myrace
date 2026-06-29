@@ -13,9 +13,11 @@ interface Props {
 const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, onClick, onDoubleClick }) => {
   const lastTapRef = useRef<number>(0);
 
-  const isPenultimate = forceBell || (rider.totalLaps > 0 && rider.lapsCounter === rider.totalLaps - 1);
+  const lapsRemaining = rider.totalLaps - rider.lapsCounter;
+  const showBell = forceBell || (lapsRemaining === 2);
+  const showStripes = forceBell || (lapsRemaining === 1);
 
-  const bgStyle = isPenultimate
+  const bgStyle = showStripes
     ? `repeating-linear-gradient(-45deg, ${color} 0px, ${color} 11px, rgba(255,255,255,0.32) 11px, rgba(255,255,255,0.32) 18px)`
     : color;
 
@@ -32,17 +34,26 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, onClick
 
   return (
     <div
-      className={`${styles.rider} ${isPenultimate ? styles.penultimate : ""}`}
+      className={`${styles.rider} ${showStripes ? styles.penultimate : ""}`}
       style={{ background: bgStyle }}
       onClick={onClick}
       onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
       onTouchEnd={handleTouchEnd}
     >
-      {isPenultimate && <div className={styles.bellBadge}>🔔</div>}
+      {showBell && (
+        <div className={styles.bellBadge} title={`2 laps left! (${rider.lapsCounter}/${rider.totalLaps})`}>
+          🔔
+        </div>
+      )}
       <div className={styles.bib}>{rider.bibNumber}</div>
       <div className={styles.laps}>
         {rider.lapsCounter}/{rider.totalLaps}
       </div>
+      {rider.totalLaps > 0 && (
+        <div className={styles.remaining}>
+          {Math.max(0, rider.totalLaps - rider.lapsCounter)} left
+        </div>
+      )}
       {rider.elapsedLastLap && (
         <div className={styles.lapTime}>{rider.elapsedLastLap}</div>
       )}

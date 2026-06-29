@@ -48,6 +48,13 @@
   color: rgba(0,0,0,0.75);
 }
 
+.remaining {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.55);
+  margin-top: -1px;
+}
+
 .lapTime {
   font-size: 10px;
   color: rgba(0,0,0,0.6);

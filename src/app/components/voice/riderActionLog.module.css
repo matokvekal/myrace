@@ -177,6 +177,16 @@
   text-overflow: ellipsis;
 }
 
+.club {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
 .meta {
   display: flex;
   gap: 8px;
