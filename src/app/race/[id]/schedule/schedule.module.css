@@ -32,15 +32,15 @@
 }
 
 .waveLabel {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--ok);
+  color: #00FF7F;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .waveTime {
-  font-size: 12px;
+  font-size: 10px;
   color: #bfd1ea;
   flex: 1;
 }
@@ -58,7 +58,7 @@
 /* ── Light yellow race-flag start header ── */
 .startHeader {
   padding: 12px 14px;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 900;
   color: #1f3558;
   background: linear-gradient(135deg, #ffd95c, #ffca42);
@@ -160,9 +160,9 @@
 
 /* Wave/start stats */
 .waveStat {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--ok);
+  color: #00FF7F;
   background: rgba(62, 221, 164, 0.14);
   padding: 2px 8px;
   border-radius: 10px;
