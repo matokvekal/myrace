@@ -4,6 +4,7 @@ import styles from './voiceIndicator.module.css';
 export function VoiceIndicator() {
   const [level, setLevel] = useState(0);
   const [isActive, setIsActive] = useState(false);
+  const [error, setError] = useState<string>('');
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -12,6 +13,7 @@ export function VoiceIndicator() {
   useEffect(() => {
     const initMicrophone = async () => {
       try {
+        console.log('VoiceIndicator: Requesting microphone access...');
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: false,
@@ -19,9 +21,15 @@ export function VoiceIndicator() {
             autoGainControl: false
           }
         });
+        console.log('VoiceIndicator: Microphone access granted, stream:', stream);
         micStreamRef.current = stream;
 
         const AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) {
+          console.error('VoiceIndicator: AudioContext not supported');
+          setIsActive(false);
+          return;
+        }
         const audioContext = new AudioContext();
         audioContextRef.current = audioContext;
 
@@ -32,10 +40,13 @@ export function VoiceIndicator() {
         source.connect(analyser);
         analyserRef.current = analyser;
 
+        console.log('VoiceIndicator: Audio analyser setup complete, starting level updates');
         setIsActive(true);
         updateLevel();
-      } catch (error) {
-        console.error('Microphone access denied:', error);
+      } catch (err: any) {
+        const errorMsg = err?.name || err?.message || String(err);
+        console.error('VoiceIndicator: Microphone access error:', errorMsg, err);
+        setError(errorMsg);
         setIsActive(false);
       }
     };
@@ -70,10 +81,11 @@ export function VoiceIndicator() {
   };
 
   if (!isActive) {
+    const displayError = error || 'Microphone not accessible';
     return (
       <div className={`${styles.voiceIndicator} ${styles.error}`}>
         <div className={styles.indicatorDot} />
-        <span>Microphone not accessible</span>
+        <span title={displayError}>{displayError}</span>
       </div>
     );
   }
