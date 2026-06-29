@@ -141,15 +141,24 @@ export function parseNumber(transcript: string, language: Language): number | nu
 }
 
 export function extractNumbers(transcript: string, language: Language): number[] {
-  const numbers: number[] = [];
-  const sentences = transcript.split(/[.,;!?]+/);
-
-  for (const sentence of sentences) {
-    const num = parseNumber(sentence.trim(), language);
-    if (num !== null) {
-      numbers.push(num);
+  // Mobile STT often returns digit strings ("47") instead of words ("forty seven").
+  // Try digit extraction first — it's faster and more reliable.
+  const digitMatches = transcript.match(/\b\d+\b/g);
+  if (digitMatches) {
+    const numbers: number[] = [];
+    for (const m of digitMatches) {
+      const n = parseInt(m, 10);
+      if (n > 0 && n <= 9999) numbers.push(n);
     }
+    if (numbers.length > 0) return numbers;
   }
 
+  // Fallback: word-based parsing (desktop English / Hebrew word numbers)
+  const numbers: number[] = [];
+  const sentences = transcript.split(/[.,;!?]+/);
+  for (const sentence of sentences) {
+    const num = parseNumber(sentence.trim(), language);
+    if (num !== null) numbers.push(num);
+  }
   return numbers;
 }

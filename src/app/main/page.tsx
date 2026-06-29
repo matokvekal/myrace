@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import styles from "./main.module.css";
 import AddRace from "./addRace/AddRace";
 import HeaderMain from "./components/headerMain/HeaderMain";
@@ -9,6 +10,7 @@ import DownloadRace from "./components/downloadRace/DownloadRace";
 import Button from "@/components/ui/Button";
 import useRaceStore from "@/stores/racesStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
+import { seedDemoRace, DEMO_RACE_UUID } from "@/utils/demoSeed";
 import {
   ArrowLeft,
   ArrowUpDown,
@@ -26,6 +28,7 @@ const STATUS_ORDER: Record<string, number> = {
 };
 
 const MainPage = () => {
+  const navigate = useNavigate();
   const [addNewRace, setAddNewRace] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -34,6 +37,7 @@ const MainPage = () => {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [riderCounts, setRiderCounts] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
+  const [loadingDemo, setLoadingDemo] = useState(false);
   const { races, getRaces, updateRace } = useRaceStore();
 
   useEffect(() => {
@@ -57,6 +61,16 @@ const MainPage = () => {
   const handleToggleFavorite = (uuid: string) => {
     const race = races.find((r) => r.uuid === uuid);
     if (race) updateRace({ ...race, isFavorite: !race.isFavorite });
+  };
+
+  const handleLoadDemo = async () => {
+    setLoadingDemo(true);
+    try {
+      await seedDemoRace();
+      navigate(`/race/${DEMO_RACE_UUID}`);
+    } finally {
+      setLoadingDemo(false);
+    }
   };
 
   const isEmpty = loaded && races.length === 0;
@@ -86,7 +100,11 @@ const MainPage = () => {
       <HeaderMain />
 
       {isEmpty ? (
-        <EmptyRaces onCreateRace={() => setAddNewRace(true)} />
+        <EmptyRaces
+          onCreateRace={() => setAddNewRace(true)}
+          onLoadDemo={handleLoadDemo}
+          loadingDemo={loadingDemo}
+        />
       ) : showAll ? (
         /* ── Full list view ── */
         <div className={styles.content}>

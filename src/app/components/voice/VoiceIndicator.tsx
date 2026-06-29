@@ -80,15 +80,10 @@ export function VoiceIndicator() {
     animationRef.current = requestAnimationFrame(updateLevel);
   };
 
-  if (!isActive) {
-    const displayError = error || 'Microphone not accessible';
-    return (
-      <div className={`${styles.voiceIndicator} ${styles.error}`}>
-        <div className={styles.indicatorDot} />
-        <span title={displayError}>{displayError}</span>
-      </div>
-    );
-  }
+  // getUserMedia is only for the level meter — SpeechRecognition works independently.
+  // If the browser blocks getUserMedia (non-HTTPS, permission denied, etc.), hide
+  // the indicator rather than showing a misleading "Microphone not accessible" error.
+  if (!isActive) return null;
 
   const isDetectingVoice = level > 15;
 

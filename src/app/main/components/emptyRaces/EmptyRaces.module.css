@@ -136,6 +136,39 @@
   text-transform: uppercase;
 }
 
+.btnDemo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  background: linear-gradient(140deg, #2ecc71, #27ae60);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 22px rgba(39, 174, 96, 0.3), 0 1px 0 rgba(255,255,255,0.25) inset;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.btnDemo:hover {
+  background: linear-gradient(140deg, #39d978, #2ecc71);
+  box-shadow: 0 14px 26px rgba(39, 174, 96, 0.38);
+}
+
+.btnDemo:active {
+  transform: translateY(1px);
+}
+
+.btnDemo:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .divider {
   display: flex;
   align-items: center;

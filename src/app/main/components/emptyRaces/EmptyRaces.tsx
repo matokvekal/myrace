@@ -5,9 +5,11 @@ import Button from "@/components/ui/Button";
 
 interface EmptyRacesProps {
   onCreateRace: () => void;
+  onLoadDemo: () => void;
+  loadingDemo?: boolean;
 }
 
-const EmptyRaces: React.FC<EmptyRacesProps> = ({ onCreateRace }) => {
+const EmptyRaces: React.FC<EmptyRacesProps> = ({ onCreateRace, onLoadDemo, loadingDemo }) => {
   return (
     <div className={styles.wrapper}>
       <div className={styles.iconCircle}>
@@ -16,10 +18,20 @@ const EmptyRaces: React.FC<EmptyRacesProps> = ({ onCreateRace }) => {
 
       <div className={styles.title}>No races yet</div>
       <div className={styles.subtitle}>
-        Create your first race or import one from the server when you're ready.
+        Try the demo race to explore all features, or create your own.
       </div>
 
       <div className={styles.actions}>
+        <button
+          className={styles.btnDemo}
+          onClick={onLoadDemo}
+          disabled={loadingDemo}
+        >
+          {loadingDemo ? "Loading..." : "▶ Try Demo Race"}
+        </button>
+
+        <div className={styles.divider}>or</div>
+
         <Button
           variant="success"
           size="lg"
@@ -29,8 +41,6 @@ const EmptyRaces: React.FC<EmptyRacesProps> = ({ onCreateRace }) => {
           <img src={Icons.plus} alt="" />
           Create new race
         </Button>
-
-        <div className={styles.divider}>or</div>
 
         <Button
           variant="secondary"

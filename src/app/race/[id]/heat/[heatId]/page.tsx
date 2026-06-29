@@ -21,6 +21,7 @@ import { VoiceSettingsModal } from "./VoiceSettingsModal";
 import { VoiceRadarIcon } from "@/components/voice/VoiceRadarIcon";
 import { DetectedNumbers } from "@/components/voice/DetectedNumbers";
 import { RiderActionLog } from "@/components/voice/RiderActionLog";
+import { extractNumbers } from "@/utils/numberParser";
 
 function parseTimeStr(t: string | null | undefined): Date | null {
   if (!t) return null;
@@ -95,8 +96,11 @@ const Heat: React.FC = () => {
   const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
   const [riderActions, setRiderActions] = useState<Array<{ id: string; rider: RiderProps; timestamp: number; source: 'click' | 'voice'; categoryColor: string; statusChange?: 'DNF' | 'DSQ' | 'DNS' }>>([]);
   const [showActionLog, setShowActionLog] = useState(false);
-  const lastClickRef = useRef<number>(0);
-  const sortTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingLap, setPendingLap] = useState<{ rider: RiderProps; color: string; endsAt: number } | null>(null);
+  const [countdown, setCountdown] = useState(5);
+  const lastClickRef   = useRef<number>(0);
+  const sortTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!raceUuid) return;
@@ -391,7 +395,7 @@ const Heat: React.FC = () => {
     return set;
   }, [filteredRiders]);
 
-  const { isListening } = useVoiceRecognition({
+  const { isListening, lastTranscript } = useVoiceRecognition({
     language: voiceSettings.language,
     validBibs,
     commands: [],
@@ -399,18 +403,24 @@ const Heat: React.FC = () => {
       const rider = filteredRiders.find((r) => String(r.bibNumber) === bib);
       if (!rider) return;
 
-      // Add to detected numbers display
       const catColor = getCatColor(rider);
+
+      // Add to detected numbers display
       setDetectedNumbers((prev) => [
         ...prev,
         { bib, categoryColor: catColor, timestamp: Date.now() },
       ]);
 
-      if (voiceSettings.autoConfirm) {
+      // Cancel any previous pending
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+
+      const endsAt = Date.now() + 5000;
+      setPendingLap({ rider, color: catColor, endsAt });
+
+      pendingTimerRef.current = setTimeout(() => {
+        setPendingLap(null);
         handleRiderClick(rider, 'voice');
-      } else {
-        setSearchTerm(bib);
-      }
+      }, 5000);
     },
     onCommand: (action) => {
       if (action === 'cancel') {
@@ -423,6 +433,20 @@ const Heat: React.FC = () => {
   useEffect(() => {
     setVoiceIsListening(isListening);
   }, [isListening]);
+
+  // Countdown tick for pending lap card
+  useEffect(() => {
+    if (!pendingLap) return;
+    setCountdown(5);
+    const tick = setInterval(() => {
+      const remaining = Math.ceil((pendingLap.endsAt - Date.now()) / 1000);
+      setCountdown(Math.max(0, remaining));
+    }, 200);
+    return () => clearInterval(tick);
+  }, [pendingLap]);
+
+  // Cleanup pending timer on unmount
+  useEffect(() => () => { if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current); }, []);
 
   // Auto-clear detected numbers after 3 seconds
   useEffect(() => {
@@ -591,6 +615,79 @@ const Heat: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Voice debug panel — visible only when voice is active */}
+      {voiceActive && (
+        <div className={styles.voiceDebug}>
+          <div className={styles.voiceDebugRow}>
+            <span className={styles.voiceDebugLabel}>status:</span>
+            <span className={`${styles.voiceDebugValue} ${voiceIsListening ? styles.green : styles.red}`}>
+              {voiceIsListening ? 'listening' : 'not connected'}
+            </span>
+          </div>
+          <div className={styles.voiceDebugRow}>
+            <span className={styles.voiceDebugLabel}>lang:</span>
+            <span className={styles.voiceDebugValue}>{voiceSettings.language === 'en' ? 'en-US' : 'he-IL'}</span>
+          </div>
+          <div className={styles.voiceDebugRow}>
+            <span className={styles.voiceDebugLabel}>heard:</span>
+            <span className={`${styles.voiceDebugValue} ${lastTranscript ? styles.yellow : ''}`}>
+              {lastTranscript || '—'}
+            </span>
+          </div>
+          {(() => {
+            const nums = extractNumbers(lastTranscript, voiceSettings.language);
+            const matched = nums.length > 0 && validBibs.has(String(nums[0]));
+            return (
+              <>
+                <div className={styles.voiceDebugRow}>
+                  <span className={styles.voiceDebugLabel}>parsed:</span>
+                  <span className={`${styles.voiceDebugValue} ${nums.length > 0 ? styles.yellow : ''}`}>
+                    {lastTranscript ? (nums.join(', ') || 'no number') : '—'}
+                  </span>
+                </div>
+                <div className={styles.voiceDebugRow}>
+                  <span className={styles.voiceDebugLabel}>match:</span>
+                  <span className={`${styles.voiceDebugValue} ${nums.length > 0 ? (matched ? styles.green : styles.red) : ''}`}>
+                    {nums.length > 0 ? (matched ? 'yes ✓' : `no — bib not running (${validBibs.size} active)`) : '—'}
+                  </span>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Pending lap confirmation — 5-second countdown before registering */}
+      {pendingLap && (
+        <div className={styles.pendingLap}>
+          <div className={styles.pendingLapBar}>
+            <div
+              className={styles.pendingLapBarFill}
+              style={{ width: `${(countdown / 5) * 100}%`, background: pendingLap.color }}
+            />
+          </div>
+          <div className={styles.pendingLapBody} style={{ borderTop: `3px solid ${pendingLap.color}` }}>
+            <div className={styles.pendingBib}>{pendingLap.rider.bibNumber}</div>
+            <div className={styles.pendingInfo}>
+              <div className={styles.pendingName}>
+                {pendingLap.rider.firstName} {pendingLap.rider.lastName}
+              </div>
+              <div className={styles.pendingCat}>{pendingLap.rider.category}</div>
+            </div>
+            <div className={styles.pendingCountdown}>{countdown}</div>
+            <button
+              className={styles.pendingCancel}
+              onClick={() => {
+                if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+                setPendingLap(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating mic button and voice indicator */}
       <div className={styles.voiceContainer}>
