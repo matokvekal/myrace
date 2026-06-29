@@ -17,7 +17,7 @@ import {
    addUserToDb,
    updateUserInDb,
    deleteUserFromDb
-} from '@/app/stores/indexDb/indexedDbHelper';
+} from '@/stores/indexDb/indexedDbHelper';
 
 /**
  * RBAC Store

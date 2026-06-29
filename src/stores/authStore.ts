@@ -83,6 +83,7 @@ export const useAuthStore = create<AuthState>()(
                const user: User = {
                   id: payload.userId,
                   name: payload.roleName, // Temporary - should be actual user name
+                  email: payload.email || "",
                   roleId: payload.roleId,
                   token: token,
                   raceUuid: payload.raceUuid,

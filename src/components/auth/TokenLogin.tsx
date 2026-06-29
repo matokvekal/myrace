@@ -8,7 +8,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import styles from "./tokenLogin.module.css";
 
@@ -24,7 +24,7 @@ export const TokenLogin: React.FC<TokenLoginProps> = ({
   redirectTo = "/main",
   onSuccess
 }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
 
   const [token, setToken] = useState("");
@@ -34,9 +34,9 @@ export const TokenLogin: React.FC<TokenLoginProps> = ({
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.push(redirectTo);
+      navigate(redirectTo);
     }
-  }, [isAuthenticated, redirectTo, router]);
+  }, [isAuthenticated, redirectTo, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +55,7 @@ export const TokenLogin: React.FC<TokenLoginProps> = ({
       if (success) {
         console.log("Login successful");
         onSuccess?.();
-        router.push(redirectTo);
+        navigate(redirectTo);
       } else {
         setError("Invalid token. Please check and try again.");
       }

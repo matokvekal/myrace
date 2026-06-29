@@ -29,6 +29,7 @@ const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
   lastNameEnglish: "Last Name (English)",
   fullName: "Full Name",
   category: "Category",
+  subCategory: "Sub-Category",
   team: "Team",
   gender: "Gender",
   heat: "Heat",
