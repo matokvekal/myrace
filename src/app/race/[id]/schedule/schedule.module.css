@@ -405,6 +405,8 @@
 .editActions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .editorLayout {
@@ -723,6 +725,17 @@
 
   .unassignedPanel {
     max-height: 300px;
+  }
+
+  .editHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .editActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 
