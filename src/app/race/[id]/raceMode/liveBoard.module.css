@@ -135,7 +135,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #1a1a2e;
+  background: linear-gradient(140deg, #7a8fa8, #6b7d96);
   color: #fff;
 }
 
