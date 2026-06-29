@@ -400,7 +400,7 @@
 }
 
 .numbersContainer {
-  width: 280px;
+  width: 160px;
   height: 56px;
   flex-shrink: 0;
   display: flex;
@@ -445,7 +445,7 @@
   }
 
   .numbersContainer {
-    width: 240px;
+    width: 140px;
     height: auto;
   }
 
