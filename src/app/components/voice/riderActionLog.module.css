@@ -1,6 +1,6 @@
 .toggleBtn {
   position: fixed;
-  top: 90px;
+  top: 70px;
   left: 20px;
   width: 44px;
   height: 44px;
@@ -368,7 +368,7 @@
 
 @media (max-width: 640px) {
   .toggleBtn {
-    top: 90px;
+    top: 70px;
     left: 16px;
   }
 
