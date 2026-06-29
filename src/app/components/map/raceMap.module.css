@@ -44,14 +44,24 @@
 
 :global(.leaflet-popup-content) {
   font-size: 12px;
-  color: var(--text-primary);
+  color: #fff;
+  margin: 0;
 }
 
 :global(.leaflet-popup-content-wrapper) {
-  background: var(--bg-card);
+  background: rgba(30, 30, 30, 0.95);
   border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 :global(.leaflet-popup-tip) {
-  background: var(--bg-card);
+  background: rgba(30, 30, 30, 0.95);
+}
+
+:global(.leaflet-popup-close-button) {
+  color: #fff !important;
+}
+
+:global(.leaflet-popup-close-button:hover) {
+  color: #ccc !important;
 }

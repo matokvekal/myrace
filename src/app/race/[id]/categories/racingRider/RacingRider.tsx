@@ -51,7 +51,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, onClick
       </div>
       {rider.totalLaps > 0 && (
         <div className={styles.remaining}>
-          {Math.max(0, rider.totalLaps - rider.lapsCounter)} left
+          {lapsRemaining === 1 ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
         </div>
       )}
       {rider.elapsedLastLap && (
