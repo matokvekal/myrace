@@ -1,0 +1,164 @@
+{
+  "bib": [
+    "bib",
+    "bib number",
+    "number",
+    "rider number",
+    "race number",
+    "start number",
+    "plate",
+    "plate number",
+    "מספר",
+    "מספר רוכב",
+    "מספר משתתף",
+    "ביב"
+  ],
+
+  "first_name": [
+    "first name",
+    "firstname",
+    "given name",
+    "שם פרטי"
+  ],
+
+  "middle_name": [
+    "middle name",
+    "middlename",
+    "middle",
+    "שם אמצעי"
+  ],
+
+  "last_name": [
+    "last name",
+    "lastname",
+    "surname",
+    "family name",
+    "שם משפחה"
+  ],
+
+  "full_name": [
+    "full name",
+    "name",
+    "rider",
+    "rider name",
+    "participant",
+    "participant name",
+    "competitor",
+    "שם מלא",
+    "שם"
+  ],
+
+  "club": [
+    "club",
+    "cycling club",
+    "bike club",
+    "team",
+    "group",
+    "squad",
+    "organization",
+    "organisation",
+    "affiliate",
+    "מועדון",
+    "מועדון רכיבה",
+    "קבוצה",
+    "קבוצה",
+    "אגודה"
+  ],
+
+  "category": [
+    "category",
+    "class",
+    "division",
+    "race class",
+    "age group",
+    "cat",
+    "קטגוריה"
+  ],
+
+  "gender": [
+    "gender",
+    "sex",
+    "male",
+    "female",
+    "m/f",
+    "מגדר",
+    "מין"
+  ],
+
+  "heat": [
+    "heat",
+    "race",
+    "wave",
+    "start wave",
+    "flight",
+    "מקצה"
+  ],
+
+  "total_laps": [
+    "laps",
+    "lap count",
+    "total laps",
+    "number of laps",
+    "סיבובים",
+    "מספר סיבובים"
+  ],
+
+  "start_time": [
+    "start time",
+    "race start",
+    "scheduled start",
+    "time",
+    "שעת התחלה",
+    "זמן התחלה"
+  ],
+
+  "position": [
+    "position",
+    "place",
+    "rank",
+    "ranking",
+    "finish position",
+    "overall position",
+    "result",
+    "מיקום",
+    "דירוג",
+    "מקום"
+  ],
+
+  "points": [
+    "points",
+    "score",
+    "pts",
+    "total points",
+    "ניקוד",
+    "נקודות"
+  ],
+
+  "federation": [
+    "federation",
+    "fed",
+    "org",
+    "organization",
+    "association",
+    "איגוד",
+    "ארגון"
+  ],
+
+  "race_day": [
+    "day",
+    "race day",
+    "event day",
+    "date",
+    "יום",
+    "יום מרוץ",
+    "תאריך"
+  ],
+    "ID": [
+    "id",
+    "דרכון",
+    "זהות",
+    "תעודת זהות",
+    "תז",
+    "תז/דרכון"
+  ]
+}
