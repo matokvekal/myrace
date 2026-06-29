@@ -215,7 +215,7 @@ const Heat: React.FC = () => {
 
     // Add to action log
     setRiderActions((prev) => [
-      { id: rider.id, rider: updatedRider, timestamp: Date.now(), source, categoryColor: catColor },
+      { id: String(rider.id), rider: updatedRider, timestamp: Date.now(), source, categoryColor: catColor },
       ...prev,
     ]);
   };
@@ -587,7 +587,7 @@ const Heat: React.FC = () => {
           const action = riderActions.find((a) => a.id === actionId);
           if (!action) return;
 
-          const rider = riders.find((r) => r.id === actionId);
+          const rider = riders.find((r) => r.id === Number(actionId));
           if (!rider || rider.lapsCounter <= 0) return;
 
           // Revert the last lap
