@@ -20,7 +20,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, onClick
   const showStripes = forceBell || (lapsRemaining === 1);
 
   const bgStyle = showStripes
-    ? `repeating-linear-gradient(-45deg, ${color} 0px, ${color} 11px, rgba(255,255,255,0.32) 11px, rgba(255,255,255,0.32) 18px)`
+    ? `repeating-linear-gradient(-45deg, ${color} 0px, ${color} 3px, rgba(255,255,255,0.5) 3px, rgba(255,255,255,0.5) 4px)`
     : color;
 
   const handleTouchEnd = (e: React.TouchEvent) => {
