@@ -134,8 +134,15 @@ const Heat: React.FC = () => {
   );
 
   const filteredRiders = useMemo(
-    () => riders.filter((r) => r.raceUuid === raceUuid && heatCategories.includes(r.category)),
-    [riders, raceUuid, heatCategories]
+    () => {
+      const filtered = riders.filter((r) => r.raceUuid === raceUuid && heatCategories.includes(r.category));
+      // Enrich riders with totalLaps from their category
+      return filtered.map((rider) => {
+        const cat = categories.find((c) => c.name === rider.category);
+        return cat && cat.laps ? { ...rider, totalLaps: cat.laps } : rider;
+      });
+    },
+    [riders, raceUuid, heatCategories, categories]
   );
 
   const getCatColor = (rider: RiderProps): string => {
