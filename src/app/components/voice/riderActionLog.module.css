@@ -1,7 +1,7 @@
 .toggleBtn {
   position: fixed;
-  top: 10px;
-  left: 7px;
+  top: 62px;
+  left: 16px;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -378,8 +378,8 @@
 
 @media (max-width: 640px) {
   .toggleBtn {
-    top: 10px;
-    left: 7px;
+    top: 62px;
+    left: 16px;
   }
 
   .panel {
