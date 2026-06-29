@@ -19,6 +19,7 @@ import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
 import { VoiceSettingsModal } from "./VoiceSettingsModal";
 import { VoiceRadarIcon } from "@/components/voice/VoiceRadarIcon";
+import { DetectedNumbers } from "@/components/voice/DetectedNumbers";
 
 function parseTimeStr(t: string | null | undefined): Date | null {
   if (!t) return null;
@@ -90,6 +91,7 @@ const Heat: React.FC = () => {
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [voiceAudioLevel, setVoiceAudioLevel] = useState(0);
   const [voiceIsListening, setVoiceIsListening] = useState(false);
+  const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
   const lastClickRef = useRef<number>(0);
   const sortTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -343,6 +345,14 @@ const Heat: React.FC = () => {
     onBibDetected: (bib) => {
       const rider = filteredRiders.find((r) => String(r.bibNumber) === bib);
       if (!rider) return;
+
+      // Add to detected numbers display
+      const catColor = getCatColor(rider);
+      setDetectedNumbers((prev) => [
+        ...prev,
+        { bib, categoryColor: catColor, timestamp: Date.now() },
+      ]);
+
       if (voiceSettings.autoConfirm) {
         handleRiderClick(rider);
       } else {
@@ -521,7 +531,12 @@ const Heat: React.FC = () => {
 
       {/* Floating mic button and voice indicator */}
       <div className={styles.voiceContainer}>
-        {voiceActive && <VoiceIndicator />}
+        {voiceActive && (
+          <>
+            <VoiceIndicator />
+            <DetectedNumbers numbers={detectedNumbers} />
+          </>
+        )}
         <button
           className={styles.micButtonRadar}
           onClick={() => setVoiceActive(!voiceActive)}
