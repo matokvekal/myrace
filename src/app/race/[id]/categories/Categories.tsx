@@ -296,21 +296,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <h3 className={styles.title}>Race Categories</h3>
-          {emptyCount > 0 && (
-            <button
-              className={`${styles.emptyToggle} ${riderFilter === "all" ? styles.emptyToggleActive : ""}`}
-              onClick={() => setRiderFilter(riderFilter === "all" ? "with" : "all")}
-            >
-              {riderFilter === "all"
-                ? `Hide empty (${emptyCount})`
-                : `Show empty (${emptyCount})`}
-            </button>
-          )}
-        </div>
-        <div className={styles.headerActions}>
+      <div className={styles.headerControls}>
           {showQuickLaps ? (
             <>
               <Button
@@ -368,7 +354,6 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
               </Button>
             </>
           )}
-        </div>
       </div>
 
       {showQuickLaps && (

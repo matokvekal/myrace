@@ -381,8 +381,16 @@
   cursor: pointer;
 }
 
+/* Header Controls */
+.headerControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
 /* Edit Mode */
-.viewHeader,
 .editHeader {
   display: flex;
   align-items: center;
@@ -394,7 +402,6 @@
   border: 1px solid var(--border-card);
 }
 
-.viewHeader h3,
 .editHeader h3 {
   margin: 0;
   font-size: 18px;

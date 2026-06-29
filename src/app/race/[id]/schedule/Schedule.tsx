@@ -368,36 +368,31 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   // ── VIEW MODE ──
   return (
     <div className={styles.container}>
-      <div className={styles.viewHeader}>
-        <div className={styles.titleRow}>
-          <h3>Race Schedule</h3>
-          <button
-            className={styles.expandAllBtn}
-            onClick={toggleAllExpanded}
-            title={allExpanded ? "Collapse all riders" : "Expand all riders"}
+      <div className={styles.headerControls}>
+        <button
+          className={styles.expandAllBtn}
+          onClick={toggleAllExpanded}
+          title={allExpanded ? "Collapse all riders" : "Expand all riders"}
+        >
+          {allExpanded ? <ChevronsUp size={16} /> : <ChevronsDown size={16} />}
+        </button>
+        <label className={styles.gapLabel}>
+          Wave gap
+          <select
+            className={styles.gapSelect}
+            value={waveGap}
+            onChange={(e) => setWaveGap(Number(e.target.value))}
           >
-            {allExpanded ? <ChevronsUp size={16} /> : <ChevronsDown size={16} />}
-          </button>
-        </div>
-        <div className={styles.headerRight}>
-          <label className={styles.gapLabel}>
-            Wave gap
-            <select
-              className={styles.gapSelect}
-              value={waveGap}
-              onChange={(e) => setWaveGap(Number(e.target.value))}
-            >
-              <option value={15}>15 min</option>
-              <option value={30}>30 min</option>
-              <option value={45}>45 min</option>
-              <option value={60}>1 hour</option>
-              <option value={90}>1.5 hrs</option>
-            </select>
-          </label>
-          <Button variant="primary" size="sm" startIcon={<Edit2 size={14} />} onClick={enterEditMode}>
-            Edit Schedule
-          </Button>
-        </div>
+            <option value={15}>15 min</option>
+            <option value={30}>30 min</option>
+            <option value={45}>45 min</option>
+            <option value={60}>1 hour</option>
+            <option value={90}>1.5 hrs</option>
+          </select>
+        </label>
+        <Button variant="primary" size="sm" startIcon={<Edit2 size={14} />} onClick={enterEditMode}>
+          Edit Schedule
+        </Button>
       </div>
 
       {[...schedule.entries()].map(([waveNum, startMap]) => {
