@@ -389,31 +389,20 @@
   right: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   z-index: 100;
 }
 
-.voicePanel {
+.controlRow {
   display: flex;
   gap: 12px;
   align-items: flex-end;
 }
 
-.numberPanel {
-  width: 280px;
-  flex-shrink: 0;
-  animation: slideInLeft 0.3s ease-out;
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.numbersContainer {
+  flex: 1;
+  min-width: 0;
+  max-width: 300px;
 }
 
 .micButtonRadar {
@@ -447,14 +436,15 @@
     right: 16px;
   }
 
-  .voicePanel {
+  .controlRow {
     flex-direction: column;
     align-items: center;
+    gap: 8px;
   }
 
-  .numberPanel {
-    width: 100%;
-    max-width: 240px;
+  .numbersContainer {
+    width: 240px;
+    max-width: 100%;
   }
 
   .micButtonRadar {
