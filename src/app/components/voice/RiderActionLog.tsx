@@ -74,7 +74,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
         onClick={onToggle}
         title="View rider action history"
       >
-        <span className={styles.icon}>📋</span>
+        <span className={styles.icon}>⏱️</span>
         {actions.length > 0 && <span className={styles.badge}>{actions.length}</span>}
       </button>
 
