@@ -20,6 +20,7 @@ import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
 import { VoiceSettingsModal } from "./VoiceSettingsModal";
 import { VoiceRadarIcon } from "@/components/voice/VoiceRadarIcon";
 import { DetectedNumbers } from "@/components/voice/DetectedNumbers";
+import { RiderActionLog } from "@/components/voice/RiderActionLog";
 
 function parseTimeStr(t: string | null | undefined): Date | null {
   if (!t) return null;
@@ -92,6 +93,8 @@ const Heat: React.FC = () => {
   const [voiceAudioLevel, setVoiceAudioLevel] = useState(0);
   const [voiceIsListening, setVoiceIsListening] = useState(false);
   const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
+  const [riderActions, setRiderActions] = useState<Array<{ id: string; rider: RiderProps; timestamp: number; source: 'click' | 'voice'; categoryColor: string }>>([]);
+  const [showActionLog, setShowActionLog] = useState(false);
   const lastClickRef = useRef<number>(0);
   const sortTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -148,7 +151,7 @@ const Heat: React.FC = () => {
     return map;
   }, [filteredRiders]);
 
-  const handleRiderClick = (rider: RiderProps) => {
+  const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
     if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
 
     const clickTime = new Date();
@@ -202,6 +205,13 @@ const Heat: React.FC = () => {
     updateRider(updatedRider);
     updateAllRiders(finalSorted);
     setSearchTerm(""); // clear search after registering a lap
+
+    // Add to action log
+    const catColor = getCatColor(rider);
+    setRiderActions((prev) => [
+      { id: rider.id, rider: updatedRider, timestamp: Date.now(), source, categoryColor: catColor },
+      ...prev,
+    ]);
   };
 
   const handleRevertLap = (rider: RiderProps) => {
@@ -354,7 +364,7 @@ const Heat: React.FC = () => {
       ]);
 
       if (voiceSettings.autoConfirm) {
-        handleRiderClick(rider);
+        handleRiderClick(rider, 'voice');
       } else {
         setSearchTerm(bib);
       }
@@ -549,6 +559,13 @@ const Heat: React.FC = () => {
           />
         </button>
       </div>
+
+      {/* Rider action log */}
+      <RiderActionLog
+        actions={riderActions}
+        isOpen={showActionLog}
+        onToggle={() => setShowActionLog(!showActionLog)}
+      />
     </div>
   );
 };
