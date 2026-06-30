@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+  <rect width="300" height="200" fill="#fff"/>
+  <rect x="0" y="38" width="300" height="24" fill="#0038b8"/>
+  <rect x="0" y="138" width="300" height="24" fill="#0038b8"/>
+  <!-- Star of David centered at 150,100 circumradius=28 -->
+  <polygon points="150,72 125.75,114 174.25,114" fill="none" stroke="#0038b8" stroke-width="6"/>
+  <polygon points="150,128 125.75,86 174.25,86" fill="none" stroke="#0038b8" stroke-width="6"/>
+</svg>
