@@ -12,16 +12,27 @@
   flex-direction: column;
   flex: 1;
   padding: 0 16px;
+  overflow: hidden;
+  min-height: 0;
 }
 
-/* ── Search wrapper (positioned left of voice controls) ── */
+.gridWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Search wrapper (under timer, centered, narrow) ── */
 .searchWrapper {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  right: 120px;
-  z-index: 95;
-  max-width: 250px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.searchWrapper .inputContainer {
+  width: 160px;
 }
 
 .inputContainer {
@@ -31,9 +42,11 @@
 
 .searchInput {
   width: 100%;
-  padding: 8px 12px;
-  padding-right: 40px;
-  font-size: 13px;
+  padding: 8px 36px 8px 12px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-align: center;
   border-radius: 8px;
   box-sizing: border-box;
   height: 48px;
@@ -92,8 +105,9 @@
   flex-direction: column;
   gap: 16px;
   margin-top: 16px;
-  height: 450px;
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 /* ── Timer row + wave info button ── */
@@ -487,111 +501,8 @@
 .voiceDebugValue.yellow { color: #facc15; }
 .voiceDebugValue.red { color: #f87171; }
 
-/* ── Pending lap confirmation card ── */
-.pendingLap {
-  position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(340px, calc(100vw - 32px));
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.32);
-  z-index: 300;
-  animation: slideUp 0.18s ease-out;
-}
-
-@keyframes slideUp {
-  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
-  to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
-}
-
-.pendingLapBar {
-  height: 5px;
-  background: rgba(255,255,255,0.25);
-  transition: none;
-}
-
-.pendingLapBarFill {
-  height: 100%;
-  background: rgba(255,255,255,0.9);
-  transition: width 1s linear;
-}
-
-.pendingLapBody {
-  display: flex;
-  align-items: center;
-  padding: 14px 16px;
-  gap: 14px;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(12px);
-}
-
-.pendingBib {
-  font-size: 36px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1;
-  min-width: 48px;
-  text-align: center;
-}
-
-.pendingInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.pendingName {
-  font-size: 15px;
-  font-weight: 700;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pendingCat {
-  font-size: 12px;
-  color: rgba(255,255,255,0.65);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pendingCountdown {
-  font-size: 28px;
-  font-weight: 900;
-  color: #fff;
-  min-width: 28px;
-  text-align: center;
-  opacity: 0.85;
-}
-
-.pendingCancel {
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 10px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.pendingCancel:active {
-  background: rgba(255,255,255,0.25);
-}
 
 @media (max-width: 640px) {
-  .searchWrapper {
-    bottom: 100px;
-    left: 16px;
-    right: 16px;
-    max-width: none;
-  }
-
   .searchInput {
     height: 44px;
     font-size: 12px;

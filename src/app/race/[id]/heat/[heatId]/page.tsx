@@ -96,11 +96,18 @@ const Heat: React.FC = () => {
   const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
   const [riderActions, setRiderActions] = useState<Array<{ id: string; rider: RiderProps; timestamp: number; source: 'click' | 'voice'; categoryColor: string; statusChange?: 'DNF' | 'DSQ' | 'DNS' }>>([]);
   const [showActionLog, setShowActionLog] = useState(false);
-  const [pendingLap, setPendingLap] = useState<{ rider: RiderProps; color: string; endsAt: number } | null>(null);
-  const [countdown, setCountdown] = useState(5);
+  const [flashingRiderId, setFlashingRiderId] = useState<number | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastClickRef   = useRef<number>(0);
   const sortTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Always-fresh refs so setTimeout callbacks can see latest store + handler
+  const ridersRef = useRef(riders);
+  const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice') => void) | null>(null);
+  // Voice buffer: queue of pending bib detections + 30s cooldown map per bib
+  const voiceQueueRef = useRef<Array<{ bib: string; detectedAt: number }>>([]);
+  const bibCooldownRef = useRef<Map<string, number>>(new Map());
+  const queueProcessingRef = useRef(false);
+  const VOICE_COOLDOWN_MS = 30_000;
 
   useEffect(() => {
     if (!raceUuid) return;
@@ -202,7 +209,7 @@ const Heat: React.FC = () => {
       elapsedLastLap: lapTime,
       elapsedTimeFromStart: formatTime((clickTime.getTime() - raceStart.getTime()) / 1000),
       timeArrive: clickTime.toISOString(),
-      raceStatus: isFinished ? "finished" : rider.raceStatus,
+      raceStatus: isFinished ? "finished" : "running",
     };
 
     const allWithUpdated = riders.map((r) => (r.id === intermediateRider.id ? intermediateRider : r));
@@ -226,19 +233,88 @@ const Heat: React.FC = () => {
     updateAllRiders(finalSorted);
     setSearchTerm(""); // clear search after registering a lap
 
-    // Add to detected numbers display
+    // Trigger flash animation on the rider card
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    setFlashingRiderId(rider.id);
+    flashTimerRef.current = setTimeout(() => setFlashingRiderId(null), 1200);
+
+    // Add to detected numbers display (voice path adds this via the queue processor)
     const catColor = getCatColor(rider);
     const actionTimestamp = Date.now();
-    setDetectedNumbers((prev) => [
-      ...prev,
-      { bib: String(rider.bibNumber), categoryColor: catColor, timestamp: actionTimestamp },
-    ]);
+    if (source !== 'voice') {
+      setDetectedNumbers((prev) => [
+        ...prev,
+        { bib: String(rider.bibNumber), categoryColor: catColor, timestamp: actionTimestamp },
+      ]);
+    }
 
     // Add to action log with unique ID (rider + lap + timestamp)
     setRiderActions((prev) => [
       { id: `${rider.id}-${lapsCounter}-${actionTimestamp}`, rider: updatedRider, timestamp: actionTimestamp, source, categoryColor: catColor },
       ...prev,
     ]);
+  };
+
+  // Keep refs in sync every render so async callbacks see fresh data
+  ridersRef.current = riders;
+  handleRiderClickRef.current = handleRiderClick;
+
+  // Drain the voice queue: process each pending bib in order, skip cooldown duplicates
+  const processVoiceQueue = () => {
+    if (queueProcessingRef.current) return;
+    queueProcessingRef.current = true;
+
+    const processNext = () => {
+      const entry = voiceQueueRef.current.shift();
+      if (!entry) { queueProcessingRef.current = false; return; }
+
+      const { bib } = entry;
+      const now = Date.now();
+
+      // 30-second cooldown: same bib already processed recently — skip silently
+      const lastTime = bibCooldownRef.current.get(bib) ?? 0;
+      if (now - lastTime < VOICE_COOLDOWN_MS) {
+        processNext(); // skip, try next immediately
+        return;
+      }
+
+      // Mark cooldown immediately so parallel queue entries for same bib are deduplicated
+      bibCooldownRef.current.set(bib, now);
+
+      const rider = ridersRef.current.find(
+        (r) => r.raceUuid === raceUuid && String(r.bibNumber) === bib && r.raceStatus !== "finished"
+      );
+
+      if (rider) {
+        const lapsBefore = rider.lapsCounter;
+        const catColor = (() => {
+          const cat = categories.find((c) => c.name === rider.category);
+          return cat?.color ?? rider.color ?? "#ccc";
+        })();
+
+        setDetectedNumbers((prev) => [
+          ...prev,
+          { bib, categoryColor: catColor, timestamp: now },
+        ]);
+
+        handleRiderClickRef.current?.(rider, 'voice');
+
+        // Safety retry: if lap didn't register after 2s, try once more with fresh data
+        setTimeout(() => {
+          const fresh = ridersRef.current.find(
+            (r) => r.raceUuid === raceUuid && String(r.bibNumber) === bib && r.raceStatus !== "finished"
+          );
+          if (fresh && fresh.lapsCounter === lapsBefore) {
+            handleRiderClickRef.current?.(fresh, 'voice');
+          }
+        }, 2000);
+      }
+
+      // Small gap between queue items so rapid multi-bib utterances don't all hit at once
+      setTimeout(processNext, 80);
+    };
+
+    processNext();
   };
 
   const handleRevertLap = (rider: RiderProps) => {
@@ -304,7 +380,7 @@ const Heat: React.FC = () => {
   };
 
   const activeRiders = useMemo(() => {
-    const running = filteredRiders.filter((r) => r.raceStatus === "running");
+    const running = filteredRiders.filter((r) => r.raceStatus !== "finished");
     const catFiltered = filterCats.size > 0 ? running.filter((r) => filterCats.has(r.category)) : running;
     const q = searchTerm.toLowerCase();
     const searched = q
@@ -328,9 +404,9 @@ const Heat: React.FC = () => {
     const ids = activeRiders.map((r) => r.id);
     const msSinceClick = Date.now() - lastClickRef.current;
     if (msSinceClick < 500) {
-      // Triggered by a lap click — delay re-order by 5s
+      // Triggered by a lap click — delay re-order by 1s (matches flash animation)
       if (sortTimerRef.current) clearTimeout(sortTimerRef.current);
-      sortTimerRef.current = setTimeout(() => setDisplayOrder(ids), 5000);
+      sortTimerRef.current = setTimeout(() => setDisplayOrder(ids), 1000);
     } else {
       // Search/filter/initial change — immediate
       if (sortTimerRef.current) clearTimeout(sortTimerRef.current);
@@ -388,7 +464,7 @@ const Heat: React.FC = () => {
   const validBibs = useMemo(() => {
     const set = new Set<string>();
     filteredRiders.forEach((r) => {
-      if (r.raceStatus === "running") {
+      if (r.raceStatus !== "finished") {
         set.add(String(r.bibNumber));
       }
     });
@@ -400,27 +476,9 @@ const Heat: React.FC = () => {
     validBibs,
     commands: [],
     onBibDetected: (bib) => {
-      const rider = filteredRiders.find((r) => String(r.bibNumber) === bib);
-      if (!rider) return;
-
-      const catColor = getCatColor(rider);
-
-      // Add to detected numbers display
-      setDetectedNumbers((prev) => [
-        ...prev,
-        { bib, categoryColor: catColor, timestamp: Date.now() },
-      ]);
-
-      // Cancel any previous pending
-      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
-
-      const endsAt = Date.now() + 5000;
-      setPendingLap({ rider, color: catColor, endsAt });
-
-      pendingTimerRef.current = setTimeout(() => {
-        setPendingLap(null);
-        handleRiderClick(rider, 'voice');
-      }, 5000);
+      // Push into buffer queue; processor handles cooldown + dedup + retry
+      voiceQueueRef.current.push({ bib, detectedAt: Date.now() });
+      processVoiceQueue();
     },
     onCommand: (action) => {
       if (action === 'cancel') {
@@ -434,19 +492,10 @@ const Heat: React.FC = () => {
     setVoiceIsListening(isListening);
   }, [isListening]);
 
-  // Countdown tick for pending lap card
-  useEffect(() => {
-    if (!pendingLap) return;
-    setCountdown(5);
-    const tick = setInterval(() => {
-      const remaining = Math.ceil((pendingLap.endsAt - Date.now()) / 1000);
-      setCountdown(Math.max(0, remaining));
-    }, 200);
-    return () => clearInterval(tick);
-  }, [pendingLap]);
-
-  // Cleanup pending timer on unmount
-  useEffect(() => () => { if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current); }, []);
+  // Cleanup timers on unmount
+  useEffect(() => () => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+  }, []);
 
   // Auto-clear detected numbers after 3 seconds
   useEffect(() => {
@@ -520,8 +569,11 @@ const Heat: React.FC = () => {
           <div className={styles.inputContainer}>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={5}
               className={styles.searchInput}
-              placeholder="Search"
+              placeholder="#"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -591,6 +643,7 @@ const Heat: React.FC = () => {
                   rider={rider}
                   color={getCatColor(rider)}
                   forceBell={cascadeBellCats.has(rider.category)}
+                  isFlashing={flashingRiderId === rider.id}
                   onClick={() => handleRiderClick(rider)}
                   onDoubleClick={() => setContextRider(rider)}
                 />
@@ -637,7 +690,8 @@ const Heat: React.FC = () => {
           </div>
           {(() => {
             const nums = extractNumbers(lastTranscript, voiceSettings.language);
-            const matched = nums.length > 0 && validBibs.has(String(nums[0]));
+            const matchedNums = nums.filter(n => validBibs.has(String(n)));
+            const unmatchedNums = nums.filter(n => !validBibs.has(String(n)));
             return (
               <>
                 <div className={styles.voiceDebugRow}>
@@ -648,44 +702,16 @@ const Heat: React.FC = () => {
                 </div>
                 <div className={styles.voiceDebugRow}>
                   <span className={styles.voiceDebugLabel}>match:</span>
-                  <span className={`${styles.voiceDebugValue} ${nums.length > 0 ? (matched ? styles.green : styles.red) : ''}`}>
-                    {nums.length > 0 ? (matched ? 'yes ✓' : `no — bib not running (${validBibs.size} active)`) : '—'}
+                  <span className={`${styles.voiceDebugValue} ${nums.length > 0 ? (matchedNums.length > 0 ? styles.green : styles.red) : ''}`}>
+                    {nums.length === 0 ? '—'
+                      : matchedNums.length > 0
+                        ? `✓ ${matchedNums.join(', ')}${unmatchedNums.length > 0 ? ` | skip: ${unmatchedNums.join(', ')}` : ''}`
+                        : `no match (${validBibs.size} active)`}
                   </span>
                 </div>
               </>
             );
           })()}
-        </div>
-      )}
-
-      {/* Pending lap confirmation — 5-second countdown before registering */}
-      {pendingLap && (
-        <div className={styles.pendingLap}>
-          <div className={styles.pendingLapBar}>
-            <div
-              className={styles.pendingLapBarFill}
-              style={{ width: `${(countdown / 5) * 100}%`, background: pendingLap.color }}
-            />
-          </div>
-          <div className={styles.pendingLapBody} style={{ borderTop: `3px solid ${pendingLap.color}` }}>
-            <div className={styles.pendingBib}>{pendingLap.rider.bibNumber}</div>
-            <div className={styles.pendingInfo}>
-              <div className={styles.pendingName}>
-                {pendingLap.rider.firstName} {pendingLap.rider.lastName}
-              </div>
-              <div className={styles.pendingCat}>{pendingLap.rider.category}</div>
-            </div>
-            <div className={styles.pendingCountdown}>{countdown}</div>
-            <button
-              className={styles.pendingCancel}
-              onClick={() => {
-                if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
-                setPendingLap(null);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       )}
 

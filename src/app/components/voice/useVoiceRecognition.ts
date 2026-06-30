@@ -119,10 +119,10 @@ export function useVoiceRecognition(options: VoiceRecognitionOptions): VoiceReco
             }
           }
 
-          // Numbers
+          // Numbers — process ALL detected bibs in the transcript
           const numbers = extractNumbers(transcript, languageRef.current);
-          if (numbers.length > 0) {
-            const bibNumber = String(numbers[0]);
+          for (const num of numbers) {
+            const bibNumber = String(num);
             if (validBibsRef.current.has(bibNumber)) {
               onBibDetectedRef.current(bibNumber);
             }

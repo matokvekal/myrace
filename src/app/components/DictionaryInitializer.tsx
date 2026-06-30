@@ -2,14 +2,12 @@
 
 import { useEffect } from "react";
 import { loadClubDictionaryFromFile } from "@/utils/dictionaryLoader";
+import { seedDemoRace } from "@/utils/demoSeed";
 
-/**
- * Initialize club dictionary from JSON file on app startup
- * This component should be placed in the root layout
- */
 export default function DictionaryInitializer() {
   useEffect(() => {
     loadClubDictionaryFromFile();
+    seedDemoRace();
   }, []);
 
   return null;

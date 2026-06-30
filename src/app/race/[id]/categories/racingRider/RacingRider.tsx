@@ -6,11 +6,12 @@ interface Props {
   rider: RiderProps;
   color: string;
   forceBell?: boolean;
+  isFlashing?: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
 }
 
-const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, onClick, onDoubleClick }) => {
+const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isFlashing = false, onClick, onDoubleClick }) => {
   const lastTapRef = useRef<number>(0);
   const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDoubleTapRef = useRef<boolean>(false);
@@ -73,10 +74,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, onClick
     }
   };
 
+  const glowClass = isFlashing ? styles.flash : "";
+
   return (
     <div
-      className={`${styles.rider} ${showStripes ? styles.penultimate : ""}`}
-      style={{ background: bgStyle }}
+      className={`${styles.rider} ${showStripes ? styles.penultimate : ""} ${glowClass}`}
+      style={{ background: bgStyle, "--glow-color": color } as React.CSSProperties}
       onClick={handleClick}
       onDoubleClick={(e) => { e.preventDefault(); }}
       onTouchEnd={handleTouchEnd}
