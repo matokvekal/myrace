@@ -379,6 +379,12 @@ const Heat: React.FC = () => {
     });
   };
 
+  const catOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    waveCategories.forEach((cat, idx) => map.set(cat.name, idx));
+    return map;
+  }, [waveCategories]);
+
   const activeRiders = useMemo(() => {
     const running = filteredRiders.filter((r) => r.raceStatus !== "finished");
     const catFiltered = filterCats.size > 0 ? running.filter((r) => filterCats.has(r.category)) : running;
@@ -392,11 +398,14 @@ const Heat: React.FC = () => {
         )
       : catFiltered;
     return [...searched].sort((a, b) => {
+      const catA = catOrderMap.get(a.category) ?? 999;
+      const catB = catOrderMap.get(b.category) ?? 999;
+      if (catA !== catB) return catA - catB;
       const expA = getExpectedArrival(a, catAvgLapMap.get(a.category) ?? 600000);
       const expB = getExpectedArrival(b, catAvgLapMap.get(b.category) ?? 600000);
       return expA - expB;
     });
-  }, [filteredRiders, searchTerm, filterCats, catAvgLapMap]);
+  }, [filteredRiders, searchTerm, filterCats, catAvgLapMap, catOrderMap]);
 
   // Delayed display order: re-sort only 5s after a lap click, immediately for search/filter changes
   const activeRiderIdsKey = activeRiders.map((r) => r.id).join(",");

@@ -13,7 +13,7 @@ interface VoiceSettingsStore {
 
 const defaultSettings: VoiceSettings = {
   enabled: true,
-  language: 'en',
+  language: 'he',
   model: 'webspeech',
   autoConfirm: true,
 };
