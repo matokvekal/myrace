@@ -24,6 +24,12 @@
   flex-wrap: wrap;
 }
 
+/* ── Wave-pill status system: 3 clearly distinct states ──
+   Upcoming = neutral gray · Running = green (only green state) · Finished = blue.
+   Selection is shown as a solid fill of the pill's own status color, so status
+   and "which wave am I viewing" are always both readable. */
+
+/* Upcoming (not started yet): neutral gray outline chip */
 .wavePill {
   padding: 5px 14px;
   border-radius: 20px;
@@ -33,19 +39,22 @@
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-/* Active pill: deep blue, never black, for contrast across all themes */
+/* Upcoming + selected: solid neutral slate (never blue — blue means finished) */
 .wavePillActive {
-  background: var(--brand-strong);
-  border-color: var(--brand-strong);
-  color: #fff;
+  background: var(--text-secondary);
+  border-color: var(--text-secondary);
+  color: var(--bg-card);
+  box-shadow: 0 2px 6px var(--shadow-md);
 }
 
+/* Running: the only green state */
 .wavePillRunning {
   border-color: var(--ok);
   color: var(--ok-strong);
-  background: rgba(62, 221, 164, 0.08);
+  background: rgba(62, 221, 164, 0.12);
   font-weight: 700;
 }
 
@@ -53,18 +62,22 @@
   background: var(--ok-strong);
   border-color: var(--ok-strong);
   color: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(47, 207, 149, 0.45);
 }
 
+/* Finished: blue = done/closed */
 .wavePillFinished {
-  border-color: var(--border-card);
-  color: var(--text-muted);
-  background: var(--bg-surface);
+  border-color: var(--brand);
+  color: var(--brand-strong);
+  background: rgba(99, 166, 252, 0.12);
+  font-weight: 600;
 }
 
 .wavePillFinished.wavePillActive {
-  background: var(--text-secondary);
-  border-color: var(--text-secondary);
-  color: var(--bg-card);
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(63, 134, 231, 0.35);
 }
 
 .subTabs {
@@ -81,31 +94,29 @@
 .subTab {
   flex: 1;
   padding: 9px 4px;
+  /* Non-selected tabs: the active blue at 20% opacity so they still read as buttons */
   border: 1.5px solid transparent;
-  background: transparent;
+  background: rgba(99, 166, 252, 0.20);
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--brand-strong);
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .subTab:hover {
-  border-color: var(--border-soft);
-  color: var(--text-primary);
+  background: rgba(99, 166, 252, 0.32);
+  border-color: var(--brand);
+  color: var(--brand-strong);
 }
 
-.subTabActive {
-  background: var(--ok-strong);
-  border-color: var(--ok-strong);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(62, 221, 164, 0.35);
-}
-
+.subTabActive,
 .subTabActive:hover {
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
   color: #fff;
-  border-color: var(--ok-strong);
+  box-shadow: 0 2px 6px rgba(63, 134, 231, 0.35);
 }
 
 .subTabGlow {

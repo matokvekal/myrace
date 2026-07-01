@@ -91,7 +91,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
       {/* Sub-tab bar */}
       <div className={styles.subTabs}>
         <button className={`${styles.subTab} ${subTab === "start" ? styles.subTabActive : ""}`} onClick={() => setSubTab("start")}>
-          Start
+          Grid
         </button>
         <button
           className={[
