@@ -320,11 +320,11 @@ export default function ColumnMappingStep({
 
         {mappings.map((mapping, index) => (
           <div key={index} className={styles.mappingRow}>
-            <div className={styles.colCSV} dir="auto">
+            <div className={styles.colCSV} dir="auto" data-label="CSV Column">
               <strong>{mapping.sourceColumn}</strong>
             </div>
 
-            <div className={styles.colSample}>
+            <div className={styles.colSample} data-label="Sample Data">
               <div className={styles.sampleData}>
                 {sampleRows.map((row, i) => (
                   <div key={i} className={styles.sampleItem} dir="auto">
@@ -336,7 +336,7 @@ export default function ColumnMappingStep({
 
             <div className={styles.colArrow}>→</div>
 
-            <div className={styles.colField}>
+            <div className={styles.colField} data-label="App Field">
               <select
                 value={mapping.targetField || ""}
                 onChange={(e) =>
@@ -360,7 +360,7 @@ export default function ColumnMappingStep({
               )}
             </div>
 
-            <div className={styles.colConfidence}>
+            <div className={styles.colConfidence} data-label="Confidence">
               {getConfidenceBadge(mapping.confidence)}
             </div>
           </div>

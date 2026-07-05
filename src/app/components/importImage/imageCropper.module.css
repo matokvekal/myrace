@@ -1,0 +1,99 @@
+.cropper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+}
+
+.stage {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.frame {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #222;
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.mask {
+  fill: rgba(0, 0, 0, 0.5);
+}
+
+.outline {
+  fill: none;
+  stroke: #667eea;
+  stroke-width: 2;
+}
+
+.handle {
+  fill: rgba(102, 126, 234, 0.35);
+  stroke: #667eea;
+  stroke-width: 2;
+  cursor: grab;
+}
+
+.handle:active {
+  cursor: grabbing;
+  fill: rgba(102, 126, 234, 0.6);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.confirmBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 28px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.confirmBtn:hover {
+  transform: translateY(-2px);
+}
+
+.cancelBtn {
+  background: white;
+  color: #555;
+  border: 1.5px solid #ccc;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  border-color: #999;
+}

@@ -2,26 +2,37 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  max-width: 1200px;
+  max-width: 95vw;
   margin: 20px auto;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .wizard {
+    max-width: 90vw;
+  }
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 32px;
+  padding: 20px 24px;
   border-bottom: 1px solid #e0e0e0;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .header h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
   color: #333;
+  flex: 1;
+  min-width: 0;
 }
 
 .closeButton {
@@ -31,6 +42,7 @@
   cursor: pointer;
   color: #999;
   padding: 4px 8px;
+  flex-shrink: 0;
 }
 
 .closeButton:hover {
@@ -39,17 +51,20 @@
 
 .progressBar {
   display: flex;
-  padding: 32px 64px;
+  padding: 24px 20px;
   background: #f8f9fa;
   position: relative;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .progressBar::before {
   content: "";
   position: absolute;
   top: 50%;
-  left: 64px;
-  right: 64px;
+  left: 20px;
+  right: 20px;
   height: 2px;
   background: #e0e0e0;
   z-index: 0;
@@ -60,14 +75,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   position: relative;
   z-index: 1;
 }
 
 .stepNumber {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: white;
   border: 2px solid #e0e0e0;
@@ -76,6 +91,8 @@
   justify-content: center;
   font-weight: 600;
   color: #999;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .step.active .stepNumber {
@@ -91,9 +108,13 @@
 }
 
 .stepLabel {
-  font-size: 14px;
+  font-size: 10px;
   color: #666;
   font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+  padding: 0 4px;
 }
 
 .step.active .stepLabel {
@@ -102,7 +123,69 @@
 }
 
 .content {
-  padding: 32px;
+  padding: 20px;
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 600px) {
+  .header {
+    padding: 20px 28px;
+  }
+
+  .header h2 {
+    font-size: 22px;
+  }
+
+  .progressBar {
+    padding: 24px 40px;
+  }
+
+  .progressBar::before {
+    left: 40px;
+    right: 40px;
+  }
+
+  .content {
+    padding: 24px;
+  }
+}
+
+@media (min-width: 900px) {
+  .header {
+    padding: 24px 32px;
+  }
+
+  .header h2 {
+    font-size: 24px;
+  }
+
+  .progressBar {
+    padding: 32px 64px;
+  }
+
+  .progressBar::before {
+    left: 64px;
+    right: 64px;
+  }
+
+  .step {
+    min-width: auto;
+    gap: 8px;
+  }
+
+  .stepNumber {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .stepLabel {
+    font-size: 14px;
+  }
+
+  .content {
+    padding: 32px;
+  }
 }

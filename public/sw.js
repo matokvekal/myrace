@@ -1,6 +1,6 @@
 /* Commissire service worker — app-shell caching for installability + offline.
  * Bump CACHE_VERSION to force clients onto a fresh cache after a deploy. */
-const CACHE_VERSION = 'commissire-v1';
+const CACHE_VERSION = 'commissire-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -9,6 +9,14 @@ const APP_SHELL = [
   '/logo.png',
   '/pwa-192.png',
   '/pwa-512.png',
+  // Offline OCR (Scan Start List) — vendored by `npm run ocr-assets`.
+  // The two SIMD cores cover all current browsers; the plain-lstm fallback
+  // for legacy devices is served same-origin and cached on first use.
+  '/ocr/worker.min.js',
+  '/ocr/core/tesseract-core-relaxedsimd-lstm.wasm.js',
+  '/ocr/core/tesseract-core-simd-lstm.wasm.js',
+  '/ocr/lang/heb.traineddata',
+  '/ocr/lang/eng.traineddata',
 ];
 
 self.addEventListener('install', (event) => {
