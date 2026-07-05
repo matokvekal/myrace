@@ -17,11 +17,13 @@ Read this file first, then drill into the specific doc as needed.
 | Bug list + code review | `docs/app-review.md` |
 | Feature roadmap (phases 1–5) | `docs/roadmap.md` |
 | CSV import component flow | `docs/csv-import.md` |
+| Photo/OCR start-list import (offline tesseract.js) | `docs/local-ocr.md` |
 | Club dictionary system | `docs/club-dictionary.md` |
 | Rider data structure + store | `docs/rider-data.md` |
 | Race data structure + store | `docs/race-data.md` |
 | Category data structure + store | `docs/category-data.md` |
 | GitHub Pages deployment (CI, custom domain, SPA routing) | `docs/github-pages.md` |
+| Cloud sync, per-race roles, Supabase (numbered doc set) | `docs/cloud/0-START.md` |
 | All CSV field types | `src/app/types/csv.types.ts` — `RiderFieldKey` type |
 | All core types | `src/app/types/types.ts` |
 | Zustand stores | `src/app/stores/` directory |
@@ -31,6 +33,7 @@ Read this file first, then drill into the specific doc as needed.
 src/
 ├── app/
 │   ├── components/csv/           # CSV import wizard (4 steps)
+│   ├── components/importImage/   # Offline photo-OCR import (tesseract.js)
 │   ├── stores/                   # Zustand state + IDB persistence
 │   │   ├── ridersStore.ts
 │   │   ├── categoryStore.ts

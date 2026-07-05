@@ -1,0 +1,260 @@
+.capture {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.instructions h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.instructions p {
+  color: #666;
+  line-height: 1.6;
+  margin: 0;
+  font-size: 14px;
+}
+
+.fileInput {
+  display: none;
+}
+
+.languageRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.languageLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+.languageSelect {
+  padding: 7px 10px;
+  border: 1.5px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+}
+
+.languageSelect:focus {
+  border-color: #667eea;
+  outline: none;
+}
+
+.languageHint {
+  font-size: 12px;
+  color: #999;
+}
+
+.thumbGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.thumbCard {
+  position: relative;
+  width: 110px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.thumbImage {
+  display: block;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.pageBadge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: #667eea;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+.croppedBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.thumbActions {
+  display: flex;
+  border-top: 1px solid #eee;
+}
+
+.thumbActions button {
+  flex: 1;
+  border: none;
+  background: #fafafa;
+  padding: 5px 0;
+  font-size: 12px;
+  color: #555;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumbActions button + button {
+  border-left: 1px solid #eee;
+}
+
+.thumbActions button:hover:not(:disabled) {
+  background: #eef;
+  color: #667eea;
+}
+
+.thumbActions button:disabled {
+  color: #ccc;
+  cursor: default;
+}
+
+.addRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: #667eea;
+  border: 1.5px solid #667eea;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.addBtn:hover:not(:disabled) {
+  background: #f5f3ff;
+}
+
+.addBtn:disabled {
+  border-color: #ccc;
+  color: #aaa;
+  cursor: default;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  background: #fdecea;
+  color: #c0392b;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 14px;
+}
+
+.runBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 28px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.runBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.runBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cancelBtn {
+  background: white;
+  color: #555;
+  border: 1.5px solid #ccc;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  border-color: #999;
+}
+
+/* ── OCR progress ── */
+.progressPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 20px;
+}
+
+.progressIcon {
+  color: #667eea;
+}
+
+.progressLabel {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.progressTrack {
+  width: 100%;
+  max-width: 360px;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  transition: width 0.2s;
+}
+
+.progressNote {
+  margin: 0;
+  font-size: 12px;
+  color: #999;
+}

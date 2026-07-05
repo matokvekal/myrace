@@ -229,6 +229,13 @@
   padding: 32px 0;
 }
 
+.emptyActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .emptyImportBtn {
   background: #667eea;
   color: white;
@@ -457,10 +464,16 @@
   background: white;
   border-radius: 12px;
   width: 100%;
-  max-width: 700px;
+  max-width: 95vw;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+@media (min-width: 768px) {
+  .wizardModal {
+    max-width: 90vw;
+  }
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import styles from "./headerMain.module.css";
 import Images from "@/constants/Images";
 import Button from "@/components/ui/Button";
+import Version from "@/components/Version/Version";
 import { useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
 import Cookies from "js-cookie";
@@ -48,6 +49,7 @@ function HeaderMain() {
         </Button>
         <div className={styles.head}>Commissire - Bike Race</div>
         <div className={styles.right}>
+          <Version />
           <Button
             variant="icon"
             size="md"

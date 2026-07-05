@@ -23,6 +23,9 @@ import { VoiceRadarIcon } from "@/components/voice/VoiceRadarIcon";
 import { DetectedNumbers } from "@/components/voice/DetectedNumbers";
 import { RiderActionLog } from "@/components/voice/RiderActionLog";
 import { extractNumbers } from "@/utils/numberParser";
+import { recordRaceEvent } from "@/services/cloud/raceEvents";
+import { canForRace } from "@/services/cloud/permissions";
+import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 
 function parseTimeStr(t: string | null | undefined): Date | null {
   if (!t) return null;
@@ -44,6 +47,9 @@ const Heat: React.FC = () => {
   const { riders, getRiders, updateRider, updateAllRiders } = useRiderStore();
   const { categories, getCategories } = useCategoryStore();
   const { settings: voiceSettings } = useVoiceSettingsStore();
+
+  // live cloud sync for this race (no-op when race is local-only)
+  useCloudRaceSync(raceUuid);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCats, setFilterCats] = useState<Set<string>>(new Set());
@@ -125,6 +131,11 @@ const Heat: React.FC = () => {
   const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
     if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
 
+    if (!canForRace(raceUuid, "MARK_LAP")) {
+      toast.warn("No permission to mark laps");
+      return;
+    }
+
     const clickTime = new Date();
 
     // Prevent duplicate actions within 500ms (debounce rapid clicks/voice detections)
@@ -184,6 +195,27 @@ const Heat: React.FC = () => {
     updateRider(updatedRider);
     updateAllRiders(finalSorted);
     setSearchTerm(""); // clear search after registering a lap
+
+    // Cloud event log (local-first; no-op side effects for local-only races)
+    void recordRaceEvent({
+      raceUuid,
+      riderId: rider.id,
+      bibNumber: rider.bibNumber,
+      eventType: "LAP_MARKED",
+      lapNumber: lapsCounter,
+      payload: {
+        riderLocalId: rider.id,
+        riderPatch: {
+          lapsCounter: updatedRider.lapsCounter,
+          lapsDetails: updatedRider.lapsDetails,
+          elapsedLastLap: updatedRider.elapsedLastLap,
+          elapsedTimeFromStart: updatedRider.elapsedTimeFromStart,
+          timeArrive: updatedRider.timeArrive,
+          raceStatus: updatedRider.raceStatus,
+          position_category: updatedRider.position_category,
+        },
+      },
+    });
 
     // Trigger flash animation on the rider card
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
@@ -281,29 +313,70 @@ const Heat: React.FC = () => {
 
   const handleRevertLap = (rider: RiderProps) => {
     if (rider.lapsCounter <= 0) { setContextRider(null); return; }
+    if (!canForRace(raceUuid, "UNDO_EVENT")) {
+      toast.warn("No permission to undo laps");
+      setContextRider(null);
+      return;
+    }
     const newDetails = (rider.lapsDetails ?? []).slice(0, -1);
     const prevArrive = newDetails.length > 0
       ? new Date(newDetails[newDetails.length - 1].endTime).toISOString()
       : null;
-    updateRider({
+    const revertedRider: RiderProps = {
       ...rider,
       lapsCounter: rider.lapsCounter - 1,
       lapsDetails: newDetails,
       timeArrive: prevArrive,
       raceStatus: "running",
       elapsedLastLap: newDetails.length > 0 ? newDetails[newDetails.length - 1].lapTime : null,
+    };
+    updateRider(revertedRider);
+    void recordRaceEvent({
+      raceUuid,
+      riderId: rider.id,
+      bibNumber: rider.bibNumber,
+      eventType: "UNDO",
+      lapNumber: rider.lapsCounter,
+      payload: {
+        riderLocalId: rider.id,
+        riderPatch: {
+          lapsCounter: revertedRider.lapsCounter,
+          lapsDetails: revertedRider.lapsDetails,
+          timeArrive: revertedRider.timeArrive,
+          raceStatus: revertedRider.raceStatus,
+          elapsedLastLap: revertedRider.elapsedLastLap,
+        },
+      },
     });
     setContextRider(null);
   };
 
   const handleStatusChange = (rider: RiderProps, status: RiderProps["status"]) => {
     const isOut = ["DNF", "DSQ", "DNS"].includes(status);
+    if (isOut && !canForRace(raceUuid, status === "DNS" ? "MARK_DNS" : "MARK_DNF")) {
+      toast.warn("No permission to change rider status");
+      return;
+    }
     const updatedRider: RiderProps = {
       ...rider,
       status,
       raceStatus: isOut ? "finished" : "running",
     };
     updateRider(updatedRider);
+
+    if (isOut) {
+      void recordRaceEvent({
+        raceUuid,
+        riderId: rider.id,
+        bibNumber: rider.bibNumber,
+        // DSQ rides on the DNF event type; the real status is in the patch
+        eventType: status === "DNS" ? "DNS" : "DNF",
+        payload: {
+          riderLocalId: rider.id,
+          riderPatch: { status: updatedRider.status, raceStatus: updatedRider.raceStatus },
+        },
+      });
+    }
 
     // Add status change to action log for DNF/DSQ/DNS
     if (isOut) {

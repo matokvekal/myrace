@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "./app/page";
 import LoginPage from "./app/login/page";
@@ -10,8 +10,19 @@ import RacePage from "./app/race/[id]/page";
 import HeatPage from "./app/race/[id]/heat/[heatId]/page";
 import StandingPage from "./app/race/[id]/standing/[heatId]/page";
 import { InstallPrompt } from "./app/components/pwa/InstallPrompt";
+import { useCloudStore } from "./app/stores/cloudStore";
+import { isCloudConfigured } from "./app/services/cloud/supabaseClient";
+import { attachOnlineListener } from "./app/services/cloud/cloudSync";
 
 export default function App() {
+  // Restore Supabase session + start the offline->online flush listener.
+  // Both are no-ops when cloud is not configured.
+  useEffect(() => {
+    if (!isCloudConfigured()) return;
+    useCloudStore.getState().init();
+    attachOnlineListener();
+  }, []);
+
   return (
     <>
       <Routes>

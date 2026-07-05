@@ -7,6 +7,8 @@ import useUIStore from "@/stores/uiStore";
 import StatusModal from "../../components/modals/StatusModal";
 import QuickAddRider from "./QuickAddRider";
 import Icons from "@/constants/Icons";
+import { recordRaceEvent } from "@/services/cloud/raceEvents";
+import { canForRace } from "@/services/cloud/permissions";
 
 interface Props {
   raceUuid: string;
@@ -44,13 +46,29 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
 
   const catNames = [...new Set(waveRiders.map((r) => r.category))].sort();
 
+  const recordCheckin = (rider: RiderProps, checked: boolean) => {
+    void recordRaceEvent({
+      raceUuid,
+      riderId: rider.id,
+      bibNumber: rider.bibNumber,
+      eventType: "RIDER_CHECKIN",
+      payload: { riderLocalId: rider.id, riderPatch: { checked } },
+    });
+  };
+
   const toggleCheck = (rider: RiderProps) => {
+    if (!canForRace(raceUuid, "CHECKIN_RIDER")) return;
     updateRider({ ...rider, checked: !rider.checked });
+    recordCheckin(rider, !rider.checked);
   };
 
   const checkAll = () => {
+    if (!canForRace(raceUuid, "CHECKIN_RIDER")) return;
     const unchecked = filtered.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status));
-    unchecked.forEach((r) => updateRider({ ...r, checked: true }));
+    unchecked.forEach((r) => {
+      updateRider({ ...r, checked: true });
+      recordCheckin(r, true);
+    });
   };
 
   const allAccountedFor = filtered.length > 0 && filtered.every(

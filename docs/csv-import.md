@@ -9,7 +9,8 @@
 CSVImportWizard (main orchestrator)
 ├── UploadStep (step 1)
 │   ├── File upload (drag & drop)
-│   └── Template selection
+│   ├── Template selection
+│   └── Scan Start List → ImageCapture (photo OCR — see docs/local-ocr.md)
 ├── ColumnMappingStep (step 2)
 │   ├── Auto-detect columns using dictionary_csv.json
 │   ├── Manual mapping adjustment
@@ -39,9 +40,13 @@ CSVImportWizard (main orchestrator)
 **Types:**
 - `src/app/types/csv.types.ts` - All CSV-related types
 
+**Alternate source (photo OCR):**
+- `src/app/components/importImage/` - Offline OCR import module (see `docs/local-ocr.md`)
+
 ## Data Flow
 
 1. **Upload** → File parsed → Headers detected
+   - 1b. **Scan** (photo OCR) → photos → OCR → table reconstruction → enters the flow at step 2 with `detection: { encoding: 'OCR', delimiter: 'OCR', headerRow: 0 }`
 2. **Mapping** → Columns matched against `dictionary_csv.json` → User confirms mapping
 3. **Preview** → Data validated → Errors highlighted → User reviews
 4. **Import** → Valid rows imported to Zustand stores → Categories rebuilt

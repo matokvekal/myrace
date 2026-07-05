@@ -3,6 +3,7 @@ import styles from "./addRace.module.css";
 import Images from "@/constants/Images";
 import Button from "@/components/ui/Button";
 import { saveRace } from "@/utils/saveRace";
+import { compressImage } from "@/utils/compressImage";
 import useRaceStore from "@/stores/racesStore";
 import { ArrowLeft, ImagePlus } from "lucide-react";
 
@@ -47,9 +48,10 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
       .then(r => r.json())
       .then((data: { images: string[] }) => {
         setGallery(data.images);
-        // Pick first gallery image as default if nothing is selected yet
+        // Pick a random gallery image as default if nothing is selected yet
         if (!selectedImage && data.images.length > 0) {
-          setSelectedImage(`images/${data.images[0]}`);
+          const randomFile = data.images[Math.floor(Math.random() * data.images.length)];
+          setSelectedImage(`images/${randomFile}`);
         }
       })
       .catch(() => { /* no manifest — fall through to asset fallback */ });
@@ -64,12 +66,19 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     return defaultFallback;
   })();
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => setSelectedImage(e.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      // Shrink large uploads to ~100–200 KB so they don't bloat storage.
+      const compressed = await compressImage(file);
+      setSelectedImage(compressed);
+    } catch {
+      // Compression failed (unusual) — fall back to the raw image.
+      const reader = new FileReader();
+      reader.onload = (e) => setSelectedImage(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

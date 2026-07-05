@@ -7,6 +7,7 @@ import EmptyRaces from "./components/emptyRaces/EmptyRaces";
 import RaceCard from "./components/raceCard/RaceCard";
 import RaceTile from "./components/raceTile/RaceTile";
 import DownloadRace from "./components/downloadRace/DownloadRace";
+import CloudRacesSection from "@/components/cloud/CloudRacesSection";
 import Button from "@/components/ui/Button";
 import useRaceStore from "@/stores/racesStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
@@ -100,11 +101,15 @@ const MainPage = () => {
       <HeaderMain />
 
       {isEmpty ? (
-        <EmptyRaces
-          onCreateRace={() => setAddNewRace(true)}
-          onLoadDemo={handleLoadDemo}
-          loadingDemo={loadingDemo}
-        />
+        <>
+          {/* invited users land here with no local races yet */}
+          <CloudRacesSection />
+          <EmptyRaces
+            onCreateRace={() => setAddNewRace(true)}
+            onLoadDemo={handleLoadDemo}
+            loadingDemo={loadingDemo}
+          />
+        </>
       ) : showAll ? (
         /* ── Full list view ── */
         <div className={styles.content}>
@@ -235,6 +240,9 @@ const MainPage = () => {
               ))}
             </div>
           </div>
+
+          {/* Shared cloud races (renders nothing when cloud is off) */}
+          <CloudRacesSection />
 
           {/* Discover / Download section */}
           <div className={styles.section}>

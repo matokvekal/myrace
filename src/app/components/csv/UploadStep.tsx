@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, DragEvent } from "react";
+import { Camera } from "lucide-react";
 import type { MappingTemplate } from "@/types/csv.types";
 import { getAllTemplates } from "@/services/templateStorage";
 import styles from "./uploadStep.module.css";
 
 interface UploadStepProps {
   onFileUpload: (file: File, template?: MappingTemplate) => void;
+  onScanClick?: () => void;
 }
 
 const SUPPORTED_EXTS = ['.csv', '.xlsx', '.xls'];
@@ -20,7 +22,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-export default function UploadStep({ onFileUpload }: UploadStepProps) {
+export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [templates, setTemplates] = useState<MappingTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<MappingTemplate | null>(null);
@@ -137,6 +139,16 @@ export default function UploadStep({ onFileUpload }: UploadStepProps) {
           )}
         </div>
       </div>
+
+      {/* ── Photo OCR source ── */}
+      {onScanClick && (
+        <div className={styles.scanRow}>
+          <span className={styles.scanDivider}>or</span>
+          <button type="button" className={styles.scanButton} onClick={onScanClick}>
+            <Camera size={18} /> Scan Start List (photo)
+          </button>
+        </div>
+      )}
 
       {/* ── Saved templates ── */}
       {templates.length > 0 && (
