@@ -6,7 +6,7 @@
  * worker precaches them at install (public/sw.js).
  */
 
-import { createWorker, OEM } from 'tesseract.js';
+import { createWorker, OEM, PSM } from 'tesseract.js';
 import type { Worker as TesseractWorker } from 'tesseract.js';
 import type { OCRProvider } from './OCRProvider';
 import type { OCRPageResult, OCRWord, OcrLanguages } from './types';
@@ -42,7 +42,13 @@ export class TesseractProvider implements OCRProvider {
       });
       // Canvases carry no DPI; without a hint Tesseract guesses (often badly
       // for dense Hebrew print). ~300dpi matches an A4 page at our OCR size.
-      await this.worker.setParameters({ user_defined_dpi: '300' });
+      // SINGLE_BLOCK: automatic page segmentation silently drops whole table
+      // lines at small glyph sizes and around filled cells; the input is one
+      // uniform table and TableParser rebuilds columns from word boxes anyway.
+      await this.worker.setParameters({
+         user_defined_dpi: '300',
+         tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+      });
       onProgress?.(1);
    }
 
