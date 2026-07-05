@@ -1,6 +1,7 @@
 import React from "react";
 import styles from "./headerRace.module.css";
 import Button from "@/components/ui/Button";
+import Version from "@/components/Version/Version";
 import { useNavigate } from "react-router-dom";
 import useUIStore from "@/stores/uiStore";
 import { ArrowLeft, Flag, MoreHorizontal, X } from "lucide-react";
@@ -50,6 +51,7 @@ function HeaderRace() {
       </div>
 
       <div className={styles.right}>
+        <Version />
         {!isRaceMode && (
           <Button
             variant="icon"

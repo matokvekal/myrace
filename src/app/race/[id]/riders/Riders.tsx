@@ -9,6 +9,7 @@ import Icons from "@/constants/Icons";
 import { shallow } from "zustand/shallow";
 import { debounce } from "lodash";
 import CSVImportWizard from "@/components/csv/CSVImportWizard";
+import ScanDocumentButton from "@/components/importImage/ScanDocumentButton";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
@@ -64,6 +65,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [importMode, setImportMode] = useState<"file" | "scan">("file");
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -198,15 +200,19 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
             </button>
           </div>
 
-          {/* Import button */}
+          {/* Import buttons */}
           <Button
             variant="secondary"
             size="sm"
             className={styles.importBtn}
-            onClick={() => setShowImportWizard(true)}
+            onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
           >
             Import CSV
           </Button>
+          <ScanDocumentButton
+            variant="bar"
+            onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
+          />
         </div>
       </div>
 
@@ -363,9 +369,18 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
       ) : (
         <div className={styles.emptyState}>
           <p className={styles.empty}>No riders yet.</p>
-          <button className={styles.emptyImportBtn} onClick={() => setShowImportWizard(true)}>
-            Import CSV
-          </button>
+          <div className={styles.emptyActions}>
+            <button
+              className={styles.emptyImportBtn}
+              onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+            >
+              Import CSV
+            </button>
+            <ScanDocumentButton
+              variant="empty"
+              onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
+            />
+          </div>
         </div>
       )}
 
@@ -393,6 +408,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
           <div className={styles.wizardModal}>
             <CSVImportWizard
               raceUuid={raceUuid}
+              initialMode={importMode}
               onClose={() => setShowImportWizard(false)}
               onComplete={() => {
                 setShowImportWizard(false);

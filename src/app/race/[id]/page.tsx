@@ -18,6 +18,9 @@ import RaceMode from "./raceMode/RaceMode";
 import EditRiders from "./editRiders/EditRiders";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
+import RaceCloudPanel from "@/components/cloud/RaceCloudPanel";
+import useCloudRaceSync from "@/hooks/useCloudRaceSync";
+import { canForRace } from "@/services/cloud/permissions";
 
 const TABS = [
   "schedule",
@@ -26,6 +29,7 @@ const TABS = [
   "results",
   "edit",
   "map",
+  "cloud",
   "info"
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -49,6 +53,9 @@ const Race: React.FC = () => {
 
   const isRaceMode = useUIStore((s) => s.isRaceMode);
   const { activeTab, setActiveTab } = useDataStore();
+
+  // no-op unless this race is cloud-linked and the user is logged in
+  useCloudRaceSync(raceUuid);
 
   const race = useMemo(
     () => races.find((r) => r.uuid === raceUuid) ?? null,
@@ -152,10 +159,15 @@ const Race: React.FC = () => {
                 />
               )}
               {activeTabSafe === "map" && <Map raceUuid={raceUuid} />}
+              {activeTabSafe === "cloud" && <RaceCloudPanel race={race} />}
               {activeTabSafe === "info" && (
                 <Info
                   race={race}
                   onDeleteRace={async () => {
+                    if (!canForRace(raceUuid, "DELETE_RACE")) {
+                      alert("No permission to delete this race");
+                      return;
+                    }
                     await deleteRidersByRace(raceUuid);
                     await deleteRace(raceUuid);
                     navigate("/");

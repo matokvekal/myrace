@@ -16,6 +16,13 @@ export interface RaceCardProps {
 
 
 
+export interface TrackMarker {
+  lat: number;
+  lng: number;
+  label: string;
+  type?: "start" | "finish" | "feed" | "point";
+}
+
 export interface RaceProps {
   id: number;
   uuid: string;
@@ -40,6 +47,11 @@ export interface RaceProps {
   isActive: boolean;
   isFavorite?: boolean;
   map: string;
+  // Map / course area
+  mapCenter?: { lat: number; lng: number };  // race area center
+  mapZoom?: number;                            // preferred zoom for the area
+  trackPoints?: [number, number][];            // course polyline: [lat, lng] pairs
+  mapMarkers?: TrackMarker[];                   // custom points (start, feed zone, etc.)
   distance: number;
   isPrivate?: boolean;  // If true, requires password to download
   password?: string;    // Password for private races

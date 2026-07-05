@@ -1,9 +1,10 @@
 import { openDB, IDBPDatabase } from "idb";
 import { RiderProps, RaceProps, CategoryProps } from "@/types/types";
 import { Role, User } from "@/types/rbac.types";
+import type { RaceEvent, SyncStatus } from "@/types/cloud.types";
 
 const DB_NAME = "commissireDb";
-const DB_VERSION = 8; // Incremented to add roles and users stores
+const DB_VERSION = 9; // v9: race_events store for cloud sync
 
 export const initIndexedDB = async (): Promise<IDBPDatabase> => {
   try {
@@ -24,6 +25,12 @@ export const initIndexedDB = async (): Promise<IDBPDatabase> => {
         }
         if (!db.objectStoreNames.contains("users")) {
           db.createObjectStore("users", { keyPath: "id" });
+        }
+        // Cloud sync event log (v9)
+        if (!db.objectStoreNames.contains("race_events")) {
+          const store = db.createObjectStore("race_events", { keyPath: "id" });
+          store.createIndex("byRace", "raceId");
+          store.createIndex("bySyncStatus", "syncStatus");
         }
       },
     });
@@ -236,5 +243,80 @@ export const deleteUserFromDb = async (userId: string): Promise<void> => {
     db.close();
   } catch (error) {
     console.error("Error deleting user from IndexedDB:", error);
+  }
+};
+
+// ============================================================================
+// Cloud Sync - Race Events Log (v9)
+// ============================================================================
+
+// Add or replace a race event
+export const putRaceEventInDb = async (event: RaceEvent): Promise<void> => {
+  try {
+    const db = await initIndexedDB();
+    await db.put("race_events", event);
+    db.close();
+  } catch (error) {
+    console.error("Error saving race event to IndexedDB:", error);
+  }
+};
+
+// Get all events for a race (local uuid)
+export const getRaceEventsFromDb = async (raceUuid: string): Promise<RaceEvent[]> => {
+  try {
+    const db = await initIndexedDB();
+    const events = await db.getAllFromIndex("race_events", "byRace", raceUuid);
+    db.close();
+    return events || [];
+  } catch (error) {
+    console.error("Error fetching race events from IndexedDB:", error);
+    return [];
+  }
+};
+
+// Get events waiting to be pushed to the cloud
+export const getPendingEventsFromDb = async (raceUuid?: string): Promise<RaceEvent[]> => {
+  try {
+    const db = await initIndexedDB();
+    const pending: RaceEvent[] = await db.getAllFromIndex(
+      "race_events",
+      "bySyncStatus",
+      "pending"
+    );
+    db.close();
+    return raceUuid ? pending.filter((e) => e.raceId === raceUuid) : pending;
+  } catch (error) {
+    console.error("Error fetching pending events from IndexedDB:", error);
+    return [];
+  }
+};
+
+// Check if an event id already exists (dedupe for realtime merge)
+export const raceEventExistsInDb = async (eventId: string): Promise<boolean> => {
+  try {
+    const db = await initIndexedDB();
+    const found = await db.get("race_events", eventId);
+    db.close();
+    return Boolean(found);
+  } catch (error) {
+    console.error("Error checking race event in IndexedDB:", error);
+    return false;
+  }
+};
+
+// Update the sync status of one event
+export const setRaceEventStatusInDb = async (
+  eventId: string,
+  syncStatus: SyncStatus
+): Promise<void> => {
+  try {
+    const db = await initIndexedDB();
+    const event = await db.get("race_events", eventId);
+    if (event) {
+      await db.put("race_events", { ...event, syncStatus });
+    }
+    db.close();
+  } catch (error) {
+    console.error("Error updating race event status in IndexedDB:", error);
   }
 };

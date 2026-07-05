@@ -32,7 +32,7 @@ const StandingCard: React.FC<StandingCardProps> = ({
       <div className={styles.left}>
         <div className={styles.imageWrapper}>
           <img className={styles.imageRider} src={Images.user} alt="Rider" width={36} height={36} />
-          <img className={styles.imageFlag} src={Icons.flag_us} alt="Flag" width={14} height={14} />
+          <img className={styles.imageFlag} src={`/international/${rider.flag || "il"}.svg`} alt={rider.flag || "il"} width={14} height={14} />
         </div>
       </div>
 

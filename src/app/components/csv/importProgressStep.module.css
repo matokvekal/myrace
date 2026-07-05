@@ -1,26 +1,27 @@
 .progressStep {
-  padding: 40px 32px;
+  padding: 24px 16px;
 }
 
 /* ── Importing state ── */
 .header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 28px;
 }
 
 .header h3 {
-  margin: 0 0 12px;
-  font-size: 24px;
+  margin: 0 0 8px;
+  font-size: 20px;
 }
 
 .header p {
   color: #666;
   margin: 0;
+  font-size: 14px;
 }
 
 .progressContainer {
-  margin: 0 auto 32px;
-  max-width: 500px;
+  margin: 0 auto 24px;
+  max-width: 100%;
 }
 
 .progressBar {
@@ -58,35 +59,37 @@
 
 .headlineOk {
   margin: 0;
-  font-size: 26px;
+  font-size: 22px;
   color: #2e7d32;
 }
 
 .headlineWarn {
   margin: 0;
-  font-size: 26px;
+  font-size: 22px;
   color: #e65100;
 }
 
 .completedStats {
   display: flex;
   justify-content: center;
-  gap: 48px;
-  padding: 24px 32px;
+  gap: 20px;
+  padding: 16px 12px;
   background: #f8f9fa;
   border-radius: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .completedStat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex: 0 0 auto;
 }
 
 .completedLabel {
-  font-size: 13px;
+  font-size: 11px;
   color: #888;
   font-weight: 500;
   text-transform: uppercase;
@@ -94,7 +97,7 @@
 }
 
 .completedValue {
-  font-size: 40px;
+  font-size: 28px;
   font-weight: 700;
   color: #333;
   line-height: 1;
@@ -221,4 +224,51 @@
 
 .closeButton:hover {
   transform: translateY(-2px);
+}
+
+@media (min-width: 640px) {
+  .progressStep {
+    padding: 40px 32px;
+  }
+
+  .header {
+    margin-bottom: 40px;
+  }
+
+  .header h3 {
+    font-size: 24px;
+    margin-bottom: 12px;
+  }
+
+  .header p {
+    font-size: 16px;
+  }
+
+  .progressContainer {
+    max-width: 500px;
+    margin-bottom: 32px;
+  }
+
+  .headlineOk,
+  .headlineWarn {
+    font-size: 26px;
+  }
+
+  .completedStats {
+    gap: 48px;
+    padding: 24px 32px;
+    margin-bottom: 28px;
+  }
+
+  .completedLabel {
+    font-size: 13px;
+  }
+
+  .completedValue {
+    font-size: 40px;
+  }
+
+  .logTable {
+    max-height: 280px;
+  }
 }

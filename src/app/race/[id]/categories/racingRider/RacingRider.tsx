@@ -113,7 +113,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isFlash
           <span className={styles.lapTimeCell}>{sinceArrive ?? "--:--"}</span>
         </div>
       )}
-      <div className={styles.pos}>{rider.position_category ?? "—"}</div>
+      <div className={`${styles.pos} ${typeof rider.position_category === "number" && rider.position_category >= 1 && rider.position_category <= 3 ? styles.posPodium : ""}`}>{rider.position_category ?? "—"}</div>
     </div>
   );
 };

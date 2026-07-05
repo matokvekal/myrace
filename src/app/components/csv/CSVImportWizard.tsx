@@ -22,6 +22,7 @@ import ColumnMappingStep from "./ColumnMappingStep";
 import PreviewStep from "./PreviewStep";
 import ImportProgressStep from "./ImportProgressStep";
 import MultiDayDialog from "./MultiDayDialog";
+import ImageCapture from "@/components/importImage/ImageCapture";
 import styles from "./csvImportWizard.module.css";
 
 type WizardStep = "upload" | "mapping" | "preview" | "importing";
@@ -30,6 +31,8 @@ interface CSVImportWizardProps {
   raceUuid: string;
   onClose: () => void;
   onComplete?: (count: number) => void;
+  /** "scan" opens directly on the photo-OCR source instead of file upload */
+  initialMode?: "file" | "scan";
 }
 
 const STEP_ORDER: WizardStep[] = ["upload", "mapping", "preview", "importing"];
@@ -191,9 +194,11 @@ function rowToRider(
 export default function CSVImportWizard({
   raceUuid,
   onClose,
-  onComplete
+  onComplete,
+  initialMode = "file"
 }: CSVImportWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>("upload");
+  const [scanMode, setScanMode] = useState(initialMode === "scan");
   const [parseResult, setParseResult] = useState<CSVParseResult | null>(null);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
@@ -240,6 +245,16 @@ export default function CSVImportWizard({
       console.error("Failed to parse file:", error);
       alert("Failed to parse file. Please check the file format.");
     }
+  };
+
+  // Photo-OCR source: same handoff as handleFileUpload, minus file parsing
+  const handleOcrParsed = async (result: CSVParseResult) => {
+    setParseResult(result);
+    const autoMappings = await autoMapColumns(result.headers);
+    setSuggestedName("Scanned start list");
+    setColumnMappings(autoMappings);
+    setScanMode(false);
+    setCurrentStep("mapping");
   };
 
   const handleMappingConfirm = (mappings: ColumnMapping[]) => {
@@ -413,6 +428,7 @@ export default function CSVImportWizard({
 
   const handleClose = () => {
     setCurrentStep("upload");
+    setScanMode(false);
     setParseResult(null);
     setColumnMappings([]);
     setImportProgress(null);
@@ -429,7 +445,7 @@ export default function CSVImportWizard({
   return (
     <div className={styles.wizard}>
       <div className={styles.header}>
-        <h2>Import Riders from CSV</h2>
+        <h2>{currentStep === "upload" && scanMode ? "Import Riders from Photo" : "Import Riders from CSV"}</h2>
         <button className={styles.closeButton} onClick={handleClose}>
           ✕
         </button>
@@ -466,9 +482,18 @@ export default function CSVImportWizard({
       )}
 
       <div className={styles.content}>
-        {currentStep === "upload" && (
-          <UploadStep onFileUpload={(file, tpl) => handleFileUpload(file, tpl)} />
-        )}
+        {currentStep === "upload" &&
+          (scanMode ? (
+            <ImageCapture
+              onComplete={handleOcrParsed}
+              onCancel={() => setScanMode(false)}
+            />
+          ) : (
+            <UploadStep
+              onFileUpload={(file, tpl) => handleFileUpload(file, tpl)}
+              onScanClick={() => setScanMode(true)}
+            />
+          ))}
         {currentStep === "mapping" && parseResult && (
           <ColumnMappingStep
             headers={parseResult.headers}

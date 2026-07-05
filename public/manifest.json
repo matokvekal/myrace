@@ -1,21 +1,32 @@
 {
+  "id": "/",
   "name": "Commissire - Bike Race",
-  "short_name": "Commissire - Bike Race",
+  "short_name": "Commissire",
   "description": "Simple bike race management",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#caf3f9",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/pwa-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/logo.png",
+      "src": "/pwa-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

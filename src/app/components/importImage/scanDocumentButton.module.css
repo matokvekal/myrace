@@ -1,0 +1,23 @@
+.barBtn {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.emptyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: #667eea;
+  border: 1.5px solid #667eea;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.emptyBtn:hover {
+  background: #f5f3ff;
+}

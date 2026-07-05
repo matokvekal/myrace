@@ -1,0 +1,43 @@
+{
+  "baseLocale": "en",
+  "defaultLocale": "en",
+  "locales": [
+    { "locale": "en", "label": "English", "country": "US", "dir": "ltr" },
+    { "locale": "he", "label": "עברית", "country": "IL", "dir": "rtl" }
+  ],
+  "countryToLocale": {
+    "US": "en",
+    "GB": "en",
+    "AU": "en",
+    "IL": "he"
+  },
+  "fieldPriority": {
+    "bibNumber": 10,
+    "category": 9,
+    "firstName": 8,
+    "lastName": 8,
+    "subCategory": 8,
+    "raceDay": 8,
+    "fullName": 7,
+    "heat": 7,
+    "team": 6,
+    "startTime": 6,
+    "standing": 6,
+    "middleName": 5,
+    "gender": 5,
+    "totalLaps": 5,
+    "points": 5,
+    "federation": 5,
+    "position": 4,
+    "firstNameEnglish": 4,
+    "lastNameEnglish": 4,
+    "uciNumber": 4,
+    "idNumber": 4,
+    "birthDate": 3,
+    "federationNumber": 3,
+    "federationChip": 3,
+    "roadNumber": 3,
+    "chip": 3,
+    "notes": 2
+  }
+}
