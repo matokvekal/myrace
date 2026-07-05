@@ -137,9 +137,61 @@ export function detectVerticalRules(canvas: HTMLCanvasElement): number[] {
 export interface PreprocessOptions {
    /** Hard binary threshold (0-255). Off by default — see module comment. */
    threshold?: number;
+   /** Local background flattening (highlighted cells, uneven light). Default on. */
+   flatten?: boolean;
 }
 
-/** Grayscale + contrast-stretched copy sized for OCR. */
+/**
+ * Local background estimate: separable sliding-window MAXIMUM (grayscale
+ * dilation) with an O(n) monotonic-deque per row/column. Ink is always
+ * darker than its surroundings, so the windowed max ≈ the local background
+ * level — a highlighted cell's fill, a shadow, or plain paper white.
+ */
+function localBackground(
+   gray: Uint8ClampedArray,
+   width: number,
+   height: number,
+   radius: number
+): Uint8ClampedArray {
+   const horizontal = new Uint8ClampedArray(gray.length);
+   const out = new Uint8ClampedArray(gray.length);
+   const deque = new Int32Array(Math.max(width, height) + 1);
+
+   for (let y = 0; y < height; y++) {
+      const off = y * width;
+      let head = 0;
+      let tail = 0;
+      for (let x = 0; x < width + radius; x++) {
+         if (x < width) {
+            const v = gray[off + x];
+            while (tail > head && gray[off + deque[tail - 1]] <= v) tail--;
+            deque[tail++] = x;
+         }
+         const outX = x - radius;
+         if (outX < 0) continue;
+         while (deque[head] < outX - radius) head++;
+         horizontal[off + outX] = gray[off + deque[head]];
+      }
+   }
+   for (let x = 0; x < width; x++) {
+      let head = 0;
+      let tail = 0;
+      for (let y = 0; y < height + radius; y++) {
+         if (y < height) {
+            const v = horizontal[y * width + x];
+            while (tail > head && horizontal[deque[tail - 1] * width + x] <= v) tail--;
+            deque[tail++] = y;
+         }
+         const outY = y - radius;
+         if (outY < 0) continue;
+         while (deque[head] < outY - radius) head++;
+         out[outY * width + x] = horizontal[deque[head] * width + x];
+      }
+   }
+   return out;
+}
+
+/** Grayscale + background flattening + contrast-stretched copy sized for OCR. */
 export function preprocessForOCR(
    src: HTMLCanvasElement,
    options: PreprocessOptions = {}
@@ -150,15 +202,33 @@ export function preprocessForOCR(
    const pix = imageData.data;
    const pixelCount = canvas.width * canvas.height;
 
-   // Grayscale (luma) + histogram in one pass
+   // Grayscale (luma)
    const gray = new Uint8ClampedArray(pixelCount);
-   const histogram = new Uint32Array(256);
    for (let i = 0; i < pixelCount; i++) {
       const idx = i * 4;
-      const value = 0.299 * pix[idx] + 0.587 * pix[idx + 1] + 0.114 * pix[idx + 2];
-      gray[i] = value;
-      histogram[gray[i]]++;
+      gray[i] = 0.299 * pix[idx] + 0.587 * pix[idx + 1] + 0.114 * pix[idx + 2];
    }
+
+   // Flatten the background: rescale every pixel against its local
+   // background level. Start lists highlight cells with colored fills;
+   // after a *global* stretch such a fill stays a mid-gray slab that
+   // Tesseract's binarization turns solid black — the cell's text (and
+   // often the neighboring lines' layout) is lost. Dividing by the local
+   // max turns "dark text on colored fill" into dark text on white while
+   // leaving ink and ruling lines dark. Window radius must exceed the
+   // widest ink stroke but stay below cell height (~1/120 of the page).
+   const histogram = new Uint32Array(256);
+   if (options.flatten !== false) {
+      const radius = Math.max(4, Math.round(Math.max(canvas.width, canvas.height) / 120));
+      const background = localBackground(gray, canvas.width, canvas.height, radius);
+      for (let i = 0; i < pixelCount; i++) {
+         // Floor the divisor: inside large solid-dark areas (page borders,
+         // photo edges) there is no background to normalize against.
+         const value = (gray[i] * 255) / Math.max(background[i], 64);
+         gray[i] = value > 255 ? 255 : value;
+      }
+   }
+   for (let i = 0; i < pixelCount; i++) histogram[gray[i]]++;
 
    // Contrast stretch: remap the 2nd..98th percentile range to 0..255
    const lowCount = pixelCount * 0.02;
