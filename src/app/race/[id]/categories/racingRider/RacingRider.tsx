@@ -30,14 +30,17 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isFlash
   const showBell = forceBell || (lapsRemaining === 2);
   const showStripes = forceBell || (lapsRemaining === 1);
 
-  // Live ticking clock: how long since this rider last crossed (or since race start if never)
+  // Live ticking clock: how long since this rider last crossed (or since race start if never).
+  // Only ticks once the race has actually started — before that the card shows a frozen 00:00.
+  const hasStarted = rider.raceStatus === "running" || rider.raceStatus === "finished";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!hasStarted) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [hasStarted]);
   const sinceArriveBaseline = parseTimeToMs(rider.timeArrive) ?? parseTimeToMs(rider.timeStartRace);
-  const sinceArrive = sinceArriveBaseline != null
+  const sinceArrive = hasStarted && sinceArriveBaseline != null
     ? formatTime((now - sinceArriveBaseline) / 1000)
     : null;
 
@@ -107,7 +110,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isFlash
           {lapsRemaining === 1 ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
         </div>
       )}
-      {(lastLapTime || sinceArrive) && (
+      {!hasStarted ? (
+        <div className={styles.lapTime}>
+          <span className={styles.lapTimeCell}>00:00</span>
+          <span className={styles.lapTimeCell}>00:00</span>
+        </div>
+      ) : (lastLapTime || sinceArrive) && (
         <div className={styles.lapTime}>
           <span className={styles.lapTimeCell}>{lastLapTime ?? "--:--"}</span>
           <span className={styles.lapTimeCell}>{sinceArrive ?? "--:--"}</span>

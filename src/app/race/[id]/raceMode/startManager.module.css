@@ -352,6 +352,55 @@
   filter: grayscale(0.3);
 }
 
+/* Blocked but still tappable — tap shows the reasons modal */
+.btnBlocked {
+  opacity: 0.45;
+  filter: grayscale(0.3);
+}
+
+.blockedPanel {
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  background: rgba(255, 152, 50, 0.08);
+  border: 1px solid rgba(255, 152, 50, 0.35);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.blockedTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #c05000;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.blockedReason {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding-inline-start: 20px;
+  position: relative;
+}
+
+.blockedReason::before {
+  content: "•";
+  position: absolute;
+  inset-inline-start: 8px;
+  color: #e08030;
+}
+
+.blockedHint {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--text-secondary, #888);
+  padding-inline-start: 20px;
+}
+
 .startBtn {
   flex: 2;
   display: flex;

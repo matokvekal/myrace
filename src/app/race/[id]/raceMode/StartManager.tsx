@@ -836,6 +836,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
         const firstStartTime = cats.find((c) => c.startTime)?.startTime;
         const catIssuesMap = Object.fromEntries(cats.map((c) => [c.id, getCatIssues(c)]));
         const totalIssues = Object.values(catIssuesMap).reduce((s, arr) => s + arr.length, 0);
+        const groupBlockReasons = totalIssues > 0 ? validateGroup(group) : [];
 
         /* ── FINISHED ── */
         if (isFinished) {
@@ -1052,12 +1053,29 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                   })}
                 </div>
 
+                {totalIssues > 0 && (
+                  <div className={styles.blockedPanel}>
+                    <div className={styles.blockedTitle}>
+                      <AlertTriangle size={14} />
+                      <span>Not ready to start</span>
+                    </div>
+                    {groupBlockReasons.map((msg, i) => (
+                      <div key={i} className={styles.blockedReason} dir="auto">
+                        {msg}
+                      </div>
+                    ))}
+                    <div className={styles.blockedHint}>
+                      Set laps in Categories and check riders in at Check-In to enable start.
+                    </div>
+                  </div>
+                )}
+
                 <div className={styles.actions}>
                   {[30, 60, 120].map((sec) => (
                     <button
                       key={sec}
-                      className={styles.countdownBtn}
-                      disabled={totalIssues > 0}
+                      className={`${styles.countdownBtn} ${totalIssues > 0 ? styles.btnBlocked : ""}`}
+                      aria-disabled={totalIssues > 0}
                       title={totalIssues > 0 ? "Resolve check-in / laps issues first" : undefined}
                       onClick={() => {
                         const errors = validateGroup(group);
@@ -1069,8 +1087,8 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                     </button>
                   ))}
                   <button
-                    className={styles.startBtn}
-                    disabled={totalIssues > 0}
+                    className={`${styles.startBtn} ${totalIssues > 0 ? styles.btnBlocked : ""}`}
+                    aria-disabled={totalIssues > 0}
                     title={totalIssues > 0 ? "Resolve check-in / laps issues first" : undefined}
                     onClick={() => startGroup(group)}
                   >
