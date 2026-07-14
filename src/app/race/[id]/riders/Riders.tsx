@@ -239,9 +239,10 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode })
               <Layers size={16} />
             </button>
           </div>
+        </div>
 
-          {/* Actions dropdown — Import / Scan / Edit */}
-          <div className={styles.actionsMenu} ref={actionsRef}>
+        {/* Actions dropdown — Import / Scan / Edit (right end of the bar) */}
+        <div className={styles.actionsMenu} ref={actionsRef}>
             <button
               type="button"
               className={styles.actionsTrigger}
@@ -282,7 +283,6 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode })
                 )}
               </div>
             )}
-          </div>
         </div>
       </div>
 

@@ -121,3 +121,37 @@
     font-size: 12.5px;
   }
 }
+
+/* compactOnMobile (heat header): the switcher shares the row with the race
+   info and the clock/settings. On phones the WORDS stay (Race / Start / Live)
+   and the icons go — the words are what the commissaire reads at a glance. */
+@media (max-width: 640px) {
+  .compactOnMobile {
+    gap: 4px;
+    width: auto;
+  }
+  .compactOnMobile .btn {
+    flex: 0 0 auto;
+    padding: 8px;
+    gap: 4px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+  .compactOnMobile .btn svg {
+    display: none;
+  }
+}
+
+/* Very narrow phones only: no room for words — fall back to icon-only */
+@media (max-width: 380px) {
+  .compactOnMobile .btn {
+    padding: 8px 9px;
+    gap: 0;
+  }
+  .compactOnMobile .btn svg {
+    display: block;
+  }
+  .compactOnMobile .label {
+    display: none;
+  }
+}

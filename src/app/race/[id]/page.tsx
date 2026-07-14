@@ -18,6 +18,7 @@ import RaceMode from "./raceMode/RaceMode";
 import EditRiders from "./editRiders/EditRiders";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
+import { DEMO_RACE_UUID, DEMO_LIVE_ONBOARD_KEY } from "@/utils/demoSeed";
 // import RaceCloudPanel from "@/components/cloud/RaceCloudPanel"; // cloud tab hidden for now
 import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { canForRace } from "@/services/cloud/permissions";
@@ -56,6 +57,20 @@ const Race: React.FC = () => {
 
   // no-op unless this race is cloud-linked and the user is logged in
   useCloudRaceSync(raceUuid);
+
+  // Demo onboarding: the demo seeds mid-race (Wave 1 live on course), so the
+  // FIRST open of the demo race in a session jumps straight to the Live page.
+  // One-shot via sessionStorage — the user can still navigate back afterwards.
+  useEffect(() => {
+    if (raceUuid !== DEMO_RACE_UUID) return;
+    try {
+      if (sessionStorage.getItem(DEMO_LIVE_ONBOARD_KEY)) return;
+      sessionStorage.setItem(DEMO_LIVE_ONBOARD_KEY, "1");
+    } catch {
+      return;
+    }
+    navigate(`/race/${raceUuid}/heat/1`, { replace: true });
+  }, [raceUuid, navigate]);
 
   const race = useMemo(
     () => races.find((r) => r.uuid === raceUuid) ?? null,

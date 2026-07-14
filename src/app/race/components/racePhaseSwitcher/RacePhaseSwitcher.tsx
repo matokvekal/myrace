@@ -14,7 +14,9 @@ import styles from "./racePhaseSwitcher.module.css";
 
 type Phase = "setup" | "race" | "live";
 
-const RacePhaseSwitcher: React.FC = () => {
+/** `compact` — for tight headers (live heat): drops button labels to icon-only
+ *  on narrow screens so the header's clock/settings never overflow off-screen. */
+const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const navigate = useNavigate();
   const params = useParams();
   const raceUuid = params?.id as string;
@@ -53,7 +55,11 @@ const RacePhaseSwitcher: React.FC = () => {
   ];
 
   return (
-    <div className={styles.switcher} role="tablist" aria-label="Race phase">
+    <div
+      className={`${styles.switcher} ${compact ? styles.compactOnMobile : ""}`}
+      role="tablist"
+      aria-label="Race phase"
+    >
       {items.map((it) => {
         const active = phase === it.key;
         return (

@@ -21,7 +21,7 @@ const THEME_OPTIONS: { value: Theme; label: string; bg: string; accent: string; 
 
 const SKIN_OPTIONS: { value: Skin; label: string; bg: string; radius: string }[] = [
   { value: 'classic', label: 'Classic', bg: 'linear-gradient(145deg, #63a6fc, #4a8ee7)', radius: '10px' },
-  { value: 'gaming',  label: 'Gaming',  bg: 'linear-gradient(145deg, #ff2fd0, #7a2bff)', radius: '3px' },
+  { value: 'gaming',  label: 'PRO',  bg: 'linear-gradient(145deg, #1d3d78, #e0a92c)', radius: '3px' },
 ];
 
 function HeaderMain() {

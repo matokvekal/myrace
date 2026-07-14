@@ -42,8 +42,8 @@ function HeaderHeat({ raceId, onSettingsClick }: { raceId: string; onSettingsCli
         </div>
       </div>
 
-      {/* Always-visible Setup / Race / Live switcher */}
-      <RacePhaseSwitcher />
+      {/* Always-visible Setup / Race / Live switcher (icon-only on phones) */}
+      <RacePhaseSwitcher compact />
 
       <div className={styles.rightSection}>
         <div className={styles.timeDisplay}>

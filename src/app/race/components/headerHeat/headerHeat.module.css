@@ -15,6 +15,7 @@
   align-items: center;
   gap: 12px;
   flex: 1;
+  min-width: 0; /* let the race name truncate instead of pushing the clock off-screen */
 }
 
 .backBtn {
@@ -150,7 +151,7 @@
 @media (max-width: 640px) {
   .headerRace {
     height: 56px;
-    padding: 0 12px;
+    padding: 0 10px;
     gap: 8px;
   }
 
@@ -169,10 +170,36 @@
   }
 
   .time {
-    font-size: 14px;
+    font-size: 13px;
+    letter-spacing: 0;
   }
 
   .timeDisplay {
-    padding: 6px 10px;
+    padding: 5px 8px;
+  }
+
+  /* Clock digits alone are enough on a phone */
+  .timeLabel {
+    display: none;
+  }
+
+  .rightSection {
+    gap: 8px;
+  }
+
+  .raceLiveLabel {
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+}
+
+/* Very narrow phones: drop the race name — RACE LIVE + wave say enough */
+@media (max-width: 400px) {
+  .raceName {
+    display: none;
+  }
+
+  .headerRace {
+    gap: 6px;
   }
 }

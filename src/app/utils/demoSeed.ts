@@ -6,6 +6,16 @@ import type { RaceProps, CategoryProps, RiderProps } from "@/types/types";
 
 export const DEMO_RACE_UUID = "demo-race-99001";
 
+// sessionStorage key: first open of the demo race jumps straight to the Live
+// page (the seed is mid-race); the flag makes that a one-shot per session so
+// the user can still navigate back to Setup/Race afterwards.
+export const DEMO_LIVE_ONBOARD_KEY = "demo-live-onboarded";
+
+// Bump this to force every existing install to re-seed the demo on next app
+// load (localStorage-stamped). v2 = mid-race snapshot with live Wave 1.
+const DEMO_SEED_VERSION = "2";
+const DEMO_SEED_VERSION_KEY = "demo-seed-version";
+
 const _now = new Date();
 const _dd = String(_now.getDate()).padStart(2, "0");
 const _mm = String(_now.getMonth() + 1).padStart(2, "0");
@@ -67,7 +77,7 @@ const RACE: RaceProps = {
   date: TODAY,
   image: "images/2.jpg",
   heat: "2",
-  status: "upcoming",
+  status: "running",
   type: "MTB",
   level: "All",
   orgenizer: "Israeli Cycling Federation",
@@ -109,10 +119,10 @@ const C_MW = "Masters Women ";
 //    09:30 → Masters Women 50+
 //
 const CATEGORIES: CategoryProps[] = [
-  // Wave 1 — 08:00
-  { id: 99001, raceUuid: DEMO_RACE_UUID, name: C_EM, subCategory: null, laps: 7, lapsCounter: 0, riders: 5, startTime: "08:00", isConnected: false, color: "#e74c3c", heat: 1, status: "upcoming", linkedFinish: false },
-  // Wave 1 — 08:15
-  { id: 99002, raceUuid: DEMO_RACE_UUID, name: C_EW, subCategory: null, laps: 6, lapsCounter: 0, riders: 5, startTime: "08:15", isConnected: false, color: "#9b59b6", heat: 1, status: "upcoming", linkedFinish: false },
+  // Wave 1 — 08:00 · LIVE mid-race in the seed (leader on his last lap, 6/7)
+  { id: 99001, raceUuid: DEMO_RACE_UUID, name: C_EM, subCategory: null, laps: 7, lapsCounter: 6, riders: 5, startTime: "08:00", isConnected: false, color: "#e74c3c", heat: 1, status: "running", linkedFinish: false },
+  // Wave 1 — 08:15 · LIVE mid-race in the seed (leaders on lap 4 of 6)
+  { id: 99002, raceUuid: DEMO_RACE_UUID, name: C_EW, subCategory: null, laps: 6, lapsCounter: 3, riders: 5, startTime: "08:15", isConnected: false, color: "#9b59b6", heat: 1, status: "running", linkedFinish: false },
   // Wave 1 — 08:30
   { id: 99003, raceUuid: DEMO_RACE_UUID, name: C_MM, subCategory: "19-29", laps: 5, lapsCounter: 0, riders: 5, startTime: "08:30", isConnected: false, color: "#2980b9", heat: 1, status: "upcoming", linkedFinish: false },
   { id: 99004, raceUuid: DEMO_RACE_UUID, name: C_MW, subCategory: "19-29", laps: 5, lapsCounter: 0, riders: 5, startTime: "08:30", isConnected: false, color: "#e91e63", heat: 1, status: "upcoming", linkedFinish: false },
@@ -215,17 +225,110 @@ const RIDERS: RiderProps[] = [
   mk(99040, 105, "Paola", "Vitale", C_MW, "50+", IT_AURORA, "it", 2, "#795548", 4, 5),
 ];
 
+// ─── Mid-race snapshot ──────────────────────────────────────────────────────
+// The demo always seeds IN THE MIDDLE of the race, so a new user opens
+// straight onto live action instead of an empty setup screen:
+//   · Wave 1 / Start 1 (Elite Men, 7 laps)  — on course ~22 min, leader on lap 6
+//   · Wave 1 / Start 2 (Elite Women, 6 laps) — on course ~12 min, leaders on lap 3
+//   · Wave 1 / Start 3 (Masters 19-29)       — all checked in, waiting to start
+//   · Wave 2                                 — scheduled, not checked in yet
+// All times are computed relative to "now" at seed time so the live clocks
+// tick realistically the moment the page opens.
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const clockStr = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+const mmss = (sec: number) => `${pad2(Math.floor(sec / 60))}:${pad2(Math.floor(sec % 60))}`;
+
+// Per-start live data: minutes since the gun, and each bib's lap times (sec).
+const LIVE_STARTS: { offsetMin: number; laps: Record<number, number[]> }[] = [
+  {
+    offsetMin: 30, // Elite Men — started 30 min ago, leader on his LAST lap
+    laps: {
+      1: [285, 282, 288, 292, 287, 290], // 6 of 7 laps — last-lap flag showing
+      3: [288, 286, 291, 295, 293, 296],
+      2: [292, 300, 306, 309, 304],
+      5: [296, 305, 312, 318, 310],
+      4: [300, 310, 320, 326, 316],
+    },
+  },
+  {
+    offsetMin: 18, // Elite Women — started 18 min ago, on lap 4 of 6
+    laps: {
+      51: [275, 280, 283],
+      53: [280, 286, 289],
+      52: [288, 294, 297],
+      55: [292, 300, 303],
+      54: [298, 306, 308],
+    },
+  },
+];
+
+// Wave 1 · 08:30 start: checked in at the line, waiting for the gun.
+const CHECKED_IN_BIBS = new Set([11, 12, 13, 14, 15, 61, 62, 63, 64, 65]);
+
 // Fresh copies of the seed data — never hand store/IDB a shared module object.
 const cleanCategories = (): CategoryProps[] => CATEGORIES.map((c) => ({ ...c }));
-const cleanRiders = (): RiderProps[] =>
-  RIDERS.map((r) => ({ ...r, lapsDetails: [] }));
+
+// Riders with the mid-race state applied (laps, timing, check-ins).
+function midRaceRiders(): RiderProps[] {
+  const now = new Date();
+  const riders: RiderProps[] = RIDERS.map((r) => ({ ...r, lapsDetails: [] }));
+
+  for (const start of LIVE_STARTS) {
+    const startDate = new Date(now.getTime() - start.offsetMin * 60_000);
+    const timeStartRace = clockStr(startDate);
+
+    // Rank: more laps first, then lower total time — same order the app computes.
+    const entries = Object.entries(start.laps)
+      .map(([bib, lapSecs]) => ({
+        bib: Number(bib),
+        lapSecs,
+        total: lapSecs.reduce((a, b) => a + b, 0),
+      }))
+      .sort((a, b) => b.lapSecs.length - a.lapSecs.length || a.total - b.total);
+
+    entries.forEach((e, idx) => {
+      const rider = riders.find((r) => r.bibNumber === e.bib);
+      if (!rider) return;
+      const position = idx + 1;
+      let t = startDate.getTime();
+      rider.lapsDetails = e.lapSecs.map((sec, i) => {
+        const lapStart = new Date(t);
+        t += sec * 1000;
+        return {
+          lap: i + 1,
+          startTime: lapStart,
+          endTime: new Date(t),
+          lapTime: mmss(sec),
+          position,
+        };
+      });
+      rider.checked = true;
+      rider.raceStatus = "running";
+      rider.timeStartRace = timeStartRace;
+      rider.lapsCounter = e.lapSecs.length;
+      rider.timeArrive = new Date(t).toISOString();
+      rider.elapsedLastLap = mmss(e.lapSecs[e.lapSecs.length - 1]);
+      rider.elapsedTimeFromStart = mmss(e.total);
+      rider.position_category = position;
+    });
+  }
+
+  for (const r of riders) {
+    if (CHECKED_IN_BIBS.has(r.bibNumber)) r.checked = true;
+  }
+  return riders;
+}
 
 // Overwrite the demo's categories + riders for DEMO_RACE_UUID back to the clean
 // seed state, in BOTH IndexedDB and the Zustand stores, so every tab reflects the
 // reset immediately (no stale finished/running statuses left over from a prior run).
 async function resetDemoData(): Promise<void> {
   const cats = cleanCategories();
-  const riders = cleanRiders();
+  const riders = midRaceRiders();
+
+  // Re-arm the one-shot "open straight into Live" onboarding redirect.
+  try { sessionStorage.removeItem(DEMO_LIVE_ONBOARD_KEY); } catch { /* no-op */ }
 
   const db = await initIndexedDB();
 
@@ -245,10 +348,10 @@ async function resetDemoData(): Promise<void> {
 
   // Sync in-memory state (Zustand is the source the tabs render from).
   useCategoryStore.setState((s) => ({
-    categories: [...s.categories.filter((c) => c.raceUuid !== DEMO_RACE_UUID), ...cleanCategories()],
+    categories: [...s.categories.filter((c) => c.raceUuid !== DEMO_RACE_UUID), ...cats.map((c) => ({ ...c }))],
   }));
   useRiderStore.setState((s) => ({
-    riders: [...s.riders.filter((r) => r.raceUuid !== DEMO_RACE_UUID), ...cleanRiders()],
+    riders: [...s.riders.filter((r) => r.raceUuid !== DEMO_RACE_UUID), ...riders.map((r) => ({ ...r }))],
     lastFetchedRaceUuid: DEMO_RACE_UUID,
   }));
 }
@@ -261,7 +364,14 @@ export async function seedDemoRace(force = false): Promise<void> {
     const allRaces = await db.getAll("races");
     const existing = (allRaces as RaceProps[]).find((r) => r.uuid === DEMO_RACE_UUID);
 
-    if (existing && !force) {
+    // Version-stamped upgrade: any install whose demo was seeded by an older
+    // seed (whatever state the user left it in) re-seeds once to the current
+    // mid-race snapshot. The stamp is written after a successful (re)seed.
+    let seededVersion: string | null = null;
+    try { seededVersion = localStorage.getItem(DEMO_SEED_VERSION_KEY); } catch { /* no-op */ }
+    const outdatedSeed = existing != null && seededVersion !== DEMO_SEED_VERSION;
+
+    if (existing && !force && !outdatedSeed) {
       // Backfill / refresh the real Bullentäle course onto demos seeded before
       // the map feature (or with an earlier, incorrect course) existed.
       const stale =
@@ -294,13 +404,15 @@ export async function seedDemoRace(force = false): Promise<void> {
     await resetDemoData();
 
     if (existing) {
-      // Reset the race itself back to an unstarted state (clears status: "running"
-      // / any timing left from a prior session), keeping the id/uuid stable.
+      // Reset the race itself back to the seeded mid-race state, keeping the
+      // id/uuid stable.
       await useRaceStore.getState().updateRace({ ...RACE });
     } else {
       // insertRace handles both IDB write and Zustand state update
       await useRaceStore.getState().insertRace(RACE);
     }
+
+    try { localStorage.setItem(DEMO_SEED_VERSION_KEY, DEMO_SEED_VERSION); } catch { /* no-op */ }
   } catch (e) {
     console.warn("Demo seed failed (non-fatal):", e);
   }

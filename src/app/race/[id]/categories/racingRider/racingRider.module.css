@@ -154,6 +154,72 @@
   text-shadow: 0 1px 2px rgba(0,0,0,0.35);
 }
 
+/* ═══ PRO skin (data-skin="gaming"): arcade card treatment ═══
+   The category colour is injected as an inline `background`, which resets
+   background-image — so the gloss layer needs !important to win. */
+:root[data-skin="gaming"] .rider {
+  border-radius: 12px;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 45%, rgba(0, 0, 0, 0.1) 55%, rgba(0, 0, 0, 0.24) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.05) 0% 25%, transparent 0% 50%) !important;
+  background-size: auto, 14px 14px !important;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 0 rgba(0, 0, 0, 0.28),
+    0 8px 14px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-skin="gaming"] .rider:active {
+  transform: translateY(3px) scale(0.97);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 0 rgba(0, 0, 0, 0.28),
+    0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* PRO text: light-pink kit lettering with a dark edge — the default dark ink
+   drowns in the darkened bottom gloss on deep category colours */
+:root[data-skin="gaming"] .bib {
+  font-size: 26px;
+  font-style: italic;
+  color: #ffd6e8;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-skin="gaming"] .pos {
+  font-style: italic;
+  font-size: 16px;
+  transform: skewX(-10deg);
+  color: #ffd6e8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .laps {
+  color: rgba(255, 214, 232, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .lapsLabel {
+  color: rgba(255, 214, 232, 0.75);
+}
+
+:root[data-skin="gaming"] .remaining {
+  color: rgba(255, 214, 232, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .lapTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: rgba(255, 214, 232, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .lapTimeCell + .lapTimeCell {
+  border-left-color: rgba(255, 214, 232, 0.45);
+}
+
 /* Click/voice-confirm flash — one-shot bright glow that fades out */
 .flash {
   animation: clickFlash 1.1s ease-out forwards;

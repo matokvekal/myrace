@@ -259,3 +259,41 @@
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
+
+/* ═══ PRO skin (data-skin="gaming"): broadcast-style board ═══ */
+:root[data-skin="gaming"] .catBlock {
+  box-shadow:
+    0 6px 20px rgba(10, 16, 30, 0.45),
+    0 0 0 1px rgba(224, 169, 44, 0.2);
+}
+
+:root[data-skin="gaming"] .pos {
+  transform: skewX(-12deg);
+  border-radius: 3px;
+  font-size: 13px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* Podium P-plates in gold / silver / bronze metal */
+:root[data-skin="gaming"] .rowP1 .pos {
+  background: linear-gradient(180deg, #ffe27a, #e0a92c);
+  color: #3a2a00;
+}
+:root[data-skin="gaming"] .rowP2 .pos {
+  background: linear-gradient(180deg, #f2f5fa, #b9c2cf);
+}
+:root[data-skin="gaming"] .rowP3 .pos {
+  background: linear-gradient(180deg, #e8a76a, #b06a2a);
+  color: #3a1f00;
+}
+
+/* LED-green live times */
+:root[data-skin="gaming"] .time {
+  font-family: "Courier New", monospace;
+  color: #7ce83c;
+  text-shadow: 0 0 6px rgba(124, 232, 60, 0.45);
+}
+
+:root[data-skin="gaming"] .row {
+  border-top-color: rgba(224, 169, 44, 0.12);
+}
