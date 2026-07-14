@@ -111,9 +111,9 @@
   font-size: 14px;
 }
 
-/* ── Race leaderboard / timing-tower look: dark board, gold trim ── */
+/* ── Race leaderboard / timing-tower look: deep indigo board, gold trim ── */
 .catBlock {
-  background: linear-gradient(180deg, #1d2436 0%, #141a29 100%);
+  background: linear-gradient(180deg, #2f2568 0%, #1c1642 100%);
   border: 1px solid rgba(224, 169, 44, 0.3);
   border-radius: 14px;
   overflow: hidden;
@@ -137,7 +137,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: linear-gradient(90deg, #2b3450, #1c2333);
+  background: linear-gradient(90deg, #45348f, #2a1f63);
   border-bottom: 2px solid #e0a92c;
   color: #fff;
 }

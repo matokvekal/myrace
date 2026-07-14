@@ -233,6 +233,13 @@
   border-top: 1px solid var(--drawer-border);
 }
 
+.drawerFooter {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--drawer-border);
+}
+
 .themeSectionLabel {
   display: flex;
   align-items: center;

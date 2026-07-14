@@ -26,7 +26,13 @@ self.addEventListener('install', (event) => {
       Promise.allSettled(APP_SHELL.map((url) => cache.add(url)))
     )
   );
-  self.skipWaiting();
+  // NOTE: no skipWaiting() here — a new worker parks in `waiting` so the app
+  // can show an "Update now" prompt and reload on the user's terms (never
+  // mid-heat). The client triggers activation via the SKIP_WAITING message.
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

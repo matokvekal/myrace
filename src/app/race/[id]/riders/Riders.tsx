@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -76,11 +76,25 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode })
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Close the actions dropdown on outside click
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [actionsOpen]);
 
   const { getRiders, riders, deleteRidersByRace } = useRiderStore(
     (state) => ({
@@ -187,11 +201,11 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode })
         <div className={styles.leftControls}>
           {/* Sort dropdown */}
           <div className={styles.sortDropdownWrapper}>
-            <label className={styles.sortLabel}>Sort:</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortKey)}
               className={styles.sortDropdown}
+              aria-label="Sort riders"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.key} value={opt.key}>
@@ -226,29 +240,49 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode })
             </button>
           </div>
 
-          {/* Import buttons */}
-          <Button
-            variant="secondary"
-            size="sm"
-            className={styles.importBtn}
-            onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
-          >
-            Import CSV
-          </Button>
-          <ScanDocumentButton
-            variant="bar"
-            onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
-          />
-          {onEditMode && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className={styles.importBtn}
-              onClick={onEditMode}
+          {/* Actions dropdown — Import / Scan / Edit */}
+          <div className={styles.actionsMenu} ref={actionsRef}>
+            <button
+              type="button"
+              className={styles.actionsTrigger}
+              onClick={() => setActionsOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={actionsOpen}
             >
-              <Pencil size={14} /> Edit
-            </Button>
-          )}
+              <Pencil size={13} /> Actions
+              <ChevronDown size={14} className={styles.actionsChevron} />
+            </button>
+            {actionsOpen && (
+              <div className={styles.actionsList} role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.actionItem}
+                  onClick={() => { setActionsOpen(false); setImportMode("file"); setShowImportWizard(true); }}
+                >
+                  <Upload size={15} /> Import CSV
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.actionItem}
+                  onClick={() => { setActionsOpen(false); setImportMode("scan"); setShowImportWizard(true); }}
+                >
+                  <Camera size={15} /> Scan Start List
+                </button>
+                {onEditMode && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.actionItem}
+                    onClick={() => { setActionsOpen(false); onEditMode(); }}
+                  >
+                    <Pencil size={15} /> Edit Riders
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

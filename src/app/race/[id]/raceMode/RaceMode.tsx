@@ -4,7 +4,6 @@ import { CategoryProps } from "@/types/types";
 import StartManager from "./StartManager";
 import CheckIn from "./CheckIn";
 import LiveBoard from "./LiveBoard";
-import LiveCards from "./LiveCards";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory } from "../schedule/Schedule";
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
@@ -15,7 +14,7 @@ interface Props {
   categories: CategoryProps[];
 }
 
-type SubTab = "start" | "checkin" | "board" | "cards";
+type SubTab = "start" | "checkin" | "board";
 
 const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   // Group categories by time gap (same logic as Schedule view)
@@ -99,12 +98,13 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
 
       {/* Sub-tab bar */}
       <div className={styles.subTabs}>
-        <button className={`${styles.subTab} ${subTab === "start" ? styles.subTabActive : ""}`} onClick={() => setSubTab("start")}>
+        <button className={`${styles.subTab} ${styles.tabGrid} ${subTab === "start" ? styles.subTabActive : ""}`} onClick={() => setSubTab("start")}>
           Grid
         </button>
         <button
           className={[
             styles.subTab,
+            styles.tabCheckin,
             subTab === "checkin" ? styles.subTabActive : "",
             needsCheckIn && subTab !== "checkin" ? styles.subTabGlow : "",
           ].join(" ")}
@@ -112,10 +112,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
         >
           Check-In
         </button>
-        <button className={`${styles.subTab} ${subTab === "cards" ? styles.subTabActive : ""}`} onClick={() => setSubTab("cards")}>
-          Cards
-        </button>
-        <button className={`${styles.subTab} ${subTab === "board" ? styles.subTabActive : ""}`} onClick={() => setSubTab("board")}>
+        <button className={`${styles.subTab} ${styles.tabBoard} ${subTab === "board" ? styles.subTabActive : ""}`} onClick={() => setSubTab("board")}>
           Board
         </button>
       </div>
@@ -123,7 +120,6 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
       <div className={styles.content}>
         {subTab === "start"   && <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
         {subTab === "checkin" && <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
-        {subTab === "cards"   && <LiveCards raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
         {subTab === "board"   && <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
       </div>
     </div>

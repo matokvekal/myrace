@@ -6,8 +6,10 @@ import Version from "@/components/Version/Version";
 import { useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
 import Cookies from "js-cookie";
-import { Bike, LogOut, Menu, MessageCircle, Palette, UserRound, X } from "lucide-react";
+import { Bike, Download, Gamepad2, LogOut, Menu, MessageCircle, Palette, UserRound, X } from "lucide-react";
 import { useTheme, type Theme } from "@/hooks/useTheme";
+import { useSkin, type Skin } from "@/hooks/useSkin";
+import { usePwaInstall } from "@/components/pwa/usePwaInstall";
 
 const THEME_OPTIONS: { value: Theme; label: string; bg: string; accent: string; text: string }[] = [
   { value: 'light',    label: 'Light',    bg: '#f5f8fc', accent: '#63a6fc', text: '#14243c' },
@@ -17,11 +19,18 @@ const THEME_OPTIONS: { value: Theme; label: string; bg: string; accent: string; 
   { value: 'night',    label: 'Night',    bg: '#040812', accent: '#00c8ff', text: '#d2ebff' },
 ];
 
+const SKIN_OPTIONS: { value: Skin; label: string; bg: string; radius: string }[] = [
+  { value: 'classic', label: 'Classic', bg: 'linear-gradient(145deg, #63a6fc, #4a8ee7)', radius: '10px' },
+  { value: 'gaming',  label: 'Gaming',  bg: 'linear-gradient(145deg, #ff2fd0, #7a2bff)', radius: '3px' },
+];
+
 function HeaderMain() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { user, getUser } = useDataStore();
   const { theme, setTheme } = useTheme();
+  const { skin, setSkin } = useSkin();
+  const { canInstall, promptInstall } = usePwaInstall();
 
   useEffect(() => {
     getUser();
@@ -49,7 +58,6 @@ function HeaderMain() {
         </Button>
         <div className={styles.head}>Commissire - Bike Race</div>
         <div className={styles.right}>
-          <Version />
           <Button
             variant="icon"
             size="md"
@@ -158,6 +166,20 @@ function HeaderMain() {
             <Bike className={styles.navItemIcon} aria-hidden="true" />
             My Races
           </Button>
+          {canInstall && (
+            <Button
+              variant="ghost"
+              size="lg"
+              className={styles.navItem}
+              onClick={async () => {
+                await promptInstall();
+                setDrawerOpen(false);
+              }}
+            >
+              <Download className={styles.navItemIcon} aria-hidden="true" />
+              Install app
+            </Button>
+          )}
         </nav>
 
         {/* Theme picker */}
@@ -194,6 +216,38 @@ function HeaderMain() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Button style picker */}
+        <div className={styles.themeSection}>
+          <div className={styles.themeSectionLabel}>
+            <Gamepad2 className={styles.themeSectionIcon} aria-hidden="true" />
+            Button Style
+          </div>
+          <div className={styles.themeOptions}>
+            {SKIN_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                className={styles.themeOption}
+                onClick={() => setSkin(opt.value)}
+                aria-label={`${opt.label} button style`}
+                title={opt.label}
+              >
+                <span
+                  className={`${styles.themeSwatch} ${skin === opt.value ? styles.themeSwatchActive : ''}`}
+                  style={{ background: opt.bg, borderRadius: opt.radius }}
+                />
+                <span className={`${styles.themeLabel} ${skin === opt.value ? styles.themeLabelActive : ''}`}>
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Version lives here in the side menu */}
+        <div className={styles.drawerFooter}>
+          <Version />
         </div>
       </div>
     </>

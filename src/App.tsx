@@ -10,6 +10,7 @@ import RacePage from "./app/race/[id]/page";
 import HeatPage from "./app/race/[id]/heat/[heatId]/page";
 import StandingPage from "./app/race/[id]/standing/[heatId]/page";
 import { InstallPrompt } from "./app/components/pwa/InstallPrompt";
+import { UpdatePrompt } from "./app/components/pwa/UpdatePrompt";
 import { useCloudStore } from "./app/stores/cloudStore";
 import { isCloudConfigured } from "./app/services/cloud/supabaseClient";
 import { attachOnlineListener } from "./app/services/cloud/cloudSync";
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <InstallPrompt />
+      <UpdatePrompt />
     </>
   );
 }

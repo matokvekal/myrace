@@ -300,6 +300,40 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   BUTTON SKINS  (toggle via useSkin → [data-skin] attribute on <html>)
+   The default / "classic" skin adds NOTHING here — the existing button
+   design is left completely untouched (zero risk).
+   The "gaming" skin below only restyles the LOOK of <button> elements
+   (corners, arcade depth, typography). It never changes each button's own
+   background color, size, layout or JS logic — so semantic button colors
+   (start / stop / danger etc.) still read correctly. Fully reversible.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root[data-skin="gaming"] button:not(:disabled) {
+  border-radius: 4px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28),
+    0 4px 0 rgba(0, 0, 0, 0.32),
+    0 8px 16px rgba(0, 0, 0, 0.30) !important;
+}
+
+:root[data-skin="gaming"] button:not(:disabled):hover {
+  filter: brightness(1.08) saturate(1.15);
+}
+
+:root[data-skin="gaming"] button:not(:disabled):active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.30),
+    0 1px 0 rgba(0, 0, 0, 0.32),
+    0 3px 8px rgba(0, 0, 0, 0.30) !important;
+}
+
 a {
   color: inherit;
   text-decoration: none;

@@ -26,20 +26,16 @@
   border-color: rgba(22, 163, 74, 0.25);
 }
 
-.left,
-.right {
+.left {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 80px;
-}
-
-.right {
-  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .center {
   flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: center;
 }
