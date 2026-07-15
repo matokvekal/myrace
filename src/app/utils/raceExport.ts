@@ -10,7 +10,8 @@ function safeStr(v: unknown): string {
 export function exportRaceToXlsx(
   race: RaceProps,
   categories: CategoryProps[],
-  riders: RiderProps[]
+  riders: RiderProps[],
+  filenameSuffix?: string
 ): void {
   const wb = XLSX.utils.book_new();
 
@@ -70,5 +71,6 @@ export function exportRaceToXlsx(
   // ── Download ────────────────────────────────────────────────────
   const safeName = (race.name ?? "race").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
   const date = race.date ? race.date.replace(/-/g, "") : new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  XLSX.writeFile(wb, `${safeName}_${date}.xlsx`);
+  const suffix = filenameSuffix ? `_${filenameSuffix}` : "";
+  XLSX.writeFile(wb, `${safeName}_${date}${suffix}.xlsx`);
 }

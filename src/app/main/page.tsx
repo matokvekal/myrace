@@ -21,12 +21,30 @@ import {
   Search
 } from "lucide-react";
 
-type SortKey = "date" | "status";
+type SortKey = "date" | "name" | "status";
+const SORT_CYCLE: SortKey[] = ["date", "name", "status"];
+const SORT_LABEL: Record<SortKey, string> = {
+  date: "Date",
+  name: "Name",
+  status: "Status"
+};
 const STATUS_ORDER: Record<string, number> = {
   running: 0,
   upcoming: 1,
   finished: 2
 };
+
+// Race dates are stored as "DD/MM/YYYY" (demo/new races) but tolerate ISO too.
+const parseRaceDate = (d: string | null | undefined): number => {
+  if (!d) return 0;
+  const dm = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dm) return new Date(+dm[3], +dm[2] - 1, +dm[1]).getTime();
+  const t = Date.parse(d);
+  return Number.isNaN(t) ? 0 : t;
+};
+
+// How many recent races the home row shows before "See All" takes over
+const HOME_ROW_LIMIT = 10;
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -76,21 +94,33 @@ const MainPage = () => {
 
   const isEmpty = loaded && races.length === 0;
 
-  // Sorted newest-first
-  const myRaces = [...races].sort((a, b) => b.id - a.id);
+  // Home row: most recent races only — the full list lives behind "See All"
+  const myRaces = [...races]
+    .sort((a, b) => (parseRaceDate(b.date) - parseRaceDate(a.date)) || (b.id - a.id))
+    .slice(0, HOME_ROW_LIMIT);
 
-  // Filtered + sorted for "See All" list
+  // Filtered + sorted for "See All" list — search matches name, location or date
+  const q = search.trim().toLowerCase();
   const allFiltered = races
     .filter((r) => {
       if (showFavoritesOnly && !r.isFavorite) return false;
-      return r.name.toLowerCase().includes(search.toLowerCase());
+      if (!q) return true;
+      return (
+        r.name.toLowerCase().includes(q) ||
+        (r.location ?? "").toLowerCase().includes(q) ||
+        (r.date ?? "").includes(q)
+      );
     })
-    .sort((a, b) =>
-      sortBy === "date"
-        ? b.id - a.id
-        : (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) -
-          (STATUS_ORDER[b.status ?? "upcoming"] ?? 1)
-    );
+    .sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "status")
+        return (
+          (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) -
+            (STATUS_ORDER[b.status ?? "upcoming"] ?? 1) ||
+          parseRaceDate(b.date) - parseRaceDate(a.date)
+        );
+      return (parseRaceDate(b.date) - parseRaceDate(a.date)) || (b.id - a.id);
+    });
 
   if (addNewRace) {
     return <AddRace setAddNewwRace={setAddNewRace} />;
@@ -134,7 +164,8 @@ const MainPage = () => {
               <Search className={styles.searchIcon} aria-hidden="true" />
               <input
                 className={styles.search}
-                placeholder="Search races..."
+                dir="auto"
+                placeholder="Search by name, date or location..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -146,10 +177,15 @@ const MainPage = () => {
                   variant="secondary"
                   size="md"
                   className={styles.iconBtn}
-                  onClick={() => setSortBy(sortBy === "date" ? "status" : "date")}
+                  onClick={() =>
+                    setSortBy(
+                      SORT_CYCLE[(SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length]
+                    )
+                  }
+                  title="Sort by date / name / status"
                 >
                   <ArrowUpDown className={styles.iconGlyph} aria-hidden="true" />
-                  <span>{sortBy === "date" ? "Date" : "Status"}</span>
+                  <span>{SORT_LABEL[sortBy]}</span>
                 </Button>
                 <Button
                   variant="icon"
@@ -179,6 +215,11 @@ const MainPage = () => {
           </div>
 
           <div className={styles.list}>
+            {allFiltered.length === 0 && (
+              <div className={styles.noResults} dir="auto">
+                No races match &ldquo;{search}&rdquo;
+              </div>
+            )}
             {allFiltered.map((race) => (
               <RaceCard
                 key={race.uuid}

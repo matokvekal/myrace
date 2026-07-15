@@ -1,0 +1,64 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   NIGHT-STAGE ARCADE THEME  (public pages: landing / sign-up / contact)
+
+   Palette is sampled straight from the rider-cube logo (public/logo.png):
+   sky blue top face, magenta side, amber side, cream fills — floated over
+   a deep race-night navy so the candy colors read like stadium lights.
+   The in-app UI keeps its own 5 themes; `.arcadeTheme` is scoped to the
+   marketing/public pages only.
+   ═══════════════════════════════════════════════════════════════════════ */
+@import "@fontsource/bungee";
+
+.arcadeTheme {
+  --gx-bg: #0a0e22;
+  --gx-bg-2: #10173a;
+  --gx-card: #121a40;
+  --gx-card-2: #182253;
+  --gx-ink: #07091a;
+  --gx-blue: #6ec2f2;
+  --gx-blue-deep: #3f9fdc;
+  --gx-pink: #e46ab8;
+  --gx-amber: #f4a93c;
+  --gx-cream: #faeed6;
+  --gx-text: #eef3ff;
+  --gx-dim: #94a5d2;
+  --gx-line: rgba(110, 194, 242, 0.16);
+  --gx-display: "Bungee", "Arial Black", var(--font-sans);
+
+  position: relative;
+  min-height: 100vh;
+  color: var(--gx-text);
+  background-color: var(--gx-bg);
+  /* corner glows + starfield specks over the night navy */
+  background-image:
+    radial-gradient(90rem 40rem at 85% -10%, rgba(228, 106, 184, 0.14), transparent 60%),
+    radial-gradient(80rem 36rem at 0% 0%, rgba(110, 194, 242, 0.16), transparent 55%),
+    radial-gradient(60rem 40rem at 50% 110%, rgba(244, 169, 60, 0.10), transparent 60%),
+    radial-gradient(1.5px 1.5px at 22% 18%, rgba(238, 243, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 68% 8%, rgba(238, 243, 255, 0.4) 50%, transparent 51%),
+    radial-gradient(2px 2px at 84% 32%, rgba(110, 194, 242, 0.5) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 8% 52%, rgba(228, 106, 184, 0.45) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 45% 38%, rgba(238, 243, 255, 0.3) 50%, transparent 51%),
+    linear-gradient(180deg, var(--gx-bg-2) 0%, var(--gx-bg) 45%);
+}
+
+/* Synthwave floor grid pinned to the bottom of the page */
+.arcadeTheme::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 16rem;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, var(--gx-line) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(0deg, var(--gx-line) 0 1px, transparent 1px 34px);
+  mask-image: linear-gradient(180deg, transparent, black 85%);
+  -webkit-mask-image: linear-gradient(180deg, transparent, black 85%);
+}
+
+/* Footer ships a dark text color — lift it on the night backdrop */
+.arcadeTheme .footer {
+  color: rgba(238, 243, 255, 0.4);
+  position: relative;
+  z-index: 1;
+}

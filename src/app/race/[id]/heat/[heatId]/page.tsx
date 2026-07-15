@@ -13,7 +13,7 @@ import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { RiderProps } from "@/types/types";
 import { formatTime, formatTimeWithLeadingZeroes } from "../../../../utils/timeUtils";
 import calculatePositions from "../../../../utils/calculatePosition";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../../schedule/Schedule";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory } from "../../schedule/Schedule";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -37,6 +37,12 @@ function parseTimeStr(t: string | null | undefined): Date | null {
 }
 
 const MIN_LAP_MS = 60 * 1000; // 1 minute minimum between laps
+
+// Category identity is name + subCategory: the same name can exist in several
+// waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
+const catKey = (name: string, sub?: string | null) => `${name}|${sub ?? ""}`;
+const riderCatKey = (r: { category: string; subCategory?: string | null }) =>
+  catKey(r.category, r.subCategory);
 
 const Heat: React.FC = () => {
   const params = useParams();
@@ -95,51 +101,47 @@ const Heat: React.FC = () => {
   // treat race.distance as circuit km per lap (if set and reasonable)
   const circuitKm = currentRace?.distance && currentRace.distance > 0 ? currentRace.distance : null;
 
-  const heatCategories = useMemo(() => {
-    if (heatId == null || categories.length === 0) return categories.map((c) => c.name);
+  const waveCategories = useMemo(() => {
+    if (heatId == null || categories.length === 0) return categories;
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const slotMap = schedule.get(heatId);
     if (slotMap) {
-      const names = [...slotMap.values()].flat().map((c) => c.name);
-      if (names.length > 0) return names;
+      const cats = [...slotMap.values()].flat();
+      if (cats.length > 0) return cats;
     }
-    return categories.map((c) => c.name);
+    return categories;
   }, [categories, heatId]);
-
-  const waveCategories = useMemo(
-    () => categories.filter((c) => heatCategories.includes(c.name)),
-    [categories, heatCategories]
-  );
 
   const filteredRiders = useMemo(
     () => {
       // Live shows only riders whose race has actually begun in this wave —
       // started or finished. Categories in the wave that haven't been started
-      // yet (and DNS riders) stay "upcoming" and are excluded.
+      // yet (and DNS riders) stay "upcoming" and are excluded. Matching is by
+      // name + subCategory so same-named categories in other waves don't bleed in.
       const filtered = riders.filter(
         (r) =>
           r.raceUuid === raceUuid &&
-          heatCategories.includes(r.category) &&
+          waveCategories.some((c) => riderInCategory(r, c)) &&
           r.raceStatus !== "upcoming"
       );
       // Enrich riders with totalLaps from their category
       return filtered.map((rider) => {
-        const cat = categories.find((c) => c.name === rider.category);
+        const cat = waveCategories.find((c) => riderInCategory(rider, c));
         return cat && cat.laps ? { ...rider, totalLaps: cat.laps } : rider;
       });
     },
-    [riders, raceUuid, heatCategories, categories]
+    [riders, raceUuid, waveCategories]
   );
 
   const getCatColor = (rider: RiderProps): string => {
-    const cat = categories.find((c) => c.name === rider.category);
+    const cat = categories.find((c) => riderInCategory(rider, c));
     return cat?.color ?? rider.color ?? "#ccc";
   };
 
   // A rider "still on the track": their category's race has ended but they
   // haven't finished — the organizer must not lose sight of them.
   const isOnTrackAfterEnd = (rider: RiderProps): boolean =>
-    categories.find((c) => c.name === rider.category)?.status === "finished";
+    categories.find((c) => riderInCategory(rider, c))?.status === "finished";
 
   const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
     if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
@@ -298,7 +300,7 @@ const Heat: React.FC = () => {
       if (rider) {
         const lapsBefore = rider.lapsCounter;
         const catColor = (() => {
-          const cat = categories.find((c) => c.name === rider.category);
+          const cat = categories.find((c) => riderInCategory(rider, c));
           return cat?.color ?? rider.color ?? "#ccc";
         })();
 
@@ -421,18 +423,18 @@ const Heat: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const lastActionRef = useRef<{ riderId: number; timestamp: number } | null>(null);
 
-  const toggleCatFilter = (catName: string) => {
+  const toggleCatFilter = (key: string) => {
     setFilterCats((prev) => {
       const next = new Set(prev);
-      if (next.has(catName)) next.delete(catName);
-      else next.add(catName);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
 
   const catOrderMap = useMemo(() => {
     const map = new Map<string, number>();
-    waveCategories.forEach((cat, idx) => map.set(cat.name, idx));
+    waveCategories.forEach((cat, idx) => map.set(catKey(cat.name, cat.subCategory), idx));
     return map;
   }, [waveCategories]);
 
@@ -445,7 +447,7 @@ const Heat: React.FC = () => {
   );
 
   const activeRiders = useMemo(() => {
-    const catFiltered = filterCats.size > 0 ? runningRiders.filter((r) => filterCats.has(r.category)) : runningRiders;
+    const catFiltered = filterCats.size > 0 ? runningRiders.filter((r) => filterCats.has(riderCatKey(r))) : runningRiders;
     const q = searchTerm.toLowerCase();
     return q
       ? catFiltered.filter(
@@ -470,8 +472,8 @@ const Heat: React.FC = () => {
       const newcomers = runningRiders
         .filter((r) => !keptSet.has(r.id))
         .sort((a, b) => {
-          const catA = catOrderMap.get(a.category) ?? 999;
-          const catB = catOrderMap.get(b.category) ?? 999;
+          const catA = catOrderMap.get(riderCatKey(a)) ?? 999;
+          const catB = catOrderMap.get(riderCatKey(b)) ?? 999;
           if (catA !== catB) return catA - catB;
           return a.bibNumber - b.bibNumber;
         })
@@ -497,12 +499,12 @@ const Heat: React.FC = () => {
     // bottom of the racing grid, next to Finished/DNF, so they don't sit between
     // the riders who are actively racing.
     const endedCats = new Set(
-      categories.filter((c) => c.status === "finished").map((c) => c.name)
+      categories.filter((c) => c.status === "finished").map((c) => catKey(c.name, c.subCategory))
     );
     if (endedCats.size === 0) return ordered;
     return [
-      ...ordered.filter((r) => !endedCats.has(r.category)),
-      ...ordered.filter((r) => endedCats.has(r.category)),
+      ...ordered.filter((r) => !endedCats.has(riderCatKey(r))),
+      ...ordered.filter((r) => endedCats.has(riderCatKey(r))),
     ];
   }, [activeRiders, displayOrder, categories]);
 
@@ -512,11 +514,11 @@ const Heat: React.FC = () => {
     const set = new Set<string>();
     waveCategories.forEach((cat) => {
       if (!cat.linkedFinish) return;
-      const catRunners = filteredRiders.filter((r) => r.category === cat.name);
+      const catRunners = filteredRiders.filter((r) => riderInCategory(r, cat));
       const anyFinished = catRunners.some(
         (r) => r.raceStatus === "finished" && !["DNF", "DSQ", "DNS"].includes(r.status)
       );
-      if (anyFinished) set.add(cat.name);
+      if (anyFinished) set.add(catKey(cat.name, cat.subCategory));
     });
     return set;
   }, [waveCategories, filteredRiders]);
@@ -529,7 +531,7 @@ const Heat: React.FC = () => {
       return 0;
     };
     return [...filteredRiders]
-      .filter((r) => r.raceStatus !== "running" && (filterCats.size === 0 || filterCats.has(r.category)))
+      .filter((r) => r.raceStatus !== "running" && (filterCats.size === 0 || filterCats.has(riderCatKey(r))))
       .sort((a, b) => {
         const oa = outOrder(a), ob = outOrder(b);
         if (oa !== ob) return oa - ob;
@@ -653,7 +655,7 @@ const Heat: React.FC = () => {
             {waveCategories.map((cat) => (
               <div key={cat.id} className={styles.waveModalRow}>
                 <span className={styles.catDot} style={{ background: cat.color ?? "#ccc" }} />
-                <span className={styles.waveModalName}>{cat.name}</span>
+                <span className={styles.waveModalName}>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
                 {cat.laps && <span className={styles.waveModalLaps}>{cat.laps} laps</span>}
               </div>
             ))}
@@ -662,13 +664,17 @@ const Heat: React.FC = () => {
       )}
 
       <div className={styles.wrapper}>
-        {/* Timer row with wave-info icon */}
+        {/* Timer row with wave-info button: which wave is live + its started categories */}
         <div className={styles.timerRow}>
           <p className={styles.timerText}>{elapsedTime}</p>
           <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
-            {waveCategories.slice(0, 4).map((cat) => (
-              <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
-            ))}
+            {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
+            {waveCategories
+              .filter((c) => c.status === "running" || c.status === "finished")
+              .slice(0, 4)
+              .map((cat) => (
+                <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
+              ))}
           </button>
         </div>
 
@@ -713,11 +719,11 @@ const Heat: React.FC = () => {
                 <label key={cat.id} className={styles.filterPanelRow}>
                   <input
                     type="checkbox"
-                    checked={filterCats.has(cat.name)}
-                    onChange={() => toggleCatFilter(cat.name)}
+                    checked={filterCats.has(catKey(cat.name, cat.subCategory))}
+                    onChange={() => toggleCatFilter(catKey(cat.name, cat.subCategory))}
                   />
                   <span className={styles.catDot} style={{ background: cat.color ?? "#ccc" }} />
-                  <span>{cat.name}</span>
+                  <span>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
                   {cat.laps && <span className={styles.filterLapTag}>{cat.laps}L</span>}
                 </label>
               ))}
@@ -760,7 +766,7 @@ const Heat: React.FC = () => {
                   key={rider.id}
                   rider={rider}
                   color={getCatColor(rider)}
-                  forceBell={cascadeBellCats.has(rider.category)}
+                  forceBell={cascadeBellCats.has(riderCatKey(rider))}
                   isFlashing={flashingRiderId === rider.id}
                   raceEnded={isOnTrackAfterEnd(rider)}
                   onClick={() => handleRiderClick(rider)}

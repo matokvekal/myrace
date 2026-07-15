@@ -25,7 +25,8 @@
 }
 
 /* ── Wave-pill status system: 3 clearly distinct states ──
-   Upcoming = neutral gray · Running = green (only green state) · Finished = blue.
+   Upcoming = neutral gray · Running = green (only green state) ·
+   Finished = red diagonal stripes (finish flag).
    Selection is shown as a solid fill of the pill's own status color, so status
    and "which wave am I viewing" are always both readable. */
 
@@ -65,19 +66,29 @@
   box-shadow: 0 2px 8px rgba(47, 207, 149, 0.45);
 }
 
-/* Finished: blue = done/closed */
+/* Finished: red diagonal "finish flag" stripes = wave closed */
 .wavePillFinished {
-  border-color: var(--brand);
-  color: var(--brand-strong);
-  background: rgba(99, 166, 252, 0.12);
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--text-secondary);
+  background-color: var(--bg-card);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(231, 76, 60, 0.22) 0 4px,
+    transparent 4px 9px
+  );
   font-weight: 600;
 }
 
 .wavePillFinished.wavePillActive {
-  background: var(--brand-strong);
-  border-color: var(--brand-strong);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(63, 134, 231, 0.35);
+  background-color: var(--text-secondary);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(231, 76, 60, 0.75) 0 4px,
+    transparent 4px 9px
+  );
+  border-color: #e74c3c;
+  color: var(--bg-card);
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.35);
 }
 
 /* ── Casino/game-style sub-tabs (matches the main race tab bar) ── */

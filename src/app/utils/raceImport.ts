@@ -1,8 +1,9 @@
 import * as XLSX from "xlsx";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
+import { riderInCategory, catWaveKey } from "../race/[id]/schedule/Schedule";
 
-interface ImportResult {
+export interface ImportResult {
   raceUuid: string;
   categories: CategoryProps[];
   riders: RiderProps[];
@@ -125,6 +126,74 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
   });
 
   return { raceUuid, categories, riders, raceName };
+}
+
+export interface MergeResult {
+  categories: CategoryProps[];
+  riders: RiderProps[];
+}
+
+// Replaces ONLY the given categories (matched by name + subCategory) and their
+// riders inside one race — everything else in the race is untouched. This is the
+// multi-commissaire flow: each device records its own categories, and the main
+// device merges the result files one by one at the end of the race.
+export async function mergeCategoriesIntoRace(
+  raceUuid: string,
+  importedCats: CategoryProps[],
+  importedRiders: RiderProps[]
+): Promise<MergeResult> {
+  const db = await initIndexedDB();
+  const allCats: CategoryProps[] = await db.getAll("categories");
+  const allRiders: RiderProps[] = await db.getAll("riders");
+
+  const selectedKeys = new Set(importedCats.map((c) => catWaveKey(c.name, c.subCategory)));
+
+  const catsToDelete = allCats.filter(
+    (c) => c.raceUuid === raceUuid && selectedKeys.has(catWaveKey(c.name, c.subCategory))
+  );
+  const ridersToDelete = allRiders.filter(
+    (r) => r.raceUuid === raceUuid && importedCats.some((c) => riderInCategory(r, c))
+  );
+
+  // Only riders that belong to the merged categories may come in
+  const incomingRiders = importedRiders.filter((r) =>
+    importedCats.some((c) => riderInCategory(r, c))
+  );
+
+  // ids are global across the whole store (other races too) — an imported record
+  // must never overwrite a record we are not deliberately replacing.
+  const deletedCatIds = new Set(catsToDelete.map((c) => c.id));
+  const deletedRiderIds = new Set(ridersToDelete.map((r) => r.id));
+  const takenCatIds = new Set(allCats.filter((c) => !deletedCatIds.has(c.id)).map((c) => c.id));
+  const takenRiderIds = new Set(allRiders.filter((r) => !deletedRiderIds.has(r.id)).map((r) => r.id));
+
+  let nextId = Date.now();
+  const freshId = (taken: Set<number>): number => {
+    while (taken.has(nextId)) nextId++;
+    return nextId++;
+  };
+
+  const finalCats = importedCats.map((c) =>
+    takenCatIds.has(c.id) ? { ...c, id: freshId(takenCatIds) } : c
+  );
+  const finalRiders = incomingRiders.map((r) =>
+    takenRiderIds.has(r.id) ? { ...r, id: freshId(takenRiderIds) } : r
+  );
+
+  const catTx = db.transaction("categories", "readwrite");
+  const catStore = catTx.objectStore("categories");
+  for (const c of catsToDelete) await catStore.delete(c.id);
+  for (const c of finalCats) await catStore.put(c);
+  await catTx.done;
+
+  const riderTx = db.transaction("riders", "readwrite");
+  const riderStore = riderTx.objectStore("riders");
+  for (const r of ridersToDelete) await riderStore.delete(r.id);
+  for (const r of finalRiders) await riderStore.put(r);
+  await riderTx.done;
+
+  db.close();
+  return { categories: finalCats, riders: finalRiders };
 }
 
 export async function replaceCategoriesForRace(

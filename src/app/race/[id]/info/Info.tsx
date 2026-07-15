@@ -8,7 +8,16 @@ import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
 import { Edit2, Check, X, ExternalLink, Download, Upload } from "lucide-react";
 import { exportRaceToXlsx } from "@/utils/raceExport";
-import { importRaceFromXlsx, replaceCategoriesForRace } from "@/utils/raceImport";
+import {
+  importRaceFromXlsx,
+  replaceCategoriesForRace,
+  mergeCategoriesIntoRace,
+  ImportResult,
+} from "@/utils/raceImport";
+import { riderInCategory, catWaveKey } from "../schedule/Schedule";
+import ExportCategoriesModal from "./ExportCategoriesModal";
+import MergeImportModal, { ImportMode } from "./MergeImportModal";
+import { CategoryProps } from "@/types/types";
 import { toast } from "react-toastify";
 
 interface Props {
@@ -27,47 +36,97 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState<EditForm>({} as EditForm);
   const [importing, setImporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [pendingImport, setPendingImport] = useState<ImportResult | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const updateRace = useRaceStore((s) => s.updateRace);
   const { riders, deleteRidersByRace, insertRiders } = useRiderStore();
   const { categories } = useCategoryStore();
 
-  const handleExport = () => {
-    const raceRiders = riders.filter((r) => r.raceUuid === race.uuid);
-    const raceCats = categories.filter((c) => c.raceUuid === race.uuid);
-    exportRaceToXlsx(race, raceCats, raceRiders);
+  const raceRiders = riders.filter((r) => r.raceUuid === race.uuid);
+  const raceCats = categories.filter((c) => c.raceUuid === race.uuid);
+
+  const handleExportConfirm = (selected: CategoryProps[]) => {
+    const partial = selected.length !== raceCats.length;
+    // Full export keeps every rider (even ones without a category);
+    // partial export only takes riders of the chosen categories.
+    const exportRiders = partial
+      ? raceRiders.filter((r) => selected.some((c) => riderInCategory(r, c)))
+      : raceRiders;
+    exportRaceToXlsx(race, selected, exportRiders, partial ? "partial" : undefined);
+    setShowExportModal(false);
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    setImporting(true);
     try {
       const data = await importRaceFromXlsx(file);
-      const catCount = data.categories.length;
-      const riderCount = data.riders.length;
-      const ok = window.confirm(
-        `Import "${data.raceName}"?\n${catCount} categories, ${riderCount} riders.\n\nThis will REPLACE all current riders and categories for this race.`
-      );
-      if (!ok) return;
+      setPendingImport(data);
+    } catch (err) {
+      toast.error(`Import failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  };
 
+  const handleImportConfirm = async (selected: CategoryProps[], mode: ImportMode) => {
+    if (!pendingImport) return;
+    setImporting(true);
+    try {
       // Remap to current race UUID (supports cross-device import)
-      const remappedCats = data.categories.map((c) => ({ ...c, raceUuid: race.uuid }));
-      const remappedRiders = data.riders.map((r) => ({ ...r, raceUuid: race.uuid }));
+      const remappedCats = pendingImport.categories.map((c) => ({ ...c, raceUuid: race.uuid }));
+      const remappedRiders = pendingImport.riders.map((r) => ({ ...r, raceUuid: race.uuid }));
 
-      await deleteRidersByRace(race.uuid);
-      await replaceCategoriesForRace(race.uuid, remappedCats);
-      // Sync Zustand: replace categories in memory
-      useCategoryStore.setState((s) => ({
-        categories: [
-          ...s.categories.filter((c) => c.raceUuid !== race.uuid),
-          ...remappedCats,
-        ],
-      }));
-      await insertRiders(remappedRiders);
+      if (mode === "replace") {
+        await deleteRidersByRace(race.uuid);
+        await replaceCategoriesForRace(race.uuid, remappedCats);
+        useCategoryStore.setState((s) => ({
+          categories: [
+            ...s.categories.filter((c) => c.raceUuid !== race.uuid),
+            ...remappedCats,
+          ],
+        }));
+        await insertRiders(remappedRiders);
+        toast.success(
+          `Imported ${remappedRiders.length} riders across ${remappedCats.length} categories`
+        );
+      } else {
+        const selectedKeys = new Set(selected.map((c) => catWaveKey(c.name, c.subCategory)));
+        const catsToMerge = remappedCats.filter((c) =>
+          selectedKeys.has(catWaveKey(c.name, c.subCategory))
+        );
+        const ridersToMerge = remappedRiders.filter((r) =>
+          catsToMerge.some((c) => riderInCategory(r, c))
+        );
 
-      toast.success(`Imported ${riderCount} riders across ${catCount} categories`);
+        const result = await mergeCategoriesIntoRace(race.uuid, catsToMerge, ridersToMerge);
+
+        // Sync Zustand with what actually landed in IDB
+        useCategoryStore.setState((s) => ({
+          categories: [
+            ...s.categories.filter(
+              (c) =>
+                !(c.raceUuid === race.uuid && selectedKeys.has(catWaveKey(c.name, c.subCategory)))
+            ),
+            ...result.categories,
+          ],
+        }));
+        useRiderStore.setState((s) => ({
+          riders: [
+            ...s.riders.filter(
+              (r) =>
+                !(r.raceUuid === race.uuid && catsToMerge.some((c) => riderInCategory(r, c)))
+            ),
+            ...result.riders,
+          ],
+        }));
+        toast.success(
+          `Merged ${result.riders.length} riders in ${result.categories.length} ${
+            result.categories.length === 1 ? "category" : "categories"
+          }`
+        );
+      }
+      setPendingImport(null);
     } catch (err) {
       toast.error(`Import failed: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
@@ -222,10 +281,11 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
         <div className={styles.dataSectionTitle}>Data Transfer</div>
         <div className={styles.dataBody}>
           <div className={styles.dataText}>
-            Export all race data (riders, categories, lap results) to Excel so another device can import and continue the race.
+            Export race data (riders, categories, lap results) to Excel — all of it, or only your
+            categories so the main commissaire can merge everyone's results after the race.
           </div>
           <div className={styles.dataButtons}>
-            <button className={styles.exportBtn} onClick={handleExport}>
+            <button className={styles.exportBtn} onClick={() => setShowExportModal(true)}>
               <Download size={14} />
               Export to Excel
             </button>
@@ -260,6 +320,27 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
             </button>
           </div>
         </div>
+      )}
+
+      {showExportModal && (
+        <ExportCategoriesModal
+          categories={raceCats}
+          riders={raceRiders}
+          onConfirm={handleExportConfirm}
+          onCancel={() => setShowExportModal(false)}
+        />
+      )}
+
+      {pendingImport && (
+        <MergeImportModal
+          fileRaceName={pendingImport.raceName}
+          fileCategories={pendingImport.categories}
+          fileRiders={pendingImport.riders}
+          localCategories={raceCats}
+          localRiders={raceRiders}
+          onConfirm={handleImportConfirm}
+          onCancel={() => { if (!importing) setPendingImport(null); }}
+        />
       )}
 
       {showDeleteRace && onDeleteRace && (

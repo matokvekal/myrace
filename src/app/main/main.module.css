@@ -404,6 +404,13 @@
   padding: 8px 16px 34px;
 }
 
+.noResults {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-secondary, #888);
+  font-size: 0.9rem;
+}
+
 /* ── Overture: cards arrive one by one on an 89ms Fibonacci beat.
    Only the first five (one phone-screen's worth) are staggered; the
    rest appear together so long lists never feel slow. ── */

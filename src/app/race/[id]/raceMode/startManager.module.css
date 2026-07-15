@@ -24,6 +24,54 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Whole-wave finish button — lives on the purple header, so white-on-glass */
+.finishWaveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(231, 76, 60, 0.35);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.finishWaveBtn:hover {
+  background: rgba(231, 76, 60, 0.55);
+}
+
+/* Closed wave: red diagonal "finish flag" stripes, matching the wave pill */
+.waveFinishedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(231, 76, 60, 0.55) 0 4px,
+    rgba(255, 255, 255, 0.08) 4px 9px
+  );
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .currentTime {
   display: flex;
   align-items: center;

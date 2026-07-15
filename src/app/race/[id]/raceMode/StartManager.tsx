@@ -315,6 +315,11 @@ const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
     (c) => c.status === "running" || c.status === "finished"
   );
 
+  // The wave is closed once every category is finished: no new start groups,
+  // and the wave pill up top shows its "finished" stripes.
+  const waveFinished =
+    categories.length > 0 && categories.every((c) => c.status === "finished");
+
   // Rule: only one wave may run at a time. If any category OUTSIDE this wave is
   // running, this wave cannot be started until that one finishes.
   const thisWaveIds = new Set(categories.map((c) => c.id));
@@ -327,6 +332,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [waveBaseTime, setWaveBaseTime] = useState<string>("");
   const [confirmFinishId, setConfirmFinishId] = useState<string | null>(null);
+  const [confirmFinishWave, setConfirmFinishWave] = useState(false);
   const [expandedFinished, setExpandedFinished] = useState<Set<string>>(new Set());
   const [startError, setStartError] = useState<string[] | null>(null);
 
@@ -630,6 +636,8 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       .filter(Boolean) as CategoryProps[];
 
     for (const cat of cats) {
+      // Never-started categories have nothing to finalize.
+      if (cat.status === "upcoming") continue;
       if (cat.status === "running") {
         await updateCategory({ ...cat, status: "finished" as const, finishedAt: now.getTime() });
       }
@@ -637,23 +645,51 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
         (r) => riderInCategory(r, cat) && r.raceUuid === raceUuid && r.status !== "DNS"
       );
       const updatedRiders = catRiders.map((r) => {
-        const completed = r.raceStatus === "finished";
         const isOut = r.status === "DNF" || r.status === "DSQ" || r.status === "DNS";
         return {
           ...r,
-          // Riders who already completed their laps are finalized as finished.
-          // Riders STILL ON THE TRACK keep raceStatus "running" so they remain
-          // visible on Live (flagged "still on track") — the organizer must not
-          // lose them. They get finalized when the wave is cleared by a new start.
-          status: completed && !isOut ? ("finished" as const) : r.status,
-          elapsedTimeFromStart: completed
-            ? (r.elapsedTimeFromStart ?? formatElapsed(now, r.timeStartRace))
-            : r.elapsedTimeFromStart,
+          // Ending the race finalizes EVERY rider — including those still on the
+          // track — so Live is clean and the next wave starts from a blank slate.
+          raceStatus: "finished" as const,
+          status: isOut ? r.status : ("finished" as const),
+          elapsedTimeFromStart:
+            r.elapsedTimeFromStart ?? formatElapsed(now, r.timeStartRace),
         };
       });
       if (updatedRiders.length > 0) await updateAllRiders(updatedRiders);
     }
 
+  };
+
+  // Finish the ENTIRE wave: every category is closed, every started rider is
+  // finalized in the DB, and never-started categories are marked finished so
+  // the wave signs off as done (no new start groups can be added afterwards).
+  const finishWave = async () => {
+    const now = new Date();
+    setCountdown(null);
+
+    for (const cat of categories) {
+      if (cat.status === "finished") continue;
+      const wasStarted = cat.status === "running";
+      await updateCategory({ ...cat, status: "finished" as const, finishedAt: now.getTime() });
+      // Categories that never started have no riders on the road to finalize.
+      if (!wasStarted) continue;
+
+      const catRiders = riders.filter(
+        (r) => riderInCategory(r, cat) && r.raceUuid === raceUuid && r.status !== "DNS"
+      );
+      const updatedRiders = catRiders.map((r) => {
+        const isOut = r.status === "DNF" || r.status === "DSQ" || r.status === "DNS";
+        return {
+          ...r,
+          raceStatus: "finished" as const,
+          status: isOut ? r.status : ("finished" as const),
+          elapsedTimeFromStart:
+            r.elapsedTimeFromStart ?? formatElapsed(now, r.timeStartRace),
+        };
+      });
+      if (updatedRiders.length > 0) await updateAllRiders(updatedRiders);
+    }
   };
 
   const adjustTime = (groupId: string, seconds: number) => {
@@ -826,14 +862,50 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
             {currentTime.toLocaleTimeString("en-GB")}
           </span>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          startIcon={<Plus size={14} />}
-          onClick={addNewStart}
-        >
-          Add Start Group
-        </Button>
+        <div className={styles.headerActions}>
+          {waveFinished ? (
+            <span className={styles.waveFinishedBadge}>
+              <Flag size={13} /> Wave {waveNum} finished
+            </span>
+          ) : (
+            <>
+              {waveHasStarted &&
+                (confirmFinishWave ? (
+                  <div className={styles.confirmInline}>
+                    <span className={styles.confirmText}>Finish whole wave?</span>
+                    <button
+                      className={styles.confirmYes}
+                      onClick={() => { finishWave(); setConfirmFinishWave(false); }}
+                    >
+                      Yes <Flag size={13} />
+                    </button>
+                    <button
+                      className={styles.confirmNo}
+                      onClick={() => setConfirmFinishWave(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className={styles.finishWaveBtn}
+                    onClick={() => setConfirmFinishWave(true)}
+                    title="Finish all starts in this wave and close it"
+                  >
+                    <Flag size={13} /> Finish Wave
+                  </button>
+                ))}
+              <Button
+                variant="primary"
+                size="sm"
+                startIcon={<Plus size={14} />}
+                onClick={addNewStart}
+              >
+                Add Start Group
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Wave Time Control */}

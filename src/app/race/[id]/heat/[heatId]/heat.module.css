@@ -235,6 +235,15 @@
   background: var(--bg-surface);
 }
 
+.waveInfoLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
 .miniDot {
   width: 10px;
   height: 10px;

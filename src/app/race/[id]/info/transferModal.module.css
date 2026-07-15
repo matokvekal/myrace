@@ -1,0 +1,251 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #1e3a5f;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 0 0 14px;
+  color: #5f7ba5;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.selectAllRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px;
+  border-bottom: 1px solid rgba(99, 166, 252, 0.2);
+  margin-bottom: 6px;
+}
+
+.selectAllBtn {
+  background: none;
+  border: none;
+  color: #2f6fd8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.countLabel {
+  font-size: 12px;
+  color: #5f7ba5;
+  font-weight: 600;
+}
+
+.catList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  min-height: 60px;
+}
+
+.catRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(99, 166, 252, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(165deg, #ffffff, #f6faff);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.catRow:hover {
+  border-color: rgba(99, 166, 252, 0.5);
+}
+
+.catRowChecked {
+  border-color: #2f6fd8;
+  background: linear-gradient(165deg, #f0f6ff, #e6f0ff);
+}
+
+.catRowDisabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.catCheckbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #2f6fd8;
+  flex-shrink: 0;
+}
+
+.catInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.catName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e3a5f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catSub {
+  font-weight: 500;
+  color: #5f7ba5;
+}
+
+.catMeta {
+  font-size: 11px;
+  color: #5f7ba5;
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.statusChip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #eef2f8;
+  color: #5f7ba5;
+}
+
+.statusFinished {
+  background: #e3f4e6;
+  color: #1e7a33;
+}
+
+.overwriteWarn {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b26a00;
+  background: #fff4e0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.modeGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid rgba(99, 166, 252, 0.2);
+  border-radius: 8px;
+  background: #f8fafd;
+}
+
+.modeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1e3a5f;
+  line-height: 1.4;
+}
+
+.modeOption input {
+  margin-top: 2px;
+  accent-color: #2f6fd8;
+}
+
+.modeHint {
+  display: block;
+  font-size: 11px;
+  color: #5f7ba5;
+}
+
+.modeDanger {
+  color: #b71c1c;
+}
+
+.emptyNote {
+  text-align: center;
+  color: #5f7ba5;
+  font-size: 13px;
+  padding: 20px 0;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancelBtn {
+  padding: 10px 20px;
+  background: #f5f5f5;
+  color: #555;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.confirmBtn {
+  padding: 10px 20px;
+  background: #2f6fd8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  background: #2258b3;
+}
+
+.confirmBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.confirmBtnDanger {
+  background: #c62828;
+}
+
+.confirmBtnDanger:hover:not(:disabled) {
+  background: #b71c1c;
+}
