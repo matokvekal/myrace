@@ -35,13 +35,13 @@ export const initIndexedDB = async (): Promise<IDBPDatabase> => {
       },
     });
   } catch (err: any) {
-    if (err.name === "VersionError") {
-      await new Promise<void>((resolve, reject) => {
-        const del = indexedDB.deleteDatabase(DB_NAME);
-        del.onerror = () => reject(del.error);
-        del.onsuccess = () => resolve();
-      });
-      return initIndexedDB();
+    if (err?.name === "VersionError") {
+      // The stored DB is NEWER than this bundle — happens when an older cached
+      // build loads after a newer deploy. NEVER delete the user's races
+      // (BUGS.md #12 / BUG-02): open at whatever version already exists on disk,
+      // which keeps every store and all data intact. A newer version is a
+      // superset, so the stores this build needs are already present.
+      return await openDB(DB_NAME);
     }
     throw err;
   }

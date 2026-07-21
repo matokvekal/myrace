@@ -18,13 +18,82 @@ after finish fix bug or fiture re organize the md files AGENT BUGS
 | 9  | Status order DNF → DSQ → DNS | ✅ DONE |
 | 10 | Live cancel restores rider to exact prior state + slot | ✅ DONE |
 | 11 | Downloadable example.csv | ✅ DONE |
-| 12 | Cleanup pass (dead files, single source of truth) | ⏳ DEFERRED — fix ESLint first |
+| 12 | Cleanup pass (dead files, single source of truth) | 🟡 PARTIAL — 2 important bugs fixed (BUG-02, BUG-03); dead-file sweep still deferred |
 | 13 | Race image crash on save | ✅ DONE |
 | 14 | Live timer freezes at stop + gated Clear button | ✅ DONE |
 | 15 | Narrow-phone timer seconds hidden by wave chip | ✅ DONE |
 | 16 | Terms & Conditions page + startup acceptance gate | ✅ DONE (draft text) |
+| 17 | Finish start: "riders still on track" should not nag/block | 🆕 TODO |
+| 18 | Wait for rider import before opening the race | ✅ V DONE |
+| 19 | Import CSV columns by header name | ✅ V DONE |
+| 20 | One rider-import implementation | ✅ V DONE |
+| 21 | Remove invalid `laps` field from Quick Add Rider | ✅ V DONE |
+| 22 | Category filter on the Standings screen | ✅ V DONE |
+| 23 | Early-finish confirmation message | ✅ V DONE |
+| 24 | Full wave status view (All Riders) | ✅ V DONE |
+| 25 | Direct DNS action on the check-in row | ✅ V DONE |
+| 26 | Time parsing moved to one shared utility | ✅ V DONE |
+| 27 | Stable `data-testid` attributes | ✅ V DONE |
+| 28 | Excel signature verification | ✅ V DONE |
+| 29 | Extract live lap logic into `useLapRecording` | ✅ V DONE |
+| 30 | Blank finish times in Results | ✅ V DONE |
+| 31 | Riders on course wrongly recorded as finishers | ✅ V DONE |
+| 32 | Live log keeps ALL wave arrivals in arrival order (not bib-sorted) | 🆕 TODO |
+| 33 | ESLint is broken project-wide (extends a Next.js preset in a Vite app) | 🆕 TODO |
+| 34 | JS bundle is 1.76 MB (558 kB gzipped) — slow first load on a phone | 🆕 TODO |
+| 35 | Terms gate has no test/dev bypass | 🆕 TODO |
+| 36 | Demo race redirects to Live with no way back signposted | 🆕 TODO |
+| 37 | `/tests/` was gitignored — whole E2E suite was uncommitted | ✅ FIXED (see Session Log) |
+
+> ⚠️ **Numbering note:** items 18–31 came from the E2E test findings and were
+> already written up below. A later edit briefly reused #18 for the live-log
+> item — that one is now **#32**, so every number means exactly one thing.
 
 Full write-ups per item below.
+
+---
+
+## 🔁 RESUME NOTE FOR NEXT SESSION  (written 2026-07-21, conversation restarted for memory)
+
+**Uncommitted work in the tree right now** (NOT yet committed — verify with `git status`,
+build passes, keep or commit before big changes):
+- `utils/calculatePosition.ts` — rewritten PURE (BUG-03). No longer mutates the
+  Zustand store objects during render; clones inputs; groups by name+subCategory.
+- `stores/indexDb/indexedDbHelper.ts` — IDB `VersionError` no longer deletes all
+  data (BUG-02); it reopens at the on-disk version instead.
+- (Earlier this session, ALREADY COMMITTED in `a46d81a`: items #2–#16.)
+
+**Open items, in the order I'd take them (priority = bottleneck + important first):**
+1. **#34 — code-split the 1.76 MB bundle** (bottleneck, real race-day phone load).
+   `React.lazy`/dynamic `import()` for OCR (tesseract), xlsx export, leaflet map,
+   MUI, supabase; then `manualChunks`. MEASURE initial-chunk size before & after.
+2. **#32 — persist the live arrival log** (important; can lose a disputed result).
+   Today it's an in-memory `riderActions` array in
+   `race/[id]/heat/[heatId]/useLapRecording.ts` — per-session, lost on reload.
+   Order already correct (newest first); job is completeness + persistence.
+3. **#33 — fix ESLint** (broken: `.eslintrc.json` extends `next/core-web-vitals`
+   in a Vite app). NEEDS user OK to add dev-deps (`typescript-eslint`,
+   `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `@eslint/js`).
+4. **#17** (Finish nag — keep one-tap) and **#36** (demo race → no way back to Setup)
+   — small UX.
+5. **#35** — terms gate test/dev bypass.
+6. **#1** — BLOCKED, needs the real Playwright error text from the user.
+7. **#12** — dead-file sweep still deferred (candidates + 64 unused imports noted
+   under #12). Do AFTER #33 so "unused" is provable.
+
+**Working environment / how I verify (Windows + PowerShell):**
+- Typecheck: `npx tsc --noEmit -p tsconfig.json`. Build: `npx vite build`.
+- Find unused code without ESLint: `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+- Pure-logic unit checks: bundle the real module with esbuild to a temp `.mjs` and
+  run under node (pattern used all session; scratchpad scripts). `@/` alias → `src/app`
+  (but tsconfig `paths` has NO `@/legal/*` — legal files use relative imports).
+- Feature notes for agents live in `CLAUDE.md` (kept updated as items land).
+
+**Conventions the user set:**
+- Don't ask questions in chat — write anything I need from them INTO this file.
+- Fix bottlenecks + important bugs first, cosmetic/cleanup last.
+- After finishing an item, reorganize/keep AGENT (CLAUDE.md) + BUGS.md tidy.
+- Numbering: 1–36, each number = one thing (the old #18/#32 dup is resolved).
 
 ---
 
@@ -232,10 +301,51 @@ the other  this make sense
    `autoMapColumns`; BOM present; no row has bib == standing.
    Files: `public/example.csv` (new), `components/csv/UploadStep.tsx` + css
 
-12
+12  — CLEANUP / CODE REVIEW  (🟡 partial — important bugs first, per your note)
  i need to go write the bugs.md what you did and else at thois before i go do quick                                        /btw when start demo race some cards has to bee at 0 laps some at finish some dnf like real race also some wave not start…
   /btw we did it before at any time at race before in after i can download race compilte file as excel json csv and other s…
-                                                                                  
+
+   Priority = bottlenecks + important bugs first, cosmetic cleanup last. Two
+   important bugs found and fixed in review:
+
+   ✅ BUG-03 — `calculatePositions` mutated its inputs. It's called during render
+      by LiveBoard & LiveCards purely to display, but it wrote `position_category`
+      / `position_race` straight onto the Zustand store objects (and sorted the
+      input array) — so every render silently mutated shared state that React
+      never re-rendered for, drifting the single source of truth. Rewrote it
+      PURE: works on clones, never touches inputs. Also now groups by the
+      composite category identity (name + subCategory) like the rest of the app,
+      so same-named categories in different waves rank separately.
+      Verified: input unchanged, out-riders excluded, correct per-category and
+      overall order, sub-categories separate. File: `utils/calculatePosition.ts`.
+
+   ✅ BUG-02 — IDB `VersionError` handler DELETED ALL DATA. It fires when the
+      stored DB is newer than the running bundle (older cached build loads after
+      a newer deploy) and it called `deleteDatabase` — wiping every race, rider
+      and category. Now it re-opens at the existing on-disk version instead
+      (a newer version is a superset, so all needed stores are present),
+      preserving all data. File: `stores/indexDb/indexedDbHelper.ts`.
+
+   STILL DEFERRED (cosmetic / lower impact):
+   - Dead-file sweep: reachability scan flagged candidates (LiveCards imported?,
+     ExportCSVButton, ViewModeToggle, RaceCloudPanel [cloud tab hidden], AdminPanel,
+     etc.) + 64 unused imports/locals (tsc `--noUnusedLocals`). Not removed yet —
+     needs per-file verification so nothing lazily-referenced breaks.
+   - `PREDEFINED_TEMPLATES` duplicated in `Categories.tsx` + `CategoryManager.tsx`.
+   - ESLint is broken project-wide (`.eslintrc.json` → `next/core-web-vitals` in a
+     Vite app). Proper fix needs installing @typescript-eslint packages — tell me
+     if I may add those dev-deps, otherwise I'll wire a no-dep `tsc --noUnusedLocals`
+     lint script instead.
+
+   NOTE — the two "/btw" lines just under this #12 header are feature requests,
+   NOT part of the cleanup:
+     (a) demo race should look real — some cards at 0 laps, some finished, some
+         DNF, and some waves not started;
+     (b) ability to download the complete race file (Excel / JSON / CSV / others)
+         before, during and after a race.
+   Leaving them here (not renumbering) because the "Implementation Tasks 18–31"
+   section lower in this file already owns export/import work — (b) likely maps
+   there. Point me at which task, or say "do (a)" / "do (b)", and I'll take it.
 13 ✅ DONE — when create new race i take image for the race but save that image crash the app
 
    **Two real defects in the create-race path:**
@@ -340,6 +450,41 @@ so each user at start the app(i see 2 pages) must check  that he read those cond
    Files: `legal/terms.ts` (new), `legal/termsAcceptance.ts` (new),
    `terms/page.tsx` + css (new), `components/legal/TermsGate.tsx` + css (new),
    `App.tsx`
+
+17 🆕 TODO — Finish a start while riders are still on the track
+   "i now have finish button at start for existing starts but if i click i got
+   message that still riders at the track. so what — if i want to finish it's ok,
+   i can finish; those on the track stay on the track until we finish the wave or
+   until they arrive."
+
+   WANT: clicking Finish on a start should just finish it, without the on-track
+   riders being a blocker. They stay on Live marked ON TRACK and finish on their
+   next crossing (or when the whole wave is finished).
+
+   CLAUDE NOTE (from a quick look): the per-start Finish in `StartManager.tsx`
+   (`data-testid="finish-start-group"` → `confirmFinishId` → `endRace(group)`)
+   already ALLOWS this — it shows a confirm ("… N riders still on course — they
+   stay ON TRACK and finish on their next crossing") and the Yes button proceeds;
+   it does NOT hard-block. So this is likely a UX-nag, not a real block. Options
+   when you want it done:
+     (a) drop/soften the confirmation so Finish is one tap, OR
+     (b) if you're seeing an actual BLOCK (can't proceed at all), tell me which
+         screen/button — there may be a different finish path that blocks.
+   Related: [[finish-race-on-track-model]] (ending a race must not hide on-road riders).
+   File to touch: `race/[id]/raceMode/StartManager.tsx` (~lines 1074–1110).
+
+18 🆕 TODO — Live race/action log should keep ALL arrivals for the wave, in arrival order
+   "at live the race log has to hold all the riders from this wave in their order
+   of ARRIVAL, not only sorted by bib — sometimes the commissaire needs to see
+   all arrivals from the start."
+
+   WANT: the live log (RiderActionLog / the action feed on the heat screen) should
+   retain every arrival for the current wave, ordered by time of arrival (most
+   recent first, or chronological — confirm), so the commissaire can review the
+   full sequence of who crossed and when, from the start. Today it appears to be
+   limited / bib-ordered rather than a complete arrival-ordered history.
+   Files to look at: `race/[id]/heat/[heatId]/page.tsx` (riderActions / action log),
+   `components/voice/RiderActionLog.tsx`.
 
 
 agfter run test
@@ -888,6 +1033,11 @@ are still out with `raceStatus: "running"`. The existing next-crossing logic
 then finalizes them correctly. Riders already finished, DNF/DSQ/DNS keep their
 status.
 
+
+32 - term file
+term file is not the first
+on;y after landing page near the start work or the demo race butons add the check box so then user can start this will be at the localstorage (later at db)
+
 **Required validation:**
 
 * Flag off a group while riders are still racing.
@@ -904,13 +1054,253 @@ status.
 
 Implement tasks in this order:
 
-1. **Tasks 30–31: results integrity.** Both corrupt or hide real race results;
-   31 also unblocks 23.
+✅ **Tasks 18–31 are all complete and verified** (suite green twice, `tsc` clean,
+production build passes). The order they were done in:
+
+1. Tasks 30–31: results integrity — both corrupted or hid real race results;
+   31 also unblocked 23.
 2. Tasks 18–20: import reliability.
-3. Tasks 21–23: correctness and race operation clarity.
-4. Tasks 24–25: UI improvements without changing existing workflows.
+3. Tasks 21–23: correctness and race-operation clarity.
+4. Tasks 24–25: UI additions that don't change existing workflows.
 5. Tasks 26–27: code and test stability.
 6. Task 28: signature verification.
-7. Task 29: controlled refactoring only after all previous flows are stable.
+7. Task 29: controlled refactoring, only once every flow above was stable.
+
+### What's left, in the order I'd take it
+
+1. **#33 — fix ESLint.** Cheapest first: it currently gates nothing, and the
+   missing `react-hooks/exhaustive-deps` warnings are the ones most likely to be
+   hiding real bugs in the big components.
+2. **#32 — persist the live arrival log.** The only outstanding item that can
+   cost you a result in a dispute.
+3. **#34 — code-split the bundle.** Real-world impact on race day (phone, mobile
+   data, cold PWA start).
+4. **#17, #36 — UX polish.** Both are small and self-contained.
+5. **#35 — terms bypass for tests/demos.**
+6. **#1 — blocked**, needs the real error text from you.
+7. **#12 — dead-file sweep**, still deferred.
 
 Every pull request should remain small, reviewable, and easy to revert.
+
+---
+
+# Open items — logged, not yet implemented
+
+Everything above numbered 18–31 is done and verified. These are the ones still
+outstanding. Each says what to change and how to know it worked.
+
+---
+
+### 17. Finish start: "riders still on track" should not nag or block — TODO
+
+Finishing a start group while riders are still out must stay a one-tap action.
+The confirmation added in task 23 states the consequence, which is right — but it
+must never become a blocking dialog, a second confirm, or a repeating warning
+that the commissaire has to dismiss on every start.
+
+Task 31 already made the underlying behaviour correct: those riders stay ⚑ ON
+TRACK and finish on their next crossing, so nothing is lost by flagging off.
+
+**Required validation:**
+
+* Finish a group with riders still out — one tap plus one confirm, no more.
+* Verify no warning re-appears afterwards on the Grid or on Live.
+* Verify the ⚑ ON TRACK riders still finish on their next crossing.
+* Verify finishing a group with nobody on course is unchanged.
+
+---
+
+### 32. Live log should keep ALL wave arrivals in arrival order — TODO
+
+*(Renumbered from a duplicate #18 — see the numbering note in the index.)*
+
+The rider action log should be a complete, chronological record of every arrival
+in the wave, in the order they crossed — not sorted by bib, and not truncated.
+That is what makes it usable for resolving a disputed placing after the race.
+
+Today it is an in-memory `riderActions` array in `useLapRecording`, so it is
+per-session and per-wave: navigating away or reloading loses it. Arrival order is
+already correct (newest first), so the work is completeness and persistence,
+not re-sorting.
+
+**Required validation:**
+
+* Record laps for a full wave with staggered starts.
+* Verify every arrival appears exactly once, newest first, never bib-sorted.
+* Verify an undo removes exactly its own entry and nothing else.
+* Reload mid-wave and verify the log survives.
+* Verify DNF/DSQ entries stay interleaved in the right time position.
+
+---
+
+### 33. ESLint is broken project-wide — TODO
+
+`npx eslint` cannot run at all:
+
+```
+ESLint couldn't find the config "next/core-web-vitals" to extend from.
+```
+
+`.eslintrc.json` extends the Next.js preset, but this is a **Vite** app with no
+Next.js installed. So `npm run lint` has never gated anything — no unused vars,
+no missing hook deps, no accessibility rules. Given the size of
+`heat/[heatId]/page.tsx` and `StartManager.tsx`, the missing
+`react-hooks/exhaustive-deps` warnings are the ones most likely hiding real bugs.
+
+**Fix:** replace the config with a Vite/React one — `@eslint/js`,
+`eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, plus
+`typescript-eslint`.
+
+**Required validation:**
+
+* `npm run lint` runs and reports.
+* Triage the first run: fix genuine errors, deliberately silence the rest rather
+  than leaving a wall of noise nobody reads.
+* Verify the app still builds and the full test suite still passes.
+* Do NOT auto-fix across the whole repo in one commit.
+
+---
+
+### 34. JS bundle is 1.76 MB — slow first load on a phone — TODO
+
+`npm run build` warns:
+
+```
+dist/assets/index-*.js   1,758.15 kB │ gzip: 558.42 kB
+(!) Some chunks are larger than 500 kB after minification.
+```
+
+Not a blocker, and irrelevant on a laptop — but the people who need this app are
+standing at a start line on phone data. 558 kB gzipped before the first paint is
+a slow first load exactly when it matters, and a PWA cold start after an update
+pays it again.
+
+The likely heavy passengers are all things most sessions never touch:
+
+* `tesseract.js` — photo/OCR import
+* `xlsx` — export/import
+* `leaflet` + `react-leaflet` — the map tab
+* `@mui/material`, `@mui/x-date-pickers`
+* `@supabase/supabase-js` — cloud sync
+
+**Fix:** `React.lazy` + dynamic `import()` for the OCR wizard, the map tab and
+the Excel export/import path, so none of them are in the initial chunk. Then
+`build.rollupOptions.output.manualChunks` to split the remaining vendor code.
+Measure before and after — don't guess at which import is the expensive one.
+
+**Required validation:**
+
+* Record the current initial-chunk size first, as the baseline.
+* Verify the initial chunk drops materially (target: under 500 kB raw).
+* Verify OCR import, the map tab, and Excel export/import all still work when
+  their chunk loads on demand.
+* Run the full test suite.
+
+---
+
+### 35. Terms gate has no test/dev bypass — TODO
+
+`TermsGate` blocks every control on first load in a fresh profile. When it landed
+it silently broke all four existing E2E specs on their very first click — nothing
+to do with what they tested. Worked around in `tests/helpers.ts` with
+`acceptTerms()`, but the product gap is still there.
+
+**Fix:** a `localStorage` seed helper or an env flag so automation, demos and
+screenshots don't have to script their way past a legal dialog.
+
+**Required validation:**
+
+* Verify a real first-time user still sees the gate and must accept.
+* Verify the bypass works for tests without weakening the real path.
+* Verify a `TERMS_VERSION` bump still re-prompts everyone.
+
+---
+
+### 36. Demo race redirects to Live with no way back signposted — TODO
+
+`race/[id]/page.tsx` bounces the first open of the demo to `/race/:id/heat/1`,
+one-shot per session. You click "Try Demo Race" and arrive somewhere you didn't
+ask for, with no indication a Setup view exists. It was also the second reason
+the E2E suite was failing (worked around in `loadDemoRace()`).
+
+**Fix:** an affordance on the Live screen for demo races — "you're watching a
+race in progress → go to Setup".
+
+**Required validation:**
+
+* Verify a first-time user can find their way back to Setup without guessing.
+* Verify the one-shot redirect still only fires once per session.
+* Verify a non-demo race is unaffected.
+
+---
+
+# SESSION LOG / HANDOFF — 2026-07-21
+
+Read this first if you're picking the project up cold.
+
+## State right now
+
+* **Suite: 11 tests, 8 files — green twice in a row** (~65 s). `tsc --noEmit`
+  clean. `npm run build` passes (29 s).
+* **Items 18–31 + 8: done and verified.** Everything else outstanding is listed
+  in the STATUS INDEX at the top of this file with a full write-up below it.
+* Working tree is **staged but NOT committed**.
+
+## ⚠️ Read before you commit
+
+`/tests/` was in `.gitignore` — a leftover from a Next.js scaffold (this is a
+Vite app). **The entire Playwright suite was excluded from version control.**
+Fixed: `/tests/` removed from `.gitignore`, `playwright-report` added, and all 13
+test files staged. If you `git stash` or reset, check they survive.
+
+Same scaffold left `.eslintrc.json` extending `next/core-web-vitals`, which is
+why `npx eslint` cannot run at all — logged as **#33**.
+
+## How to run the tests
+
+```bash
+npm run test        # whole suite  (~65 s)
+npm run test:full   # just the full race-day scenario (~25 s)
+npx playwright test full-race-e2e --headed   # watch it
+npx playwright test <file> --repeat-each=3   # flake check
+```
+
+`TEST.md` has the **test inventory** (all 11 tests, what each covers, which BUGS
+item it maps to) plus an explicit "not covered" list. Point an agent at that
+section for "run the tests for what we've built".
+
+## Things that will bite you
+
+1. **The E2E suite runs on a fake clock** (`page.clock`). Two app behaviours make
+   it mandatory: a rider can't record two laps within 60 s (`MIN_LAP_MS`), and a
+   rider card waits 300 ms to tell a single tap from a double tap. After a tap you
+   must `fastForward(400)` or the tap never registers. Don't "fix" that by
+   removing the fake clock.
+2. **react-toastify doesn't animate under a frozen clock**, so toasts can't be
+   asserted. Assert the behaviour instead (e.g. the refused lap, not the "Wait
+   Ns" toast).
+3. **Two cold-start flakes were fixed by making selectors tolerant**, not by
+   adding sleeps — `create-race.spec.ts` (races the dev server's first compile,
+   so it accepts either "Create new race" or "Add") and `csv-import.spec.ts`
+   (search typed while the list was still re-rendering; wrapped in `toPass`).
+   If a test flakes, reproduce with `--repeat-each=3` before changing app code.
+4. **A green test can mean the bug is still there.** While #31 was unfixed,
+   `flagOffEarly()` deliberately asserted the *wrong* behaviour so the day
+   someone fixed `endRace()` the test would go red and tell them what to change.
+   That trick is now spent — the test asserts correct behaviour.
+5. **The demo race seeds MID-RACE** (wave 1 already checked in and on course) and
+   bounces the first open of a session to Live. `tests/helpers.ts` handles both.
+   Don't assume a clean unstarted demo.
+6. **Only one wave may run at a time.** `race-flow.spec.ts` has to finish wave 1
+   before it can start wave 2.
+
+## Next steps, in order
+
+1. **#33 — fix ESLint.** Cheapest, and it currently gates nothing; the missing
+   `react-hooks/exhaustive-deps` warnings are most likely to be hiding real bugs.
+2. **#32 — persist the live arrival log.** The only open item that can cost you a
+   result in a dispute.
+3. **#34 — code-split the 1.76 MB bundle.** Real impact on race day.
+4. **#17, #36** — small UX. **#35** — terms bypass for tests/demos.
+5. **#1 — blocked**, needs the real Playwright error text.
+6. **#12 — dead-file sweep**, still deferred.

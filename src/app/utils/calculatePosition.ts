@@ -1,55 +1,61 @@
 import { RiderProps } from "@/types/types";
 
-const parseTime = (time: string | null): Date | null => (time ? new Date(time) : null);
+/**
+ * Rank riders by finishing order and assign `position_category` / `position_race`.
+ *
+ * PURE (BUGS.md #12 / BUG-03): the input riders are Zustand store objects, so
+ * this must never mutate them or their array — LiveBoard/LiveCards call it during
+ * render purely to display, and the old in-place mutation silently rewrote store
+ * state on every render (React never saw it; the single source of truth drifted).
+ * It works on clones and returns a fresh, sorted array of new objects. Callers
+ * read positions from the return value.
+ *
+ * Grouping for `position_category` uses the composite identity (name +
+ * subCategory), matching the rest of the app — the same category name in two
+ * waves stays ranked separately.
+ */
+
+const timeMs = (time: string | null): number => (time ? new Date(time).getTime() || 0 : 0);
+
+const OUT_STATUSES = new Set<RiderProps["status"]>(["DNF", "DNS", "DSQ"]);
+
+/** Higher lap count first, then earlier arrival. */
+const byPlace = (a: RiderProps, b: RiderProps): number => {
+   if (b.lapsCounter !== a.lapsCounter) return b.lapsCounter - a.lapsCounter;
+   return timeMs(a.timeArrive) - timeMs(b.timeArrive);
+};
 
 const calculatePositions = (riders: RiderProps[]): RiderProps[] => {
-   // Filter out DNF and DNS riders
-   const activeRiders = riders.filter(
-      (rider) => rider.status !== "DNF" && rider.status !== "DNS" && rider.status !== "DSQ"
-   );
+   // Clone up front so nothing downstream can touch the store objects.
+   const active = riders
+      .filter((rider) => !OUT_STATUSES.has(rider.status))
+      .map((rider) => ({ ...rider }));
 
-   // Group riders by category
-   const categories = activeRiders.reduce((acc, rider) => {
-      acc[rider.category] = acc[rider.category] || [];
-      acc[rider.category].push(rider);
-      return acc;
-   }, {} as Record<string, RiderProps[]>);
-
-   // Process each category separately
-   Object.values(categories).forEach((ridersInCategory) => {
-      // Sort by laps completed (descending) and arrival time (ascending)
-      ridersInCategory.sort((a, b) => {
-         if (b.lapsCounter !== a.lapsCounter) {
-            return b.lapsCounter - a.lapsCounter; // Higher lap count comes first
-         }
-
-         const timeA = parseTime(a.timeArrive);
-         const timeB = parseTime(b.timeArrive);
-         return (timeA?.getTime() || 0) - (timeB?.getTime() || 0); // Earlier time comes first
-      });
-
-      // Assign position within the category
-      ridersInCategory.forEach((rider, index) => {
+   // position_category — within each category (name + subCategory).
+   const groups = new Map<string, RiderProps[]>();
+   for (const rider of active) {
+      const key = `${rider.category}::${rider.subCategory ?? ""}`;
+      let group = groups.get(key);
+      if (!group) {
+         group = [];
+         groups.set(key, group);
+      }
+      group.push(rider);
+   }
+   for (const group of groups.values()) {
+      group.sort(byPlace);
+      group.forEach((rider, index) => {
          rider.position_category = index + 1;
       });
-   });
+   }
 
-   // Combine all riders, re-sort by overall race position
-   const sortedRiders = activeRiders.sort((a, b) => {
-      const lapsDifference = b.lapsCounter - a.lapsCounter;
-      if (lapsDifference !== 0) return lapsDifference;
-
-      const timeA = parseTime(a.timeArrive);
-      const timeB = parseTime(b.timeArrive);
-      return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
-   });
-
-   // Assign overall race positions
-   sortedRiders.forEach((rider, index) => {
+   // position_race — overall order (same clone instances, so both fields stick).
+   const sorted = [...active].sort(byPlace);
+   sorted.forEach((rider, index) => {
       rider.position_race = index + 1;
    });
 
-   return sortedRiders;
+   return sorted;
 };
 
 export default calculatePositions;

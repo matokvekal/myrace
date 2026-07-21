@@ -12,8 +12,11 @@ env.ts
 # next.js
 /.next/
 /out/
-/tests/
+# NOTE: `/tests/` used to be ignored here (leftover from a Next.js scaffold —
+# this is a Vite app). That silently excluded the whole Playwright E2E suite
+# from version control. Test SOURCES are tracked; only their OUTPUT is ignored.
 test-results
+playwright-report
 test-examples
 # production
 /build
