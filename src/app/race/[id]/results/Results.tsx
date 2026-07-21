@@ -6,7 +6,7 @@ import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
-import { Trophy } from "lucide-react";
+import { Trophy, SlidersHorizontal } from "lucide-react";
 import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
 import { parseClockTime } from "@/utils/timeUtils";
 
@@ -16,6 +16,30 @@ interface Props {
 
 type SortKey = "place" | "name" | "bib" | "time";
 type GroupBy = "category" | "wave";
+
+// Columns the user can show/hide on Results (BUGS.md #8). Position and Name are
+// always shown — Name is the whole point ("we cant see the name in some case").
+type ResultField = "bib" | "laps" | "time" | "status";
+const RESULT_FIELDS: { key: ResultField; label: string }[] = [
+  { key: "bib", label: "Bib #" },
+  { key: "laps", label: "Laps" },
+  { key: "time", label: "Time" },
+  { key: "status", label: "Status" },
+];
+const FIELDS_STORAGE_KEY = "resultsVisibleFields";
+
+function loadVisibleFields(): Set<ResultField> {
+  try {
+    const raw = localStorage.getItem(FIELDS_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw) as ResultField[];
+      return new Set(arr.filter((f) => RESULT_FIELDS.some((rf) => rf.key === f)));
+    }
+  } catch {
+    /* ignore — fall through to default */
+  }
+  return new Set<ResultField>(["bib", "laps", "time", "status"]); // all on by default
+}
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 
@@ -50,8 +74,27 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
+  const [visibleFields, setVisibleFields] = useState<Set<ResultField>>(loadVisibleFields);
+  const [showFieldMenu, setShowFieldMenu] = useState(false);
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
+
+  // Persist the chosen columns as the default for next time (BUGS.md #8).
+  useEffect(() => {
+    try {
+      localStorage.setItem(FIELDS_STORAGE_KEY, JSON.stringify([...visibleFields]));
+    } catch {
+      /* storage unavailable — selection just won't persist */
+    }
+  }, [visibleFields]);
+
+  const toggleField = (key: ResultField) =>
+    setVisibleFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const raceCategories = useMemo(
     () => categories.filter((c) => c.raceUuid === raceUuid),
@@ -177,13 +220,15 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
               <span className={`${styles.pos} ${podiumMode && sortBy === "place" && !isOut && idx < 3 ? styles[`pos${idx + 1}`] : ""}`}>
                 {showMedal ? MEDAL[idx] : posLabel}
               </span>
-              <span className={styles.bib}>#{rider.bibNumber}</span>
+              {visibleFields.has("bib") && <span className={styles.bib}>#{rider.bibNumber}</span>}
               <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
-              <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>
-              <span className={styles.time}>
-                {el && el !== Infinity ? fmtTime(el) : "—"}
-              </span>
-              {(() => {
+              {visibleFields.has("laps") && <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>}
+              {visibleFields.has("time") && (
+                <span className={styles.time}>
+                  {el && el !== Infinity ? fmtTime(el) : "—"}
+                </span>
+              )}
+              {visibleFields.has("status") && (() => {
                 const info = getRiderStatusInfo(rider);
                 return (
                   <span
@@ -267,12 +312,45 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
               </Button>
             ))}
           </div>
-          <button
-            className={`${styles.podiumToggle} ${podiumMode ? styles.podiumToggleOn : ""}`}
-            onClick={() => setPodiumMode((v) => !v)}
-          >
-            <Trophy size={15} /> Podium
-          </button>
+          <div className={styles.rightTools}>
+            {/* Column picker — persisted so it's the default next time (BUGS.md #8) */}
+            <div className={styles.fieldMenuWrap}>
+              <button
+                className={styles.fieldMenuBtn}
+                onClick={() => setShowFieldMenu((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={showFieldMenu}
+                title="Choose columns"
+              >
+                <SlidersHorizontal size={15} /> Columns
+              </button>
+              {showFieldMenu && (
+                <>
+                  <div className={styles.fieldMenuOverlay} onClick={() => setShowFieldMenu(false)} />
+                  <div className={styles.fieldMenu} role="menu">
+                    <div className={styles.fieldMenuTitle}>Show columns</div>
+                    {RESULT_FIELDS.map((f) => (
+                      <label key={f.key} className={styles.fieldMenuItem}>
+                        <input
+                          type="checkbox"
+                          checked={visibleFields.has(f.key)}
+                          onChange={() => toggleField(f.key)}
+                        />
+                        <span>{f.label}</span>
+                      </label>
+                    ))}
+                    <div className={styles.fieldMenuNote}>Name is always shown.</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              className={`${styles.podiumToggle} ${podiumMode ? styles.podiumToggleOn : ""}`}
+              onClick={() => setPodiumMode((v) => !v)}
+            >
+              <Trophy size={15} /> Podium
+            </button>
+          </div>
         </div>
       </div>
 

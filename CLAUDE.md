@@ -167,6 +167,26 @@ See `docs/app-review.md` for full bug list. Top 4 critical:
 - Status buttons are ordered DNF → DSQ → DNS everywhere (`RiderLiveModal`,
   `StatusModal`); out-statuses come before the internal ones.
 
+### Live timer + Clear board (heat page)
+- The clock derives from the earliest started rider's `timeStartRace`. When the
+  wave is stopped (every started category `finished`) it FREEZES at the latest
+  category `finishedAt` — do not derive it from a "running" rider, that resets to
+  0 on stop.
+- `clearedWave` state (reset on heatId change) wipes the board to 00:00:00 and
+  empties the rider lists. The "Clear board" button shows only when `waveStopped`,
+  behind a confirm. It's view-only — results stay in the Results tab.
+
+### Results column picker
+- The Results toolbar has a "Columns" menu; Bib/Laps/Time/Status toggle, Place and
+  Name always show. Choice persists in localStorage (`resultsVisibleFields`). Rows
+  are flexbox so hiding a column reflows and gives the name room.
+
+### Terms & Conditions (startup gate)
+- Content lives in `legal/terms.ts` (the ONLY file to edit; it's a DRAFT, not
+  lawyer-reviewed). `TermsGate` (rendered in `App.tsx`) blocks the app until the
+  user accepts; acceptance is persisted + versioned in `legal/termsAcceptance.ts`.
+  Bump `TERMS_VERSION` to re-prompt everyone. The `/terms` route shows the full text.
+
 ### Laps: the category is the source of truth
 - `rider.totalLaps` is only a cache of `category.laps`. Riders imported without a
   laps column start at 0.

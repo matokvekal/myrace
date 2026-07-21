@@ -2,6 +2,31 @@
 importent at this page all bugs and fitures you have to write some smal comment at the agents /read me so we know all the fitures of the app
 after finish fix bug or fiture re organize the md files AGENT BUGS 
 
+---
+## STATUS INDEX  (updated 2026-07-21)
+
+| #  | Item | Status |
+|----|------|--------|
+| 1  | Playwright / service-worker error | ⏳ BLOCKED — needs the real error text (see note under #1) |
+| 2  | Flatten sub-categories → one category per age band | ✅ DONE |
+| 3  | Bib vs Standing separated on import | ✅ DONE |
+| 4  | Riders Actions popup clipped on narrow phones | ✅ DONE |
+| 5  | Hide missing rider image / flag (was showing alt text) | ✅ DONE |
+| 6  | Auto-color checkbox + distinct colours for overlapping starts | ✅ DONE |
+| 7  | Category laps now propagate to riders (0/5 not 0/0) | ✅ DONE |
+| 8  | Results column picker, saved to localStorage | ✅ DONE |
+| 9  | Status order DNF → DSQ → DNS | ✅ DONE |
+| 10 | Live cancel restores rider to exact prior state + slot | ✅ DONE |
+| 11 | Downloadable example.csv | ✅ DONE |
+| 12 | Cleanup pass (dead files, single source of truth) | ⏳ DEFERRED — fix ESLint first |
+| 13 | Race image crash on save | ✅ DONE |
+| 14 | Live timer freezes at stop + gated Clear button | ✅ DONE |
+| 15 | Narrow-phone timer seconds hidden by wave chip | ✅ DONE |
+| 16 | Terms & Conditions page + startup acceptance gate | ✅ DONE (draft text) |
+
+Full write-ups per item below.
+
+---
 
 1. ❯ whay error     // The app registers a service worker; block it so tests always hit fresh code.
   at dev server (port 3000) and drives the app in Chromium.
@@ -12,6 +37,14 @@ after finish fix bug or fiture re organize the md files AGENT BUGS
     forbidOnly: !!process.env.CI,
     retries: 0,
 ⧉ Selected 7 lines from playwright.config.ts in Visual Studio Code
+
+   ⏳ BLOCKED — NEEDS FROM YOU (Claude): I can't see an actual error here, just a
+   snippet of playwright.config.ts. To fix #1, paste the real error text below —
+   run `npx playwright test` (or `npm run test:e2e`) and copy what it prints
+   (the red error/stack). Separately, ESLint is currently broken project-wide
+   (`.eslintrc.json` extends `next/core-web-vitals`, but this is a Vite app, not
+   Next) — say the word and I'll fix that too. Until the error is here, #1 stays
+   parked and I'll keep going down the list.
 
 2 
 ❯ sub categories make me trobles i want to have only categories  so sya we have man pro  and man masters  so man masters can be 19-29 then master man 30 to 39 so on so that category per each age area but pro man are all one category not inner so we will not use sub category at all  nead secure fix
@@ -143,7 +176,23 @@ any way at auto color dot choose similar color for close time starts
    `race/[id]/raceMode/{LiveCards,LiveBoard}.tsx`, `race/[id]/results/Results.tsx`,
    `race/[id]/heat/[heatId]/page.tsx`
 
-8.at results - give in good ux way to select what fields to sho since we cant see the name in some case also save it as default at local storage
+8. ✅ V — DONE — at results - give in good ux way to select what fields to sho since we cant see the name in some case also save it as default at local storage
+
+   **E2E test added afterwards** (it had none): the Results step in
+   `full-race-e2e.spec.ts` hides the Bib column via the Columns menu, asserts the
+   bibs disappear while the rider name stays visible, asserts the choice was
+   written to `localStorage.resultsVisibleFields`, then restores it.
+
+   **Cause:** the Results row showed a fixed set of columns (place, bib, name,
+   laps, time, status). On a narrow phone the fixed-width columns squeezed the
+   name (`flex:1`) down to an ellipsis.
+   **Fix:** added a "Columns" picker (checkboxes) in the Results toolbar. Bib /
+   Laps / Time / Status can each be toggled; Place and Name are always shown
+   (Name is the whole point). Hiding columns reflows the flex row and gives the
+   name room. The choice is saved to localStorage (`resultsVisibleFields`) and
+   restored as the default next time. Verified: default = all on, saved subset
+   restored, unknown/corrupt keys ignored.
+   Files: `race/[id]/results/Results.tsx`, `race/[id]/results/results.module.css`
 
 9. ✅ DONE — when we at live click at rider twice we want to give his status the DNF first up then DSQ
 the other  this make sense

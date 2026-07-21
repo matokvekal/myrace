@@ -14,6 +14,46 @@ this document: it's the scenario you can change and repeat.
 
 ---
 
+## Test inventory — everything covered today
+
+11 tests across 8 files. `npm run test` runs them all (~65 s).
+**This is the list to point an agent at when you want "run the tests for what we
+built so far".**
+
+| # | File | Covers | Tasks |
+|---|---|---|---|
+| 1 | `full-race-e2e.spec.ts` | The full race day (below) — the big one | 18–31, 8 |
+| 2 | `lap-recording.spec.ts` | Record a lap · 60 s minimum enforced · undo · DNF · DSQ | 29 |
+| 3 | `csv-column-order.spec.ts` | Same start list with columns shuffled → identical riders + categories | 19, 20 |
+| 4 | `create-race.spec.ts` | Creating a race with **no** riders file still works | 18 |
+| 5 | `csv-import.spec.ts` | Import wizard path (Riders → Actions → CSV) | — |
+| 6 | `time-parsing.spec.ts` | The one shared clock parser: `08:00`, `08:04:31`, ISO, AM/PM, junk | 26, 30 |
+| 7 | `dns-dnf.spec.ts` | DNS/DNF toggles from the Schedule tab | — |
+| 8 | `rider-edits.spec.ts` | Edit a rider's name + start time, values persist | — |
+| 9 | `race-flow.spec.ts` | Demo race smoke: finish wave 1 → check in, start, finish wave 2 | — |
+| 10 | `side-menu.spec.ts` | Feedback email link in the side menu | — |
+| 11 | *(2nd test in `lap-recording`)* | DNF/DSQ move a rider off the racing grid | 29 |
+
+### What the big scenario asserts, by area
+
+- **Import** — 30 riders, 6 categories auto-derived with correct laps/waves, 2-wave schedule
+- **Check-in** — Check All · one-tap DNS · DNS and Status menu stay in sync · Quick Add of 2 late entries
+- **Start** — three staggered start groups per wave, each flips to RUNNING
+- **Live** — 5-minute laps recorded by tapping · DNF after lap 1 · DSQ after lap 2 · commissaire notes saved
+- **Early flag-off** — confirmation states the count, riders stay ⚑ ON TRACK, finish on next crossing
+- **All Riders view** — every rider exactly once, correct status buckets, filters
+- **Standings** — per-category, filter widens to All and narrows again
+- **Boards / Results** — winners per category, real finish times, DNS/DNF/DSQ classified, column picker + localStorage
+- **Export** — signed workbook, SHA-256 verified in Node, then verified in-app across valid / results-modified / unsigned
+
+### Not covered (worth knowing)
+
+Voice recognition, OCR/photo import, the map tab, cloud sync, multi-day races,
+club dictionary, and PWA install. Also: the "Wait Ns" toast isn't asserted
+(react-toastify doesn't animate under a frozen clock) — the refused lap is.
+
+---
+
 ## How time works in this test
 
 The whole race runs on a **fake clock** (`page.clock`), not on wall-clock time.
