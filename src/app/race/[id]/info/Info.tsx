@@ -397,17 +397,34 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
       </div>
 
       {onDeleteRace && (
-        <div className={styles.dangerZone}>
-          <div className={styles.dangerTitle}>Danger Zone</div>
-          <div className={styles.dangerBody}>
-            <div className={styles.dangerText}>
-              Permanently delete this race, all its riders, and all categories. This cannot be undone.
+        race.viewOnly ? (
+          /* Downloaded, view-only race: light one-tap remove — it's a disposable
+             read-only copy you can re-download, so no heavy confirm (BUGS.md #8). */
+          <div className={styles.viewOnlyZone}>
+            <div className={styles.viewOnlyText}>
+              This is a downloaded race, kept only to view results. Removing it
+              deletes the local copy — you can download it again anytime.
             </div>
-            <button className={styles.deleteRaceBtn} onClick={() => setShowDeleteRace(true)}>
-              🗑 Delete Race
+            <button
+              className={styles.removeDownloadBtn}
+              onClick={async () => { await onDeleteRace(); }}
+            >
+              🗑 Remove downloaded race
             </button>
           </div>
-        </div>
+        ) : (
+          <div className={styles.dangerZone}>
+            <div className={styles.dangerTitle}>Danger Zone</div>
+            <div className={styles.dangerBody}>
+              <div className={styles.dangerText}>
+                Permanently delete this race, all its riders, and all categories. This cannot be undone.
+              </div>
+              <button className={styles.deleteRaceBtn} onClick={() => setShowDeleteRace(true)}>
+                🗑 Delete Race
+              </button>
+            </div>
+          </div>
+        )
       )}
 
       {showExportModal && (

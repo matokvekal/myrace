@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import styles from "./raceCard.module.css";
 import { RaceCardProps } from "@/types/types";
 import { resolveRaceImage } from "@/utils/resolveRaceImage";
@@ -9,6 +9,7 @@ import {
   Clock3,
   Heart,
   MapPin,
+  Trash2,
   Users
 } from "lucide-react";
 
@@ -28,9 +29,14 @@ const RaceCard: React.FC<RaceCardProps> = ({
   location,
   ridersCount,
   isFavorite,
-  onToggleFavorite
+  onToggleFavorite,
+  viewOnly,
+  onDelete
 }) => {
   const navigate = useNavigate();
+  // A view-only race deletes in one interaction: tap trash → tap again to
+  // confirm (auto-reverts after 3s). No heavy modal — it's disposable (BUGS.md #8).
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const resolvedImage = resolveRaceImage(image);
 
@@ -39,6 +45,16 @@ const RaceCard: React.FC<RaceCardProps> = ({
   const handleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggleFavorite?.(uuid);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    onDelete?.(uuid);
   };
 
   return (
@@ -90,17 +106,32 @@ const RaceCard: React.FC<RaceCardProps> = ({
       </div>
 
       <div className={styles.right}>
-        <button
-          className={`${styles.favBtn} ${isFavorite ? styles.favBtnActive : ""}`}
-          onClick={handleFavorite}
-          aria-label="favorite"
-        >
-          <Heart
-            className={styles.favIcon}
-            aria-hidden="true"
-            fill={isFavorite ? "currentColor" : "none"}
-          />
-        </button>
+        {viewOnly && onDelete ? (
+          <button
+            className={`${styles.deleteBtn} ${confirmDelete ? styles.deleteBtnConfirm : ""}`}
+            onClick={handleDelete}
+            aria-label={confirmDelete ? "tap again to remove" : "remove downloaded race"}
+            title={confirmDelete ? "Tap again to remove" : "Remove downloaded race"}
+          >
+            {confirmDelete ? (
+              <span className={styles.deleteConfirmText}>Remove?</span>
+            ) : (
+              <Trash2 className={styles.favIcon} aria-hidden="true" />
+            )}
+          </button>
+        ) : (
+          <button
+            className={`${styles.favBtn} ${isFavorite ? styles.favBtnActive : ""}`}
+            onClick={handleFavorite}
+            aria-label="favorite"
+          >
+            <Heart
+              className={styles.favIcon}
+              aria-hidden="true"
+              fill={isFavorite ? "currentColor" : "none"}
+            />
+          </button>
+        )}
         <ChevronRight className={styles.chevron} aria-hidden="true" />
       </div>
     </div>

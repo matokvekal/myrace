@@ -158,6 +158,9 @@ const Heat: React.FC = () => {
     clearTimers,
   } = useLapRecording({
     raceUuid,
+    // Persist the action log per wave so a mid-wave reload restores every
+    // arrival (BUGS.md #2). Keyed by race + heat so waves never share a log.
+    persistKey: heatId != null ? `${raceUuid}:heat:${heatId}` : null,
     riders,
     updateRider,
     updateAllRiders,

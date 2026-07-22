@@ -52,6 +52,7 @@ const FIELD_LABELS: Record<RiderFieldKey, string> = {
   roadNumber: "Road Number",
   chip: "Chip",
   notes: "Notes",
+  infoField: "Info (on card)",
 };
 
 export default function PreviewStep({

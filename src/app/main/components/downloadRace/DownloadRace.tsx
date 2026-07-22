@@ -103,8 +103,9 @@ const DownloadRace: React.FC<Props> = ({ onClose, onSuccess }) => {
         }
       }
 
-      // Save race
-      await updateRace(race);
+      // Save race. Mark it view-only: a downloaded race is a read-only copy for
+      // viewing results, so it gets the light one-tap delete (BUGS.md #8).
+      await updateRace({ ...race, viewOnly: true });
 
       // Save categories
       for (const cat of raceCategories) {

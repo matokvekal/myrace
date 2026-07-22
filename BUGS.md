@@ -2,31 +2,45 @@
 importent at this page all bugs and fitures you have to write some smal comment at the agents /read me so we know all the fitures of the app
 after finish fix bug or fiture re organize the md files AGENT BUGS
 
-> Completed items (1–31 incl. 17, R1–R6, R8, R10, 37) were removed to keep this
-> file to OPEN work only. Their write-ups live in git history and the feature
-> notes are in CLAUDE.md. Below is only what's left to do.
+> Completed items were removed to keep this file to OPEN work only. Their
+> write-ups live in git history and the feature notes are in CLAUDE.md. Below is
+> only what's left to do, renumbered 1..N in working order.
 
 ---
 ## OPEN ITEMS  (updated 2026-07-22)
 
 | #  | Item | Priority | Status |
 |----|------|----------|--------|
-| 34 | JS bundle 1.76 MB (558 kB gz) — slow first load on a phone | 🔴 bottleneck | 🆕 TODO |
-| 32 | Live log must keep ALL wave arrivals, in arrival order, persisted | 🟠 important | 🆕 TODO |
-| 33 | ESLint broken project-wide (extends a Next.js preset in a Vite app) | 🟡 tooling | 🆕 TODO — needs OK to add dev-deps |
-| 36 | Demo race redirects to Live with no signposted way back to Setup | 🟢 UX | 🆕 TODO |
-| 35 | Terms gate has no test/dev bypass | 🟡 tooling | 🆕 TODO |
-| R7 | Import: option to keep ANY skipped column as info on the card | 🟢 feature | 🆕 TODO |
-| 12 | Cleanup: dead-file sweep + single-source-of-truth | 🟢 cleanup | 🟡 PARTIAL — do after #33 |
-| R9 | Downloaded view-only races should be much easier to delete | 🟢 later | 🆕 TODO (later) |
-| 1  | Playwright / service-worker "error" | — | ⏳ BLOCKED — needs the real error text |
+| 1 | JS bundle 1.76 MB (558 kB gz) — slow first load on a phone | 🔴 bottleneck | 🆕 TODO |
+| 2 | ESLint broken project-wide (extends a Next.js preset in a Vite app) | 🟡 tooling | 🆕 TODO — needs OK to add dev-deps |
+| 3 | Demo race redirects to Live with no signposted way back to Setup | 🟢 UX | 🆕 TODO |
+| 4 | Terms gate has no test/dev bypass | 🟡 tooling | 🆕 TODO |
+| 5 | Cleanup: dead-file sweep + single-source-of-truth | 🟢 cleanup | 🟡 PARTIAL — do after #2 |
+| 6 | Playwright / service-worker "error" | — | ⏳ BLOCKED — needs the real error text |
 
 Working order (user rule: bottleneck + important first, then the rest, 1 by 1):
-**34 → 32 → 33 → 36 → 35 → R7 → 12 → (R9 later) → (1 blocked).**
+**1 → 2 → 3 → 4 → 5 → (6 blocked).**
+
+Recently landed (this session):
+* **✅ Live log persisted per wave.** The rider action log (every arrival, newest
+  first) is now mirrored to localStorage keyed `${raceUuid}:heat:${heatId}`, so a
+  mid-wave reload restores the whole log. Hydrates synchronously; a guard stops the
+  old wave's log being written under a new wave's key. Files:
+  `race/[id]/heat/[heatId]/useLapRecording.ts` (+ `persistKey` from `page.tsx`).
+* **✅ View-only (downloaded) races: light delete.** `RaceProps.viewOnly` is set on
+  download; such races get a one-tap trash on the race list card (tap→confirm, no
+  modal) and a light "Remove downloaded race" in the Info tab instead of the heavy
+  Danger-Zone confirm. Files: `DownloadRace.tsx`, `main/page.tsx`, `RaceCard.tsx`,
+  `race/[id]/info/Info.tsx`, `types.ts`.
+* **✅ Import: "Keep as info" for any column.** New synthetic mapping target
+  `infoField` (multi-use, never auto-detected) keeps an UNrecognised column's raw
+  value in `rider.extraFields[<column header>]`, shown in the card's "More info".
+  Files: `types/csv.types.ts`, `components/csv/ColumnMappingStep.tsx`,
+  `PreviewStep.tsx`, `ImportProgressStep.tsx`, `services/riderRowMapper.ts`.
 
 ---
 
-### 34. JS bundle is 1.76 MB — slow first load on a phone — 🔴 TODO (doing first)
+### 1. JS bundle is 1.76 MB — slow first load on a phone — 🔴 TODO (doing first)
 
 `npm run build` warns:
 ```
@@ -51,23 +65,24 @@ MEASURE before/after — don't guess which import is expensive.
 (target < 500 kB raw); verify OCR, map, and Excel still work on demand; full test
 suite green.
 
+agent wrote me , but im not sure its ok to remove need to check Node modules and libraries: likely unused dependencies
+These appear not referenced in source and are good candidates to remove from package.json:
+
+@emotion/react
+@emotion/styled
+@mui/lab
+@mui/x-date-pickers
+@react-google-maps/api
+axios
+dayjs
+react-circular-progressbar
+react-color
+react-leaflet
+Note: @mui/material is used (loader), so keep it unless you replace that component.
+
 ---
 
-### 32. Live log should keep ALL wave arrivals, in arrival order — 🟠 TODO
-
-The rider action log should be a complete, chronological record of every arrival
-in the wave, in crossing order — not bib-sorted, not truncated. That's what
-settles a disputed placing. Today it's an in-memory `riderActions` array in
-`useLapRecording`, so it's per-session/per-wave and lost on reload. Arrival order
-is already newest-first, so the work is completeness + persistence.
-
-**Validation:** record a full staggered wave; every arrival appears once, newest
-first; undo removes exactly its own entry; reload mid-wave and the log survives;
-DNF/DSQ stay interleaved in time order.
-
----
-
-### 33. ESLint is broken project-wide — 🟡 TODO (needs OK to add dev-deps)
+### 2. ESLint is broken project-wide — 🟡 TODO (needs OK to add dev-deps)
 
 `npx eslint` fails: `couldn't find the config "next/core-web-vitals"`.
 `.eslintrc.json` extends the Next.js preset but this is a **Vite** app. So
@@ -84,7 +99,7 @@ in one commit.
 
 ---
 
-### 36. Demo race redirects to Live with no way back — 🟢 TODO
+### 3. Demo race redirects to Live with no way back — 🟢 TODO
 
 `race/[id]/page.tsx` bounces the first open of the demo to `/race/:id/heat/1`,
 one-shot per session, with no indication a Setup view exists. **Fix:** an
@@ -96,7 +111,7 @@ redirect still fires only once per session; a non-demo race is unaffected.
 
 ---
 
-### 35. Terms gate has no test/dev bypass — 🟡 TODO
+### 4. Terms gate has no test/dev bypass — 🟡 TODO
 
 `TermsGate` blocks every control on first load in a fresh profile (broke all E2E
 specs until worked around in `tests/helpers.ts` `acceptTerms()`). **Fix:** a
@@ -108,20 +123,7 @@ for tests without weakening the real path; a `TERMS_VERSION` bump still re-promp
 
 ---
 
-### R7. Import: let the user keep ANY skipped column as info — 🟢 TODO
-
-R6 already keeps RECOGNISED extra columns (UCI number/points, etc.) in
-`rider.extraFields`, shown in the rider card's "More info". The broader ask: in
-the mapping step, offer "Keep as info (show on card)" for an UNrecognised column,
-storing its raw value in `rider.extraFields[<column header>]`. Needs mapping-UI
-plumbing: a synthetic multi-use target (several columns can be "info"), exempt
-from the one-column-per-field dedup, handled in `riderRowMapper`.
-Files: `types/csv.types.ts`, `components/csv/ColumnMappingStep.tsx`,
-`services/riderRowMapper.ts`.
-
----
-
-### 12. Cleanup: dead files + single source of truth — 🟡 PARTIAL (after #33)
+### 5. Cleanup: dead files + single source of truth — 🟡 PARTIAL (after #2)
 
 Two important bugs from this pass already fixed (BUG-02 IDB wipe, BUG-03
 calculatePositions mutation). Still deferred:
@@ -130,21 +132,12 @@ calculatePositions mutation). Still deferred:
   (`tsc --noUnusedLocals --noUnusedParameters`). Verify each removal against a
   build so nothing lazily-referenced breaks.
 * `PREDEFINED_TEMPLATES` duplicated in `Categories.tsx` + `CategoryManager.tsx`.
-* Do AFTER #33 so "unused" is provable.
+* Do AFTER #2 (ESLint) so "unused" is provable.
 
 ---
 
-### R9. Easier delete for downloaded / view-only races — 🟢 TODO (later)
-
-Races you download just to view results are read-only. Deleting them should be
-much lighter than a full working race (skip the heavy confirm / one-tap remove).
-Needs a way to mark a race as view-only/imported + a lighter delete affordance.
-User said "later".
-
----
-
-### 1. Playwright / service-worker "error" — ⏳ BLOCKED
+### 6. Playwright / service-worker "error" — ⏳ BLOCKED
 
 Only a snippet of `playwright.config.ts` was pasted, no actual error. To fix:
 run `npx playwright test` (or `npm run test:e2e`) and paste the real error/stack
-here. (Unblock ESLint separately via #33.)
+here. (Unblock ESLint separately via #2.)

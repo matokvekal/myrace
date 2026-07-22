@@ -49,6 +49,7 @@ const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
   roadNumber: "Road #",
   chip: "Chip",
   notes: "Notes",
+  infoField: "Info (on card)",
   general: "General"
 };
 

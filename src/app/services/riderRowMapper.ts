@@ -20,12 +20,18 @@ export function rowToRider(
   clubDictionary?: typeof useClubDictionaryStore
 ): RiderProps {
   const data: Record<string, any> = {};
+  // Columns the user chose to "Keep as info" (BUGS.md #7): raw value, keyed by
+  // the original column header, surfaced on the rider card's "More info".
+  const infoFields: Record<string, string> = {};
 
   mappings.forEach((mapping, colIdx) => {
     if (!mapping.targetField) return;
     const value = row[colIdx]?.trim() || "";
 
     switch (mapping.targetField) {
+      case "infoField":
+        if (value) infoFields[mapping.sourceColumn] = value;
+        break;
       case "bibNumber":
         data.bibNumber = parseInt(value) || 0;
         break;
@@ -155,6 +161,11 @@ export function rowToRider(
   for (const [key, label] of EXTRA_LABELS) {
     const v = data[key];
     if (v != null && String(v).trim() !== "") extraFields[label] = String(v);
+  }
+  // User-selected "Keep as info" columns, keyed by their original header. A
+  // recognised label already present wins, so these never clobber a known field.
+  for (const [header, value] of Object.entries(infoFields)) {
+    if (!(header in extraFields)) extraFields[header] = value;
   }
 
   return {

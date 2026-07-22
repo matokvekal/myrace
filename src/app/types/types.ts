@@ -11,6 +11,10 @@ export interface RaceCardProps {
   curentHeat: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: (uuid: string) => void;
+  /** Downloaded read-only race — enables the light one-tap delete (BUGS.md #8). */
+  viewOnly?: boolean;
+  /** Remove a view-only race straight from the list. */
+  onDelete?: (uuid: string) => void;
 }
 
 
@@ -61,6 +65,13 @@ export interface RaceProps {
   distance: number;
   isPrivate?: boolean;  // If true, requires password to download
   password?: string;    // Password for private races
+  /**
+   * True for a race pulled in via "Download a Race" — a read-only copy kept just
+   * to view someone else's results, not to run. Deleting one is intentionally
+   * light (one tap, no heavy confirm) since it's disposable and re-downloadable
+   * (BUGS.md #8).
+   */
+  viewOnly?: boolean;
   syncedAt?: Date;      // Last sync timestamp
   serverVersion?: number;  // Version control for conflict resolution
 }

@@ -442,6 +442,46 @@
   border-color: #c62828;
 }
 
+/* ── View-only (downloaded) race: light remove (BUGS.md #8) ────────── */
+.viewOnlyZone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px solid var(--border, #d8dde8);
+  border-radius: 14px;
+  background: var(--surface-2, #f6f8fb);
+}
+
+.viewOnlyText {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  flex: 1;
+  min-width: 180px;
+}
+
+.removeDownloadBtn {
+  flex-shrink: 0;
+  padding: 8px 20px;
+  background: white;
+  color: #455a64;
+  border: 1.5px solid #cfd8dc;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.removeDownloadBtn:hover {
+  background: #eceff1;
+  border-color: #90a4ae;
+}
+
 /* ── Signature verification result (BUGS.md #28) ───────────────────── */
 .verifyBox {
   margin-top: 12px;

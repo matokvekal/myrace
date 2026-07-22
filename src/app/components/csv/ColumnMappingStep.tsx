@@ -85,7 +85,9 @@ export default function ColumnMappingStep({
       needsConfirmation: false
     };
     setMappings(updated);
-    if (newField) {
+    // "Keep as info" is a per-file, freeform choice (BUGS.md #7) — don't teach
+    // the fuzzy matcher to auto-map this column to info next time.
+    if (newField && newField !== "infoField") {
       await confirmMapping(updated[index].sourceColumn, newField);
     }
   };
@@ -174,9 +176,12 @@ export default function ColumnMappingStep({
     roadNumber: "Road Number",
     chip: "Chip",
     notes: "Notes",
+    infoField: "⭐ Keep as info (show on card)",
   };
 
   const FIELD_HINTS: Partial<Record<string, string>> = {
+    infoField:
+      "Stored as-is under this column's name and shown in the rider card's \"More info\" — not used by the app. Several columns can be info.",
     category: "Main group — e.g. Men Junior, Gravel, MTB",
     subCategory:
       "Not imported — categories are flat. Put the age band in the category itself, e.g. \"Man Masters 30-39\"",
@@ -221,7 +226,10 @@ export default function ColumnMappingStep({
       .filter((f) => !IGNORED_FIELDS.has(f))
       .filter(
         (f) => !usedFields.has(f) || mappings.find((m) => m.targetField === f)
-      )
+      ),
+    // "Keep as info" is always offered and never deduped — many columns can be
+    // info at once (BUGS.md #7).
+    "infoField"
   ];
 
   const mappedCount = mappings.filter((m) => m.targetField !== null).length;

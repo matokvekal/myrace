@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { RiderProps } from "@/types/types";
 import { formatTime, parseClockTime } from "@/utils/timeUtils";
@@ -18,6 +18,26 @@ import { canForRace } from "@/services/cloud/permissions";
 /** A rider can't record two laps inside a minute. */
 export const MIN_LAP_MS = 60 * 1000;
 
+/**
+ * Persisted-log key prefix (BUGS.md #2). The action log is the complete,
+ * chronological record of every arrival in a wave — the thing that settles a
+ * disputed placing. It used to live only in React state, so a reload mid-wave
+ * wiped it. We now mirror it to localStorage per wave.
+ */
+const LOG_STORAGE_PREFIX = "commissaire.actionLog.";
+
+function loadPersistedActions(key: string | null): RiderAction[] {
+  if (!key || typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOG_STORAGE_PREFIX + key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as RiderAction[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export interface RiderAction {
   id: string;
   rider: RiderProps;
@@ -32,6 +52,12 @@ export interface RiderAction {
 
 interface Params {
   raceUuid: string;
+  /**
+   * Stable key that identifies THIS wave's log (e.g. `${raceUuid}:heat:${heatId}`).
+   * The action log is persisted under it so a mid-wave reload restores every
+   * arrival. `null` disables persistence (kept in-memory only).
+   */
+  persistKey: string | null;
   riders: RiderProps[];
   updateRider: (rider: RiderProps) => void;
   updateAllRiders: (riders: RiderProps[]) => void;
@@ -47,6 +73,7 @@ interface Params {
 
 export function useLapRecording({
   raceUuid,
+  persistKey,
   riders,
   updateRider,
   updateAllRiders,
@@ -57,8 +84,43 @@ export function useLapRecording({
   setDisplayOrder,
   onLapRecorded,
 }: Params) {
-  const [riderActions, setRiderActions] = useState<RiderAction[]>([]);
+  // Hydrate synchronously from storage so the log is complete on first paint
+  // after a reload (BUGS.md #2) instead of flashing empty then filling in.
+  const [riderActions, setRiderActions] = useState<RiderAction[]>(() =>
+    loadPersistedActions(persistKey)
+  );
   const [flashingRiderId, setFlashingRiderId] = useState<number | null>(null);
+
+  // Re-hydrate when the wave changes, and persist every edit back to storage.
+  // `pendingHydrationRef` holds the array we just loaded so the save effect can
+  // tell a hydration-triggered state change from a real user edit — without it,
+  // the transitional render (persistKey changed, state not yet applied) would
+  // write the OLD wave's log under the NEW wave's key.
+  const persistKeyRef = useRef<string | null>(persistKey);
+  const pendingHydrationRef = useRef<RiderAction[] | null>(null);
+
+  useEffect(() => {
+    persistKeyRef.current = persistKey;
+    const loaded = loadPersistedActions(persistKey);
+    pendingHydrationRef.current = loaded;
+    setRiderActions(loaded);
+  }, [persistKey]);
+
+  useEffect(() => {
+    // Skip the write caused by hydration itself; only persist real changes.
+    if (pendingHydrationRef.current === riderActions) {
+      pendingHydrationRef.current = null;
+      return;
+    }
+    if (pendingHydrationRef.current !== null) return; // hydration in flight
+    const key = persistKeyRef.current;
+    if (!key || typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(LOG_STORAGE_PREFIX + key, JSON.stringify(riderActions));
+    } catch {
+      /* quota / serialization — the log is a convenience, never block scoring. */
+    }
+  }, [riderActions]);
 
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Pending "drop to end of queue" timers, so an undo inside 1s can cancel it. */

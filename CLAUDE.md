@@ -166,6 +166,24 @@ See `docs/app-review.md` for full bug list. Top 4 critical:
   `lapsDetails`, that drops `elapsedTimeFromStart` and `position_category`.
 - Status buttons are ordered DNF → DSQ → DNS everywhere (`RiderLiveModal`,
   `StatusModal`); out-statuses come before the internal ones.
+- The action log (`riderActions`) is the complete arrival record and is PERSISTED
+  per wave to localStorage (`commissaire.actionLog.${raceUuid}:heat:${heatId}`) so
+  a mid-wave reload restores it. `useLapRecording` takes `persistKey`; it hydrates
+  synchronously and guards against writing the previous wave's log under a new key.
+
+### View-only (downloaded) races
+- `RaceProps.viewOnly` marks a race pulled in via "Download a Race" — a read-only
+  copy for viewing results. Set in `DownloadRace.tsx`. Such races get a LIGHT
+  delete: a one-tap trash on the race-list `RaceCard` (tap → "Remove?" → tap again,
+  no modal, wired via `main/page.tsx` `handleDeleteRace`) and a plain "Remove
+  downloaded race" in the Info tab instead of the heavy Danger-Zone confirm.
+
+### Import: "Keep as info" columns
+- The mapping step offers a synthetic target `infoField` ("Keep as info") for any
+  UNrecognised column. It's MULTI-USE (many columns can be info) and never
+  auto-detected. `rowToRider` stores each such column's raw value in
+  `rider.extraFields[<original header>]`, shown in the rider card's "More info".
+  A recognised extra-field label always wins over an info column of the same key.
 
 ### Live timer + Clear board (heat page)
 - The clock derives from the earliest started rider's `timeStartRace`. When the

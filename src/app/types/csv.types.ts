@@ -60,7 +60,12 @@ export type RiderFieldKey =
    | 'federationChip'
    | 'roadNumber'
    | 'chip'
-   | 'notes';
+   | 'notes'
+   // Synthetic target (BUGS.md #7): "Keep as info". Not a real rider field and
+   // never auto-detected — the user assigns it by hand to any UNrecognised
+   // column to keep its raw value on the rider (extraFields, shown on the card).
+   // Unlike every other target it is MULTI-USE: many columns can be info at once.
+   | 'infoField';
 
 export interface ColumnMapping {
    sourceColumn: string;      // Original CSV column name

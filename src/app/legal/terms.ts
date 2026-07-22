@@ -1,19 +1,20 @@
 /**
  * Terms & Conditions content (BUGS.md #16).
  *
- * ⚠️ DRAFT / PLACEHOLDER — standard wording, NOT reviewed by a lawyer. Replace
- * the section bodies below with your own or your lawyer's text before relying on
- * this legally. Everything the app renders (the /terms page and the startup
- * acceptance gate) reads from here, so this is the only file you need to edit.
+ * ⚠️ DRAFT / PLACEHOLDER — NOT reviewed by a lawyer.
+ * Have the final wording reviewed by a qualified lawyer before relying on it.
  *
- * Bump TERMS_VERSION whenever the wording changes materially — the startup gate
- * re-asks users to accept when the accepted version is older than this.
+ * Everything rendered on the /terms page and in the startup acceptance gate
+ * reads from this file.
+ *
+ * Bump TERMS_VERSION whenever the wording changes materially.
  */
 
-// draft-2: added the supported-devices section (Android tested, iOS untested).
-export const TERMS_VERSION = "2026-07-draft-2";
+// draft-3: expanded to all sports, strengthened user responsibility,
+// prohibited unlawful use, and added future paid features.
+export const TERMS_VERSION = "2026-07-draft-3";
 
-export const TERMS_EFFECTIVE_DATE = "21 July 2026";
+export const TERMS_EFFECTIVE_DATE = "22 July 2026";
 
 export interface TermsSection {
   heading: string;
@@ -22,53 +23,119 @@ export interface TermsSection {
 
 export const TERMS_SECTIONS: TermsSection[] = [
   {
-    heading: "1. Free to use",
+    heading: "1. Purpose of the service",
     body: [
-      "Commissaire is provided free of charge for organising and timing cycling races, for personal and club use.",
-      "You may use the app for your own events without payment. No account purchase or licence fee is required.",
+      "Commissaire is a website and application designed to assist with recording, managing, calculating, and displaying results for sporting events in general, with a particular focus on cycling races and cycling events.",
+      "The app may be used to record participants, riders, laps, times, finish order, classifications, penalties, incidents, and other event-related information.",
+      "The app is an administrative tool only. It does not replace official timing systems, sporting regulations, event permits, safety procedures, or the judgement and authority of authorised race officials.",
     ],
   },
   {
-    heading: "2. No copying or redistribution",
+    heading: "2. Free use and future paid features",
     body: [
-      "The app, its design, code, and content are the property of the app owner.",
-      "You may not copy, reproduce, resell, redistribute, rebrand, reverse-engineer, or create derivative versions of the app or any part of it without the owner's prior written permission.",
-      "Race data that you enter remains yours; these terms concern the application itself, not the start lists or results you create with it.",
+      "The current version of Commissaire is provided free of charge for personal, club, organiser, and sporting-event use.",
+      "The app owner may introduce optional paid subscriptions, premium features, services, or add-ons in the future.",
+      "Any price, billing period, renewal terms, and cancellation conditions will be displayed before a user confirms a purchase.",
     ],
   },
   {
-    heading: "3. Provided “as is” — no warranty",
+    heading: "3. Full user responsibility",
     body: [
-      "The app is provided “as is” and “as available”, without warranties of any kind, whether express or implied, including fitness for a particular purpose or uninterrupted, error-free operation.",
-      "Race timing and results depend on correct use, device performance, and network conditions. Always keep an independent backup of critical results.",
+      "All use of the website and application is made entirely at the user's sole responsibility.",
+      "The user is fully and exclusively responsible for all information entered into the app and for every result, calculation, classification, penalty, publication, announcement, decision, or action based on information from the app.",
+      "The user is responsible for confirming that all entered information is complete, accurate, lawful, and suitable for the relevant sporting event.",
+      "The user must independently verify all results before they are published, announced, used for rankings, prizes, sanctions, qualifications, or treated as official results.",
+      "The app owner does not check, approve, certify, or declare any result as an official sporting result.",
     ],
   },
   {
-    heading: "4. No owner liability",
+    heading: "4. Provisional results only",
     body: [
-      "To the maximum extent permitted by law, the app owner is not responsible or liable for any loss, damage, incorrect result, missed timing, data loss, or other consequence arising from use of the app.",
-      "You are responsible for verifying results before they are published or used for any official ranking or award.",
+      "All results, rankings, lap counts, finish orders, penalties, and classifications displayed or calculated by the app must be treated as provisional until they have been checked and formally approved by the authorised event officials.",
+      "Official results may only be declared by the organiser, chief commissaire, commissaires' panel, timing provider, federation, or other person or body authorised to do so.",
+      "Users should verify results against available independent sources, including official timing records, manual records, transponder data, video, photographs, and reports from event officials.",
     ],
   },
   {
-    heading: "5. Your data",
+    heading: "5. No owner liability",
     body: [
-      "Race data you create is stored locally on your device. Clearing your browser storage or uninstalling the app may delete it.",
-      "You are responsible for handling any personal data of riders in line with the laws that apply to your event.",
+      "To the maximum extent permitted by applicable law, the app owner is not responsible or liable for any loss, damage, claim, incorrect result, missed rider, missed timing, incorrect lap count, incorrect penalty, data loss, event delay, cancellation, or other consequence arising from use of or reliance on the app.",
+      "The app owner is not responsible for decisions made by users, organisers, officials, federations, participants, teams, or other third parties based on information entered into or generated by the app.",
+      "The user accepts full responsibility for any claim, dispute, protest, appeal, ranking, prize allocation, disqualification, publication, or other consequence connected with the user's use of the app.",
+      "Nothing in these terms excludes liability that cannot legally be excluded under applicable law.",
     ],
   },
   {
-    heading: "6. Supported devices",
+    heading: "6. Not a safety or emergency system",
     body: [
-      "Commissaire is developed and tested on Android phones and tablets. That is the platform it is verified on.",
-      "The app is a web app and is expected to work on iPhone and iPad through the browser, but it has not been tested in depth on iOS. Some behaviour — particularly around background timing, audio input, and offline storage — may differ or not work as intended there.",
-      "If you are timing a race on iOS, test your full workflow beforehand and keep an independent backup of results.",
+      "The app must not be used as the sole system for safety-critical decisions, emergency management, medical decisions, course control, or determining whether all participants have safely completed or left a course.",
+      "The organiser and authorised officials must maintain appropriate independent safety, communication, timing, marshal, medical, and backup procedures.",
+      "The user must not rely only on the app when deciding whether an event should start, continue, stop, restart, or be cancelled.",
     ],
   },
   {
-    heading: "7. Changes to these terms",
+    heading: "7. Lawful and authorised use",
     body: [
-      "These terms may be updated from time to time. When they change materially, you will be asked to review and accept the updated version the next time you open the app.",
+      "The app may only be used for lawful and properly authorised sporting events.",
+      "The user is responsible for ensuring that the event has all permits, approvals, insurance, federation authorisations, and other requirements applicable to the event.",
+      "The app must not be used for an illegal, unauthorised, falsely represented, or prohibited event.",
+      "The app must not be used to falsify, manipulate, conceal, or unfairly influence results, assist cheating or fraud, impersonate an official, or breach sporting integrity.",
+      "Access may be suspended or terminated where unlawful activity, unauthorised use, security abuse, result manipulation, or a material breach of these terms is suspected.",
     ],
   },
+  {
+    heading: "8. No copying or redistribution",
+    body: [
+      "The app, website, design, source code, architecture, workflows, database structure, documentation, graphics, text, and other content are the property of the app owner or its licensors.",
+      "The user receives only a limited, revocable, non-exclusive, and non-transferable right to use the app for its intended purpose.",
+      "You may not copy, reproduce, sell, rent, redistribute, rebrand, modify, reverse-engineer, decompile, extract source code, scrape, create derivative versions, or use the app or its design to create a competing product without the owner's prior written permission.",
+      "Race data entered by the user remains the user's responsibility. These restrictions apply to the application itself and not to legitimate start lists or results created by the user.",
+    ],
+  },
+  {
+    heading: "9. Provided “as is” — no warranty",
+    body: [
+      "The app is provided “as is” and “as available”, without warranties of any kind, whether express or implied.",
+      "The app owner does not guarantee uninterrupted availability, error-free operation, accurate calculations, permanent data storage, compatibility with every device, or suitability for a particular event.",
+      "Operation may be affected by incorrect user input, device failure, battery loss, browser behaviour, network interruption, delayed synchronisation, software defects, third-party services, or data loss.",
+      "Users must maintain an appropriate independent backup of critical event information and results.",
+    ],
+  },
+  {
+    heading: "10. User and race data",
+    body: [
+      "The user is responsible for all race, participant, rider, official, and event information entered into the app.",
+      "The user confirms that they have the necessary authority and lawful basis to collect, store, process, and publish such information.",
+      "The user must not enter unnecessary sensitive personal information.",
+      "Race data may be stored locally on the user's device. Clearing browser storage, resetting the device, uninstalling the app, or losing the device may permanently delete that data.",
+      "The user is responsible for backups and for complying with all privacy and data-protection laws applicable to the event.",
+    ],
+  },
+  {
+    heading: "11. Supported devices",
+    body: [
+      "Commissaire is primarily developed and tested on Android phones and tablets.",
+      "The app is a web application and may also operate on iPhone, iPad, desktop computers, and other browser-based devices, but behaviour may vary between devices, browsers, and operating systems.",
+      "Background timing, audio input, offline operation, storage, notifications, and synchronisation may not operate in the same way on every platform.",
+      "Users must test their complete event workflow on the intended device before the event and maintain an independent backup.",
+    ],
+  },
+{
+  heading: "12. Changes to the service and these terms",
+  body: [
+    "The app owner, creator, or anyone acting on their behalf may, at any time and at their sole discretion, change any previous decision, policy, commercial model, feature, service, or position relating to the app.",
+    "They may modify, replace, add to, limit, suspend, or discontinue any part of the app, its features, pricing, services, policies, or these terms.",
+    "Such changes may be made without prior notice to any customer, user, club, organiser, or other person, except where prior notice is required by applicable law.",
+    "Updated terms will take effect from the date they are published or displayed in the app. Continued use of the app after that date constitutes acceptance of the updated terms.",
+    "Where required by the app owner, users must review and accept the updated terms before continuing to use the app.",
+  ],
+},
+  {
+    heading: "13. Governing law",
+    body: [
+      "These terms are governed by the laws of the State of Israel.",
+      "Subject to any mandatory legal jurisdiction, the competent courts in the Tel Aviv–Jaffa District will have exclusive jurisdiction over disputes relating to the app or these terms.",
+    ],
+  },
+  
 ];

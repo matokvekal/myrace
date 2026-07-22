@@ -10,6 +10,7 @@ import DownloadRace from "./components/downloadRace/DownloadRace";
 import CloudRacesSection from "@/components/cloud/CloudRacesSection";
 import Button from "@/components/ui/Button";
 import useRaceStore from "@/stores/racesStore";
+import useRiderStore from "@/stores/ridersStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { seedDemoRace, DEMO_RACE_UUID } from "@/utils/demoSeed";
 import {
@@ -57,7 +58,8 @@ const MainPage = () => {
   const [riderCounts, setRiderCounts] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const [loadingDemo, setLoadingDemo] = useState(false);
-  const { races, getRaces, updateRace } = useRaceStore();
+  const { races, getRaces, updateRace, deleteRace } = useRaceStore();
+  const deleteRidersByRace = useRiderStore((s) => s.deleteRidersByRace);
 
   useEffect(() => {
     getRaces().then(() => setLoaded(true));
@@ -80,6 +82,14 @@ const MainPage = () => {
   const handleToggleFavorite = (uuid: string) => {
     const race = races.find((r) => r.uuid === uuid);
     if (race) updateRace({ ...race, isFavorite: !race.isFavorite });
+  };
+
+  // Light delete for downloaded view-only races, straight from the list
+  // (BUGS.md #8). Same data cleanup as the Info Danger Zone, no heavy modal.
+  const handleDeleteRace = async (uuid: string) => {
+    await deleteRidersByRace(uuid);
+    await deleteRace(uuid);
+    await getRaces();
   };
 
   const handleLoadDemo = async () => {
@@ -235,6 +245,8 @@ const MainPage = () => {
                 curentHeat={race.heat}
                 isFavorite={race.isFavorite}
                 onToggleFavorite={handleToggleFavorite}
+                viewOnly={race.viewOnly}
+                onDelete={handleDeleteRace}
               />
             ))}
           </div>
