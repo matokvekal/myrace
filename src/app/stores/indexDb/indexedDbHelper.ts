@@ -6,42 +6,53 @@ import type { RaceEvent, SyncStatus } from "@/types/cloud.types";
 const DB_NAME = "commissireDb";
 const DB_VERSION = 9; // v9: race_events store for cloud sync
 
+// Every store the app reads/writes. Used to sanity-check a recovered DB.
+const REQUIRED_STORES = ["riders", "categories", "races", "roles", "users", "race_events"];
+
+function createStores(db: IDBPDatabase) {
+  if (!db.objectStoreNames.contains("riders")) db.createObjectStore("riders", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("categories")) db.createObjectStore("categories", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("races")) db.createObjectStore("races", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("roles")) db.createObjectStore("roles", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("users")) db.createObjectStore("users", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("race_events")) {
+    const store = db.createObjectStore("race_events", { keyPath: "id" });
+    store.createIndex("byRace", "raceId");
+    store.createIndex("bySyncStatus", "syncStatus");
+  }
+}
+
+async function deleteAndRecreate(): Promise<IDBPDatabase> {
+  await new Promise<void>((resolve, reject) => {
+    const del = indexedDB.deleteDatabase(DB_NAME);
+    del.onerror = () => reject(del.error);
+    del.onsuccess = () => resolve();
+    del.onblocked = () => resolve(); // proceed even if another tab holds it
+  });
+  return openDB(DB_NAME, DB_VERSION, { upgrade: createStores });
+}
+
 export const initIndexedDB = async (): Promise<IDBPDatabase> => {
   try {
-    return await openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("riders")) {
-          db.createObjectStore("riders", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("categories")) {
-          db.createObjectStore("categories", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("races")) {
-          db.createObjectStore("races", { keyPath: "id" });
-        }
-        // RBAC stores
-        if (!db.objectStoreNames.contains("roles")) {
-          db.createObjectStore("roles", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("users")) {
-          db.createObjectStore("users", { keyPath: "id" });
-        }
-        // Cloud sync event log (v9)
-        if (!db.objectStoreNames.contains("race_events")) {
-          const store = db.createObjectStore("race_events", { keyPath: "id" });
-          store.createIndex("byRace", "raceId");
-          store.createIndex("bySyncStatus", "syncStatus");
-        }
-      },
-    });
+    return await openDB(DB_NAME, DB_VERSION, { upgrade: createStores });
   } catch (err: any) {
     if (err?.name === "VersionError") {
       // The stored DB is NEWER than this bundle — happens when an older cached
-      // build loads after a newer deploy. NEVER delete the user's races
-      // (BUGS.md #12 / BUG-02): open at whatever version already exists on disk,
-      // which keeps every store and all data intact. A newer version is a
-      // superset, so the stores this build needs are already present.
-      return await openDB(DB_NAME);
+      // build loads after a newer deploy. Preferred recovery: open at whatever
+      // version already exists on disk, preserving all data (BUG-02 — never wipe
+      // silently). BUT only if that DB actually has every store the app needs; a
+      // partially-migrated DB with a missing store would make reads return
+      // nothing ("no riders"). If it's incomplete or won't open, fall back to a
+      // clean rebuild so the app is always usable.
+      try {
+        const existing = await openDB(DB_NAME);
+        const hasAll = REQUIRED_STORES.every((s) => existing.objectStoreNames.contains(s));
+        if (hasAll) return existing;
+        existing.close();
+      } catch {
+        /* fall through to rebuild */
+      }
+      return deleteAndRecreate();
     }
     throw err;
   }
