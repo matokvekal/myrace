@@ -504,12 +504,12 @@ async function runWave(
     await expect(page.getByText(/✗ 1 DNS/)).toBeVisible();
 
     for (const entry of opts.lateEntries) {
-      await page.getByRole("button", { name: /Quick Add Rider/ }).click();
+      // Add-rider now lives in each category block (category is fixed there).
+      await page.getByTestId(`checkin-add-${entry.category}`).click();
       await page.getByPlaceholder("First name *").fill(entry.firstName);
       await page.getByPlaceholder("Last name *").fill(entry.lastName);
       await page.getByPlaceholder("Bib # *").fill(String(entry.bib));
       await page.getByPlaceholder("Club / team").fill(entry.team);
-      await page.locator("select").last().selectOption(entry.category);
       await page.getByRole("button", { name: "Add Rider", exact: true }).click();
       await expect(page.getByText(`#${entry.bib}`)).toBeVisible();
     }

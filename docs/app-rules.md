@@ -69,7 +69,9 @@ Source: `src/app/race/[id]/raceMode/CheckIn.tsx`
 - **RULE-CHK-05** — Once the wave is active (any category `running` or `finished`), check-in
   is **locked**: a banner shows, check buttons are disabled, and only status changes are
   allowed. (`CheckIn.tsx:103-105,153-157,230-234`)
-- **RULE-CHK-06** — "Sort by standing" orders by `position_start` ascending; nulls sort last.
+- **RULE-CHK-06** — Check-in is always grouped Wave (start slot) → Category. Sort = Standing/Bib/Name, asc/desc, within category or whole wave. Standing is `standing ?? position_start`; riders without standing sort last.
+- **RULE-CHK-07** — "+ Add rider" sits in each category block (category fixed); bib must be unique in the race.
+- **RULE-CHK-08** — "✎ Bib" edits a rider's bib inline (unique per race, persisted, logged as `RIDER_EDITED`); disabled once the race is running.
   Scope may be per-category or overall across the wave. (`CheckIn.tsx:48-60`)
 - **RULE-CHK-07** — Counts shown: number `checked`, number `DNS`, and total wave riders.
   (`CheckIn.tsx:294-297`)

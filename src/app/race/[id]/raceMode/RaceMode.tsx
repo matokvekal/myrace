@@ -148,7 +148,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
 
       <div className={styles.content}>
         {subTab === "start"   && <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
-        {subTab === "checkin" && <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
+        {subTab === "checkin" && <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} slots={schedule.get(selectedWave)} />}
         {subTab === "board"   && <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
         {subTab === "status"  && <WaveStatus raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
       </div>
