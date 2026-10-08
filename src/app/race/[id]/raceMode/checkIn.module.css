@@ -40,6 +40,58 @@
   color: #1a1a2e;
 }
 
+/* ── Standing sort bar ── */
+.standingBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.standingToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a2e;
+  cursor: pointer;
+  user-select: none;
+}
+
+.standingToggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #63a6fc;
+  cursor: pointer;
+}
+
+.scopeToggle {
+  display: flex;
+  border: 1.5px solid #d5e4fb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.scopeBtn {
+  padding: 5px 12px;
+  border: none;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a7a9a;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.scopeBtn + .scopeBtn { border-left: 1.5px solid #d5e4fb; }
+
+.scopeBtnActive {
+  background: #1a1a2e;
+  color: #fff;
+}
+
 .counts {
   display: flex;
   gap: 12px;
@@ -56,6 +108,55 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* ── Group-by-category blocks ── */
+.groupWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.catGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.catGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f3f4f8;
+}
+
+.catGroupBar {
+  width: 6px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.catGroupName {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1a1a2e;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catGroupCount {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3a9d7a;
+  background: rgba(62, 221, 164, 0.14);
+  padding: 2px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .row {
@@ -76,6 +177,14 @@
 .row.out {
   opacity: 0.55;
   background: #fafafa;
+}
+
+/* Per-rider category color bar on the left of each list row */
+.rowColorBar {
+  width: 5px;
+  align-self: stretch;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 
 /* ── Left area: check circle + status trigger (OR status badge) ── */
@@ -172,6 +281,28 @@
   color: #e05585;
 }
 
+/* One-tap DNS on the row (BUGS.md #25) — same chip as .statusTrigger, tinted
+   so the destructive action reads as distinct from the neutral Status menu. */
+.dnsTrigger {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border: 1.5px solid #e0c0cc;
+  border-radius: 6px;
+  background: #fff;
+  color: #c2456f;
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.dnsTrigger:hover {
+  background: #e05585;
+  border-color: #e05585;
+  color: #fff;
+}
+
 /* Status inline badge — replaces circle when DNS/DNF/DSQ set */
 .statusInlineBadge {
   padding: 5px 11px;
@@ -205,10 +336,32 @@
   border-color: rgba(140, 90, 210, 0.4);
 }
 
+.standingNum {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1a304f;
+  min-width: 20px;
+  text-align: center;
+  background: rgba(99, 166, 252, 0.14);
+  border-radius: 6px;
+  padding: 2px 5px;
+  flex-shrink: 0;
+}
+
 .bib {
   font-size: 11px;
   color: #7a7a9a;
-  width: 34px;
+  min-width: 34px;
+  flex-shrink: 0;
+}
+
+.catDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: middle;
   flex-shrink: 0;
 }
 
@@ -296,6 +449,13 @@
 
 .checkTileOut {
   opacity: 0.55;
+}
+
+/* Category color strip across the top of each card, always visible */
+.tileCatStrip {
+  height: 5px;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .checkTileInner {
@@ -407,4 +567,185 @@
   color: #63a6fc;
   cursor: pointer;
   text-align: center;
+}
+
+/* ── Sticky toolbar + sort bar ── */
+.stickyBar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  background: #f7f8fc;
+}
+
+.sortBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sortLabel {
+  font-size: 11px;
+  font-weight: 800;
+  color: #7a7a9a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dirBtn {
+  padding: 7px 10px;
+  border: 1.5px solid #d5e4fb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scopeBtn { padding: 8px 12px; }
+
+/* ── Wave block (one per start slot) ── */
+.waveBlock {
+  border: 2.5px solid #1a1a2e;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.waveHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.waveTitle { font-size: 15px; font-weight: 900; letter-spacing: 0.02em; }
+
+.waveCount {
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(62, 221, 164, 0.25);
+  color: #3edda4;
+  padding: 3px 10px;
+  border-radius: 8px;
+}
+
+.waveBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+/* ── Category block inside a wave ── */
+.catBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 2px solid #d5e4fb;
+  border-radius: 12px;
+  padding: 8px;
+  background: #fbfcff;
+}
+
+.catBlockHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.catDnsCount {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b8205c;
+  background: rgba(224, 85, 133, 0.12);
+  padding: 2px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.catAddBtn {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1.5px solid #63a6fc;
+  border-radius: 8px;
+  background: rgba(99, 166, 252, 0.1);
+  color: #2f6fc4;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.catAddBtn:hover { background: rgba(99, 166, 252, 0.22); }
+
+.addChips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.emptyCat {
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  color: #9a9ab8;
+  font-style: italic;
+}
+
+/* ── Edit bib ── */
+.bibWrap { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.bibEditBtn {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1.5px solid #d0d0e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  color: #4a5a85;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bibEditBtn:hover { border-color: #63a6fc; color: #2f6fc4; }
+
+.bibEdit { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+.bibInput {
+  width: 72px;
+  padding: 6px 8px;
+  border: 2px solid #63a6fc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bibSave, .bibCancel {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.bibSave { background: #3edda4; color: #fff; }
+.bibCancel { background: #eceef5; color: #7a7a9a; }
+
+.bibError { flex-basis: 100%; font-size: 11px; font-weight: 700; color: #c2182b; }
+
+.bibSaved { font-size: 10px; font-weight: 800; color: #2ab882; }
+
+.tileStanding {
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(0,0,0,0.6);
 }

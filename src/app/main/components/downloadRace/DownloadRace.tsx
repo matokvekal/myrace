@@ -28,7 +28,7 @@ const DownloadRace: React.FC<Props> = ({ onClose, onSuccess }) => {
 
   const { updateRace } = useRaceStore();
   const { insertRiders } = useRiderStore();
-  const { categories, updateCategory } = useCategoryStore();
+  const { categories, upsertCategories } = useCategoryStore();
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -103,21 +103,25 @@ const DownloadRace: React.FC<Props> = ({ onClose, onSuccess }) => {
         }
       }
 
-      // Save race
-      await updateRace(race);
+      // Save race. Mark it view-only: a downloaded race is a read-only copy for
+      // viewing results, so it gets the light one-tap delete (BUGS.md #8).
+      await updateRace({ ...race, viewOnly: true });
 
-      // Save categories
-      for (const cat of raceCategories) {
-        const existingCat = categories.find(
-          (c) =>
-            c.raceUuid === race.uuid &&
-            c.name === cat.name &&
-            c.subCategory === cat.subCategory
-        );
-        if (!existingCat) {
-          updateCategory(cat);
-        }
-      }
+      // Save categories. Batched and AWAITED on purpose: this used to loop an
+      // un-awaited async `updateCategory`, so the modal closed and the race
+      // screen opened while the writes were still in flight — Live then had no
+      // categories to match riders against and showed no cards until the
+      // writes landed.
+      const newCategories = raceCategories.filter(
+        (cat) =>
+          !categories.some(
+            (c) =>
+              c.raceUuid === race.uuid &&
+              c.name === cat.name &&
+              c.subCategory === cat.subCategory
+          )
+      );
+      await upsertCategories(newCategories);
 
       // Save riders
       if (riders.length > 0) {

@@ -1,43 +1,101 @@
+/* Race info card — golden-scale hierarchy:
+   name 21px → values 13px (φ pair), labels 10px eyebrows, Fibonacci gaps. */
 .raceInfo {
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding: 13px 16px;
+  gap: 5px;
   font-size: 13px;
 }
 
-.infoTop {
-  border: 1px solid rgb(13, 0, 255);
-  justify-content: space-between;
-}
-.row {
-  height: 20px;
-  display: flex;
-  padding-left: 16px;
-  font-size: 12px;
-  color: rgba(41, 48, 66, 0.6);
-}
-.rowHead,.row {
-  height: 20px;
-  display: flex;
-  font-size: 12px;
-  color: rgba(41, 48, 66, 0.6);
-}
+/* Header row: race name (focal point) + status button */
 .header {
-  height: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
 }
+
+.header > div:first-child {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Data rows: two columns of icon + value */
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 21px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* The lone "Details" row is an eyebrow label */
+.raceInfo > .row:nth-of-type(2) {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  min-height: 16px;
+}
+
 .left,
 .right {
   display: flex;
+  align-items: center;
   flex: 1;
-  gap: 5px;
-  color: rgba(41, 48, 66, 1);
+  gap: 6px;
+  min-width: 0;
 }
+
+.left img,
+.right img {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+/* Values read as data — strong ink, ellipsized */
+.rowData {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Second section (manager / terms) separated by a soft rule */
 .bottom {
-  margin-top: 16px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-soft);
 }
-.header {
-  justify-content: space-between;
-  margin-top: 16px;
-  padding-right: 16px;
-  color: rgba(41, 48, 66, 1);
+
+/* Column eyebrow labels: "Race manager" / "Racing terms" */
+.rowHead {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+/* ═══ PRO skin: arcade name + gold eyebrows ═══ */
+:root[data-skin="gaming"] .header > div:first-child {
+  font-size: var(--fs-md); /* 21px — golden pair with the 13px values */
+  font-weight: 900;
+  font-style: italic;
+}
+
+:root[data-skin="gaming"] .raceInfo > .row:nth-of-type(2),
+:root[data-skin="gaming"] .rowHead {
+  color: #c9930f;
 }

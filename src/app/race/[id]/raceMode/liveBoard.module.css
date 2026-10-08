@@ -1,8 +1,36 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-bottom: 32px;
+  gap: 13px;
+  padding-bottom: 34px;
+}
+
+/* Timing-tower blocks cascade in on the shared Fibonacci beat */
+.container > * {
+  animation: boardRise var(--beat-3) ease-out backwards;
+}
+
+.container > *:nth-child(2) {
+  animation-delay: var(--stagger);
+}
+
+.container > *:nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+.container > *:nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+@keyframes boardRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Toolbar ── */
@@ -59,6 +87,86 @@
   color: #5a3800;
 }
 
+/* ── Column picker — same look as results/results.module.css ── */
+.fieldMenuWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.fieldMenuBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #d5e4fb;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7a7a9a;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fieldMenuBtn:hover {
+  border-color: #a8c5f8;
+  color: #3a5580;
+}
+
+.fieldMenuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.fieldMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 31;
+  min-width: 170px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #d5e4fb;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(20, 31, 50, 0.18);
+}
+
+.fieldMenuTitle {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7a7a9a;
+  padding: 2px 6px 6px;
+}
+
+.fieldMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a304f;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.fieldMenuItem:hover {
+  background: #f3f8ff;
+}
+
+.fieldMenuItem input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .podiumSizeBtn {
   font-size: 10px;
   font-weight: 800;
@@ -77,12 +185,31 @@
   color: #a0e0ff;
 }
 
-/* Podium row highlights */
-.rowP1 { background: rgba(255,215,0,0.09); border-left: 3px solid #ffd700; }
-.rowP2 { background: rgba(192,192,192,0.10); border-left: 3px solid #b8b8c8; }
-.rowP3 { background: rgba(205,127,50,0.09); border-left: 3px solid #cd7f32; }
+/* Podium row highlights — P1 gets a slow gold shine sweep (trophy-case feel) */
+.rowP1 {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 215, 0, 0.14) 20%,
+    rgba(255, 235, 130, 0.34) 50%,
+    rgba(255, 215, 0, 0.14) 80%
+  );
+  background-size: 250% 100%;
+  border-left: 3px solid #ffd700;
+  animation: goldShimmer 2584ms linear infinite;
+}
+.rowP2 { background: rgba(200,205,215,0.12); border-left: 3px solid #c8cdd7; }
+.rowP3 { background: rgba(205,127,50,0.14); border-left: 3px solid #cd7f32; }
 
-.finRow { background: rgba(99,166,252,0.04); }
+@keyframes goldShimmer {
+  0% {
+    background-position: 125% 0;
+  }
+  100% {
+    background-position: -125% 0;
+  }
+}
+
+.finRow { background: rgba(52,161,255,0.08); }
 
 /* Out chips */
 .outSummary {
@@ -111,15 +238,17 @@
   font-size: 14px;
 }
 
+/* ── Race leaderboard / timing-tower look: deep indigo board, gold trim ── */
 .catBlock {
-  background: #fff;
+  background: linear-gradient(180deg, #2f2568 0%, #1c1642 100%);
+  border: 1px solid rgba(224, 169, 44, 0.3);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 14px rgba(10, 16, 30, 0.35);
 }
 
 .catBlockDone {
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .catHeaderDone {
@@ -135,7 +264,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: linear-gradient(140deg, #7a8fa8, #6b7d96);
+  background: linear-gradient(90deg, #45348f, #2a1f63);
+  border-bottom: 2px solid #e0a92c;
   color: #fff;
 }
 
@@ -148,8 +278,11 @@
 
 .catName {
   flex: 1;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .catStats {
@@ -175,63 +308,138 @@
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .lapSegmentDone {
-  background: #5ab4f0;
+  background: #e0a92c;
 }
 
 .noData {
-  padding: 10px 12px;
+  padding: 12px;
   font-size: 12px;
-  color: #b0b0c8;
+  color: #8fa2c0;
   text-align: center;
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-top: 1px solid #f4f4fb;
-  font-size: 12px;
+  gap: 10px;
+  padding: 9px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
 }
 
 .row.running {
-  background: rgba(62, 221, 164, 0.04);
+  background: rgba(124, 232, 60, 0.05);
 }
 
+/* White position box, like a timing-tower P-plate */
 .pos {
-  width: 18px;
-  font-weight: 800;
-  color: #1a1a2e;
+  width: 32px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #10151f;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 12px;
+  border-radius: 5px;
+  transform: skewX(-8deg);
   flex-shrink: 0;
 }
 
 .bib {
-  width: 32px;
-  color: #7a7a9a;
+  width: 40px;
+  color: #ffd27a;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .name {
   flex: 1;
-  font-weight: 500;
-  color: #1a1a2e;
+  min-width: 76px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .laps {
-  color: #7a7a9a;
+  color: #8fa2c0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .time {
+  width: 66px;
+  text-align: right;
+  color: #cfe0f5;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.gap {
+  width: 46px;
+  text-align: right;
+  color: #8fa2c0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.speed {
   width: 60px;
   text-align: right;
-  color: #7a7a9a;
+  color: #8fa2c0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+}
+
+/* ═══ PRO skin (data-skin="gaming"): broadcast-style board ═══ */
+:root[data-skin="gaming"] .catBlock {
+  box-shadow:
+    0 6px 20px rgba(10, 16, 30, 0.45),
+    0 0 0 1px rgba(224, 169, 44, 0.2);
+}
+
+:root[data-skin="gaming"] .pos {
+  transform: skewX(-12deg);
+  border-radius: 3px;
+  font-size: 13px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* Podium P-plates in gold / silver / bronze metal */
+:root[data-skin="gaming"] .rowP1 .pos {
+  background: linear-gradient(180deg, #ffe27a, #e0a92c);
+  color: #3a2a00;
+}
+:root[data-skin="gaming"] .rowP2 .pos {
+  background: linear-gradient(180deg, #f2f5fa, #b9c2cf);
+}
+:root[data-skin="gaming"] .rowP3 .pos {
+  background: linear-gradient(180deg, #e8a76a, #b06a2a);
+  color: #3a1f00;
+}
+
+/* LED-green live times */
+:root[data-skin="gaming"] .time {
+  font-family: "Courier New", monospace;
+  color: #7ce83c;
+  text-shadow: 0 0 6px rgba(124, 232, 60, 0.45);
+}
+
+:root[data-skin="gaming"] .row {
+  border-top-color: rgba(224, 169, 44, 0.12);
 }

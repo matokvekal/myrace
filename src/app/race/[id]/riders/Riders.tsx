@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import RiderCard from "../../components/riderCard/RiderCard";
+import RiderFlag from "../../components/riderFlag/RiderFlag";
 import Icons from "@/constants/Icons";
 import { shallow } from "zustand/shallow";
 import { debounce } from "lodash";
@@ -12,14 +14,26 @@ import CSVImportWizard from "@/components/csv/CSVImportWizard";
 import ScanDocumentButton from "@/components/importImage/ScanDocumentButton";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey } from "../schedule/Schedule";
 
 interface ManageHeatProps {
   raceUuid: string;
   categories: CategoryProps[];
+  onEditMode?: () => void;
+  /**
+   * Finalized race — the start list is part of a signed result, so every way
+   * of changing it (import, edit, delete-all) is removed. The stores reject
+   * these writes anyway; hiding them keeps the screen honest.
+   */
+  readOnly?: boolean;
 }
 
-type SortKey = "name" | "bib" | "club" | "category";
+type SortKey = "name" | "bib" | "club" | "category" | "wave" | "status";
+
+// Status ordering for the sortable Status column (active first, out last).
+const STATUS_ORDER: Record<string, number> = {
+  running: 0, standing: 1, finished: 2, DNF: 3, DNS: 4, DSQ: 5,
+};
 type WaveFilter = "all" | "now" | number;
 
 function formatElapsed(now: Date, startTimeStr: string | null | undefined): string {
@@ -40,7 +54,7 @@ function getNowWave(categories: CategoryProps[], catWaveMap: Map<string, number>
   const todayPrefix = now.toISOString().slice(0, 10);
   const waveTimeMap = new Map<number, Date>();
   categories.forEach((cat) => {
-    const waveNum = catWaveMap.get(cat.name);
+    const waveNum = catWaveMap.get(catWaveKey(cat.name, cat.subCategory));
     if (waveNum == null || !cat.startTime) return;
     const dt = new Date(`${todayPrefix}T${cat.startTime}`);
     if (!waveTimeMap.has(waveNum) || dt < waveTimeMap.get(waveNum)!) {
@@ -57,10 +71,12 @@ function getNowWave(categories: CategoryProps[], catWaveMap: Map<string, number>
   return closest;
 }
 
-const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
+const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, readOnly = false }) => {
+  const { t } = useTranslation();
   const previousRaceUuid = useRef<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [waveFilter, setWaveFilter] = useState<WaveFilter>("all");
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -69,11 +85,25 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Close the actions dropdown on outside click
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [actionsOpen]);
 
   const { getRiders, riders, deleteRidersByRace } = useRiderStore(
     (state) => ({
@@ -105,7 +135,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const map = new Map<string, number>();
     schedule.forEach((startMap, waveNum) => {
-      startMap.forEach((cats) => cats.forEach((cat) => map.set(cat.name, waveNum)));
+      startMap.forEach((cats) => cats.forEach((cat) => map.set(catWaveKey(cat.name, cat.subCategory), waveNum)));
     });
     return {
       waves: [...schedule.keys()].sort((a, b) => a - b),
@@ -122,21 +152,40 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
           : null;
 
     let list = riders.filter((r) => r.raceUuid === raceUuid);
-    if (activeHeat != null) list = list.filter((r) => catWaveMap.get(r.category) === activeHeat);
+    if (activeHeat != null) list = list.filter((r) => catWaveMap.get(catWaveKey(r.category, r.subCategory)) === activeHeat);
 
-    return [...list].sort((a, b) => {
-      if (sortBy === "name")
-        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
-      if (sortBy === "bib") return a.bibNumber - b.bibNumber;
-      if (sortBy === "club") return (a.team ?? "").localeCompare(b.team ?? "");
-      if (sortBy === "category") {
-        const catCmp = a.category.localeCompare(b.category);
-        if (catCmp !== 0) return catCmp;
-        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+    const waveOf = (r: RiderProps) =>
+      catWaveMap.get(catWaveKey(r.category, r.subCategory)) ?? r.heat ?? Infinity;
+    const byName = (a: RiderProps, b: RiderProps) =>
+      `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+
+    const sorted = [...list].sort((a, b) => {
+      let base = 0;
+      if (sortBy === "name") base = byName(a, b);
+      else if (sortBy === "bib") base = a.bibNumber - b.bibNumber;
+      else if (sortBy === "club") base = (a.team ?? "").localeCompare(b.team ?? "");
+      else if (sortBy === "category") {
+        base = a.category.localeCompare(b.category);
+        if (base === 0) base = (a.subCategory ?? "").localeCompare(b.subCategory ?? "");
+        if (base === 0) base = byName(a, b);
+      } else if (sortBy === "wave") {
+        base = waveOf(a) - waveOf(b);
+        if (base === 0) base = a.bibNumber - b.bibNumber;
+      } else if (sortBy === "status") {
+        base = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+        if (base === 0) base = a.bibNumber - b.bibNumber;
       }
-      return 0;
+      return sortDir === "asc" ? base : -base;
     });
-  }, [riders, raceUuid, waveFilter, sortBy, categories, catWaveMap]);
+    return sorted;
+  }, [riders, raceUuid, waveFilter, sortBy, sortDir, categories, catWaveMap]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortBy(key); setSortDir("asc"); }
+  };
+
+  const sortArrow = (key: SortKey) => (sortBy === key ? (sortDir === "asc" ? " ▲" : " ▼") : "");
 
   const grouped = useMemo((): Map<string, RiderProps[]> | null => {
     if (!groupByCategory) return null;
@@ -161,11 +210,11 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
         <div className={styles.leftControls}>
           {/* Sort dropdown */}
           <div className={styles.sortDropdownWrapper}>
-            <label className={styles.sortLabel}>Sort:</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortKey)}
               className={styles.sortDropdown}
+              aria-label="Sort riders"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.key} value={opt.key}>
@@ -199,21 +248,56 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
               <Layers size={16} />
             </button>
           </div>
-
-          {/* Import buttons */}
-          <Button
-            variant="secondary"
-            size="sm"
-            className={styles.importBtn}
-            onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
-          >
-            Import CSV
-          </Button>
-          <ScanDocumentButton
-            variant="bar"
-            onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
-          />
         </div>
+
+        {/* Actions dropdown — Import / Scan / Edit (right end of the bar).
+            Gone entirely on a finalized race: nothing in it would work. */}
+        {!readOnly && (
+        <div className={styles.actionsMenu} ref={actionsRef}>
+            <button
+              type="button"
+              className={styles.actionsTrigger}
+              onClick={() => setActionsOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={actionsOpen}
+            >
+              <Pencil size={13} /> Actions
+              <ChevronDown size={14} className={styles.actionsChevron} />
+            </button>
+            {actionsOpen && (
+              <div className={styles.actionsList} role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.actionItem}
+                  onClick={() => { setActionsOpen(false); setImportMode("file"); setShowImportWizard(true); }}
+                >
+                  <Upload size={15} /> Import CSV
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.actionItem}
+                  disabled
+                  title={t("scan.tooltip", "Scan Start List — coming soon")}
+                >
+                  <Camera size={15} /> {t("scan.list", "Scan Start List")}
+                  <span className={styles.comingSoonBadge}>{t("scan.soon", "Soon")}</span>
+                </button>
+                {onEditMode && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.actionItem}
+                    onClick={() => { setActionsOpen(false); onEditMode(); }}
+                  >
+                    <Pencil size={15} /> Edit Riders
+                  </button>
+                )}
+              </div>
+            )}
+        </div>
+        )}
       </div>
 
       {(waves.length > 1 || riders.some((r) => r.raceUuid === raceUuid)) && (
@@ -243,7 +327,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
           )}
 
           {/* Delete All button - right side */}
-          {riders.some((r) => r.raceUuid === raceUuid) && (
+          {!readOnly && riders.some((r) => r.raceUuid === raceUuid) && (
             <Button
               variant="secondary"
               size="sm"
@@ -270,11 +354,11 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
                 <span className={styles.colRow}>#</span>
                 <span className={styles.colDot} />
                 <span className={styles.colFlag} />
-                <span className={styles.colBib}>Bib</span>
-                <span className={styles.colName}>Name</span>
-                <span className={styles.colCat}>Category</span>
-                <span className={styles.colWave}>Wave</span>
-                <span className={styles.colStatus}>Status</span>
+                <span className={styles.colBib} style={{ cursor: "pointer" }} onClick={() => handleSort("bib")} title="Sort by bib">Bib{sortArrow("bib")}</span>
+                <span className={styles.colName} style={{ cursor: "pointer" }} onClick={() => handleSort("name")} title="Sort by name">Name{sortArrow("name")}</span>
+                <span className={styles.colCat} style={{ cursor: "pointer" }} onClick={() => handleSort("category")} title="Sort by category">Category{sortArrow("category")}</span>
+                <span className={styles.colWave} style={{ cursor: "pointer" }} onClick={() => handleSort("wave")} title="Sort by wave">Wave{sortArrow("wave")}</span>
+                <span className={styles.colStatus} style={{ cursor: "pointer" }} onClick={() => handleSort("status")} title="Sort by status">Status{sortArrow("status")}</span>
               </div>
               {(() => {
                 let lastCat = "";
@@ -301,11 +385,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
                         <span className={styles.colRow}>{idx + 1}</span>
                         <span className={styles.colDot} style={{ background: rider.color ?? "#ddd" }} />
                         <span className={styles.colFlag}>
-                          <img
-                            src={`/international/${rider.flag || "il"}.svg`}
-                            alt={rider.flag || "il"}
-                            className={styles.flagIcon}
-                          />
+                          <RiderFlag flag={rider.flag} className={styles.flagIcon} />
                         </span>
                         <span className={styles.colBib}><strong>#{rider.bibNumber || "—"}</strong></span>
                         <span className={styles.colName} dir="auto">
@@ -317,7 +397,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
                           {rider.category || "—"}
                           {rider.subCategory && <span className={styles.subCatLabel}> · {rider.subCategory}</span>}
                         </span>
-                        <span className={styles.colWave}>{catWaveMap.get(rider.category) ?? rider.heat ?? "—"}</span>
+                        <span className={styles.colWave}>{catWaveMap.get(catWaveKey(rider.category, rider.subCategory)) ?? rider.heat ?? "—"}</span>
                         <span className={styles.colStatus}>
                           {isOut ? (
                             <span className={`${styles.statusTag} ${styles[rider.status.toLowerCase() + "Tag"]}`}>
@@ -369,18 +449,20 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
       ) : (
         <div className={styles.emptyState}>
           <p className={styles.empty}>No riders yet.</p>
-          <div className={styles.emptyActions}>
-            <button
-              className={styles.emptyImportBtn}
-              onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
-            >
-              Import CSV
-            </button>
-            <ScanDocumentButton
-              variant="empty"
-              onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
-            />
-          </div>
+          {!readOnly && (
+            <div className={styles.emptyActions}>
+              <button
+                className={styles.emptyImportBtn}
+                onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+              >
+                Import CSV
+              </button>
+              <ScanDocumentButton
+                variant="empty"
+                onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
+              />
+            </div>
+          )}
         </div>
       )}
 

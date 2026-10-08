@@ -13,6 +13,47 @@ interface RaceState {
    deleteRace: (raceUuid: string) => Promise<void>;
 }
 
+/**
+ * Fields a FINALIZED race still accepts writes to. Everything here is local
+ * bookkeeping that says nothing about the result — a favourite star, sync
+ * housekeeping, or the finalization record itself (stamped by
+ * `utils/finalizeRace.ts` as its last step, after the riders are saved).
+ *
+ * Lives here rather than in `utils/raceLock.ts` so that module can import this
+ * store without an import cycle.
+ */
+const FINALIZED_WRITABLE_FIELDS = new Set<keyof RaceProps>([
+   "isFavorite",
+   "viewOnly",
+   "syncedAt",
+   "serverVersion",
+   "lastUpdateAt",
+   "finalized",
+]);
+
+/**
+ * Which fields an update would actually change on a finalized race, ignoring
+ * the harmless ones. Empty array -> the write is safe to let through.
+ */
+export function blockedFinalizedFields(
+   existing: RaceProps,
+   incoming: RaceProps
+): string[] {
+   const keys = new Set([
+      ...Object.keys(existing),
+      ...Object.keys(incoming),
+   ]) as Set<keyof RaceProps>;
+   const changed: string[] = [];
+   for (const key of keys) {
+      if (FINALIZED_WRITABLE_FIELDS.has(key)) continue;
+      // Deep-ish compare: map points / markers are arrays, the rest are scalars.
+      if (JSON.stringify(existing[key] ?? null) !== JSON.stringify(incoming[key] ?? null)) {
+         changed.push(String(key));
+      }
+   }
+   return changed;
+}
+
 const useRaceStore = create<RaceState>()(
    persist(
       (set, get) => ({
@@ -59,12 +100,17 @@ const useRaceStore = create<RaceState>()(
          insertRace: async (newRace: RaceProps) => {
             try {
                const { races } = get();
-               const updatedRaces = [...races, newRace];
+               // Replace if the same race is already cached (e.g. a re-save)
+               const updatedRaces = races.some((r) => r.id === newRace.id)
+                  ? races.map((r) => (r.id === newRace.id ? newRace : r))
+                  : [...races, newRace];
 
                set({ races: updatedRaces });
 
                const db = await initIndexedDB();
-               await db.add("races", newRace);
+               // put, not add: add throws ConstraintError if the id already
+               // exists, which crashed the save when the row was written twice.
+               await db.put("races", newRace);
                db.close();
             } catch (error) {
                console.error("Error inserting race:", error);
@@ -74,6 +120,21 @@ const useRaceStore = create<RaceState>()(
          updateRace: async (updatedRace: RaceProps) => {
             try {
                const { races } = get();
+
+               // A finished race is a published result — its details are frozen.
+               // Only the local bookkeeping fields above may still move. This is
+               // the backstop for any screen that forgot to hide its Edit button.
+               const existing = races.find((r) => r.uuid === updatedRace.uuid);
+               if (existing?.finalized) {
+                  const blocked = blockedFinalizedFields(existing, updatedRace);
+                  if (blocked.length > 0) {
+                     console.warn(
+                        `Race ${existing.uuid} is finalized — ignored change to: ${blocked.join(", ")}`
+                     );
+                     return;
+                  }
+               }
+
                const updatedRaces = races.map((race) =>
                   // race.id === updatedRace.id ? updatedRace : race
                race.uuid === updatedRace.uuid ? updatedRace : race

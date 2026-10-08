@@ -8,6 +8,7 @@
   justify-content: center;
   z-index: 900;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow-y: auto;
 }
 
 /* Sheet slides up from bottom on mobile, centered on wider screens */
@@ -17,6 +18,7 @@
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -89,6 +91,13 @@
 }
 
 .sub { opacity: 0.75; }
+
+.club {
+  font-size: 12px;
+  color: #7a8aa8;
+  font-weight: 500;
+  margin-top: 2px;
+}
 
 .closeBtn {
   background: #f0f2f6;

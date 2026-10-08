@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import styles from "./editRiders.module.css";
 import useRiderStore from "@/stores/ridersStore";
+import useRaceStore from "@/stores/racesStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import CategoryManager from "../../components/categoryManager/CategoryManager";
+import { AuditLogService } from "@/services/auditLog/auditLogService";
 
 interface Props {
   raceUuid: string;
   categories: CategoryProps[];
+  onBack?: () => void;
 }
 
 interface FormState {
@@ -76,8 +79,9 @@ function parseCSV(text: string): ParsedRow[] {
         firstName: cols[idx("first name")] ?? "",
         lastName: cols[idx("last name")] ?? "",
         category: cols[idx("category")] ?? "",
-        subCategory:
-          cols[idx("sub category")] || cols[idx("subcategory")] || null,
+        // Sub-categories are no longer imported — categories are flat, one per
+        // age band (BUGS.md #2). Legacy rows keep rendering theirs.
+        subCategory: null,
         team: cols[idx("team")] ?? "",
         heat: parseInt(cols[idx("heat")] ?? "1") || 1,
         totalLaps: parseInt(cols[idx("laps")] ?? "0") || 0,
@@ -86,7 +90,7 @@ function parseCSV(text: string): ParsedRow[] {
     });
 }
 
-const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
+const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
   const {
     riders,
     getRiders,
@@ -95,6 +99,7 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
     deleteRider,
     insertRiders
   } = useRiderStore();
+  const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [addingNew, setAddingNew] = useState(false);
@@ -199,13 +204,23 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
         chipNumber: form.chipNumber || undefined
       };
       await addNewRider(newRider);
+      if (race) {
+        AuditLogService.log({
+          race,
+          action: "ADD_RIDER",
+          screen: "EditRiders",
+          entityType: "rider",
+          entityId: newRider.bibNumber,
+          after: { firstName: newRider.firstName, lastName: newRider.lastName, category: newRider.category },
+        });
+      }
     } else if (editingId != null) {
       const existing = raceRiders.find((r) => r.id === editingId);
       if (!existing) return;
       const cat = categories.find(
         (c) => c.name === form.category && c.subCategory === form.subCategory
       );
-      await updateRider({
+      const updatedRider = {
         ...existing,
         bibNumber: parseInt(form.bibNumber),
         firstName: form.firstName,
@@ -216,7 +231,19 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
         color: form.categoryColor,
         team: form.team || null,
         chipNumber: form.chipNumber || undefined
-      });
+      };
+      await updateRider(updatedRider);
+      if (race) {
+        AuditLogService.log({
+          race,
+          action: "EDIT_RIDER",
+          screen: "EditRiders",
+          entityType: "rider",
+          entityId: existing.bibNumber,
+          before: { firstName: existing.firstName, lastName: existing.lastName, category: existing.category },
+          after: { firstName: updatedRider.firstName, lastName: updatedRider.lastName, category: updatedRider.category },
+        });
+      }
     }
     cancelForm();
   };
@@ -329,6 +356,15 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
       };
     });
     await insertRiders(newRiders);
+    if (race) {
+      AuditLogService.log({
+        race,
+        action: "IMPORT_RIDERS",
+        screen: "EditRiders",
+        entityType: "rider",
+        details: { riderCount: newRiders.length },
+      });
+    }
     setImportPreview(null);
   };
 
@@ -337,7 +373,18 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
       setDeleteConfirm(id);
       return;
     }
+    const existing = raceRiders.find((r) => r.id === id);
     await deleteRider(id);
+    if (race && existing) {
+      AuditLogService.log({
+        race,
+        action: "DELETE_RIDER",
+        screen: "EditRiders",
+        entityType: "rider",
+        entityId: existing.bibNumber,
+        before: { firstName: existing.firstName, lastName: existing.lastName, category: existing.category },
+      });
+    }
     setDeleteConfirm(null);
   };
 
@@ -346,6 +393,11 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories }) => {
     <div className={styles.container}>
       {/* Toolbar */}
       <div className={styles.toolbar}>
+        {onBack && (
+          <button className={styles.importBtn} onClick={onBack}>
+            ← Back
+          </button>
+        )}
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}>🔍</span>
           <input

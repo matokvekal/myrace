@@ -1,0 +1,192 @@
+/* No container chrome — the buttons sit directly on the header, so the only
+   layers are: header → button. Buttons share the full width equally. */
+.switcher {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  gap: 6px;
+}
+
+.btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 10px;
+  border: 2px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: rgba(30, 40, 55, 0.55);
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, filter 0.12s;
+  white-space: nowrap;
+}
+
+.label {
+  line-height: 1;
+}
+
+/* ── Traffic-light phases: Race 🔴 → Start 🟡 → Live 🟢 ──
+   Idle buttons wear a faint tint of their own colour so the
+   colour language is always readable; the active button gets the
+   glossy racing-game fill (matches start-zone buttons). */
+
+/* Active button: glossy top / dark bottom split + checkered texture */
+.active {
+  color: #fff;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
+  border-color: rgba(0, 0, 0, 0.5);
+}
+
+.active:hover {
+  filter: brightness(1.08);
+}
+
+/* Race (setup) — RED */
+.setupIdle {
+  background: rgba(220, 38, 38, 0.1);
+  color: #c02525;
+}
+.setupIdle:hover {
+  background: rgba(220, 38, 38, 0.18);
+  color: #a31414;
+}
+.setupActive {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 46%, rgba(0, 0, 0, 0.16) 52%, rgba(0, 0, 0, 0.3) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.1) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px,
+    linear-gradient(180deg, #e6413c 0%, #a30f0f 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 8px rgba(220, 38, 38, 0.45);
+}
+
+/* Start (race) — AMBER */
+.raceIdle {
+  background: rgba(234, 179, 8, 0.12);
+  color: #9a6c00;
+}
+.raceIdle:hover {
+  background: rgba(234, 179, 8, 0.22);
+  color: #7d5700;
+}
+.raceActive {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 46%, rgba(0, 0, 0, 0.16) 52%, rgba(0, 0, 0, 0.3) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.1) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px,
+    linear-gradient(180deg, #f0b429 0%, #b07d00 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 8px rgba(234, 179, 8, 0.45);
+}
+
+/* Live — GREEN */
+.liveIdle {
+  background: rgba(22, 163, 74, 0.12);
+  color: #12813c;
+}
+.liveIdle:hover {
+  background: rgba(22, 163, 74, 0.22);
+  color: #0d6a30;
+}
+.liveActive {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 46%, rgba(0, 0, 0, 0.16) 52%, rgba(0, 0, 0, 0.3) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.1) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px,
+    linear-gradient(180deg, #7ec832 0%, #3d8f0e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 8px rgba(22, 163, 74, 0.45);
+}
+
+/* Pulsing dot on the Live button while it's the active phase */
+.liveDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  animation: livePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+
+/* Compact on narrow screens: keep icons + labels but tighten spacing */
+@media (max-width: 420px) {
+  .btn {
+    padding: 9px 12px;
+    font-size: 12.5px;
+  }
+}
+
+/* compactOnMobile (heat header): the switcher shares the row with the race
+   info and the clock/settings, on EVERY screen width — not just phones — so
+   it must never claim the base rule's width:100%, or it fights raceInfo for
+   space and the two visually collide. A fixed (not auto) flex-basis is what
+   makes the three buttons divide evenly — flex:1 children only split space
+   equally when their parent's own size is definite; an auto/hug parent sizes
+   each button to its own content instead, so "Race" ends up a different
+   width than "Live". 420px reads as comfortably wide on desktop without
+   stretching across the whole header; it can still shrink (down to
+   min-width) if the window is narrower. */
+.compactOnMobile {
+  flex: 0 1 420px;
+  min-width: 260px;
+  width: auto;
+}
+
+/* On phones the WORDS stay (Race / Start / Live) and the icons go — the
+   words are what the commissaire reads at a glance. */
+@media (max-width: 640px) {
+  .compactOnMobile {
+    flex-basis: auto;
+    min-width: 0;
+    gap: 4px;
+  }
+  .compactOnMobile .btn {
+    flex: 0 0 auto;
+    padding: 8px;
+    gap: 4px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+  .compactOnMobile .btn svg {
+    display: none;
+  }
+}
+
+/* Very narrow phones only: no room for words — fall back to icon-only */
+@media (max-width: 380px) {
+  .compactOnMobile .btn {
+    padding: 8px 9px;
+    gap: 0;
+  }
+  .compactOnMobile .btn svg {
+    display: block;
+  }
+  .compactOnMobile .label {
+    display: none;
+  }
+}
+
+/* Replaces the whole Setup/Start/Live switcher on a finalized race — there is
+   no phase left to switch to, so the control becomes a seal instead. */
+.finalTag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(224, 169, 44, 0.2), rgba(224, 169, 44, 0.08));
+  border: 1px solid rgba(224, 169, 44, 0.5);
+  color: #ffd464;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}

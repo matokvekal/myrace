@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import styles from './riderActionLog.module.css';
 import { RiderProps } from '@/types/types';
 import { Bell, Search, X } from 'lucide-react';
+import { parseClockTimeMs } from '@/utils/timeUtils';
 
 interface RiderAction {
   id: string;
@@ -30,15 +31,6 @@ function formatDuration(ms: number): string {
   const mm = String(m).padStart(2, '0');
   const ss = String(s).padStart(2, '0');
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-function parseTimeToMs(t: string | null | undefined): number | null {
-  if (!t) return null;
-  if (t.includes('T')) return new Date(t).getTime();
-  const today = new Date();
-  const [h, m, s = 0] = t.split(':').map(Number);
-  today.setHours(h, m, s, 0);
-  return today.getTime();
 }
 
 export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderActionLogProps) {
@@ -143,6 +135,9 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
       <button
         className={`${styles.toggleBtn} ${isOpen ? styles.open : ''}`}
         onClick={onToggle}
+        // Without this the ⏱️ glyph IS the accessible name — `title` is only a
+        // fallback, so the button announced as "⏱️" and was unaddressable.
+        aria-label="View rider action history"
         title="View rider action history"
       >
         <span className={styles.icon}>⏱️</span>
@@ -176,7 +171,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
               >
                 <Search size={16} />
               </button>
-              <button className={styles.closeBtn} onClick={onToggle}>✕</button>
+              <button className={styles.closeBtn} onClick={onToggle} aria-label="Close rider log">✕</button>
             </div>
 
             {searchOpen && (
@@ -217,7 +212,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
                   const laps = rider.lapsDetails ?? [];
                   const lastLap = laps.length > 0 ? laps[laps.length - 1] : null;
                   const lastLapTime = lastLap?.lapTime ?? rider.elapsedLastLap ?? null;
-                  const sinceArriveBaseline = parseTimeToMs(rider.timeArrive) ?? parseTimeToMs(rider.timeStartRace);
+                  const sinceArriveBaseline = parseClockTimeMs(rider.timeArrive) ?? parseClockTimeMs(rider.timeStartRace);
                   const sinceArrive = !isOut && !isFinished && sinceArriveBaseline != null
                     ? formatDuration(now - sinceArriveBaseline)
                     : null;
@@ -338,7 +333,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
 
                   const lastLap = laps.length > 0 ? laps[laps.length - 1] : null;
                   const lastLapTime = lastLap?.lapTime ?? rider.elapsedLastLap ?? null;
-                  const sinceArriveBaseline = parseTimeToMs(rider.timeArrive) ?? parseTimeToMs(rider.timeStartRace);
+                  const sinceArriveBaseline = parseClockTimeMs(rider.timeArrive) ?? parseClockTimeMs(rider.timeStartRace);
                   const sinceArrive = !isOut && !isFinished && sinceArriveBaseline != null
                     ? formatDuration(now - sinceArriveBaseline)
                     : null;

@@ -5,9 +5,10 @@ import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
-import { Trophy } from "lucide-react";
-import { getRiderStatusInfo } from "@/utils/statusChip";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
+import { Trophy, SlidersHorizontal } from "lucide-react";
+import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
+import { parseClockTime } from "@/utils/timeUtils";
 
 interface Props {
   raceUuid: string;
@@ -15,6 +16,34 @@ interface Props {
 
 type SortKey = "place" | "name" | "bib" | "time";
 type GroupBy = "category" | "wave";
+
+// Columns the user can show/hide on Results (BUGS.md #8). Position and Name are
+// always shown — Name is the whole point ("we cant see the name in some case").
+// Gap/Speed default OFF (see loadVisibleFields) — keep the results list lean by
+// default and let commissaires opt into the denser view.
+type ResultField = "bib" | "laps" | "time" | "status" | "gap" | "speed";
+const RESULT_FIELDS: { key: ResultField; label: string }[] = [
+  { key: "bib", label: "Bib #" },
+  { key: "laps", label: "Laps" },
+  { key: "time", label: "Time" },
+  { key: "status", label: "Status" },
+  { key: "gap", label: "Gap to leader" },
+  { key: "speed", label: "Speed" },
+];
+const FIELDS_STORAGE_KEY = "resultsVisibleFields";
+
+function loadVisibleFields(): Set<ResultField> {
+  try {
+    const raw = localStorage.getItem(FIELDS_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw) as ResultField[];
+      return new Set(arr.filter((f) => RESULT_FIELDS.some((rf) => rf.key === f)));
+    }
+  } catch {
+    /* ignore — fall through to default */
+  }
+  return new Set<ResultField>(["bib", "laps", "time", "status"]); // all on by default
+}
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 
@@ -26,11 +55,35 @@ function fmtTime(ms: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
+// "+M:SS" behind the category leader on elapsed time — always a time diff,
+// never a lap count, even when the rider is a lap down (user req).
+function fmtGap(leader: RiderProps | null, rider: RiderProps): string {
+  if (!leader || rider.id === leader.id) return "—";
+  const diffMs = riderElapsed(rider) - riderElapsed(leader);
+  if (!isFinite(diffMs) || diffMs <= 0) return "—";
+  const s = Math.floor(diffMs / 1000);
+  return `+${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// Last recorded lap's speed (BUGS.md-style derived field — km/h needs
+// `race.distance` set as the circuit length; see useLapRecording.ts).
+function riderSpeedKph(rider: RiderProps): string {
+  const laps = rider.lapsDetails;
+  const kph = laps && laps.length > 0 ? laps[laps.length - 1].speed_kph : undefined;
+  return kph != null ? `${kph.toFixed(1)} km/h` : "—";
+}
+
 function riderElapsed(rider: RiderProps): number {
-  if (!rider.timeStartRace) return Infinity;
-  const start = new Date(rider.timeStartRace).getTime();
+  // `timeStartRace` is a wall-clock string ("08:04:31"), NOT a date — feeding it
+  // to `new Date()` yields Invalid Date, so every elapsed time came out NaN and
+  // rendered as "—" (and the Time sort silently compared NaN). Parse it with the
+  // shared helper that already handles this format (BUGS.md #30).
+  const start = parseClockTime(rider.timeStartRace);
+  if (!start) return Infinity;
   const end = rider.timeArrive ? new Date(rider.timeArrive).getTime() : Date.now();
-  return end - start;
+  if (isNaN(end)) return Infinity;
+  const ms = end - start.getTime();
+  return ms >= 0 ? ms : Infinity;
 }
 
 const Results: React.FC<Props> = ({ raceUuid }) => {
@@ -43,27 +96,60 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
+  const [visibleFields, setVisibleFields] = useState<Set<ResultField>>(loadVisibleFields);
+  const [showFieldMenu, setShowFieldMenu] = useState(false);
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
 
-  const raceRiders = riders.filter((r) => r.raceUuid === raceUuid);
+  // Persist the chosen columns as the default for next time (BUGS.md #8).
+  useEffect(() => {
+    try {
+      localStorage.setItem(FIELDS_STORAGE_KEY, JSON.stringify([...visibleFields]));
+    } catch {
+      /* storage unavailable — selection just won't persist */
+    }
+  }, [visibleFields]);
+
+  const toggleField = (key: ResultField) =>
+    setVisibleFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const raceCategories = useMemo(
     () => categories.filter((c) => c.raceUuid === raceUuid),
     [categories, raceUuid]
+  );
+  // Laps resolved from the category so results read 0/5, not 0/0 (BUGS.md #7)
+  const raceRiders = useMemo(
+    () => withCategoryLaps(riders.filter((r) => r.raceUuid === raceUuid), raceCategories),
+    [riders, raceUuid, raceCategories]
   );
 
   const { waveNums, catWaveMap } = useMemo(() => {
     const schedule = buildSchedule(raceCategories, DEFAULT_WAVE_GAP_MINUTES);
     const map = new Map<string, number>();
     schedule.forEach((startMap, waveNum) => {
-      startMap.forEach((cats) => cats.forEach((cat) => map.set(cat.name, waveNum)));
+      startMap.forEach((cats) => cats.forEach((cat) => map.set(catWaveKey(cat.name, cat.subCategory), waveNum)));
     });
     return { waveNums: [...schedule.keys()].sort((a, b) => a - b), catWaveMap: map };
   }, [raceCategories]);
 
-  const allCatNames = useMemo(
-    () => [...new Set(raceRiders.map((r) => r.category))].sort(),
-    [raceRiders]
+  // A "category" here is identified by name + subCategory (composite key), so
+  // e.g. "Masters Men " 19-29 and 30-49 are separate blocks in the right waves.
+  const catIdents = useMemo(() => {
+    const map = new Map<string, { name: string; sub: string | null }>();
+    raceRiders.forEach((r) => {
+      map.set(catWaveKey(r.category, r.subCategory), { name: r.category, sub: r.subCategory ?? null });
+    });
+    return map;
+  }, [raceRiders]);
+
+  const allCatKeys = useMemo(
+    () => [...catIdents.keys()].sort(),
+    [catIdents]
   );
 
   const sortGroup = (group: RiderProps[]) =>
@@ -78,37 +164,64 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
       return 0;
     });
 
-  const filteredCatNames = useMemo(() => {
-    let names = allCatNames;
-    if (waveFilter !== "all") names = names.filter((n) => catWaveMap.get(n) === waveFilter);
-    if (filterCategory !== "all") names = names.filter((n) => n === filterCategory);
-    return names;
-  }, [allCatNames, waveFilter, filterCategory, catWaveMap]);
+  const filteredCatKeys = useMemo(() => {
+    let keys = allCatKeys;
+    if (waveFilter !== "all") keys = keys.filter((k) => catWaveMap.get(k) === waveFilter);
+    if (filterCategory !== "all") keys = keys.filter((k) => k === filterCategory);
+    return keys;
+  }, [allCatKeys, waveFilter, filterCategory, catWaveMap]);
 
-  const getPodiumSize = (catName: string): 3 | 5 => podiumSizes[catName] ?? 3;
+  const getPodiumSize = (catKey: string): 3 | 5 => podiumSizes[catKey] ?? 3;
 
-  const togglePodiumSize = (catName: string) =>
-    setPodiumSizes((prev) => ({ ...prev, [catName]: prev[catName] === 5 ? 3 : 5 }));
+  const togglePodiumSize = (catKey: string) =>
+    setPodiumSizes((prev) => ({ ...prev, [catKey]: prev[catKey] === 5 ? 3 : 5 }));
 
-  const renderCategory = (catName: string) => {
-    const allInCat = raceRiders.filter((r) => r.category === catName);
+  const renderCategory = (catKey: string) => {
+    const ident = catIdents.get(catKey);
+    if (!ident) return null;
+    const { name, sub } = ident;
+    const waveNum = catWaveMap.get(catKey);
+    const allInCat = raceRiders.filter(
+      (r) => r.category === name && (r.subCategory ?? null) === sub
+    );
     const sorted = sortGroup(allInCat);
     if (!sorted.length) return null;
-    const catMeta = raceCategories.find((c) => c.name === catName);
-    const podSize = getPodiumSize(catName);
+    const catMeta = raceCategories.find(
+      (c) => c.name === name && (c.subCategory ?? null) === sub
+    );
+    const podSize = getPodiumSize(catKey);
     const active = sorted.filter((r) => !["DNS", "DNF", "DSQ"].includes(r.status));
     const out = sorted.filter((r) => ["DNS", "DNF", "DSQ"].includes(r.status));
     const display = podiumMode ? active.slice(0, podSize) : sorted;
+    // Gap is always relative to the actual #1 by place, independent of whatever
+    // column the list is currently sorted by (name/bib/time) — not `active[0]`.
+    const leader = active.length > 0
+      ? [...active].sort((a, b) => a.lapsCounter !== b.lapsCounter
+          ? b.lapsCounter - a.lapsCounter
+          : riderElapsed(a) - riderElapsed(b))[0]
+      : null;
 
     return (
-      <div key={catName} className={styles.categoryBlock}>
+      <div key={catKey} className={styles.categoryBlock}>
         <div className={styles.categoryHeader}>
           {catMeta && <span className={styles.dot} style={{ background: catMeta.color ?? "#ccc" }} />}
-          <span className={styles.catHeaderName}>{catName}</span>
+          <span className={styles.catHeaderName}>{name}{sub ? ` · ${sub}` : ""}</span>
+          {(() => {
+            const info = getCategoryStatusInfo(catMeta?.status);
+            return (
+              <span
+                className={styles.statusChip}
+                style={{ background: `${info.color}1f`, color: info.color }}
+              >
+                {info.label}
+              </span>
+            );
+          })()}
+          {waveNum != null && <span className={styles.count}>Wave {waveNum}</span>}
           {podiumMode && (
             <button
               className={`${styles.podiumSizeBtn} ${podSize === 5 ? styles.podiumSize5 : ""}`}
-              onClick={() => togglePodiumSize(catName)}
+              onClick={() => togglePodiumSize(catKey)}
               title={`Top ${podSize} — click to toggle 3/5`}
             >
               {podSize === 5 ? "Top 5" : "Top 3"}
@@ -136,13 +249,21 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
               <span className={`${styles.pos} ${podiumMode && sortBy === "place" && !isOut && idx < 3 ? styles[`pos${idx + 1}`] : ""}`}>
                 {showMedal ? MEDAL[idx] : posLabel}
               </span>
-              <span className={styles.bib}>#{rider.bibNumber}</span>
+              {visibleFields.has("bib") && <span className={styles.bib}>#{rider.bibNumber}</span>}
               <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
-              <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>
-              <span className={styles.time}>
-                {el && el !== Infinity ? fmtTime(el) : "—"}
-              </span>
-              {(() => {
+              {visibleFields.has("laps") && <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>}
+              {visibleFields.has("time") && (
+                <span className={styles.time}>
+                  {el && el !== Infinity ? fmtTime(el) : "—"}
+                </span>
+              )}
+              {visibleFields.has("gap") && (
+                <span className={styles.gap}>{isOut ? "—" : fmtGap(leader, rider)}</span>
+              )}
+              {visibleFields.has("speed") && (
+                <span className={styles.speed}>{riderSpeedKph(rider)}</span>
+              )}
+              {visibleFields.has("status") && (() => {
                 const info = getRiderStatusInfo(rider);
                 return (
                   <span
@@ -194,7 +315,11 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
             onChange={(e) => setFilterCategory(e.target.value)}
           >
             <option value="all">All categories</option>
-            {allCatNames.map((c) => <option key={c} value={c}>{c}</option>)}
+            {allCatKeys.map((k) => {
+              const ident = catIdents.get(k);
+              const label = ident ? `${ident.name}${ident.sub ? ` · ${ident.sub}` : ""}` : k;
+              return <option key={k} value={k}>{label}</option>;
+            })}
           </select>
           <div className={styles.groupBtns}>
             <button
@@ -222,12 +347,45 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
               </Button>
             ))}
           </div>
-          <button
-            className={`${styles.podiumToggle} ${podiumMode ? styles.podiumToggleOn : ""}`}
-            onClick={() => setPodiumMode((v) => !v)}
-          >
-            <Trophy size={15} /> Podium
-          </button>
+          <div className={styles.rightTools}>
+            {/* Column picker — persisted so it's the default next time (BUGS.md #8) */}
+            <div className={styles.fieldMenuWrap}>
+              <button
+                className={styles.fieldMenuBtn}
+                onClick={() => setShowFieldMenu((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={showFieldMenu}
+                title="Choose columns"
+              >
+                <SlidersHorizontal size={15} /> Columns
+              </button>
+              {showFieldMenu && (
+                <>
+                  <div className={styles.fieldMenuOverlay} onClick={() => setShowFieldMenu(false)} />
+                  <div className={styles.fieldMenu} role="menu">
+                    <div className={styles.fieldMenuTitle}>Show columns</div>
+                    {RESULT_FIELDS.map((f) => (
+                      <label key={f.key} className={styles.fieldMenuItem}>
+                        <input
+                          type="checkbox"
+                          checked={visibleFields.has(f.key)}
+                          onChange={() => toggleField(f.key)}
+                        />
+                        <span>{f.label}</span>
+                      </label>
+                    ))}
+                    <div className={styles.fieldMenuNote}>Name is always shown.</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              className={`${styles.podiumToggle} ${podiumMode ? styles.podiumToggleOn : ""}`}
+              onClick={() => setPodiumMode((v) => !v)}
+            >
+              <Trophy size={15} /> Podium
+            </button>
+          </div>
         </div>
       </div>
 
@@ -239,7 +397,7 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
         ? waveNums
             .filter((w) => waveFilter === "all" || waveFilter === w)
             .map((w) => {
-              const cats = filteredCatNames.filter((n) => catWaveMap.get(n) === w);
+              const cats = filteredCatKeys.filter((k) => catWaveMap.get(k) === w);
               if (!cats.length) return null;
               return (
                 <div key={w}>
@@ -248,7 +406,7 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
                 </div>
               );
             })
-        : filteredCatNames.map(renderCategory)
+        : filteredCatKeys.map(renderCategory)
       }
     </div>
   );

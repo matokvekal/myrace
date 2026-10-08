@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import styles from "./riderLiveModal.module.css";
 import { RiderProps } from "@/types/types";
+import { riderTotalTime } from "@/utils/timeUtils";
 
 interface Props {
   rider: RiderProps;
   catColor: string;
+  /** "+M:SS" / "+NL" behind the category leader, or "—" for the leader themself. */
+  gapToLeader?: string;
   onClose: () => void;
   onRevertLap: (rider: RiderProps) => void;
   onStatusChange: (rider: RiderProps, status: RiderProps["status"]) => void;
@@ -14,6 +17,7 @@ interface Props {
 const RiderLiveModal: React.FC<Props> = ({
   rider,
   catColor,
+  gapToLeader,
   onClose,
   onRevertLap,
   onStatusChange,
@@ -49,6 +53,9 @@ const RiderLiveModal: React.FC<Props> = ({
                 {rider.category}
                 {rider.subCategory && <span className={styles.sub}> · {rider.subCategory}</span>}
               </span>
+              {rider.team && (
+                <span className={styles.club} dir="auto">🏳️ {rider.team}</span>
+              )}
             </div>
           </div>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
@@ -64,13 +71,19 @@ const RiderLiveModal: React.FC<Props> = ({
             <span className={styles.statLabel}>Position</span>
             <span className={styles.statVal}>P{rider.position_category ?? "—"}</span>
           </div>
+          {gapToLeader && (
+            <div className={styles.stat}>
+              <span className={styles.statLabel}>Gap</span>
+              <span className={styles.statVal}>{gapToLeader}</span>
+            </div>
+          )}
           <div className={styles.stat}>
             <span className={styles.statLabel}>Last lap</span>
             <span className={styles.statVal}>{rider.elapsedLastLap || "—"}</span>
           </div>
           <div className={styles.stat}>
             <span className={styles.statLabel}>Total</span>
-            <span className={styles.statVal}>{rider.elapsedTimeFromStart || "—"}</span>
+            <span className={styles.statVal}>{riderTotalTime(rider)}</span>
           </div>
           {isOut && (
             <div className={`${styles.stat} ${styles.statOut}`}>

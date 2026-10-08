@@ -2,10 +2,24 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
-import { CategoryProps, RiderProps } from "@/types/types";
+import { CategoryProps, RiderProps, RaceProps } from "@/types/types";
+import { assignCategoryColors } from "@/utils/colorAssignment";
 import categoryStorageAdapter from "./indexDb/categoryStorageAdapter";
 import { COLORS } from "@/constants/index";
 import useRiderStore from "./ridersStore";
+import { isRaceUuidFinalized } from "@/utils/raceLock";
+
+/**
+ * Hard guard for a FINALIZED race — the category twin of the rider guard in
+ * `ridersStore.ts`. See `utils/raceLock.ts` for why the lock is enforced down
+ * here and not only in the UI.
+ */
+function blockIfFinalized(cats: { raceUuid: string }[], action: string): boolean {
+  const locked = [...new Set(cats.map((c) => c.raceUuid))].filter(isRaceUuidFinalized);
+  if (locked.length === 0) return false;
+  console.warn(`Race ${locked.join(", ")} is finalized — ignored category ${action}.`);
+  return true;
+}
 
 interface CategoryState {
   categories: CategoryProps[];
@@ -14,6 +28,7 @@ interface CategoryState {
   rebuildCategoriesFromRiders: (raceUuid: string) => Promise<void>;
   updateRiderColor: (categoryName: string, color: string, raceUuid: string) => Promise<void>;
   updateCategory: (updatedCategory: CategoryProps) => void;
+  upsertCategories: (cats: CategoryProps[]) => Promise<void>;
 }
 
 const useCategoryStore = create<CategoryState>()(
@@ -51,16 +66,33 @@ const useCategoryStore = create<CategoryState>()(
         }
       },
 
+      // Deliberately NOT guarded for finalized races: this only ever runs when
+      // a race has zero categories, as a derive-from-riders recovery. Blocking
+      // it would leave a finalized race with nothing to group its results by.
       createCategoriesFromRiders: async (raceUuid) => {
         try {
           const normTime = (t: string | null | undefined): string | null => {
             if (!t) return null;
-            const m = t.match(/^(\d{1,2}):(\d{2})/);
-            return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;
+            const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (!m) return null;
+            const hhmm = `${m[1].padStart(2, "0")}:${m[2]}`;
+            // Keep non-zero seconds: 08:22:30 is its own start, not 08:22
+            return m[3] && m[3] !== "00" ? `${hhmm}:${m[3]}` : hhmm;
           };
 
           const db = await initIndexedDB();
           let riders: RiderProps[] = await db.getAll("riders");
+
+          // Remember the order categories first appear in the uploaded file (rider ids
+          // ascend with row order) before the name sort below discards it.
+          const fileOrder = new Map<string, number>();
+          [...riders]
+            .filter((rider) => rider.raceUuid === raceUuid && rider.category)
+            .sort((a, b) => a.id - b.id)
+            .forEach((rider) => {
+              const key = rider.subCategory ? `${rider.category}::${rider.subCategory}` : rider.category;
+              if (!fileOrder.has(key)) fileOrder.set(key, fileOrder.size);
+            });
 
           // Filter riders by raceUuid and sort them
           riders = riders
@@ -96,16 +128,39 @@ const useCategoryStore = create<CategoryState>()(
                 riders: 0, // ✅ Always initialize to 0
                 startTime: normTime(rider.timeStartRace),
                 isConnected: false,
-                color: COLORS[colorIndex].code, // ✅ Assign color from COLORS array
+                // Provisional — replaced below once every start time is known
+                color: COLORS[colorIndex].code,
                 heat: rider.heat || null,
+                importOrder: fileOrder.get(categoryKey),
                 status: "upcoming",
               };
             }
             categoryMap[categoryKey].riders = (categoryMap[categoryKey]?.riders ?? 0) + 1;
+          });
 
-            // ✅ Ensure riders get the correct color
-            riderUpdates.push({ ...rider, color: categoryMap[categoryKey].color });
+          // Colours are assigned only once ALL categories and their start times
+          // are known — waves that can be on course together must look distinct,
+          // which can't be decided while still discovering them (BUGS.md #6).
+          // Skipped when the organizer turned Auto color off for this race.
+          const race = (await db.getAll("races")).find(
+            (r: RaceProps) => r.uuid === raceUuid
+          );
+          if (race?.autoColor !== false) {
+            const palette = assignCategoryColors(Object.values(categoryMap));
+            for (const cat of Object.values(categoryMap)) {
+              const assigned = palette.get(`${cat.name}::${cat.subCategory ?? ""}`);
+              if (assigned) cat.color = assigned;
+            }
+          }
 
+          // ✅ Ensure riders get the correct color (after final assignment)
+          riders.forEach((rider) => {
+            if (!rider.category) return;
+            const categoryKey = rider.subCategory
+              ? `${rider.category}::${rider.subCategory}`
+              : rider.category;
+            const cat = categoryMap[categoryKey];
+            if (cat) riderUpdates.push({ ...rider, color: cat.color });
           });
 
           // ✅ Store updated categories in Zustand and IndexedDB
@@ -132,6 +187,7 @@ const useCategoryStore = create<CategoryState>()(
 
 
       rebuildCategoriesFromRiders: async (raceUuid) => {
+        if (blockIfFinalized([{ raceUuid }], "rebuild")) return;
         try {
           // Clear existing categories for this race from IDB
           const db = await initIndexedDB();
@@ -158,6 +214,7 @@ const useCategoryStore = create<CategoryState>()(
       },
 
       updateRiderColor: async (categoryName, color, raceUuid) => {
+        if (blockIfFinalized([{ raceUuid }], "recolour")) return;
         try {
           const db = await initIndexedDB();
           const tx = db.transaction("riders", "readwrite");
@@ -185,7 +242,39 @@ const useCategoryStore = create<CategoryState>()(
         }
       },
 
+      /**
+       * Write a batch of categories in ONE store set and ONE IDB transaction.
+       *
+       * Use this whenever a whole set of categories arrives at once (race
+       * download / import). Looping `updateCategory` instead opens a separate
+       * DB connection per category and, because it is async, callers that
+       * forget to await it navigate away while the writes are still in flight —
+       * the race screen then reads a half-written category list and shows no
+       * rider cards until the writes catch up.
+       */
+      upsertCategories: async (cats: CategoryProps[]) => {
+        if (cats.length === 0) return;
+        if (blockIfFinalized(cats, "upsert")) return;
+        set((state) => {
+          const byId = new Map(state.categories.map((c) => [c.id, c]));
+          for (const cat of cats) byId.set(cat.id, cat);
+          return { categories: [...byId.values()] };
+        });
+
+        try {
+          const db = await initIndexedDB();
+          const tx = db.transaction("categories", "readwrite");
+          const store = tx.objectStore("categories");
+          await Promise.all(cats.map((cat) => store.put(cat)));
+          await tx.done;
+          db.close();
+        } catch (error) {
+          console.error("Error upserting categories in IDB:", error);
+        }
+      },
+
       updateCategory: async (updatedCategory: CategoryProps) => {
+        if (blockIfFinalized([updatedCategory], "update")) return;
         try {
           const { categories } = get();
 

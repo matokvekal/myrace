@@ -1,7 +1,7 @@
 .versionBadge {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(30, 40, 55, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 8px;
@@ -12,5 +12,5 @@
 }
 
 .versionBadge:hover {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(30, 40, 55, 0.9);
 }

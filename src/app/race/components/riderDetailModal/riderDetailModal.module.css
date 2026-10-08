@@ -8,6 +8,7 @@
   justify-content: center;
   z-index: 200;
   padding: 0;
+  overflow-y: auto;
 }
 
 .modal {
@@ -16,6 +17,7 @@
   width: 100%;
   max-width: 540px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   padding-bottom: 32px;
   box-shadow: 0 -8px 40px rgba(17, 62, 126, 0.18);
@@ -62,6 +64,21 @@
   border-radius: 10px;
   padding: 6px 14px;
   cursor: pointer;
+}
+
+/* Takes the Edit button's place on a finalized race — same footprint so the
+   header doesn't jump between a live and a closed race. */
+.lockedTag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #a8761a;
+  background: #fffaf0;
+  border: 1px solid #f0e0bd;
+  border-radius: 10px;
+  padding: 6px 14px;
 }
 
 .editActions {
@@ -228,6 +245,33 @@
   font-size: 14px;
   font-weight: 600;
   color: #1a304f;
+}
+
+/* Reference-only imported columns (BUGS.md #A) */
+.extraGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.extraRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.extraKey {
+  color: #7a8aa8;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.extraVal {
+  color: #1a304f;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
 }
 
 /* Inputs */

@@ -1,65 +1,61 @@
 .inputContainer {
   position: relative;
-  margin-top: 1.25rem;
+  margin-top: 1.15rem;
   width: 100%;
 }
-/* --main-background: #f8f8fe;
-  --main-backgroundOld: #f5f5f5; */
+
 .label {
   position: absolute;
-  top: -0.4375rem;
-  left: 0.625rem;
-  background: linear-gradient(
-    to bottom,
-    var(#dadafa) 70%,
-    var(--Secondary-Purple-Shades-4) 40%
-  );
-  background: linear-gradient(to bottom, #f4fcfc 70%, rgba(84, 83, 227, 0.04) 40%); 
-  padding: 0 0.3125rem;
-  font-size: 0.75rem;
+  top: -0.45rem;
+  left: 0.7rem;
   z-index: 1;
-  color: gray;
+  padding: 0 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gx-blue, #6ec2f2);
+  background: var(--gx-card-2, #182253);
+  border-radius: 3px;
   transition: color 0.3s;
 }
 
 .typingLabel {
-  color: var(--primary-green);
-  background-color: var(--login-background);
+  color: var(--gx-amber, #f4a93c);
 }
 
 .input {
   width: 100%;
-  padding: 0.625rem;
-  padding-top: 1.125rem;
-  border: 2px solid var(--primary-green);
-  border-radius: 0.5rem;
-  outline: none;
-  font-size: 16px;
-  transition: border-color 0.3s;
-  background-color: var(--Secondary-Purple-Shades-4, 0.1);
-  caret-color: var(--primary-green);
-  padding-top: 1.125rem;
-  padding-bottom: 1.125rem;
   height: 3rem;
+  padding: 0.625rem 0.8rem;
+  font-size: 16px;
   line-height: 1.5rem;
+  color: var(--gx-text, #eef3ff);
+  background: rgba(7, 9, 26, 0.55);
+  border: 1px solid var(--gx-line, rgba(110, 194, 242, 0.16));
+  border-radius: 6px;
+  outline: none;
+  caret-color: var(--gx-amber, #f4a93c);
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.input.empty {
-  border: 1px solid var(--login-input-border);
-  color: gray;
+.input::placeholder {
+  color: var(--gx-dim, #94a5d2);
 }
 
-/* .input.typing {
-  border-color: #00bcd4;
-} */
+.input.typing {
+  border-color: var(--gx-blue, #6ec2f2);
+  box-shadow: 0 0 0 3px rgba(110, 194, 242, 0.18);
+}
 
 .input.error {
-  border: 1px solid var(--label-error);
-  color: var(--label-error);
+  border-color: #ff8080;
+  color: #ff9a9a;
 }
 
 .errorMessage {
-  color: var(--label-error);
-  font-size: 0.875rem;
-  margin-top: 0.3125rem;
+  color: #ff8080;
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
 }

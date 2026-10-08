@@ -4,8 +4,9 @@ import { useState } from "react";
 import type { RiderProps } from "@/types/types";
 import Images from "@/constants/Images";
 import useRiderStore from "@/stores/ridersStore";
+import { useRaceFinalized } from "@/utils/raceLock";
 import styles from "./riderDetailModal.module.css";
-import { X, Edit2, Save, XCircle, User } from "lucide-react";
+import { X, Edit2, Save, XCircle, User, Lock } from "lucide-react";
 
 interface Props {
   rider: RiderProps;
@@ -44,11 +45,20 @@ export default function RiderDetailModal({ rider, onClose }: Props) {
   });
 
   const updateRider = useRiderStore((s) => s.updateRider);
+  // The modal opens from Riders, Results and Standing alike, so it asks about
+  // the lock itself rather than making three callers remember to pass it down.
+  // Without this the Save button would look like it worked while the store
+  // silently dropped the write (utils/raceLock.ts).
+  const finalized = useRaceFinalized(rider.raceUuid);
 
   const avatar =
     rider.image?.startsWith("data:") || rider.image?.startsWith("http")
       ? rider.image
       : Images.user;
+
+  // A dead image URL must fall back to the placeholder icon, not the broken-image
+  // alt text (BUGS.md #5).
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const set = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -84,7 +94,11 @@ export default function RiderDetailModal({ rider, onClose }: Props) {
           <button className={styles.closeBtn} onClick={onClose}>
             <X size={18} />
           </button>
-          {!editMode ? (
+          {finalized ? (
+            <span className={styles.lockedTag} data-testid="rider-modal-locked">
+              <Lock size={13} /> Final
+            </span>
+          ) : !editMode ? (
             <button className={styles.editBtn} onClick={() => setEditMode(true)}>
               <Edit2 size={14} /> Edit
             </button>
@@ -103,8 +117,13 @@ export default function RiderDetailModal({ rider, onClose }: Props) {
         {/* Avatar + identity */}
         <div className={styles.hero}>
           <div className={styles.avatarWrap}>
-            {rider.image ? (
-              <img src={avatar} alt="rider" className={styles.avatar} />
+            {rider.image && !avatarFailed ? (
+              <img
+                src={avatar}
+                alt=""
+                className={styles.avatar}
+                onError={() => setAvatarFailed(true)}
+              />
             ) : (
               <div className={styles.avatarPlaceholder}>
                 <User size={34} color="#aac0df" />
@@ -149,10 +168,16 @@ export default function RiderDetailModal({ rider, onClose }: Props) {
           <Field label="Category" editMode={editMode}
             view={<span>{rider.category}{rider.subCategory ? ` · ${rider.subCategory}` : ""}</span>}
             edit={
-              <div className={styles.twoCol}>
+              // Sub-category is legacy — only editable on riders that already
+              // have one. New races use one flat category per age band (BUGS.md #2).
+              rider.subCategory ? (
+                <div className={styles.twoCol}>
+                  <input className={styles.input} value={form.category} onChange={e => set("category", e.target.value)} placeholder="Category" />
+                  <input className={styles.input} value={form.subCategory} onChange={e => set("subCategory", e.target.value)} placeholder="Sub-category" />
+                </div>
+              ) : (
                 <input className={styles.input} value={form.category} onChange={e => set("category", e.target.value)} placeholder="Category" />
-                <input className={styles.input} value={form.subCategory} onChange={e => set("subCategory", e.target.value)} placeholder="Sub-category" />
-              </div>
+              )
             }
           />
 
@@ -197,6 +222,16 @@ export default function RiderDetailModal({ rider, onClose }: Props) {
             />
           )}
 
+          {rider.uciNumber && (
+            <Field label="UCI Number" editMode={false}
+              view={<span dir="auto">{rider.uciNumber}</span>} edit={null} />
+          )}
+
+          {rider.uciPoints != null && (
+            <Field label="UCI Points" editMode={false}
+              view={<span>{rider.uciPoints}</span>} edit={null} />
+          )}
+
           {(rider.position_start != null || rider.position_category > 0) && (
             <Field label="Position" editMode={false}
               view={<span>{rider.raceStatus === "upcoming" ? `Start: ${rider.position_start ?? "—"}` : `Cat: ${rider.position_category}`}</span>}
@@ -211,6 +246,21 @@ export default function RiderDetailModal({ rider, onClose }: Props) {
                 ? <textarea className={`${styles.input} ${styles.textarea}`} value={form.comment} onChange={e => set("comment", e.target.value)} rows={2} />
                 : <div className={styles.fieldValue}>{rider.comment || "—"}</div>
               }
+            </div>
+          )}
+
+          {/* Reference-only imported columns — shown but not used (BUGS.md #A) */}
+          {rider.extraFields && Object.keys(rider.extraFields).length > 0 && (
+            <div className={styles.fieldFull}>
+              <div className={styles.fieldLabel}>More info</div>
+              <div className={styles.extraGrid}>
+                {Object.entries(rider.extraFields).map(([label, value]) => (
+                  <div key={label} className={styles.extraRow}>
+                    <span className={styles.extraKey}>{label}</span>
+                    <span className={styles.extraVal} dir="auto">{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

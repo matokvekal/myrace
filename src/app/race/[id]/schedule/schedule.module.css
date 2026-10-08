@@ -12,31 +12,49 @@
   font-size: 14px;
 }
 
-/* Wave block */
+/* ── Wave block: ONE clear unit — navy frame, tinted body; the inner
+   start cards float inside it so the parent/child nesting is obvious ── */
 .wave {
-  background: linear-gradient(160deg, var(--bg-card), var(--bg-card-2));
+  background: linear-gradient(170deg, #eef4fc, #e2ecf9);
   border-radius: 16px;
-  border: 1px solid var(--border-card);
+  border: 4px solid #16305e;
   overflow: hidden;
-  box-shadow: 0 12px 20px var(--shadow-sm);
+  box-shadow: 0 12px 20px rgba(20, 40, 80, 0.12);
 }
 
-/* ── Dark navy wave header — intentional race-official design, kept hardcoded ── */
+/* ── Dark navy wave header with gold trim — matches the leaderboard kit ── */
 .waveHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: linear-gradient(140deg, #1f3558, #162640);
+  background: linear-gradient(90deg, #1d3d78, #122a54);
+  border-bottom: 2px solid #e0a92c;
   color: #fff;
+  position: relative;
+}
+
+/* Faint checkered-flag band at the right edge of every wave header */
+.waveHeader::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.9) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px;
+  opacity: 0.1;
+  pointer-events: none;
 }
 
 .waveLabel {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 900;
+  font-style: italic;
   color: #00FF7F;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
 }
 
 .waveTime {
@@ -50,24 +68,71 @@
   min-height: 32px;
 }
 
-/* Start group */
-.startGroup {
-  border-top: 3px solid var(--text-primary);
-  background: var(--bg-card);
+/* ── Started / finished waves "shine" ──────────────────────────────
+   A wave that has started or finished is locked; a moving sheen +
+   colored edge glow flags it. Green = started, gold = finished. */
+.waveHeader[data-wave-lock] {
+  position: relative;
+  overflow: hidden;
 }
 
-/* ── Light yellow race-flag start header ── */
+.waveHeader[data-wave-lock="running"] {
+  --shine: rgba(62, 221, 164, 0.45);
+  box-shadow: inset 4px 0 0 #3edda4, 0 0 16px rgba(62, 221, 164, 0.28);
+}
+
+.waveHeader[data-wave-lock="finished"] {
+  --shine: rgba(255, 207, 64, 0.55);
+  box-shadow: inset 4px 0 0 #ffcf40, 0 0 16px rgba(255, 207, 64, 0.32);
+}
+
+.waveHeader[data-wave-lock]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, var(--shine, rgba(255, 255, 255, 0.3)), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: waveShine 3.8s ease-in-out infinite;
+}
+
+@keyframes waveShine {
+  0% { left: -60%; }
+  55%, 100% { left: 160%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveHeader[data-wave-lock]::after { animation: none; }
+}
+
+/* Start group: an inset card INSIDE the wave — clearly a child of the wave */
+.startGroup {
+  margin: 10px;
+  border: 1.5px solid #9dbbe0;
+  border-left: 4px solid #e0a92c;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-card);
+  box-shadow: 0 3px 10px rgba(20, 40, 80, 0.12);
+}
+
+/* ── Medium blue start header: the middle tier between the navy wave
+   header and the white category rows — clear 3-level hierarchy ── */
 .startHeader {
   padding: 12px 14px;
   font-size: 13px;
   font-weight: 900;
-  color: #1f3558;
-  background: linear-gradient(135deg, #ffd95c, #ffca42);
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(135deg, #4a80cc, #31609f);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 3px solid #e6b840;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
+  border-bottom: 2px solid #e0a92c;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -75,19 +140,68 @@
   transition: background 0.2s ease;
 }
 
-/* ── Lighter yellow when wave is running ── */
+/* ── Green while the wave is running ── */
 .startHeader[data-wave-running="true"] {
-  background: linear-gradient(135deg, #fffae6, #fff9d9);
-  border-bottom-color: #f0e6c0;
-  color: #5a4a2a;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(135deg, #2fa96e, #1f8653);
+  border-bottom-color: #7ce83c;
+  color: #fff;
+}
+
+/* ── Started / finished start-group "shine" (green / gold edge + sheen) ── */
+.startHeader[data-wave-lock] {
+  position: relative;
+  overflow: hidden;
+}
+
+.startHeader[data-wave-lock="running"] {
+  --shine: rgba(62, 221, 164, 0.5);
+  box-shadow: inset 4px 0 0 #24a877, inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.startHeader[data-wave-lock="finished"] {
+  --shine: rgba(240, 160, 20, 0.5);
+  box-shadow: inset 4px 0 0 #c8860a, inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.startHeader[data-wave-lock]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, var(--shine, rgba(255, 255, 255, 0.3)), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: waveShine 3.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startHeader[data-wave-lock]::after { animation: none; }
 }
 
 .startInfo {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+/* Slanted white "START N" plate — like a timing-tower P-plate */
+.startLabel {
+  background: #fff;
+  color: #10315e;
+  font-size: 12px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  padding: 5px 14px;
+  border-radius: 6px;
+  transform: skewX(-8deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
 }
 
 .startActions {
@@ -96,14 +210,50 @@
   flex-shrink: 0;
 }
 
-/* Start time in yellow header: deep orange contrast color, kept */
+/* Small pulsing LIVE chip next to the start clock */
+.liveChipBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff5252, #d92b2b);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(255, 60, 60, 0.5);
+  animation: liveChipPulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.liveChipBtn:active {
+  transform: scale(0.94);
+}
+
+@keyframes liveChipPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 60, 60, 0.55); }
+  50% { box-shadow: 0 0 3px rgba(255, 60, 60, 0.25); }
+}
+
+/* Start time: race-clock plate — dark panel, green digits, gold frame */
 .startTime {
   font-weight: 900;
   text-transform: none;
-  letter-spacing: 0.05em;
-  font-size: 18px;
-  color: #d84315;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.08em;
+  font-size: 17px;
+  color: #7ce83c;
+  font-variant-numeric: tabular-nums;
+  font-family: "Courier New", monospace;
+  background: #10151f;
+  border: 1px solid #e0a92c;
+  border-radius: 6px;
+  padding: 3px 10px;
+  text-shadow: 0 0 8px rgba(124, 232, 60, 0.5);
 }
 
 /* Category row */
@@ -115,12 +265,14 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Category color dot: injected via inline style from data model */
+/* Category color bar: injected via inline style from data model —
+   tall bar instead of a small dot so the category colour really shows */
 .colorDot {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 26px;
   border-radius: 3px;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .catInfo {
@@ -132,8 +284,8 @@
 }
 
 .catName {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -143,6 +295,56 @@
 .catMeta {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* Per-category laps stepper; red when laps are still 0 so it needs setting */
+.lapsEditor {
+  display: inline-flex;
+  /* .catInfo is a column flex box: without this the pill stretches the full row */
+  align-self: flex-start;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  vertical-align: middle;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+.lapsMissing {
+  background: #e53935;
+  color: #fff;
+}
+
+.lapsBtn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lapsEditing {
+  padding: 0 3px;
+}
+
+.lapsValue {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.lapsEditing .lapsValue {
+  min-width: 38px;
 }
 
 .statusBadge {
@@ -183,15 +385,18 @@
   margin-right: 8px;
 }
 
-/* Start stat: intentional orange timing accent, kept */
+/* Finishers chip: sits at the right end of the header row */
 .startStat {
   font-size: 13px;
-  font-weight: 700;
-  color: #f57c00;
-  background: rgba(255, 193, 7, 0.18);
-  padding: 2px 7px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 2px 9px;
   border-radius: 8px;
-  margin-left: 8px;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Lap progress bar */
@@ -209,7 +414,7 @@
 }
 
 .lapSegmentDone {
-  background: var(--brand-strong);
+  background: #e0a92c;
 }
 
 /* Inline standings */
@@ -560,7 +765,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: linear-gradient(140deg, #1f3558, #162640);
+  background: linear-gradient(140deg, #1d3d78, #122a54);
   color: #fff;
   gap: 12px;
 }
@@ -609,6 +814,31 @@
   gap: 8px;
 }
 
+.nudgeBtn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  min-width: 34px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  transition: all 0.2s;
+}
+
+.nudgeBtn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.nudgeBtn:active {
+  transform: scale(0.94);
+}
+
 .timeInput {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -653,14 +883,14 @@
   overflow: hidden;
 }
 
-/* Light yellow race-flag slot header */
+/* Light blue slot header, gold trim (matches start headers) */
 .slotHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(135deg, #ffd95c, #ffca42);
-  border-bottom: 2px solid #e6b840;
+  background: linear-gradient(135deg, #e3f0ff, #c9e0fa);
+  border-bottom: 2px solid #e0a92c;
 }
 
 .slotLabel {
@@ -845,7 +1075,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: linear-gradient(140deg, #1f3558, #162640);
+  background: linear-gradient(140deg, #1d3d78, #122a54);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
@@ -872,11 +1102,54 @@
   gap: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, #1f3558, #162640);
+  background: linear-gradient(135deg, #1d3d78, #122a54);
 }
 
 .waveTimeRow:last-child {
   border-bottom: none;
+}
+
+/* Locked (started / finished) wave rows in the editor */
+.waveTimeRow[data-wave-lock="running"] {
+  box-shadow: inset 4px 0 0 #3edda4;
+}
+
+.waveTimeRow[data-wave-lock="finished"] {
+  box-shadow: inset 4px 0 0 #ffcf40;
+}
+
+.nudgeBtn:disabled,
+.timeInput:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.nudgeBtn:disabled:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.lockTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.lockTag[data-wave-lock="running"] {
+  color: #3edda4;
+  background: rgba(62, 221, 164, 0.16);
+}
+
+.lockTag[data-wave-lock="finished"] {
+  color: #ffcf40;
+  background: rgba(255, 207, 64, 0.18);
 }
 
 .categoryAssignSection {

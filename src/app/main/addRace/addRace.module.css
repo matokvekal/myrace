@@ -97,6 +97,63 @@
   flex-direction: column;
   gap: 4px;
 }
+
+/* ── Race type selector ── */
+.raceTypeField {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.raceTypeLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(41, 48, 66, 0.7);
+  margin-bottom: 6px;
+}
+
+.raceTypeOptions {
+  display: flex;
+  gap: 8px;
+}
+
+.raceTypeBtn {
+  position: relative;
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-color: rgb(246, 248, 250);
+  color: rgba(41, 48, 66, 0.85);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.raceTypeBtnActive {
+  border-color: #4f90ea;
+  background-color: rgba(79, 144, 234, 0.12);
+  color: #2b5da8;
+}
+
+.raceTypeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.raceTypeSoon {
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(201, 147, 15, 0.18);
+  color: #a8760a;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
 .fileUpload {
   width: 100%;
   text-align: center;
@@ -107,6 +164,42 @@
   font-size: 14px;
   color: #4f8fe8;
   cursor: pointer;
+}
+
+.autoColorRow {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.autoColorRow input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.autoColorText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.autoColorText strong {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}
+
+.autoColorText small {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #777;
 }
 
 .fileName {

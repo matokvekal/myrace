@@ -10,12 +10,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </BrowserRouter>
 )
 
-// Register the service worker (needed for installability + offline).
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const swUrl = `${import.meta.env.BASE_URL}sw.js`
-    navigator.serviceWorker.register(swUrl).catch((err) => {
-      console.warn('Service worker registration failed:', err)
-    })
-  })
-}
+// The service worker is registered in useServiceWorkerUpdate (mounted via
+// <UpdatePrompt/>) so registration and update-detection live in one place.

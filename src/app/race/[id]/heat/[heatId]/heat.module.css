@@ -1,10 +1,35 @@
 .heat {
   display: flex;
   flex-direction: column;
-  font-family: Arial, sans-serif;
-  background-color: var(--bg-body);
+  font-family: var(--font-sans);
+  /* Live backdrop: faint diagonal speed-lines + colour glows on a bright base */
+  background:
+    repeating-linear-gradient(115deg, rgba(22, 48, 94, 0.035) 0 2px, transparent 2px 28px),
+    radial-gradient(900px 480px at 85% -10%, rgba(52, 161, 255, 0.22), transparent 60%),
+    radial-gradient(700px 420px at -10% 35%, rgba(124, 232, 60, 0.16), transparent 60%),
+    radial-gradient(800px 500px at 50% 110%, rgba(255, 166, 61, 0.13), transparent 60%),
+    linear-gradient(180deg, #eef5fd 0%, #dfeaf7 100%);
   height: 100vh;
   overflow: hidden;
+}
+
+/* ═══ PRO skin: arcade-floor backdrop ═══
+   Bigger, more saturated colour blooms pulled straight from the card palette
+   (gold #e0a92c, purple #9b5de5, pink) plus the same conic "sparkle" texture
+   the rider/joker cards use, so the whole screen reads as one game world
+   instead of plain cards floating on a plain page. Kept static (no drifting
+   animation) — the page already repaints every second for the clock and
+   every rider tick, and a full-screen animated gradient on top of that is
+   real repaint cost on a phone like the reported Galaxy A41. */
+:root[data-skin="gaming"] .heat {
+  background:
+    repeating-linear-gradient(115deg, rgba(224, 169, 44, 0.1) 0 2px, transparent 2px 24px),
+    repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0% 25%, transparent 0% 50%),
+    radial-gradient(900px 520px at 88% -12%, rgba(155, 93, 229, 0.38), transparent 62%),
+    radial-gradient(760px 460px at -12% 30%, rgba(224, 169, 44, 0.32), transparent 62%),
+    radial-gradient(820px 520px at 50% 118%, rgba(255, 105, 180, 0.26), transparent 62%),
+    linear-gradient(180deg, #fdf3ff 0%, #f3e6ff 45%, #ffe9c2 100%);
+  background-size: auto, 14px 14px, auto, auto, auto, auto;
 }
 
 .wrapper {
@@ -24,15 +49,245 @@
   min-height: 0;
 }
 
-/* ── Search wrapper (under timer, centered, narrow) ── */
+/* ── Control panel: clock, wave info, Joker and bib search grouped into one
+   elevated "console" card so they read as a single distinct zone — clearly
+   separate from the dark header above and the open card grid below, instead
+   of controls floating loose on the busy racing background. ── */
+.controlPanel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 2px 6px 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Search wrapper (under timer). Search input stays centered; the Joker
+   button (when enabled) pins to the left on the same row. ── */
 .searchWrapper {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Thin divider between the clock row and the search row inside the panel —
+   a quiet visual break instead of the two rows just running together. */
+.controlPanel .searchWrapper {
+  border-top: 1px solid var(--border-soft, rgba(20, 40, 80, 0.1));
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+.searchWrapperLeft {
   display: flex;
-  justify-content: center;
-  margin-bottom: 4px;
+  justify-content: flex-start;
+}
+
+.searchWrapperRight {
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 14px;
+  min-width: 0;
+}
+
+/* Wave-switch dropdown, mirrored on the right of the search box (Joker sits
+   left). Lets the commissaire jump to another wave without leaving Live. A
+   quiet "Wave" label + status dot + chevron inside a thin-bordered pill, so
+   it reads as its own dropdown control (not a second bold action button)
+   while still being clearly tappable next to the bib-search "plate". */
+.waveSwitcher {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  max-width: 168px;
+  padding: 0 26px 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-card, rgba(20, 40, 80, 0.18));
+  background: var(--bg-card, #fff);
+  box-shadow: 0 1px 3px rgba(20, 40, 80, 0.08);
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.waveSwitcher:hover,
+.waveSwitcher:focus-within {
+  border-color: #63a6fc;
+  color: var(--text-primary, #16305e);
+}
+
+.waveSwitcherLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: inherit;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.waveSwitcherDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #9aa5b8;
+}
+
+.waveSwitcherDotRunning {
+  background: #3edda4;
+  box-shadow: 0 0 0 3px rgba(62, 221, 164, 0.2);
+}
+
+.waveSwitcherDotFinished {
+  background: #9aa5b8;
+}
+
+/* The one visible piece of text for the current wave — e.g. "3". The native
+   <select> underneath is fully transparent (see below) so its own rendered
+   value never shows through and doubles up with this. */
+.waveSwitcherValue {
+  font-size: 12px;
+  font-weight: 700;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Invisible click/tap target covering the whole pill — opens the native wave
+   picker on tap, but never paints its own text (that's .waveSwitcherValue's
+   job) so nothing overlaps. */
+.waveSwitcherSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.waveSwitcherSelect:focus {
+  outline: none;
+}
+
+.waveSwitcherChevron {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: inherit;
+  opacity: 0.7;
 }
 
 .searchWrapper .inputContainer {
   width: 160px;
+  justify-self: center;
+}
+
+.jokerBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #7846d2;
+  background: #fff;
+  color: #7846d2;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(20, 40, 80, 0.12);
+}
+
+.jokerBtn:active {
+  transform: scale(0.92);
+}
+
+.jokerBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #7846d2;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ═══ PRO skin: Joker button becomes a glowing arcade beacon — 200% the
+   classic width but only 120% the height (a pill, not a giant circle),
+   gold-ringed, breathing glow so it reads as "tap me now" in the middle
+   of a busy wave instead of a plain grey circle. ═══ */
+:root[data-skin="gaming"] .jokerBtn {
+  width: 88px;
+  height: 53px;
+  border-radius: 26px;
+  border: 3px solid #e0a92c;
+  background:
+    radial-gradient(60% 60% at 35% 28%, rgba(255, 255, 255, 0.4), transparent 60%),
+    linear-gradient(145deg, #9b5de5, #5b2fa8 55%, #3a1f6e);
+  color: #ffe9a8;
+  box-shadow:
+    0 0 0 4px rgba(224, 169, 44, 0.18),
+    0 6px 0 rgba(0, 0, 0, 0.28),
+    0 10px 18px rgba(91, 47, 168, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  animation: jokerBeacon 1.8s ease-in-out infinite;
+}
+
+:root[data-skin="gaming"] .jokerBtn svg {
+  width: 28px;
+  height: 28px;
+}
+
+:root[data-skin="gaming"] .jokerBtn:active {
+  transform: translateY(3px) scale(0.96);
+  animation-play-state: paused;
+  box-shadow:
+    0 0 0 4px rgba(224, 169, 44, 0.18),
+    0 2px 0 rgba(0, 0, 0, 0.28),
+    0 4px 10px rgba(91, 47, 168, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+@keyframes jokerBeacon {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px rgba(224, 169, 44, 0.18),
+      0 6px 0 rgba(0, 0, 0, 0.28),
+      0 10px 18px rgba(91, 47, 168, 0.45),
+      inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(224, 169, 44, 0.05),
+      0 6px 0 rgba(0, 0, 0, 0.28),
+      0 10px 26px rgba(155, 93, 229, 0.65),
+      inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  }
+}
+
+:root[data-skin="gaming"] .jokerBadge {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  top: -6px;
+  right: -6px;
+  font-size: 13px;
+  line-height: 22px;
+  border: 2px solid #ffe9a8;
 }
 
 .inputContainer {
@@ -40,19 +295,23 @@
   width: 100%;
 }
 
+/* Bib search: looks like a number plate */
 .searchInput {
   width: 100%;
   padding: 8px 36px 8px 12px;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
   letter-spacing: 4px;
   text-align: center;
-  border-radius: 8px;
+  border-radius: 10px;
   box-sizing: border-box;
   height: 48px;
-  border: 2px solid var(--border-card);
-  background: var(--bg-card);
-  color: var(--text-primary);
+  border: 2px solid #16305e;
+  background: #fff;
+  color: #10315e;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgba(20, 40, 80, 0.12);
   transition: border-color 0.15s ease;
 }
 
@@ -81,49 +340,260 @@
   width: 100%;
 }
 
+/* Fastest / average lap — inline chips sitting in the .info bar, between the
+   green "Racing" band and the Filter button. No extra row height. */
+.lapStatsInline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+}
+
+/* 2-row chip (label over value): taller, narrower than the old side-by-side
+   layout, matching the Racing/Filter buttons' height instead of stretching
+   wide and pushing Filter to the screen edge on narrow phones. Same light
+   pill treatment as the original (fully-rounded, thin border, no shadow) —
+   just stacked instead of single-row, not restyled into a heavier button. */
+.lapStatChip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 50px;
+  padding: 3px var(--sp-2);
+  border-radius: 999px;
+  color: var(--text-primary);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.35));
+  border: 1px solid var(--border-soft, rgba(20, 40, 80, 0.12));
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.lapStatChipLabel {
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.lapStatChipValue {
+  font-size: 13px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* New wave-fastest-lap: gold shimmer pulse, same trophy-case feel as the
+   LiveBoard podium row (liveBoard.module.css .rowP1). */
+.lapStatPulse {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 215, 0, 0.22) 20%,
+    rgba(255, 235, 130, 0.5) 50%,
+    rgba(255, 215, 0, 0.22) 80%
+  );
+  background-size: 250% 100%;
+  border-color: #ffd700;
+  animation: goldShimmerPulse 1200ms linear;
+}
+
+@keyframes goldShimmerPulse {
+  0% { background-position: 125% 0; }
+  100% { background-position: -125% 0; }
+}
+
 .riderGrid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
+/* Tablet/laptop (≥900px): pack cards explicitly rather than leaving density to
+   whatever flex-wrap happens to fit — same 76px card, just guaranteed several
+   per row instead of it being incidental. Cards do NOT get bigger here. */
+@media (min-width: 900px) {
+  .riderGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 76px);
+    justify-content: start;
+    gap: 10px;
+  }
+}
+
+/* Section bands: glossy game bands — green for racing, navy for finished */
 .active, .finishers {
   margin-top: 5px;
   font-size: 12px;
-  font-weight: bold;
-  color: var(--text-secondary);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  padding: 6px 14px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(135deg, #2fa96e, #1f8653);
+}
+
+.finishers {
+  align-self: flex-start;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(135deg, #1d3d78, #122a54);
 }
 
 .ridersWrapper {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 6px;
+  gap: 21px;
+  margin-top: 5px;
   flex: 1;
   overflow-y: auto;
   min-height: 0;
 }
 
-/* ── Timer row + wave info button ── */
-.timerRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  height: 60px;
+/* Sections (band + grid) fade up on entry. Deliberately applied to the
+   section containers only — never to the rider cards themselves, so the
+   one-shot clickFlash feedback animation can never be overridden. */
+.ridersWrapper > * {
+  animation: sectionRise var(--beat-3) ease-out backwards;
 }
 
+.ridersWrapper > *:nth-child(2) {
+  animation-delay: var(--stagger);
+}
+
+.ridersWrapper > *:nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+.ridersWrapper > *:nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+@keyframes sectionRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Timer row + wave info button ── */
+/* Grid, not centered-flex-with-absolute-overlay: the wave chip used to be
+   position:absolute right:0 and floated ON TOP of the centered clock, hiding the
+   seconds on narrow phones (BUGS.md #15). Three columns keep the clock centred
+   in the middle while the chip reserves its own space and can never overlap.
+   Column 1 has an explicit 50px floor: with plain "1fr 1fr", the wave-info
+   chip's own min-content width wins the fight for space and squeezes column 1
+   down far below half — on phones under ~460px that let the fixed rider-log
+   icon (sits at left:16, 44px wide) sit right under the clock. The floor
+   guarantees the icon's column always has room, independent of chip content. */
+.timerRow {
+  display: grid;
+  grid-template-columns: minmax(50px, 1fr) auto 1fr;
+  align-items: center;
+  gap: 6px;
+  height: 60px;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+/* Left column of the timer row: the rider-log toggle. The negative margin
+   cancels .timerRow's own 8px padding so the button lines up with the Joker
+   button in the search row below it (both at the wrapper's 16px edge). */
+.logSlot {
+  grid-column: 1;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  margin-left: -8px;
+}
+
+/* Hero race clock: dark plate, gold frame, glowing green digits */
 .timerText {
-  font-size: 20px;
-  font-weight: bold;
-  letter-spacing: 10px;
+  grid-column: 2;
+  justify-self: center;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 6px;
   margin: 0;
-  color: var(--text-primary);
+  white-space: nowrap;
+  font-family: "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  color: #7ce83c;
+  background: #10151f;
+  border: 2px solid #e0a92c;
+  border-radius: 10px;
+  padding: 7px 22px;
+  text-shadow: 0 0 10px rgba(124, 232, 60, 0.5);
+  box-shadow: 0 3px 10px rgba(10, 16, 30, 0.3);
+  /* Heartbeat: the glow breathes once every φ seconds — the screen feels alive */
+  animation: timerHeartbeat 1618ms ease-in-out infinite;
+}
+
+@keyframes timerHeartbeat {
+  0%,
+  100% {
+    text-shadow: 0 0 10px rgba(124, 232, 60, 0.5);
+  }
+  50% {
+    text-shadow:
+      0 0 16px rgba(124, 232, 60, 0.85),
+      0 0 32px rgba(124, 232, 60, 0.3);
+  }
+}
+
+/* PRO skin: real chronometer — chrome/gold bevel + a physical crown/button
+   knob on top (the push-button on an actual stopwatch), deeper drop shadow
+   so the plate reads as a solid object instead of a flat colour swatch. */
+:root[data-skin="gaming"] .timerText {
+  position: relative;
+  font-size: 32px;
+  letter-spacing: 8px;
+  padding: 9px 26px;
+  border-width: 3px;
+  border-style: solid;
+  border-color: #e0a92c;
+  border-image: linear-gradient(160deg, #fff6d8, #e0a92c 35%, #8a5c10 60%, #e0a92c 85%, #fff6d8) 1;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+    #0b0f17;
+  color: #8dff4a;
+  text-shadow: 0 0 14px rgba(124, 232, 60, 0.75), 0 0 3px rgba(124, 232, 60, 0.9);
+  box-shadow:
+    0 0 18px rgba(124, 232, 60, 0.22),
+    inset 0 0 12px rgba(0, 0, 0, 0.6),
+    inset 0 2px 0 rgba(255, 255, 255, 0.25),
+    0 4px 0 rgba(0, 0, 0, 0.35),
+    0 9px 18px rgba(10, 16, 30, 0.5);
+}
+
+/* The crown: a real stopwatch's top push-button */
+:root[data-skin="gaming"] .timerText::before {
+  content: "";
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 10px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #fff6d8, #e0a92c 55%, #8a5c10);
+  border: 2px solid #8a5c10;
+  border-bottom: none;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .waveInfoBtn {
-  position: absolute;
-  right: 0;
+  grid-column: 3;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -139,11 +609,95 @@
   background: var(--bg-surface);
 }
 
+.waveInfoLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
 .miniDot {
   width: 10px;
   height: 10px;
   border-radius: 5px;
   display: inline-block;
+}
+
+/* Narrow phones: shrink the clock's spacing and trim the chip so the full
+   time (incl. seconds) always fits next to the wave chip (BUGS.md #15).
+   430px covers common 412/393/390-wide Android/iPhone devices (e.g. Galaxy
+   A41 @ 412px CSS width) — 380px alone missed that whole bucket, leaving the
+   clock full-size and crowding it against the rider-log icon. Sized to ~85%
+   of the base clock. */
+@media (max-width: 430px) {
+  .timerText {
+    font-size: 22px;
+    letter-spacing: 5px;
+    padding: 6px 19px;
+  }
+  .waveInfoBtn {
+    padding: 5px 7px;
+  }
+  /* The colour dots are decorative — drop them before the clock loses digits. */
+  .waveInfoBtn .miniDot {
+    display: none;
+  }
+  .waveSwitcher {
+    max-width: 72px;
+    height: 30px;
+    padding-left: 8px;
+    padding-right: 22px;
+  }
+  /* "Wave" text label is redundant once the pill is this narrow — the dot +
+     number still say enough. */
+  .waveSwitcherLabel {
+    display: none;
+  }
+  .waveSwitcherValue {
+    font-size: 11px;
+  }
+}
+
+/* ── Clear board (BUGS.md #14) — trigger lives in VoiceSettingsModal
+   (Live Settings); this confirm dialog stays on the Heat page. ── */
+.clearConfirmText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.clearConfirmActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.clearCancelBtn,
+.clearConfirmBtn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border-card);
+}
+
+.clearCancelBtn {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.clearConfirmBtn {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+.clearConfirmBtn:hover {
+  background: #a93226;
 }
 
 /* ── Wave info modal ── */
@@ -294,29 +848,57 @@
 /* ── Filter icon button in info row ── */
 .filterIconBtn {
   font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border-card);
-  background: var(--bg-card);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(224, 169, 44, 0.55);
+  background: linear-gradient(180deg, #34a1ff 0%, #0b5ecc 100%);
+  filter: saturate(0.5) brightness(0.9);
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .filterIconBtn:hover {
-  background: var(--bg-surface);
+  filter: saturate(1) brightness(1);
 }
 
-/* Active: invert for contrast */
+/* Active filter: full-brightness casino blue with gold glow */
 .filterIconActive {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
-  color: var(--bg-card);
+  filter: none;
+  border-color: #e0a92c;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 10px rgba(255, 200, 80, 0.45);
 }
 
 .filterActive {
   font-size: 10px;
   opacity: 0.7;
+}
+
+/* Count of riders still on the track after their race ended */
+.onTrackTotal {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: #f5a623;
+  color: #3a2600;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  animation: onTrackTotalPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes onTrackTotalPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 /* ── Filter panel (checkbox popup) ── */
@@ -389,6 +971,47 @@
   border-radius: 8px;
 }
 
+/* Not-started categories: greyed out, at the end of the list, not selectable
+   — you can only filter to categories that have started (BUGS.md #R3). */
+.filterRowNotStarted,
+.filterRowNotStarted:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.filterRowNotStarted input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.filterRowFinished {
+  opacity: 0.8;
+}
+
+.filterStatusTag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.filterStatusTagDone {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #2f8a63;
+  background: rgba(62, 221, 164, 0.15);
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
 /* ── Search clear button ── */
 .clearSearch {
   position: absolute;
@@ -424,6 +1047,15 @@
   align-items: flex-end;
 }
 
+/* Always a row — even when .controlRow stacks to a column on narrow phones,
+   the mic and voice-buffer buttons stay side by side as a matched pair. */
+.micRow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+}
+
 .numbersContainer {
   width: 160px;
   height: 56px;
@@ -455,6 +1087,114 @@
 
 .micButtonRadar:active {
   transform: scale(0.95);
+}
+
+/* ── Voice buffer toggle + panel ──
+   Every bib the mic recognizes lands here (assist mode's only output; active
+   mode logs it too, alongside the real record). Same black/yellow palette as
+   the voice debug panel below, so it reads as part of the same "raw voice
+   data" family rather than a new visual language. Sized to match the mic
+   button (56px) so the two sit side by side as a matched pair, not a
+   primary/secondary mismatch. */
+.voiceLogBtn {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid var(--border-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-soft);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.voiceLogBtn:hover {
+  background: var(--bg-surface);
+  border-color: var(--text-secondary);
+}
+
+.voiceLogBtn:active {
+  transform: scale(0.95);
+}
+
+.voiceLogBtnActive {
+  background: #0ea5e9;
+  border-color: #0284c7;
+  color: #fff;
+}
+
+.voiceLogBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: #facc15;
+  color: #1a1400;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+}
+
+/* Panel: right side of the screen, newest entry on top. Width picked as a
+   starting point — tell me if it needs to be wider/narrower once you see it
+   on a real phone. */
+.voiceLogPanel {
+  position: fixed;
+  top: 70px;
+  right: 8px;
+  bottom: 96px;
+  width: 130px;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 10px;
+  padding: 8px;
+  overflow-y: auto;
+  z-index: 150;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.voiceLogPanelTitle {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #facc15;
+  border-bottom: 1px solid rgba(250, 204, 21, 0.25);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.voiceLogEmpty {
+  font-size: 11px;
+  color: rgba(250, 204, 21, 0.5);
+  padding: 4px 0;
+}
+
+.voiceLogRow {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.voiceLogBib {
+  font-size: 13px;
+  font-weight: 800;
+  color: #facc15;
+}
+
+.voiceLogTime {
+  font-size: 10px;
+  color: rgba(250, 204, 21, 0.7);
 }
 
 /* ── Voice debug panel ── */

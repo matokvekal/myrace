@@ -1,0 +1,69 @@
+.topbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.1rem 1.5rem 0;
+}
+
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.cube {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55));
+  transition: transform var(--beat-2) ease;
+}
+
+.lockup:hover .cube {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--gx-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--gx-cream);
+  text-shadow: 2px 2px 0 var(--gx-ink);
+  letter-spacing: 0.02em;
+}
+
+.sub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--gx-blue);
+  text-shadow: none;
+  margin-top: 0.3rem;
+}
+
+.navLink {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gx-dim);
+  border: 1px solid var(--gx-line);
+  border-radius: 4px;
+  padding: 0.45rem 0.9rem;
+  transition: color var(--beat-2) ease, border-color var(--beat-2) ease;
+}
+
+.navLink:hover {
+  color: var(--gx-blue);
+  border-color: var(--gx-blue);
+}

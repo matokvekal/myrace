@@ -54,27 +54,44 @@ const Standing: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
+  // The category filter the list is showing. Seeded from the ?category= param
+  // the caller arrived with; the filter modal then drives it. It used to be read
+  // straight off the URL and the modal's choice was thrown away (BUGS.md #22).
+  const [selectedCategory, setSelectedCategory] = useState(categoryName);
+
+  // Keep in step if the route's category changes underneath us.
+  useEffect(() => setSelectedCategory(categoryName), [categoryName]);
+
+  const isAllCategories = !selectedCategory || selectedCategory === "All";
 
   // Subscribe & filter riders from store directly
   const filteredRiders = useRiderStore(
     (s) =>
-      s
-        .getRidersByCategory(raceUuid, categoryName)
-        .filter((r) =>
-          [
-            r.bibNumber.toString(),
-            r.firstName.toLowerCase(),
-            r.lastName.toLowerCase()
-          ].some((f) => f.includes(searchTerm.toLowerCase()))
-        ),
+      (isAllCategories
+        ? s.riders.filter((r) => r.raceUuid === raceUuid)
+        : s.getRidersByCategory(raceUuid, selectedCategory)
+      ).filter((r) =>
+        [
+          r.bibNumber.toString(),
+          r.firstName.toLowerCase(),
+          r.lastName.toLowerCase()
+        ].some((f) => f.includes(searchTerm.toLowerCase()))
+      ),
     shallow
   );
 
+  // A finalized race reaches this screen by deep link only (nothing links here
+  // any more once it's closed), but it must still not offer edits the store
+  // would silently drop — see utils/raceLock.ts.
+  const finalized = Boolean(races.find((r) => r.uuid === raceUuid)?.finalized);
+
   const markStanding = async (rider: RiderProps) => {
+    if (finalized) return;
     await updateRider({ ...rider, status: "standing" });
   };
 
   const handleStatusChange = async (status: RiderProps["status"]) => {
+    if (finalized) { closeModal("modalStatus"); return; }
     if (selectedRider) {
       await updateRider({ ...selectedRider, status });
       closeModal("modalStatus");
@@ -99,7 +116,7 @@ const Standing: React.FC = () => {
       <div className={styles.wrapper}>
         <div className={styles.left} onClick={handleGoBack}>
           <img src={Icons.arrowBackBlack} alt="back" width={14} height={14} />
-          <div>Category: {categoryName}</div>
+          <div>Category: {isAllCategories ? "All" : selectedCategory}</div>
         </div>
 
         <div className={styles.standing}>
@@ -115,10 +132,12 @@ const Standing: React.FC = () => {
                 height={14}
                 onClick={handleFilter}
               />
-              <div className={styles.rightAdd} onClick={handleAddRider}>
-                <img src={Icons.plusBlue} alt="add" width={14} height={14} />
-                <span>Add Rider</span>
-              </div>
+              {!finalized && (
+                <div className={styles.rightAdd} onClick={handleAddRider}>
+                  <img src={Icons.plusBlue} alt="add" width={14} height={14} />
+                  <span>Add Rider</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -163,9 +182,11 @@ const Standing: React.FC = () => {
                 <p className={styles.emptyMessage}>
                   {searchTerm
                     ? "No riders match your search."
-                    : `There are no riders assigned to "${categoryName}" yet.`}
+                    : isAllCategories
+                      ? "There are no riders in this race yet."
+                      : `There are no riders assigned to "${selectedCategory}" yet.`}
                 </p>
-                {!searchTerm && (
+                {!searchTerm && !finalized && (
                   <div className={styles.emptyActions}>
                     <button
                       className={styles.addRiderBtn}
@@ -189,11 +210,20 @@ const Standing: React.FC = () => {
 
       {modals.showModalCategory && (
         <CategoryModal
+          // Every category in the race — deriving them from the already-filtered
+          // list only ever offered the one category we were showing.
           categories={[
             "All",
-            ...Array.from(new Set(filteredRiders.map((r) => r.category)))
+            ...Array.from(
+              new Set(
+                categories
+                  .filter((c) => c.raceUuid === raceUuid)
+                  .map((c) => c.name)
+              )
+            )
           ]}
           selectCategory={(cat) => {
+            setSelectedCategory(cat === "All" ? "" : cat);
             useUIStore.getState().closeModal("showModalCategory");
           }}
         />

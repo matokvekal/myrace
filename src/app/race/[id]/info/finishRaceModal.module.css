@@ -1,0 +1,230 @@
+/* Mirrors deleteConfirmModal.module.css so the two destructive dialogs feel
+   like siblings, but in the race's gold rather than delete-red: finishing a
+   race is the intended end of the event, not a mistake being cleaned up. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.modal {
+  background: white;
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 460px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  /* Tall content on a phone must scroll inside the dialog, not the page. */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #fff5dd;
+  color: #b4801a;
+  margin-bottom: 12px;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #1c2233;
+}
+
+.lead {
+  margin: 0 0 20px;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ── Impact summary ── */
+.summary {
+  text-align: left;
+  border: 1px solid #eceff4;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #46506a;
+  line-height: 1.4;
+}
+
+.summaryRow + .summaryRow {
+  border-top: 1px solid #f2f4f8;
+}
+
+.summaryValue {
+  flex-shrink: 0;
+  min-width: 30px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1c2233;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryWarn {
+  background: #fff8e8;
+}
+
+.summaryWarn .summaryValue {
+  color: #b4801a;
+}
+
+/* ── Lock explainer ── */
+.lockNote {
+  display: flex;
+  gap: 9px;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #f5f7fb;
+  color: #46506a;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.lockIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #6b7590;
+}
+
+.lockNote strong {
+  color: #1c2233;
+}
+
+.warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff4e5;
+  border: 1px solid #ffd9a0;
+  color: #8a5a00;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.warning svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ── Typed confirmation ── */
+.confirmGroup {
+  text-align: left;
+  margin-bottom: 18px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.label strong {
+  color: #b4801a;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 2px solid #f0e0bd;
+  border-radius: 6px;
+  font-size: 15px;
+  font-family: monospace;
+  letter-spacing: 0.1em;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input:focus {
+  border-color: #b4801a;
+}
+
+.error {
+  text-align: left;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 12.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancelBtn {
+  padding: 10px 24px;
+  background: #f5f5f5;
+  color: #555;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.cancelBtn:disabled {
+  opacity: 0.5;
+}
+
+.confirmBtn {
+  padding: 10px 24px;
+  background: linear-gradient(180deg, #d8a53a 0%, #b4801a 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.confirmBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

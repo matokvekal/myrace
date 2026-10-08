@@ -13,7 +13,14 @@ const ButtonStart: React.FC<{ category: any }> = ({ category }) => {
   const { races, updateRace } = useRaceStore();
 
   const startCategory = async () => {
-    const now = new Date().toLocaleTimeString();
+    // 24-hour "HH:MM:SS" — must match StartManager so parseTimeStr/formatElapsed
+    // can read it back. A bare toLocaleTimeString() can emit "2:30:05 PM", which
+    // parses to an Invalid Date and shows total time as 0.
+    const now = new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
     // 1. Get race and update its status to "running"
     const race = races.find((race) => race.uuid === category.raceUuid);
     if (race) {

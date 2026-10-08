@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import styles from "./heat.module.css";
 import { toast } from "react-toastify";
 import HeaderHeats from "../../../components/headerHeat/HeaderHeat";
@@ -11,9 +12,10 @@ import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
 import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { RiderProps } from "@/types/types";
-import { formatTime, formatTimeWithLeadingZeroes } from "../../../../utils/timeUtils";
+import { formatTime, formatTimeWithLeadingZeroes, parseClockTime } from "../../../../utils/timeUtils";
+import { useLapRecording } from "./useLapRecording";
 import calculatePositions from "../../../../utils/calculatePosition";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../../schedule/Schedule";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -26,20 +28,23 @@ import { extractNumbers } from "@/utils/numberParser";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
 import useCloudRaceSync from "@/hooks/useCloudRaceSync";
+import { useJokerMode } from "@/hooks/useJokerMode";
+import { useBoardHold } from "@/stores/boardHoldStore";
+import { useJokerQueue, type JokerEntry } from "./useJokerQueue";
+import JokerCard from "./jokerCard/JokerCard";
+import JokerResolveModal from "./JokerResolveModal";
+import { Bike, List, ChevronDown } from "lucide-react";
 
-function parseTimeStr(t: string | null | undefined): Date | null {
-  if (!t) return null;
-  if (t.includes("T")) return new Date(t);
-  const today = new Date();
-  const [h, m, s = 0] = t.split(":").map(Number);
-  today.setHours(h, m, s, 0);
-  return today;
-}
-
-const MIN_LAP_MS = 60 * 1000; // 1 minute minimum between laps
+// Category identity is name + subCategory: the same name can exist in several
+// waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
+const catKey = (name: string, sub?: string | null) => `${name}|${sub ?? ""}`;
+const riderCatKey = (r: { category: string; subCategory?: string | null }) =>
+  catKey(r.category, r.subCategory);
 
 const Heat: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams();
+  const navigate = useNavigate();
   const raceUuid = params?.id as string;
   const heatId = params?.heatId ? parseInt(params.heatId as string, 10) : null;
 
@@ -63,10 +68,14 @@ const Heat: React.FC = () => {
   const [voiceAudioLevel, setVoiceAudioLevel] = useState(0);
   const [voiceIsListening, setVoiceIsListening] = useState(false);
   const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
-  const [riderActions, setRiderActions] = useState<Array<{ id: string; rider: RiderProps; timestamp: number; source: 'click' | 'voice'; categoryColor: string; statusChange?: 'DNF' | 'DSQ' | 'DNS' }>>([]);
   const [showActionLog, setShowActionLog] = useState(false);
-  const [flashingRiderId, setFlashingRiderId] = useState<number | null>(null);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Voice buffer (BUGS.md voice assist modes): every recognized bib gets logged
+  // here regardless of autoConfirm — newest first, capped at 30 — so the
+  // commissaire can review who was called out even in assist mode, where
+  // nothing gets recorded automatically.
+  const [voiceLog, setVoiceLog] = useState<Array<{ bib: string; time: number }>>([]);
+  const [showVoiceLog, setShowVoiceLog] = useState(false);
+  const VOICE_LOG_LIMIT = 30;
   // Always-fresh refs so setTimeout callbacks can see latest store + handler
   const ridersRef = useRef(riders);
   const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice') => void) | null>(null);
@@ -92,161 +101,169 @@ const Heat: React.FC = () => {
   }, []);
 
   const currentRace = useMemo(() => races.find((r) => r.uuid === raceUuid), [races, raceUuid]);
+
+  // A finalized race has no live screen — every tap here would be swallowed by
+  // the store guards (utils/raceLock.ts). Bounce to the race, which opens on
+  // Results. Covers the deep link / bookmark / back-button routes too, which is
+  // why it lives here and not only behind the hidden Live button.
+  useEffect(() => {
+    if (currentRace?.finalized) navigate(`/race/${raceUuid}`, { replace: true });
+  }, [currentRace?.finalized, navigate, raceUuid]);
+
   // treat race.distance as circuit km per lap (if set and reasonable)
   const circuitKm = currentRace?.distance && currentRace.distance > 0 ? currentRace.distance : null;
 
-  const heatCategories = useMemo(() => {
-    if (heatId == null || categories.length === 0) return categories.map((c) => c.name);
+  const waveCategories = useMemo(() => {
+    if (heatId == null || categories.length === 0) return categories;
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const slotMap = schedule.get(heatId);
     if (slotMap) {
-      const names = [...slotMap.values()].flat().map((c) => c.name);
-      if (names.length > 0) return names;
+      const cats = [...slotMap.values()].flat();
+      if (cats.length > 0) return cats;
     }
-    return categories.map((c) => c.name);
+    return categories;
   }, [categories, heatId]);
 
-  const waveCategories = useMemo(
-    () => categories.filter((c) => heatCategories.includes(c.name)),
-    [categories, heatCategories]
+  // Every wave in this race's schedule, for the wave-switch dropdown next to
+  // the bib search — lets the commissaire jump to another wave without going
+  // back through Setup/Race (user request).
+  const scheduleWaves = useMemo(() => getScheduleWaves(categories), [categories]);
+  const currentWave = useMemo(
+    () => scheduleWaves.find((w) => w.waveNum === heatId),
+    [scheduleWaves, heatId]
   );
+  const handleWaveChange = (nextHeatId: number) => {
+    if (nextHeatId === heatId) return;
+    navigate(`/race/${raceUuid}/heat/${nextHeatId}`);
+  };
+
+  // Category filter list order: RUNNING first (the ones you're actively scoring),
+  // then finished, then not-started LAST. Not-started categories have no cards on
+  // Live, so they're shown greyed-out and can't be selected — you can only filter
+  // to categories that have started (user request).
+  const filterCategories = useMemo(() => {
+    const rank = (status?: string) =>
+      status === "running" ? 0 : status === "finished" ? 1 : 2;
+    return [...waveCategories].sort((a, b) => rank(a.status) - rank(b.status));
+  }, [waveCategories]);
 
   const filteredRiders = useMemo(
     () => {
-      const filtered = riders.filter((r) => r.raceUuid === raceUuid && heatCategories.includes(r.category));
-      // Enrich riders with totalLaps from their category
-      return filtered.map((rider) => {
-        const cat = categories.find((c) => c.name === rider.category);
-        return cat && cat.laps ? { ...rider, totalLaps: cat.laps } : rider;
-      });
+      // Live shows only riders whose CATEGORY has actually started in this wave.
+      // A category in the wave that hasn't been started yet must not show its
+      // cards at all — even though it shares the wave (user request). Gating on
+      // the category's own status (running/finished) is authoritative; the
+      // rider-level `raceStatus` check alone let not-started cards leak on.
+      // Matching is by name + subCategory so same-named categories in other
+      // waves don't bleed in.
+      const filtered = riders.filter(
+        (r) =>
+          r.raceUuid === raceUuid &&
+          r.raceStatus !== "upcoming" &&
+          waveCategories.some(
+            (c) =>
+              riderInCategory(r, c) &&
+              (c.status === "running" || c.status === "finished")
+          )
+      );
+      // Laps resolved from the category — the shared rule (BUGS.md #7)
+      return withCategoryLaps(filtered, waveCategories);
     },
-    [riders, raceUuid, heatCategories, categories]
+    [riders, raceUuid, waveCategories]
   );
 
   const getCatColor = (rider: RiderProps): string => {
-    const cat = categories.find((c) => c.name === rider.category);
+    const cat = categories.find((c) => riderInCategory(rider, c));
     return cat?.color ?? rider.color ?? "#ccc";
   };
 
+  // Gap to the category leader (position_category === 1), shown in the
+  // double-tap detail modal only — reuses the ranking calculatePositions()
+  // already assigns, so no extra sort here. Always a time diff ("+M:SS"),
+  // never a lap count, even when the rider is a lap down (user req); "—" for
+  // the leader themself.
+  const getGapToLeader = (rider: RiderProps): string => {
+    if (rider.position_category === 1) return "—";
+    const cat = categories.find((c) => riderInCategory(rider, c));
+    if (!cat) return "—";
+    const leader = filteredRiders.find((r) => riderInCategory(r, cat) && r.position_category === 1);
+    if (!leader) return "—";
+    const leaderStart = parseClockTime(leader.timeStartRace);
+    const riderStart = parseClockTime(rider.timeStartRace);
+    if (!leaderStart || !riderStart) return "—";
+    const leaderEnd = leader.timeArrive ? new Date(leader.timeArrive) : new Date();
+    const riderEnd = rider.timeArrive ? new Date(rider.timeArrive) : new Date();
+    const diffMs = (riderEnd.getTime() - riderStart.getTime()) - (leaderEnd.getTime() - leaderStart.getTime());
+    if (!isFinite(diffMs) || diffMs <= 0) return "—";
+    const s = Math.floor(diffMs / 1000);
+    return `+${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  };
+
+  // A rider "still on the track": their category's race has ended but they
+  // haven't finished — the organizer must not lose sight of them.
+  const isOnTrackAfterEnd = (rider: RiderProps): boolean =>
+    categories.find((c) => riderInCategory(rider, c))?.status === "finished";
+
+
+  // Persist the action log (and Joker queue) per wave so a mid-wave reload
+  // restores every arrival (BUGS.md #2). Keyed by race + heat so waves never
+  // share a log.
+  const persistKey = heatId != null ? `${raceUuid}:heat:${heatId}` : null;
+
+  // Joker button (side-menu opt-in): stamp an unidentified rider's arrival
+  // time+order instantly, resolve it to a bib afterward.
+  const { jokerEnabled } = useJokerMode();
+  const { jokers, addJoker, removeJoker } = useJokerQueue(persistKey);
+  const [resolvingJoker, setResolvingJoker] = useState<JokerEntry | null>(null);
+
+  // How long the board stays frozen after a tap, so a bunch arriving together
+  // doesn't reshuffle the cards while the bibs are still being read out.
+  const boardHoldMs = useBoardHold((s) => s.holdMs);
+
+  // Lap recording + rollback live in a dedicated hook (BUGS.md #29). Same rules
+  // and side effects as before — this component just drives it.
+  const {
+    riderActions,
+    setRiderActions,
+    flashingRiderId,
+    pendingMoveIds,
+    recordLap,
+    revertLap,
+    cancelAction,
+    logStatusChange,
+    clearTimers,
+  } = useLapRecording({
+    raceUuid,
+    persistKey,
+    riders,
+    updateRider,
+    updateAllRiders,
+    circuitKm,
+    isOnTrackAfterEnd,
+    getCatColor,
+    displayOrder,
+    setDisplayOrder,
+    boardHoldMs,
+    // The voice path renders its own detected-number chip, so only the tap path
+    // adds one here — exactly as before the extraction.
+    onLapRecorded: (rider, catColor, source) => {
+      if (source !== "voice") {
+        setDetectedNumbers((prev) => [
+          ...prev,
+          { bib: String(rider.bibNumber), categoryColor: catColor, timestamp: Date.now() },
+        ]);
+      }
+      setSearchTerm("");
+    },
+  });
+
   const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
-    if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
+    recordLap(rider, source);
+  };
 
-    if (!canForRace(raceUuid, "MARK_LAP")) {
-      toast.warn("No permission to mark laps");
-      return;
-    }
-
-    const clickTime = new Date();
-
-    // Prevent duplicate actions within 500ms (debounce rapid clicks/voice detections)
-    if (lastActionRef.current && lastActionRef.current.riderId === rider.id) {
-      const timeSinceLastAction = clickTime.getTime() - lastActionRef.current.timestamp;
-      if (timeSinceLastAction < 500) {
-        return; // Ignore duplicate action
-      }
-    }
-
-    // Enforce 1-minute minimum between laps
-    if (rider.timeArrive) {
-      const msSinceLast = clickTime.getTime() - new Date(rider.timeArrive).getTime();
-      if (msSinceLast < MIN_LAP_MS) {
-        const remaining = Math.ceil((MIN_LAP_MS - msSinceLast) / 1000);
-        toast.info(`Wait ${remaining}s before next lap`);
-        return;
-      }
-    }
-
-    const lapsCounter = (rider.lapsCounter || 0) + 1;
-    const raceStart = parseTimeStr(rider.timeStartRace) ?? clickTime;
-    const lastLapStart = rider.timeArrive ? new Date(rider.timeArrive) : raceStart;
-    const lapMs = clickTime.getTime() - lastLapStart.getTime();
-    const lapTime = formatTime(lapMs / 1000);
-    const isFinished = rider.totalLaps > 0 && lapsCounter >= rider.totalLaps;
-    const speed_kph = circuitKm
-      ? Math.round((circuitKm / (lapMs / 3600000)) * 10) / 10
-      : undefined;
-
-    // Build intermediate rider to run calculatePositions and get accurate position
-    const intermediateRider: RiderProps = {
-      ...rider,
-      lapsCounter,
-      elapsedLastLap: lapTime,
-      elapsedTimeFromStart: formatTime((clickTime.getTime() - raceStart.getTime()) / 1000),
-      timeArrive: clickTime.toISOString(),
-      raceStatus: isFinished ? "finished" : "running",
-    };
-
-    const allWithUpdated = riders.map((r) => (r.id === intermediateRider.id ? intermediateRider : r));
-    const sorted = calculatePositions(allWithUpdated);
-    const positionAtLap = sorted.find((r) => r.id === rider.id)?.position_category ?? rider.position_category;
-
-    // Final rider: include position and speed in the new lap detail
-    const updatedRider: RiderProps = {
-      ...intermediateRider,
-      position_category: positionAtLap,
-      lapsDetails: [
-        ...(rider.lapsDetails ?? []),
-        { lap: lapsCounter, startTime: lastLapStart, endTime: clickTime, lapTime, position: positionAtLap, speed_kph },
-      ],
-    };
-
-    const finalSorted = sorted.map((r) => (r.id === updatedRider.id ? updatedRider : r));
-    lastActionRef.current = { riderId: rider.id, timestamp: clickTime.getTime() }; // track last action for debouncing
-    updateRider(updatedRider);
-    updateAllRiders(finalSorted);
-    setSearchTerm(""); // clear search after registering a lap
-
-    // Cloud event log (local-first; no-op side effects for local-only races)
-    void recordRaceEvent({
-      raceUuid,
-      riderId: rider.id,
-      bibNumber: rider.bibNumber,
-      eventType: "LAP_MARKED",
-      lapNumber: lapsCounter,
-      payload: {
-        riderLocalId: rider.id,
-        riderPatch: {
-          lapsCounter: updatedRider.lapsCounter,
-          lapsDetails: updatedRider.lapsDetails,
-          elapsedLastLap: updatedRider.elapsedLastLap,
-          elapsedTimeFromStart: updatedRider.elapsedTimeFromStart,
-          timeArrive: updatedRider.timeArrive,
-          raceStatus: updatedRider.raceStatus,
-          position_category: updatedRider.position_category,
-        },
-      },
-    });
-
-    // Trigger flash animation on the rider card
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    setFlashingRiderId(rider.id);
-    flashTimerRef.current = setTimeout(() => setFlashingRiderId(null), 1200);
-
-    // After the flash, deterministically drop this rider to the literal end of the
-    // queue (or off it entirely if they just finished) — no lap-count/time guesswork,
-    // so "tap it, it goes last" always means last, full stop.
-    setTimeout(() => {
-      setDisplayOrder((prev) => {
-        const rest = prev.filter((id) => id !== rider.id);
-        return isFinished ? rest : [...rest, rider.id];
-      });
-    }, 1000);
-
-    // Add to detected numbers display (voice path adds this via the queue processor)
-    const catColor = getCatColor(rider);
-    const actionTimestamp = Date.now();
-    if (source !== 'voice') {
-      setDetectedNumbers((prev) => [
-        ...prev,
-        { bib: String(rider.bibNumber), categoryColor: catColor, timestamp: actionTimestamp },
-      ]);
-    }
-
-    // Add to action log with unique ID (rider + lap + timestamp)
-    setRiderActions((prev) => [
-      { id: `${rider.id}-${lapsCounter}-${actionTimestamp}`, rider: updatedRider, timestamp: actionTimestamp, source, categoryColor: catColor },
-      ...prev,
-    ]);
+  const handleRevertLap = (rider: RiderProps) => {
+    revertLap(rider);
+    setContextRider(null);
   };
 
   // Keep refs in sync every render so async callbacks see fresh data
@@ -282,7 +299,7 @@ const Heat: React.FC = () => {
       if (rider) {
         const lapsBefore = rider.lapsCounter;
         const catColor = (() => {
-          const cat = categories.find((c) => c.name === rider.category);
+          const cat = categories.find((c) => riderInCategory(rider, c));
           return cat?.color ?? rider.color ?? "#ccc";
         })();
 
@@ -309,46 +326,6 @@ const Heat: React.FC = () => {
     };
 
     processNext();
-  };
-
-  const handleRevertLap = (rider: RiderProps) => {
-    if (rider.lapsCounter <= 0) { setContextRider(null); return; }
-    if (!canForRace(raceUuid, "UNDO_EVENT")) {
-      toast.warn("No permission to undo laps");
-      setContextRider(null);
-      return;
-    }
-    const newDetails = (rider.lapsDetails ?? []).slice(0, -1);
-    const prevArrive = newDetails.length > 0
-      ? new Date(newDetails[newDetails.length - 1].endTime).toISOString()
-      : null;
-    const revertedRider: RiderProps = {
-      ...rider,
-      lapsCounter: rider.lapsCounter - 1,
-      lapsDetails: newDetails,
-      timeArrive: prevArrive,
-      raceStatus: "running",
-      elapsedLastLap: newDetails.length > 0 ? newDetails[newDetails.length - 1].lapTime : null,
-    };
-    updateRider(revertedRider);
-    void recordRaceEvent({
-      raceUuid,
-      riderId: rider.id,
-      bibNumber: rider.bibNumber,
-      eventType: "UNDO",
-      lapNumber: rider.lapsCounter,
-      payload: {
-        riderLocalId: rider.id,
-        riderPatch: {
-          lapsCounter: revertedRider.lapsCounter,
-          lapsDetails: revertedRider.lapsDetails,
-          timeArrive: revertedRider.timeArrive,
-          raceStatus: revertedRider.raceStatus,
-          elapsedLastLap: revertedRider.elapsedLastLap,
-        },
-      },
-    });
-    setContextRider(null);
   };
 
   const handleStatusChange = (rider: RiderProps, status: RiderProps["status"]) => {
@@ -380,19 +357,7 @@ const Heat: React.FC = () => {
 
     // Add status change to action log for DNF/DSQ/DNS
     if (isOut) {
-      const catColor = getCatColor(rider);
-      const statusTimestamp = Date.now();
-      setRiderActions((prev) => [
-        {
-          id: `${rider.id}-status-${status}-${statusTimestamp}`,
-          rider: updatedRider,
-          timestamp: statusTimestamp,
-          source: 'click',
-          categoryColor: catColor,
-          statusChange: status as 'DNF' | 'DSQ' | 'DNS'
-        },
-        ...prev,
-      ]);
+      logStatusChange(updatedRider, status as 'DNF' | 'DSQ' | 'DNS');
     }
 
     setContextRider(null);
@@ -403,20 +368,44 @@ const Heat: React.FC = () => {
   };
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const lastActionRef = useRef<{ riderId: number; timestamp: number } | null>(null);
 
-  const toggleCatFilter = (catName: string) => {
+  // Clear state (BUGS.md #14): once a wave is fully stopped the commissaire can
+  // wipe the live board to a clean 00:00:00 before the next wave. View-only —
+  // rider results stay in the Results tab. Reset whenever the wave changes.
+  const [clearedWave, setClearedWave] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  useEffect(() => {
+    setClearedWave(false);
+    setConfirmClear(false);
+    // New wave — last wave's voice buffer is stale, don't carry it over
+    setVoiceLog([]);
+    setShowVoiceLog(false);
+  }, [heatId]);
+
+  // Started categories in this wave, and whether the wave has been stopped
+  // (every started category finished). Drives both the frozen timer and the
+  // Clear button's visibility.
+  const startedWaveCats = useMemo(
+    () => waveCategories.filter((c) => c.status === "running" || c.status === "finished"),
+    [waveCategories]
+  );
+  const waveStopped = useMemo(
+    () => startedWaveCats.length > 0 && startedWaveCats.every((c) => c.status === "finished"),
+    [startedWaveCats]
+  );
+
+  const toggleCatFilter = (key: string) => {
     setFilterCats((prev) => {
       const next = new Set(prev);
-      if (next.has(catName)) next.delete(catName);
-      else next.add(catName);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
 
   const catOrderMap = useMemo(() => {
     const map = new Map<string, number>();
-    waveCategories.forEach((cat, idx) => map.set(cat.name, idx));
+    waveCategories.forEach((cat, idx) => map.set(catKey(cat.name, cat.subCategory), idx));
     return map;
   }, [waveCategories]);
 
@@ -428,8 +417,27 @@ const Heat: React.FC = () => {
     [filteredRiders]
   );
 
+  // Resolve a Joker (unidentified tap) to a real bib — records the lap as if
+  // it happened at the moment the Joker was tapped, not now. Returns whether
+  // it succeeded so the modal knows whether to close or let the commissaire retry.
+  const resolveJoker = (joker: JokerEntry, bibNumber: number): boolean => {
+    const candidate = runningRiders.find((r) => r.bibNumber === bibNumber);
+    if (!candidate) {
+      toast.error(`No active rider with bib ${bibNumber}`);
+      return false;
+    }
+    if (candidate.timeArrive && new Date(candidate.timeArrive).getTime() > new Date(joker.capturedAt).getTime()) {
+      toast.error(`Bib ${bibNumber} already has a more recent lap recorded`);
+      return false;
+    }
+    recordLap(candidate, "click", new Date(joker.capturedAt));
+    removeJoker(joker.id);
+    toast.success(`Joker #${joker.sequence} → Bib ${bibNumber}`);
+    return true;
+  };
+
   const activeRiders = useMemo(() => {
-    const catFiltered = filterCats.size > 0 ? runningRiders.filter((r) => filterCats.has(r.category)) : runningRiders;
+    const catFiltered = filterCats.size > 0 ? runningRiders.filter((r) => filterCats.has(riderCatKey(r))) : runningRiders;
     const q = searchTerm.toLowerCase();
     return q
       ? catFiltered.filter(
@@ -454,8 +462,8 @@ const Heat: React.FC = () => {
       const newcomers = runningRiders
         .filter((r) => !keptSet.has(r.id))
         .sort((a, b) => {
-          const catA = catOrderMap.get(a.category) ?? 999;
-          const catB = catOrderMap.get(b.category) ?? 999;
+          const catA = catOrderMap.get(riderCatKey(a)) ?? 999;
+          const catB = catOrderMap.get(riderCatKey(b)) ?? 999;
           if (catA !== catB) return catA - catB;
           return a.bibNumber - b.bibNumber;
         })
@@ -466,8 +474,14 @@ const Heat: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runningIdsKey]);
 
+  // Cards tapped during the current board hold. They keep their place on the
+  // board, so each one has to show that it registered — the drop to the bottom
+  // used to be the only confirmation.
+  const pendingMoveSet = useMemo(() => new Set(pendingMoveIds), [pendingMoveIds]);
+
   // Build displayed riders: stable order from displayOrder, live data from activeRiders
   const displayedRiders = useMemo(() => {
+    if (clearedWave) return [] as RiderProps[];
     const riderMap = new Map(activeRiders.map((r) => [r.id, r]));
     const ordered: RiderProps[] = [];
     for (const id of displayOrder) {
@@ -477,8 +491,18 @@ const Heat: React.FC = () => {
     }
     // Any new riders not yet in displayOrder go at the end
     riderMap.forEach((r) => ordered.push(r));
-    return ordered;
-  }, [activeRiders, displayOrder]);
+    // "Still on track" riders (their category's race already ended) sink to the
+    // bottom of the racing grid, next to Finished/DNF, so they don't sit between
+    // the riders who are actively racing.
+    const endedCats = new Set(
+      categories.filter((c) => c.status === "finished").map((c) => catKey(c.name, c.subCategory))
+    );
+    if (endedCats.size === 0) return ordered;
+    return [
+      ...ordered.filter((r) => !endedCats.has(riderCatKey(r))),
+      ...ordered.filter((r) => endedCats.has(riderCatKey(r))),
+    ];
+  }, [activeRiders, displayOrder, categories, clearedWave]);
 
   // Per-category cascade bell: if linkedFinish AND the leader has finished,
   // all remaining running riders in that category should show the last-lap bell
@@ -486,16 +510,17 @@ const Heat: React.FC = () => {
     const set = new Set<string>();
     waveCategories.forEach((cat) => {
       if (!cat.linkedFinish) return;
-      const catRunners = filteredRiders.filter((r) => r.category === cat.name);
+      const catRunners = filteredRiders.filter((r) => riderInCategory(r, cat));
       const anyFinished = catRunners.some(
         (r) => r.raceStatus === "finished" && !["DNF", "DSQ", "DNS"].includes(r.status)
       );
-      if (anyFinished) set.add(cat.name);
+      if (anyFinished) set.add(catKey(cat.name, cat.subCategory));
     });
     return set;
   }, [waveCategories, filteredRiders]);
 
   const finishedRiders = useMemo(() => {
+    if (clearedWave) return [] as RiderProps[];
     const outOrder = (r: RiderProps) => {
       if (r.status === "DNF") return 1;
       if (r.status === "DSQ") return 2;
@@ -503,13 +528,13 @@ const Heat: React.FC = () => {
       return 0;
     };
     return [...filteredRiders]
-      .filter((r) => r.raceStatus !== "running" && (filterCats.size === 0 || filterCats.has(r.category)))
+      .filter((r) => r.raceStatus !== "running" && (filterCats.size === 0 || filterCats.has(riderCatKey(r))))
       .sort((a, b) => {
         const oa = outOrder(a), ob = outOrder(b);
         if (oa !== ob) return oa - ob;
         return (a.position_category ?? 999) - (b.position_category ?? 999);
       });
-  }, [filteredRiders, filterCats]);
+  }, [filteredRiders, filterCats, clearedWave]);
 
   const validBibs = useMemo(() => {
     const set = new Set<string>();
@@ -526,7 +551,17 @@ const Heat: React.FC = () => {
     validBibs,
     commands: [],
     onBibDetected: (bib) => {
-      // Push into buffer queue; processor handles cooldown + dedup + retry
+      // Every recognized bib lands in the buffer, whether or not it also
+      // gets auto-recorded — this is the only path that fires for a heard
+      // bib, so logging here (not inside processVoiceQueue) means the
+      // buffer reflects exactly what the mic actually caught.
+      setVoiceLog((prev) => [{ bib, time: Date.now() }, ...prev].slice(0, VOICE_LOG_LIMIT));
+
+      // Assist mode (autoConfirm off): buffer only, nothing auto-records —
+      // the commissaire reviews the list and taps riders in manually.
+      if (!voiceSettings.autoConfirm) return;
+
+      // Active mode: push into record queue; processor handles cooldown + dedup + retry
       voiceQueueRef.current.push({ bib, detectedAt: Date.now() });
       processVoiceQueue();
     },
@@ -542,10 +577,14 @@ const Heat: React.FC = () => {
     setVoiceIsListening(isListening);
   }, [isListening]);
 
-  // Cleanup timers on unmount
-  useEffect(() => () => {
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-  }, []);
+  // Its toggle button only exists while voice is on — close the panel along
+  // with it so it can't get stuck open with no way to dismiss it.
+  useEffect(() => {
+    if (!voiceActive) setShowVoiceLog(false);
+  }, [voiceActive]);
+
+  // Cleanup timers on unmount (the hook owns them)
+  useEffect(() => clearTimers, [clearTimers]);
 
   // Auto-clear detected numbers after 3 seconds
   useEffect(() => {
@@ -558,11 +597,72 @@ const Heat: React.FC = () => {
   }, [detectedNumbers.length]);
 
   const elapsedTime = useMemo(() => {
-    const startRider = filteredRiders.find((r) => r.raceStatus === "running" && r.timeStartRace);
-    const startDate = parseTimeStr(startRider?.timeStartRace);
-    if (!startDate) return "00:00:00";
-    return formatTimeWithLeadingZeroes(Math.max(0, now.getTime() - startDate.getTime()) / 1000);
-  }, [filteredRiders, now]);
+    if (clearedWave) return "00:00:00";
+
+    // Wave start = earliest actual rider start in this wave. Use timeStartRace
+    // from ANY started rider (not just currently-running) so the clock survives
+    // the wave being stopped, when every rider flips to "finished" (BUGS.md #14).
+    const startMsList = filteredRiders
+      .map((r) => parseClockTime(r.timeStartRace)?.getTime())
+      .filter((t): t is number => t != null);
+    if (startMsList.length === 0) return "00:00:00";
+    const startMs = Math.min(...startMsList);
+
+    // If the wave has been stopped, FREEZE at the stop moment (the latest
+    // category finishedAt) instead of resetting to 0.
+    const endMs = waveStopped
+      ? Math.max(...startedWaveCats.map((c) => c.finishedAt ?? now.getTime()))
+      : now.getTime();
+
+    return formatTimeWithLeadingZeroes(Math.max(0, endMs - startMs) / 1000);
+  }, [filteredRiders, now, clearedWave, waveStopped, startedWaveCats]);
+
+  // Fastest / average lap for the wave (dopamine strip between the filter row
+  // and the racing grid). Lap 1 is excluded on purpose: the start line rarely
+  // sits exactly on the lap-timing point, so the first crossing can be short
+  // or long versus every full lap after it — only laps 2+ are comparable.
+  const lapStats = useMemo(() => {
+    const pool = filterCats.size > 0 ? filteredRiders.filter((r) => filterCats.has(riderCatKey(r))) : filteredRiders;
+    let fastestMs: number | null = null;
+    let sumMs = 0;
+    let count = 0;
+    pool.forEach((r) => {
+      (r.lapsDetails ?? []).forEach((d) => {
+        if (d.lap <= 1) return;
+        const ms = new Date(d.endTime).getTime() - new Date(d.startTime).getTime();
+        if (!Number.isFinite(ms) || ms <= 0) return;
+        if (fastestMs == null || ms < fastestMs) fastestMs = ms;
+        sumMs += ms;
+        count += 1;
+      });
+    });
+    return {
+      fastestMs,
+      fastest: fastestMs != null ? formatTime(fastestMs / 1000) : null,
+      average: count > 0 ? formatTime(sumMs / count / 1000) : null,
+    };
+  }, [filteredRiders, filterCats]);
+
+  // Brief celebratory flash whenever the wave's fastest lap improves. Guarded
+  // with `hasMountedFastLap` so hydrating an in-progress wave on load/reload
+  // doesn't fire the flash for laps that were already on the board.
+  const [newFastLap, setNewFastLap] = useState(false);
+  const prevFastestMsRef = useRef<number | null>(null);
+  const hasMountedFastLapRef = useRef(false);
+  useEffect(() => {
+    const prev = prevFastestMsRef.current;
+    const next = lapStats.fastestMs;
+    prevFastestMsRef.current = next;
+    if (!hasMountedFastLapRef.current) {
+      hasMountedFastLapRef.current = true;
+      return;
+    }
+    if (next != null && (prev == null || next < prev)) {
+      setNewFastLap(true);
+      const t = setTimeout(() => setNewFastLap(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [lapStats.fastestMs]);
 
   // Turn voice on/off. When turning on, make sure we have mic permission first,
   // showing a friendly pre-prompt before the browser's native permission dialog.
@@ -593,6 +693,7 @@ const Heat: React.FC = () => {
         <RiderLiveModal
           rider={contextRider}
           catColor={getCatColor(contextRider)}
+          gapToLeader={getGapToLeader(contextRider)}
           onClose={() => setContextRider(null)}
           onRevertLap={handleRevertLap}
           onStatusChange={handleStatusChange}
@@ -600,9 +701,27 @@ const Heat: React.FC = () => {
         />
       )}
 
+      {/* Joker resolve modal — assign a bib to an unidentified stamped tap */}
+      {resolvingJoker && (
+        <JokerResolveModal
+          joker={resolvingJoker}
+          riders={filteredRiders}
+          onSave={(bib) => resolveJoker(resolvingJoker, bib)}
+          onDelete={() => removeJoker(resolvingJoker.id)}
+          onClose={() => setResolvingJoker(null)}
+        />
+      )}
+
       {/* Voice settings modal */}
       {showVoiceSettings && (
-        <VoiceSettingsModal onClose={() => setShowVoiceSettings(false)} />
+        <VoiceSettingsModal
+          onClose={() => setShowVoiceSettings(false)}
+          canClearBoard={waveStopped && !clearedWave}
+          onClearBoard={() => {
+            setShowVoiceSettings(false);
+            setConfirmClear(true);
+          }}
+        />
       )}
 
       {/* Microphone permission pre-prompt */}
@@ -627,7 +746,7 @@ const Heat: React.FC = () => {
             {waveCategories.map((cat) => (
               <div key={cat.id} className={styles.waveModalRow}>
                 <span className={styles.catDot} style={{ background: cat.color ?? "#ccc" }} />
-                <span className={styles.waveModalName}>{cat.name}</span>
+                <span className={styles.waveModalName}>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
                 {cat.laps && <span className={styles.waveModalLaps}>{cat.laps} laps</span>}
               </div>
             ))}
@@ -635,34 +754,140 @@ const Heat: React.FC = () => {
         </div>
       )}
 
-      <div className={styles.wrapper}>
-        {/* Timer row with wave-info icon */}
-        <div className={styles.timerRow}>
-          <p className={styles.timerText}>{elapsedTime}</p>
-          <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
-            {waveCategories.slice(0, 4).map((cat) => (
-              <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
-            ))}
-          </button>
+      {/* Clear-board confirmation (BUGS.md #14) */}
+      {confirmClear && (
+        <div className={styles.contextOverlay} onClick={() => setConfirmClear(false)}>
+          <div className={styles.waveModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.waveModalHeader}>
+              <span>Clear the board?</span>
+              <button className={styles.contextClose} onClick={() => setConfirmClear(false)}>✕</button>
+            </div>
+            <p className={styles.clearConfirmText}>
+              This resets the timer to 00:00:00 and removes every rider card from the
+              live view. Race results are kept in the Results tab.
+            </p>
+            <div className={styles.clearConfirmActions}>
+              <button className={styles.clearCancelBtn} onClick={() => setConfirmClear(false)}>
+                Cancel
+              </button>
+              <button
+                className={styles.clearConfirmBtn}
+                onClick={() => {
+                  setClearedWave(true);
+                  setConfirmClear(false);
+                  // Wave's stopped — this wave's voice buffer is done too
+                  setVoiceLog([]);
+                  setShowVoiceLog(false);
+                }}
+              >
+                Clear board
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className={styles.searchWrapper}>
-          <div className={styles.inputContainer}>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={5}
-              className={styles.searchInput}
-              placeholder="#"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm ? (
-              <button className={styles.clearSearch} onClick={() => setSearchTerm("")}>✕</button>
-            ) : (
-              <img src={Icons.search} alt="search" width={16} height={16} className={styles.inputIcon} />
-            )}
+      <div className={styles.wrapper}>
+        {/* Control panel: clock, wave info, Joker and bib search, grouped
+            into one elevated card so this reads as a single distinct zone
+            between the header and the racing grid. */}
+        <div className={styles.controlPanel}>
+          {/* Timer row with wave-info button: which wave is live + its started categories */}
+          <div className={styles.timerRow}>
+            {/* Rider action log — lives in the timer row's empty left column so it
+                scrolls/reflows with the clock and wave chip instead of floating
+                over them on its own fixed coordinates. */}
+            <div className={styles.logSlot}>
+              <RiderActionLog
+                actions={riderActions}
+                isOpen={showActionLog}
+                onToggle={() => setShowActionLog(!showActionLog)}
+                onCancel={(actionId, riderName) => {
+                  // The hook owns the undo: exact snapshot restore, queue slot restore,
+                  // and cancelling any pending drop-to-end (BUGS.md #10, #29).
+                  if (!cancelAction(actionId)) return;
+                  toast.success(`Cancelled: ${riderName}`);
+                }}
+              />
+            </div>
+            <p className={styles.timerText}>{elapsedTime}</p>
+            <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
+              {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
+              {waveCategories
+                .filter((c) => c.status === "running" || c.status === "finished")
+                .slice(0, 4)
+                .map((cat) => (
+                  <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
+                ))}
+            </button>
+          </div>
+
+          <div className={styles.searchWrapper}>
+            <div className={styles.searchWrapperLeft}>
+              {jokerEnabled && (
+                <button
+                  className={styles.jokerBtn}
+                  onClick={addJoker}
+                  aria-label="Add Joker"
+                  title="Stamp an unidentified rider's arrival time now"
+                >
+                  <Bike size={20} aria-hidden="true" />
+                  {jokers.length > 0 && (
+                    <span className={styles.jokerBadge}>{jokers.length}</span>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className={styles.inputContainer}>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={5}
+                className={styles.searchInput}
+                placeholder="#"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm ? (
+                <button className={styles.clearSearch} onClick={() => setSearchTerm("")}>✕</button>
+              ) : (
+                <img src={Icons.search} alt="search" width={16} height={16} className={styles.inputIcon} />
+              )}
+            </div>
+            <div className={styles.searchWrapperRight}>
+              {scheduleWaves.length > 1 && (
+                <label className={styles.waveSwitcher} title="Switch wave">
+                  <span className={styles.waveSwitcherLabel}>Wave</span>
+                  <span
+                    className={[
+                      styles.waveSwitcherDot,
+                      currentWave?.status === "running" ? styles.waveSwitcherDotRunning : "",
+                      currentWave?.status === "finished" ? styles.waveSwitcherDotFinished : "",
+                    ].join(" ")}
+                    aria-hidden="true"
+                  />
+                  <span className={styles.waveSwitcherValue}>
+                    {currentWave ? currentWave.waveNum : heatId}
+                  </span>
+                  <select
+                    className={styles.waveSwitcherSelect}
+                    value={heatId ?? ""}
+                    onChange={(e) => handleWaveChange(Number(e.target.value))}
+                    aria-label="Switch wave"
+                  >
+                    {scheduleWaves.map((w) => (
+                      <option key={w.waveNum} value={w.waveNum}>
+                        Wave {w.waveNum}
+                        {w.startTime ? ` · ${w.startTime}` : ""}
+                        {w.status === "finished" ? " (done)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className={styles.waveSwitcherChevron} aria-hidden="true" />
+                </label>
+              )}
+            </div>
           </div>
         </div>
 
@@ -671,7 +896,7 @@ const Heat: React.FC = () => {
           <div className={styles.filterPanelOverlay} onClick={() => setShowFilterPanel(false)}>
             <div className={styles.filterPanel} onClick={(e) => e.stopPropagation()}>
               <div className={styles.filterPanelHeader}>
-                <span>Filter Categories</span>
+                <span>{t("heat.filterCategories", "Filter Categories")}</span>
                 <button className={styles.contextClose} onClick={() => setShowFilterPanel(false)}>✕</button>
               </div>
               <label className={styles.filterPanelRow}>
@@ -680,21 +905,33 @@ const Heat: React.FC = () => {
                   checked={filterCats.size === 0}
                   onChange={() => setFilterCats(new Set())}
                 />
-                <span>All categories</span>
+                <span>{t("heat.allCategories", "All categories")}</span>
               </label>
               <div className={styles.filterDivider} />
-              {waveCategories.map((cat) => (
-                <label key={cat.id} className={styles.filterPanelRow}>
-                  <input
-                    type="checkbox"
-                    checked={filterCats.has(cat.name)}
-                    onChange={() => toggleCatFilter(cat.name)}
-                  />
-                  <span className={styles.catDot} style={{ background: cat.color ?? "#ccc" }} />
-                  <span>{cat.name}</span>
-                  {cat.laps && <span className={styles.filterLapTag}>{cat.laps}L</span>}
-                </label>
-              ))}
+              {filterCategories.map((cat) => {
+                const running = cat.status === "running";
+                const finished = cat.status === "finished";
+                const notStarted = !running && !finished;
+                const key = catKey(cat.name, cat.subCategory);
+                return (
+                  <label
+                    key={cat.id}
+                    className={`${styles.filterPanelRow} ${notStarted ? styles.filterRowNotStarted : ""} ${finished ? styles.filterRowFinished : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filterCats.has(key)}
+                      disabled={notStarted}
+                      onChange={() => toggleCatFilter(key)}
+                    />
+                    <span className={styles.catDot} style={{ background: cat.color ?? "#ccc" }} />
+                    <span>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
+                    {notStarted && <span className={styles.filterStatusTag}>{t("heat.notStarted", "not started")}</span>}
+                    {finished && <span className={styles.filterStatusTagDone}>{t("heat.finished", "finished")}</span>}
+                    {cat.laps && <span className={styles.filterLapTag}>{cat.laps}L</span>}
+                  </label>
+                );
+              })}
             </div>
           </div>
         )}
@@ -706,13 +943,40 @@ const Heat: React.FC = () => {
               {filterCats.size > 0 && (
                 <span className={styles.filterActive}> · {filterCats.size} filtered</span>
               )}
+              {(() => {
+                const onTrack = runningRiders.filter(isOnTrackAfterEnd).length;
+                return onTrack > 0 ? (
+                  <span
+                    className={styles.onTrackTotal}
+                    title="Riders still on the track after their race ended — don't forget them"
+                  >
+                    ⚑ {onTrack} still on track
+                  </span>
+                ) : null;
+              })()}
             </div>
+            {/* Fastest / average lap — dopamine feedback, inline so it doesn't
+                cost its own row. Lap 1 excluded (see lapStats memo). */}
+            {(lapStats.fastest || lapStats.average) && (
+              <div className={styles.lapStatsInline}>
+                <span className={`${styles.lapStatChip} ${newFastLap ? styles.lapStatPulse : ""}`}>
+                  <span className={styles.lapStatChipLabel}>⚡ Fastest</span>
+                  <span className={styles.lapStatChipValue}>{lapStats.fastest ?? "—"}</span>
+                </span>
+                <span className={styles.lapStatChip}>
+                  <span className={styles.lapStatChipLabel}>Avg lap</span>
+                  <span className={styles.lapStatChipValue}>{lapStats.average ?? "—"}</span>
+                </span>
+              </div>
+            )}
             <button
               className={`${styles.filterIconBtn} ${filterCats.size > 0 ? styles.filterIconActive : ""}`}
               onClick={() => setShowFilterPanel(true)}
-              title="Filter categories"
+              title={t("heat.filterCategoriesTitle", "Filter categories")}
             >
-              {filterCats.size > 0 ? `Filter (${filterCats.size})` : "Filter"}
+              {filterCats.size > 0
+                ? t("heat.filterCount", "Filter ({{count}})", { count: filterCats.size })
+                : t("heat.filter", "Filter")}
             </button>
           </div>
 
@@ -723,13 +987,30 @@ const Heat: React.FC = () => {
                   key={rider.id}
                   rider={rider}
                   color={getCatColor(rider)}
-                  forceBell={cascadeBellCats.has(rider.category)}
+                  forceBell={cascadeBellCats.has(riderCatKey(rider))}
                   isFlashing={flashingRiderId === rider.id}
+                  isRecorded={pendingMoveSet.has(rider.id)}
+                  raceEnded={isOnTrackAfterEnd(rider)}
                   onClick={() => handleRiderClick(rider)}
                   onDoubleClick={() => setContextRider(rider)}
                 />
               ))}
             </div>
+
+            {jokerEnabled && jokers.length > 0 && (
+              <>
+                <div className={styles.finishers}>🃏 Unresolved ({jokers.length})</div>
+                <div className={styles.riderGrid}>
+                  {jokers.map((joker) => (
+                    <JokerCard
+                      key={joker.id}
+                      joker={joker}
+                      onClick={() => setResolvingJoker(joker)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             {finishedRiders.length > 0 && (
               <>
@@ -750,8 +1031,10 @@ const Heat: React.FC = () => {
         </div>
       </div>
 
-      {/* Voice debug panel — visible only when voice is active */}
-      {voiceActive && (
+      {/* Voice debug panel — active/auto-confirm mode only. In assist mode it
+          just covers rider cards for no benefit, since nothing auto-records
+          anyway; the new voice-buffer panel is the assist-mode equivalent. */}
+      {voiceActive && voiceSettings.autoConfirm && (
         <div className={styles.voiceDebug}>
           <div className={styles.voiceDebugRow}>
             <span className={styles.voiceDebugLabel}>status:</span>
@@ -805,54 +1088,57 @@ const Heat: React.FC = () => {
             {detectedNumbers.length > 0 && <DetectedNumbers numbers={detectedNumbers} />}
           </div>
 
-          <button
-            className={styles.micButtonRadar}
-            onClick={handleToggleVoice}
-            title={voiceActive ? "Disable voice input" : "Enable voice input"}
-          >
-            <VoiceRadarIcon
-              isActive={voiceActive}
-              audioLevel={voiceAudioLevel}
-              isListening={voiceIsListening}
-            />
-          </button>
+          {/* Mic + voice-buffer toggle stay side by side as a pair even when
+              .controlRow stacks to a column on narrow phones — this row never
+              wraps to vertical on its own. */}
+          <div className={styles.micRow}>
+            <button
+              className={styles.micButtonRadar}
+              onClick={handleToggleVoice}
+              title={voiceActive ? "Disable voice input" : "Enable voice input"}
+            >
+              <VoiceRadarIcon
+                isActive={voiceActive}
+                audioLevel={voiceAudioLevel}
+                isListening={voiceIsListening}
+              />
+            </button>
+
+            {/* Voice buffer toggle — every heard bib lands here (assist mode's
+                only output; active mode logs it too, alongside the real record).
+                Only exists once voice is actually on — nothing to show before that. */}
+            {voiceActive && (
+              <button
+                className={`${styles.voiceLogBtn} ${showVoiceLog ? styles.voiceLogBtnActive : ""}`}
+                onClick={() => setShowVoiceLog((v) => !v)}
+                aria-label="Voice buffer"
+                title="Show bibs heard by voice"
+              >
+                <List size={24} aria-hidden="true" />
+                {voiceLog.length > 0 && <span className={styles.voiceLogBadge}>{voiceLog.length}</span>}
+              </button>
+            )}
+          </div>
         </div>
+
+        {showVoiceLog && (
+          <div className={styles.voiceLogPanel}>
+            <div className={styles.voiceLogPanelTitle}>Heard ({voiceLog.length})</div>
+            {voiceLog.length === 0 ? (
+              <div className={styles.voiceLogEmpty}>Nothing yet</div>
+            ) : (
+              voiceLog.map((entry, i) => (
+                <div key={`${entry.time}-${i}`} className={styles.voiceLogRow}>
+                  <span className={styles.voiceLogBib}>#{entry.bib}</span>
+                  <span className={styles.voiceLogTime}>
+                    {new Date(entry.time).toLocaleTimeString('en-GB', { hour12: false })}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Rider action log */}
-      <RiderActionLog
-        actions={riderActions}
-        isOpen={showActionLog}
-        onToggle={() => setShowActionLog(!showActionLog)}
-        onCancel={(actionId, riderName) => {
-          const action = riderActions.find((a) => a.id === actionId);
-          if (!action) return;
-
-          // Extract rider ID from action ID (format: ${rider.id}-${lapsCounter}-${timestamp})
-          const riderIdStr = actionId.split('-')[0];
-          const rider = riders.find((r) => r.id === Number(riderIdStr));
-          if (!rider || rider.lapsCounter <= 0) return;
-
-          // Revert the last lap
-          const newDetails = (rider.lapsDetails ?? []).slice(0, -1);
-          const prevArrive = newDetails.length > 0
-            ? new Date(newDetails[newDetails.length - 1].endTime).toISOString()
-            : null;
-
-          updateRider({
-            ...rider,
-            lapsCounter: rider.lapsCounter - 1,
-            lapsDetails: newDetails,
-            timeArrive: prevArrive,
-            raceStatus: "running",
-            elapsedLastLap: newDetails.length > 0 ? newDetails[newDetails.length - 1].lapTime : null,
-          });
-
-          // Remove from action log
-          setRiderActions((prev) => prev.filter((a) => a.id !== actionId));
-          toast.success(`Cancelled: ${riderName}`);
-        }}
-      />
     </div>
   );
 };

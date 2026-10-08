@@ -64,34 +64,141 @@
   box-shadow:
     0 12px 24px rgba(99, 166, 252, 0.15),
     0 1px 0 rgba(255, 255, 255, 0.78) inset;
+  animation: infoCardLand var(--beat-3) ease-out;
 }
 
+/* The hero card lands softly over the banner */
+@keyframes infoCardLand {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══ PRO skin: arcade plate — gold top hairline + ledge depth, radius 13 ═══ */
+:root[data-skin="gaming"] .raceInfo {
+  border-radius: 13px;
+  border: 2px solid rgba(16, 48, 94, 0.22);
+  background:
+    linear-gradient(90deg, transparent 8%, rgba(224, 169, 44, 0.85) 50%, transparent 92%)
+      top / 100% 2px no-repeat,
+    linear-gradient(165deg, #ffffff, #f6faff);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 4px 0 rgba(16, 48, 94, 0.16),
+    0 12px 24px rgba(99, 166, 252, 0.15);
+}
+
+/* ── Casino/game-style tab bar (styled after public/casino.png):
+   dark backing, vivid color pills with gold frames + diagonal shine ── */
 .tabs {
   display: flex;
-  margin-top: 25px;
-  background: linear-gradient(180deg, #ffffff, #f2f7ff);
-  border-radius: 14px;
-  padding: 6px;
-  gap: 6px;
-  border: 1px solid #c9defc;
-  box-shadow: 0 10px 18px rgba(99, 166, 252, 0.14);
+  margin-top: 21px;
+  background: linear-gradient(180deg, #262e40, #171d2b);
+  border-radius: 16px;
+  padding: 7px;
+  gap: 7px;
+  border: 1px solid rgba(224, 169, 44, 0.35);
+  box-shadow: 0 10px 18px rgba(10, 16, 30, 0.35);
   overflow-x: auto;
 }
 
 .button {
   flex: 1 0 auto;
   min-width: max-content;
-  font-size: 11px;
-  font-weight: 700;
+  position: relative;
+  overflow: hidden;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.45);
+  border: 2px solid #e0a92c;
+  border-radius: 8px;
+  transform: skewX(-8deg);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.25),
+    0 3px 6px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
+/* Diagonal glossy shine streak across every pill */
+.button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.4) 42%,
+    rgba(255, 255, 255, 0.1) 52%,
+    transparent 56%
+  );
+  pointer-events: none;
+}
+
+/* Each tab gets its own casino colour — vivid, arcade-bright */
+.tabs .button:nth-child(1) { background: linear-gradient(180deg, #ff5040 0%, #c11a0a 100%); }
+.tabs .button:nth-child(2) { background: linear-gradient(180deg, #34a1ff 0%, #0b5ecc 100%); }
+.tabs .button:nth-child(3) { background: linear-gradient(180deg, #d24dff 0%, #8a10c9 100%); }
+.tabs .button:nth-child(4) { background: linear-gradient(180deg, #7ce83c 0%, #3fa60d 100%); }
+.tabs .button:nth-child(5) { background: linear-gradient(180deg, #ffa63d 0%, #cc6a0b 100%); }
+.tabs .button:nth-child(6) { background: linear-gradient(180deg, #3de0ff 0%, #0b9ecc 100%); }
+
+/* Idle tabs stay readable (bright sun) — just a touch muted; the selected
+   one is distinguished by its ring/halo/lift, not by darkening the rest */
+.tabs .button:not(.activeTab) {
+  filter: saturate(0.92) brightness(0.9);
+  border-color: rgba(224, 169, 44, 0.5);
+}
+
+.tabs .button:not(.activeTab):hover {
+  filter: saturate(1) brightness(1);
+}
+
+/* Active tab: full colour, bright ring + gold halo, lifted and enlarged */
 .button.activeTab {
-  letter-spacing: 0.01em;
+  filter: none;
+  opacity: 1;
+  z-index: 1;
+  border-color: #fff7e0;
+  transform: skewX(-8deg) translateY(-2px) scale(1.07);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.25),
+    0 0 0 2px rgba(255, 205, 90, 0.95),
+    0 0 18px rgba(255, 200, 80, 0.65),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.button:active {
+  transform: skewX(-8deg) translateY(1px);
 }
 
 .tabContent {
-  margin-top: 12px;
+  margin-top: 13px;
+  animation: contentReveal var(--beat-3) ease-out;
+}
+
+@keyframes contentReveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .bottom {
@@ -105,4 +212,32 @@
   justify-content: center;
   align-items: center;
   background-color: white;
+}
+
+/* ── Finalized race banner ──────────────────────────────────────────────
+   Sits above the tab bar on a race closed with "Finish Race". Reads as a
+   seal, not an error: this is the desired end state, so it's gold/neutral
+   rather than red. */
+.finalBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(224, 169, 44, 0.16), rgba(224, 169, 44, 0.07));
+  border: 1px solid rgba(224, 169, 44, 0.45);
+  color: #f2e3bd;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.finalBanner strong {
+  color: #ffd464;
+}
+
+.finalBannerIcon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
 }

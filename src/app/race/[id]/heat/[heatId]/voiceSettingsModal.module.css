@@ -80,6 +80,25 @@
   font-size: 14px;
 }
 
+.select {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  background: #fff;
+}
+
 .languageToggle {
   display: flex;
   gap: 8px;
@@ -153,6 +172,23 @@
   font-size: 13px;
   color: #6b7280;
   line-height: 1.4;
+}
+
+.clearBoardBtn {
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: #fdecea;
+  color: #c0392b;
+  border: 1px solid rgba(192, 57, 43, 0.3);
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.clearBoardBtn:hover {
+  background: #fbd8d4;
 }
 
 .footer {

@@ -33,10 +33,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Only ./dist is ever published. This fails the deploy if source maps,
+      # markdown, agent files, tests or config leaked into the output —
+      # see scripts/verify-dist.mjs for the full rule set.
+      - name: Validate deployment artifact
+        run: npm run verify:dist
+
+      - name: List published files
+        run: find ./dist -type f | sort
+
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: ./dist
 
   deploy:
     needs: build

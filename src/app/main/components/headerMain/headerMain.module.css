@@ -16,21 +16,21 @@
 }
 
 .navIconBtn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  border: 1px solid #bfdafb;
-  background: linear-gradient(180deg, #ffffff, #e8f2ff);
+  border-radius: 13px;
+  border: 1px solid var(--border-card);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
   cursor: pointer;
-  box-shadow: 0 8px 16px rgba(86, 145, 231, 0.19);
+  box-shadow: 0 6px 13px var(--shadow-sm), 0 1px 0 rgba(255, 255, 255, 0.25) inset;
 }
 
 .navIconBtn:hover {
-  border-color: #99c5fb;
-  background: linear-gradient(180deg, #ffffff, #dcebff);
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-3));
 }
 
 .navIconBtn:active {
@@ -40,15 +40,51 @@
 .navIcon {
   width: 18px;
   height: 18px;
-  color: #4a7dc4;
+  color: var(--brand-strong);
 }
 
+/* Logo lockup: main word over a small sub-line */
 .head {
-  color: #4f90ea;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.headMain {
+  color: #4f90ea;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.headSub {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em; /* long slogan — keep it tight so it fits on a phone */
+  text-transform: none;   /* lowercase tagline, matches the drawer slogan */
+}
+
+/* ═══ PRO skin: golden-pair lockup — 21px / 13px = φ, arcade italic + gold sub ═══ */
+:root[data-skin="gaming"] .headMain {
+  font-size: var(--fs-md); /* 21px */
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 6px rgba(79, 144, 234, 0.35);
+}
+
+:root[data-skin="gaming"] .headSub {
+  font-size: 10px; /* long slogan — smaller than the 13px it was for "BIKE RACE" */
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #c9930f;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .right {
@@ -58,21 +94,21 @@
 }
 
 .msgBtn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #bfdafb;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff, #e8f2ff);
+  border: 1px solid var(--border-card);
+  border-radius: 13px;
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
   cursor: pointer;
-  box-shadow: 0 8px 16px rgba(86, 145, 231, 0.19);
+  box-shadow: 0 6px 13px var(--shadow-sm), 0 1px 0 rgba(255, 255, 255, 0.25) inset;
 }
 
 .msgBtn:hover {
-  border-color: #99c5fb;
-  background: linear-gradient(180deg, #ffffff, #dcebff);
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-3));
 }
 
 .msgBtn:active {
@@ -82,7 +118,7 @@
 .msgIcon {
   width: 17px;
   height: 17px;
-  color: #4a7dc4;
+  color: var(--brand-strong);
 }
 
 .user {
@@ -109,76 +145,118 @@
   width: 72vw;
   max-width: 280px;
   height: 100vh;
+  height: 100dvh;
   background: linear-gradient(180deg, var(--drawer-bg), var(--drawer-bg-2));
   z-index: 50;
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), background 0.25s ease;
+  box-shadow: 8px 0 34px rgba(0, 0, 0, 0.22);
+  border-radius: 0 21px 21px 0;
+  border-right: 1px solid var(--drawer-border);
+  overflow: hidden;
 }
 
 .drawerOpen {
   transform: translateX(0);
 }
 
+/* Everything below the header scrolls on its own — the drawer itself is a
+   fixed 100vh box with overflow:hidden (for the rounded-corner clip), so
+   without this the bottom of a tall drawer (Joker checkbox, feedback email,
+   version) just gets clipped off with no way to reach it on short viewports. */
+.drawerScroll {
+  flex: 1;
+  min-height: 0;
+  /* Plain BLOCK scroller — not a flex column. A nested flex column that is also
+     the overflow container compresses its children to fit on iOS Safari/Chrome
+     instead of overflowing, so it never scrolls and the bottom (feedback +
+     version) is unreachable. Block flow + overflow-y scrolls reliably. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 .drawerHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 16px 16px;
+  padding: 21px 16px 13px;
   border-bottom: 1px solid var(--drawer-border);
 }
 
+.drawerTitleContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .drawerTitle {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 900;
+  font-style: italic;
   color: #4f90ea;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.drawerSlogan {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
 }
 
 .closeBtn {
   width: 34px;
   height: 34px;
-  border: 1px solid #bfdafb;
+  border: 1px solid var(--border-card);
   border-radius: 11px;
-  background: linear-gradient(180deg, #ffffff, #e8f2ff);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
 
+.closeBtn:active {
+  transform: translateY(1px);
+}
+
 .closeIcon {
   width: 16px;
   height: 16px;
-  color: #5c8fce;
+  color: var(--brand-strong);
 }
 
 .drawerAvatar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 16px 20px;
+  padding: 21px 16px 16px;
   border-bottom: 1px solid var(--drawer-border);
-  gap: 4px;
+  gap: 3px;
+  background:
+    radial-gradient(200px 100px at 50% 0%, rgba(99, 166, 252, 0.1), transparent 70%);
 }
 
 .avatarImg {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 2px solid #63a6fc;
+  border: 2px solid var(--brand);
   padding: 3px;
   box-sizing: border-box;
   object-fit: cover;
   margin-bottom: 6px;
+  box-shadow: 0 0 0 5px rgba(99, 166, 252, 0.14), 0 5px 13px var(--shadow-sm);
 }
 
 .avatarName {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--text-primary);
 }
 
@@ -191,19 +269,18 @@
 .drawerNav {
   display: flex;
   flex-direction: column;
-  padding: 12px 0;
-  flex: 1;
+  padding: 13px 0;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 20px;
+  gap: 13px;
+  padding: 13px 16px;
   background: transparent;
   border: none;
-  border-radius: 12px;
-  margin: 0 10px 4px;
+  border-radius: 13px;
+  margin: 0 10px 5px;
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
@@ -212,25 +289,156 @@
   width: calc(100% - 20px);
   transition:
     background 0.15s,
-    color 0.15s;
+    color 0.15s,
+    transform 0.15s;
   -webkit-tap-highlight-color: transparent;
+}
+
+.navItem:hover {
+  background: var(--bg-surface);
+  transform: translateX(3px);
+}
+
+/* Classic skin only — a flat list of transparent-border rows read as one
+   messy block once there were enough of them (Login, Contact, My Races,
+   template download…). A hairline border per row gives each its own edge.
+   Gaming skin's bold/gold treatment already reads as distinct rows, so it's
+   deliberately excluded here. */
+:root:not([data-skin="gaming"]) .navItem {
+  border: 1px solid var(--drawer-border);
+}
+
+/* Reusable "not live yet" flag for nav items whose backend isn't ready
+   (e.g. Register/Login — LOGIN_ENABLED is false until sign-up has a
+   backend). Pushed to the row's end via margin-left:auto on the flex row. */
+.soonBadge {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0384c;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* The template-download row is an <a>, not a <button> — kill link styling so it
+   matches the other nav items. */
+.navItemLink {
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .navItem:active {
   background: var(--bg-surface);
 }
 
+/* Menu items cascade in each time the drawer opens (89ms Fibonacci beat) */
+.drawerOpen .navItem {
+  animation: navItemIn var(--beat-3) ease-out backwards;
+}
+
+.drawerOpen .navItem:nth-child(1) { animation-delay: calc(var(--stagger) * 1); }
+.drawerOpen .navItem:nth-child(2) { animation-delay: calc(var(--stagger) * 2); }
+.drawerOpen .navItem:nth-child(3) { animation-delay: calc(var(--stagger) * 3); }
+.drawerOpen .navItem:nth-child(4) { animation-delay: calc(var(--stagger) * 4); }
+.drawerOpen .navItem:nth-child(5) { animation-delay: calc(var(--stagger) * 5); }
+.drawerOpen .navItem:nth-child(6) { animation-delay: calc(var(--stagger) * 6); }
+
+@keyframes navItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-13px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Icon sits in a small brand-tinted tile — scannable, modern */
 .navItemIcon {
-  width: 18px;
-  height: 18px;
-  color: #5c8fce;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(99, 166, 252, 0.12);
+  color: var(--brand-strong);
   flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ═══ PRO skin: gold arcade drawer accents ═══ */
+:root[data-skin="gaming"] .drawerTitle {
+  color: #c9930f;
+}
+
+:root[data-skin="gaming"] .navItemIcon {
+  background: rgba(224, 169, 44, 0.14);
+  color: #c9930f;
+}
+
+:root[data-skin="gaming"] .navItem {
+  font-weight: 800;
 }
 
 /* ─── Theme picker (bottom of drawer) ──────────────────────────────────────── */
 .themeSection {
   padding: 14px 16px 20px;
   border-top: 1px solid var(--drawer-border);
+}
+
+.drawerFooter {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--drawer-border);
+}
+
+/* Feedback block — same rhythm as .themeSection so the drawer reads as one list */
+.feedbackSection {
+  padding: 14px 16px 18px;
+  border-top: 1px solid var(--drawer-border);
+}
+
+.feedbackTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.feedbackIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.feedbackText {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.feedbackLink {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent, #63a6fc);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.feedbackLink:hover,
+.feedbackLink:focus-visible {
+  text-decoration: underline;
 }
 
 .themeSectionLabel {
@@ -248,6 +456,42 @@
 .themeSectionIcon {
   width: 13px;
   height: 13px;
+}
+
+.jokerToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #14243c);
+  cursor: pointer;
+}
+
+.jokerToggleRow input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.jokerToggleDesc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.boardHoldSelect {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #14243c);
+  background: var(--bg-surface, #f5f8fc);
+  border: 1px solid var(--border-card, #d6dfeb);
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 .themeOptions {
@@ -328,4 +572,55 @@
 
 .themeLabelActive {
   color: var(--brand);
+}
+
+/* Language picker — same swatch/label rhythm as the theme picker, but wraps
+   to a grid instead of one space-between row since there are 8 options, not 3. */
+.languageGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.languageOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 56px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.languageOption:active {
+  background: var(--bg-surface);
+}
+
+.languageFlag {
+  width: 38px;
+  height: 27px;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.languageFlag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.languageFlagActive {
+  border-color: var(--brand);
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--brand), 0 2px 8px rgba(0, 0, 0, 0.22);
 }

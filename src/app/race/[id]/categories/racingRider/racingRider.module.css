@@ -11,13 +11,63 @@
   cursor: pointer;
   user-select: none;
   position: relative;
-  transition: transform 0.1s, box-shadow 0.1s;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  /* Layered shadow (contact + ambient) plus a hairline top highlight reads
+     as a real raised card instead of a flat colour swatch. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 2px rgba(10, 20, 40, 0.08),
+    0 4px 10px rgba(10, 20, 40, 0.14);
+}
+
+/* Pointer devices only — phones/tablets never get a hover state stuck on
+   after a tap. */
+@media (hover: hover) {
+  .rider:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      0 2px 4px rgba(10, 20, 40, 0.1),
+      0 8px 16px rgba(10, 20, 40, 0.18);
+  }
 }
 
 .rider:active {
   transform: scale(0.91);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 3px rgba(10, 20, 40, 0.15);
+}
+
+/* ── Still on track: this rider's race has ended but they haven't finished.
+   Amber outline + pulsing ribbon so the organizer can't miss who's on the road. */
+.onTrack {
+  outline: 3px solid #f5a623;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.25), 0 2px 8px rgba(0,0,0,0.18);
+  padding-top: 16px;
+}
+
+.onTrackRibbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #f5a623;
+  color: #3a2600;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 2px 0;
+  border-radius: 16px 16px 0 0;
+  animation: onTrackPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes onTrackPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 /* Bell / flag badges sit top-right */
@@ -88,10 +138,14 @@
 }
 
 .remaining {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(0,0,0,0.55);
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.65);
   margin-top: -1px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  line-height: 1.4;
 }
 
 .lapTime {
@@ -118,10 +172,172 @@
   color: rgba(0,0,0,0.85);
 }
 
-/* Podium (positions 1–3): light font so it pops off the category color */
-.posPodium {
-  color: rgba(255,255,255,0.95);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+/* Podium medal (positions 1–3): the position number becomes a small metal chip
+   — gold / silver / bronze — so the top 3 of every category read at a glance.
+   Small and low-key on purpose; only the colour carries the signal. */
+.posMedal {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  color: #2a2000;
+  text-shadow: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.posGold   { background: linear-gradient(180deg, #ffe27a, #f4b300); }
+.posSilver { background: linear-gradient(180deg, #f6f8fa, #c2ccd6); }
+.posBronze { background: linear-gradient(180deg, #f0b27a, #cd7f32); color: #fff; }
+
+/* P1 gets a hair more presence — a soft gold ring — so the actual leader of
+   each category is the one thing that draws the eye first. */
+.posMedal.posGold {
+  box-shadow: 0 0 0 2px rgba(244, 179, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* PRO skin sets .pos to skewed pink text (0,3,0) — re-assert the chip so the
+   medal colours win and the number sits straight inside the pill. */
+:root[data-skin="gaming"] .posMedal {
+  color: #2a2000;
+  transform: none;
+  text-shadow: none;
+}
+:root[data-skin="gaming"] .posBronze { color: #fff; }
+
+/* ═══ PRO skin (data-skin="gaming"): arcade card treatment ═══
+   The category colour is injected as an inline `background`, which resets
+   background-image — so the gloss layer needs !important to win. */
+:root[data-skin="gaming"] .rider {
+  border-radius: 12px;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 45%, rgba(0, 0, 0, 0.1) 55%, rgba(0, 0, 0, 0.24) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.05) 0% 25%, transparent 0% 50%) !important;
+  background-size: auto, 14px 14px !important;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 0 rgba(0, 0, 0, 0.28),
+    0 8px 14px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-skin="gaming"] .rider:active {
+  transform: translateY(3px) scale(0.97);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 0 rgba(0, 0, 0, 0.28),
+    0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* PRO text: light-pink kit lettering with a dark edge — the default dark ink
+   drowns in the darkened bottom gloss on deep category colours */
+:root[data-skin="gaming"] .bib {
+  font-size: 26px;
+  font-style: italic;
+  color: #ffd6e8;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-skin="gaming"] .pos {
+  font-style: italic;
+  font-size: 16px;
+  transform: skewX(-10deg);
+  color: #ffd6e8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .laps {
+  color: rgba(255, 214, 232, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .lapsLabel {
+  color: rgba(255, 214, 232, 0.75);
+}
+
+:root[data-skin="gaming"] .remaining {
+  color: rgba(255, 214, 232, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  background: transparent;
+  padding: 0;
+}
+
+:root[data-skin="gaming"] .lapTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: rgba(255, 214, 232, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .lapTimeCell + .lapTimeCell {
+  border-left-color: rgba(255, 214, 232, 0.45);
+}
+
+/* ═══ PRO-only pace ring ═══
+   Fraction of the rider's own last-lap time elapsed since their last arrival,
+   traced clockwise as a solid line around the card's actual measured edge
+   starting at top-center — "the start line" (RacingRider.tsx measures the
+   card via ResizeObserver — its height is only a min-height, so it can
+   render taller than the CSS default). Sampled on its own 10s tick,
+   independent of the 1s "since arrival" tick used for the text row. Only the
+   elapsed portion is drawn — nothing paints ahead of "now". A small
+   triangle-in-circle marker rides the tip, rotated to the ring's own
+   direction of travel, so the commissaire reads direction at a glance, not
+   just position (user req). */
+.paceRing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.paceRingPath {
+  fill: none;
+  stroke: #34d058;
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+}
+
+.paceMarkerCircle {
+  fill: #34d058;
+  stroke: #fff;
+  stroke-width: 1px;
+}
+
+.paceMarkerTriangle {
+  fill: #fff;
+}
+
+/* Tip marker: where "now" actually is on the pace trail */
+.paceMarkerCurrent {
+  animation: paceDotBlink 1s ease-in-out infinite;
+}
+
+/* Overdue: the ring itself stays fully solid (it never collapses) — only the
+   tip marker, which lands back at the top-center start line once a rider is
+   overdue, turns red and blinks SLOWLY — a calm, low-attention "still
+   waiting for this rider to cross" cue for the commissaire (user req). */
+.paceMarkerWaiting {
+  animation: paceDotWaitingBlink 2.2s ease-in-out infinite;
+}
+
+.paceMarkerWaiting .paceMarkerCircle {
+  fill: #e02020;
+}
+
+@keyframes paceDotBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.15; }
+}
+
+@keyframes paceDotWaitingBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
 }
 
 /* Click/voice-confirm flash — one-shot bright glow that fades out */
@@ -133,4 +349,39 @@
   0%   { box-shadow: 0 0 0 5px #fff, 0 0 34px 14px var(--glow-color, #fff); }
   30%  { box-shadow: 0 0 0 3px rgba(255,255,255,0.7), 0 0 22px 7px var(--glow-color, #fff); }
   100% { box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+}
+
+/* ── Recorded, waiting for the board hold ──────────────────────────────────
+   The lap is in; the card just hasn't dropped to the bottom yet because riders
+   are still arriving. The flash only lasts ~1s and only ever plays on the most
+   recently tapped card, so it can't carry this — during a 20-rider bunch the
+   commissaire needs to see, at a glance, every card that's already done.
+   A washed-out overlay (not `filter`/`opacity` on the card, which would drag
+   the tick down with it) plus a green tick. */
+.recorded::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.recordedTick {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 19px;
+  text-align: center;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  z-index: 2;
 }

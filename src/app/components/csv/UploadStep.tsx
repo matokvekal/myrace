@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, DragEvent } from "react";
-import { Camera } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Camera, Download } from "lucide-react";
 import type { MappingTemplate } from "@/types/csv.types";
 import { getAllTemplates } from "@/services/templateStorage";
 import styles from "./uploadStep.module.css";
@@ -23,6 +24,7 @@ function formatDate(ts: number): string {
 }
 
 export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProps) {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [templates, setTemplates] = useState<MappingTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<MappingTemplate | null>(null);
@@ -78,16 +80,38 @@ export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProp
             <li><strong>Category</strong> - קטגוריה / Category</li>
             <li><strong>Team</strong> - קבוצה / Team / Club</li>
             <li><strong>Heat</strong> - מקצה / Heat</li>
-            <li><strong>Total Laps</strong> - סיבובים / Laps</li>
+            <li><strong>Total Laps</strong> - הקפות / Laps</li>
             <li><strong>Start Time</strong> - שעת התחלה / Start Time</li>
-            <li><strong>Position</strong> - מיקום / Position</li>
+            <li><strong>Standing</strong> - דירוג / Standing (pre-race ranking — not the bib)</li>
+            <li><strong>Points</strong> - ניקוד / Points</li>
           </ul>
+          <p className={styles.fieldsNote}>
+            Categories are flat — put the age band in the category itself
+            (e.g. <span dir="auto">"מאסטרס גברים 30-39"</span>). A sub-category
+            column is ignored on import.
+          </p>
         </div>
 
         <div className={styles.exampleNote}>
           <strong>Note:</strong> The system will automatically detect encoding,
           delimiter, and skip metadata rows.
         </div>
+
+        {/* A filled-in template organizers can copy — see BUGS.md #11 */}
+        <a
+          className={styles.exampleLink}
+          href={`${import.meta.env.BASE_URL}example.csv`}
+          download="example.csv"
+        >
+          <Download size={16} />
+          Download example.csv
+        </a>
+        <p className={styles.exampleHint}>
+          A ready-made start list you can fill in and send to organizers. Note that{" "}
+          <strong>Bib</strong> (מספר רוכב) and <strong>Standing</strong> (דירוג) are
+          separate columns — the bib is the rider's plate number, the standing is
+          their pre-race ranking.
+        </p>
       </div>
 
       <div
@@ -144,8 +168,14 @@ export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProp
       {onScanClick && (
         <div className={styles.scanRow}>
           <span className={styles.scanDivider}>or</span>
-          <button type="button" className={styles.scanButton} onClick={onScanClick}>
-            <Camera size={18} /> Scan Start List (photo)
+          <button
+            type="button"
+            className={styles.scanButton}
+            disabled
+            title={t("scan.tooltip", "Scan Start List (photo) — coming soon")}
+          >
+            <Camera size={18} /> {t("scan.listPhoto", "Scan Start List (photo)")}
+            <span className={styles.comingSoonBadge}>{t("scan.soon", "Soon")}</span>
           </button>
         </div>
       )}

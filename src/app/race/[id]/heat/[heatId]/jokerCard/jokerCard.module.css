@@ -1,0 +1,90 @@
+.joker {
+  width: 76px;
+  min-height: 84px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(120, 70, 210, 0.14) 0 8px,
+    rgba(120, 70, 210, 0.24) 8px 16px
+  );
+  border: 2px dashed rgba(120, 70, 210, 0.65);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.joker:active {
+  transform: scale(0.91);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.bikeIcon {
+  width: 22px;
+  height: 22px;
+  color: #5b2fa8;
+}
+
+.sequence {
+  font-size: 13px;
+  font-weight: 900;
+  color: #3a1f6e;
+}
+
+.since {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(58, 31, 110, 0.75);
+}
+
+/* ═══ PRO skin: arcade treatment — same 3D-press language as the racing
+   rider cards (chunky drop shadow, conic-texture gloss, italic pink-on-navy
+   text) instead of the plain dashed placeholder look. ═══ */
+:root[data-skin="gaming"] .joker {
+  border-radius: 12px;
+  border: 2px solid #e0a92c;
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.07) 0% 25%, transparent 0% 50%),
+    linear-gradient(145deg, #6b3fc9, #3a1f6e 60%, #241147);
+  background-size: 14px 14px, auto;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 4px 0 rgba(0, 0, 0, 0.28),
+    0 8px 14px rgba(58, 31, 110, 0.4);
+}
+
+:root[data-skin="gaming"] .joker:active {
+  transform: translateY(3px) scale(0.97);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 1px 0 rgba(0, 0, 0, 0.28),
+    0 3px 8px rgba(58, 31, 110, 0.32);
+}
+
+:root[data-skin="gaming"] .bikeIcon {
+  width: 24px;
+  height: 24px;
+  color: #ffd6e8;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+:root[data-skin="gaming"] .sequence {
+  font-style: italic;
+  font-weight: 900;
+  color: #ffd6e8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-skin="gaming"] .since {
+  font-weight: 800;
+  color: rgba(255, 214, 232, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

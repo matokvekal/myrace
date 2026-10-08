@@ -21,3 +21,25 @@
 .emptyBtn:hover {
   background: #f5f3ff;
 }
+
+.emptyBtn:disabled {
+  cursor: not-allowed;
+  color: #a9a9c0;
+  border-color: #d8d8ea;
+  background: #fafaff;
+}
+
+.emptyBtn:disabled:hover {
+  background: #fafaff;
+}
+
+.comingSoonBadge {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #7a5b0e;
+  background: #ffe9b3;
+  border-radius: 999px;
+}
