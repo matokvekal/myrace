@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { CategoryProps, RiderProps, RaceFinalization } from "@/types/types";
+import type { CategoryProps, RiderProps, RaceFinalization, RaceTrack, TrackMarker } from "@/types/types";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { riderInCategory, catWaveKey } from "../race/[id]/schedule/Schedule";
 import { verifyExportToken } from "./raceSignature";
@@ -19,6 +19,8 @@ export interface ImportResult {
    * "finalized" row must not be able to lock someone else's race.
    */
   finalized?: RaceFinalization;
+  /** Course maps carried in the file (absent in files exported before multi-map support). */
+  tracks?: RaceTrack[];
 }
 
 /** Parse + self-verify the finalization record stored on the Race sheet. */
@@ -61,6 +63,15 @@ function sheetToObjects(sheet: XLSX.WorkSheet): Record<string, string>[] {
   });
 }
 
+function parseKeyList(v: string | undefined): string[] {
+  try {
+    const arr = v ? JSON.parse(v) : [];
+    return Array.isArray(arr) ? arr.filter((k) => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array", cellDates: false });
@@ -97,6 +108,7 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     lapsCounter: parseNum(row.lapsCounter),
     riders: parseNum(row.riders),
     isConnected: false,
+    importOrder: row.importOrder ? parseNum(row.importOrder) : undefined,
   }));
 
   // ── Riders ──────────────────────────────────────────────────────
@@ -112,9 +124,21 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
       }
     } catch { lapsDetails = []; }
 
+    let extraFields: RiderProps["extraFields"];
+    try {
+      if (row.extraFields) {
+        const parsed = JSON.parse(row.extraFields);
+        if (parsed && typeof parsed === "object") extraFields = parsed;
+      }
+    } catch { extraFields = undefined; }
+
     return {
       id: parseNum(row.id),
       raceUuid,
+      standing: row.standing !== "" && row.standing !== undefined ? parseNum(row.standing) : null,
+      uciPoints: row.uciPoints ? parseNum(row.uciPoints) : null,
+      uciNumber: parseNullableStr(row.uciNumber),
+      extraFields,
       bibNumber: parseNum(row.bibNumber),
       firstName: row.firstName ?? "",
       middleName: parseNullableStr(row.middleName),
@@ -148,11 +172,51 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     };
   });
 
+  // ── Course maps (optional sheets) ───────────────────────────────
+  let tracks: RaceTrack[] | undefined;
+  const trackSheet = wb.Sheets["Tracks"];
+  if (trackSheet) {
+    const byId = new Map<string, RaceTrack>();
+    for (const row of sheetToObjects(trackSheet)) {
+      if (!row.id) continue;
+      const lat = parseFloat(row.centerLat);
+      const lng = parseFloat(row.centerLng);
+      byId.set(row.id, {
+        id: row.id,
+        title: row.title ?? "",
+        header: row.header ?? "",
+        color: row.color || "#3b82f6",
+        points: [],
+        markers: [],
+        center: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined,
+        zoom: row.zoom !== "" && row.zoom !== undefined ? parseNum(row.zoom) : undefined,
+        categoryKeys: parseKeyList(row.categories),
+      });
+    }
+    const pointSheet = wb.Sheets["TrackPoints"];
+    if (pointSheet) {
+      // seq keeps the original order — point order IS the direction of travel
+      const rows = sheetToObjects(pointSheet).sort((a, b) => parseNum(a.seq) - parseNum(b.seq));
+      for (const row of rows) {
+        const t = byId.get(row.trackId);
+        const lat = parseFloat(row.lat);
+        const lng = parseFloat(row.lng);
+        if (!t || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        if (row.kind === "route") t.points.push([lat, lng]);
+        else if (row.kind === "marker") {
+          t.markers.push({ lat, lng, label: row.label, type: (row.type || "point") as TrackMarker["type"] });
+        }
+      }
+    }
+    tracks = [...byId.values()];
+  }
+
   return {
     raceUuid,
     categories,
     riders,
     raceName,
+    tracks,
     finalized: await parseFinalized(raceRows["finalized"]),
   };
 }

@@ -89,16 +89,20 @@ export function withCategoryLaps<
 
 export function normalizeTime(t: string | null | undefined): string | null {
   if (!t) return null;
-  const m = t.match(/^(\d{1,2}):(\d{2})/);
+  const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (!m) return null;
-  return `${m[1].padStart(2, "0")}:${m[2]}`;
+  const hhmm = `${m[1].padStart(2, "0")}:${m[2]}`;
+  // Seconds are kept when non-zero: 08:22 and 08:22:30 are two separate starts
+  // (a category released 30 s after the previous one), not the same slot.
+  return m[3] && m[3] !== "00" ? `${hhmm}:${m[3]}` : hhmm;
 }
 
+/** Minutes since midnight; seconds count as a fraction (08:22:30 → 502.5). */
 export function toMinutes(t: string | null | undefined): number {
   const norm = normalizeTime(t);
   if (!norm) return Infinity;
-  const [h, m] = norm.split(":").map(Number);
-  return h * 60 + m;
+  const [h, m, s = 0] = norm.split(":").map(Number);
+  return h * 60 + m + s / 60;
 }
 
 export function minutesToTime(mins: number): string {
@@ -252,6 +256,19 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const [waves, setWaves] = useState<Wave[]>([]);
   const [unassignedCategories, setUnassignedCategories] = useState<CategoryProps[]>([]);
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set());
+  const [editLaps, setEditLaps] = useState(false);
+
+  // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
+  // laps, and every rider in it gets the new total (laps || rider.totalLaps).
+  const setCategoryLaps = async (cat: CategoryProps, laps: number) => {
+    const next = Math.max(0, laps);
+    if (next === (cat.laps ?? 0)) return;
+    const updated = { ...cat, laps: next };
+    await updateCategory(updated);
+    for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, cat))) {
+      await updateRider({ ...rider, color: updated.color, totalLaps: updated.laps || rider.totalLaps });
+    }
+  };
 
   const toggleCat = (catId: number) => {
     setExpandedCats((prev) => {
@@ -561,6 +578,14 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
         >
           {allExpanded ? <ChevronsUp size={16} /> : <ChevronsDown size={16} />}
         </button>
+        <Button
+          variant={editLaps ? "primary" : "secondary"}
+          size="sm"
+          startIcon={editLaps ? <Check size={14} /> : <Edit2 size={14} />}
+          onClick={() => setEditLaps((v) => !v)}
+        >
+          {editLaps ? "Done" : "Edit Laps"}
+        </Button>
         <Button variant="secondary" size="sm" startIcon={<Edit2 size={14} />} onClick={enterEditMode}>
           Edit Schedule
         </Button>
@@ -665,7 +690,28 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                               <span className={styles.catMeta}> · {cat.subCategory}</span>
                             )}
                             <span className={styles.catMeta}>
-                              {catRiders.length} riders · {cat.laps ?? 0} laps
+                              {catRiders.length} riders
+                            </span>
+                            <span
+                              className={`${styles.lapsEditor} ${(cat.laps ?? 0) > 0 ? "" : styles.lapsMissing} ${editLaps ? styles.lapsEditing : ""}`}
+                              title={(cat.laps ?? 0) > 0 ? "Laps" : "Laps not set"}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {editLaps && (cat.laps ?? 0) > 0 && (
+                                <button
+                                  type="button"
+                                  className={styles.lapsBtn}
+                                  onClick={() => setCategoryLaps(cat, (cat.laps ?? 0) - 1)}
+                                >−</button>
+                              )}
+                              <span className={styles.lapsValue}>{cat.laps ?? 0} laps</span>
+                              {editLaps && (
+                                <button
+                                  type="button"
+                                  className={styles.lapsBtn}
+                                  onClick={() => setCategoryLaps(cat, (cat.laps ?? 0) + 1)}
+                                >+</button>
+                              )}
                             </span>
                           </div>
                           {(() => {

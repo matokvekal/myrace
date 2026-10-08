@@ -8,7 +8,7 @@ import type {
   ValidationIssue,
   RiderFieldKey
 } from "@/types/csv.types";
-import { splitFullName } from "@/services/csvMapper";
+import { splitFullName, resolveColumnRules } from "@/services/csvMapper";
 import styles from "./previewStep.module.css";
 
 interface PreviewStepProps {
@@ -89,23 +89,40 @@ export default function PreviewStep({
 
   const validateData = () => {
     const issues: ValidationIssue[] = [];
-    const bibNumbers = new Set<string>();
+
+    // Per-column rules chosen in the mapping step (defaults if it was skipped).
+    // Violations are warnings: a rider with a blank or repeated value is still a
+    // rider and is imported — the manager fixes it before the start (StartManager).
+    const rules = mappings.map((m, i) =>
+      m.targetField && m.targetField !== "infoField"
+        ? resolveColumnRules(m, i, parseResult.rows)
+        : null
+    );
+    const seen = mappings.map(() => new Set<string>());
 
     parseResult.rows.forEach((row, rowIndex) => {
       const rider = parseRowToRider(row);
       const lineNumber = rowIndex + 1 + parseResult.detection.headerRow;
 
-      if (!rider.bibNumber) {
-        issues.push({ row: lineNumber, field: "bibNumber", message: "Bib number is required", severity: "error", value: "" });
-      } else if (bibNumbers.has(rider.bibNumber)) {
-        issues.push({ row: lineNumber, field: "bibNumber", message: "Duplicate bib number", severity: "error", value: rider.bibNumber });
-      } else {
-        bibNumbers.add(rider.bibNumber);
-      }
-
-      if (!rider.firstName && !rider.fullName) {
-        issues.push({ row: lineNumber, field: "firstName", message: "First name is required", severity: "warning", value: "" });
-      }
+      mappings.forEach((m, i) => {
+        const rule = rules[i];
+        if (!rule || !m.targetField) return;
+        const value = String(row[i] ?? "").trim();
+        const label = m.sourceColumn || m.targetField;
+        if (!value) {
+          if (rule.required) {
+            issues.push({ row: lineNumber, field: m.targetField, message: `${label} is empty (required)`, severity: "warning", value: "" });
+          }
+          return;
+        }
+        if (rule.unique) {
+          if (seen[i].has(value)) {
+            issues.push({ row: lineNumber, field: m.targetField, message: `${label} "${value}" is not unique`, severity: "warning", value });
+          } else {
+            seen[i].add(value);
+          }
+        }
+      });
 
       if (rider.heat) {
         const heatNum = parseInt(rider.heat);

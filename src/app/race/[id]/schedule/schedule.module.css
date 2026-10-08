@@ -297,6 +297,56 @@
   color: var(--text-secondary);
 }
 
+/* Per-category laps stepper; red when laps are still 0 so it needs setting */
+.lapsEditor {
+  display: inline-flex;
+  /* .catInfo is a column flex box: without this the pill stretches the full row */
+  align-self: flex-start;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  vertical-align: middle;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+.lapsMissing {
+  background: #e53935;
+  color: #fff;
+}
+
+.lapsBtn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lapsEditing {
+  padding: 0 3px;
+}
+
+.lapsValue {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.lapsEditing .lapsValue {
+  min-width: 38px;
+}
+
 .statusBadge {
   font-size: 10px;
   font-weight: 700;

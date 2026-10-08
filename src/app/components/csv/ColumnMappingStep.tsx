@@ -6,7 +6,8 @@ import { FIELD_KEYWORDS, IGNORED_FIELDS } from "@/types/csv.types";
 import {
   getColumnSuggestions,
   confirmMapping,
-  detectNameSplitting
+  detectNameSplitting,
+  resolveColumnRules
 } from "@/services/csvMapper";
 import {
   getAllTemplates,
@@ -21,6 +22,8 @@ interface ColumnMappingStepProps {
   headers: string[];
   mappings: ColumnMapping[];
   sampleRows: string[][];
+  /** Every data row — needed to tell whether a column is empty throughout. */
+  allRows: string[][];
   onConfirm: (mappings: ColumnMapping[]) => void;
   onBack: () => void;
   suggestedName?: string;
@@ -41,6 +44,7 @@ export default function ColumnMappingStep({
   headers,
   mappings: initialMappings,
   sampleRows,
+  allRows,
   onConfirm,
   onBack,
   suggestedName = ""
@@ -82,7 +86,10 @@ export default function ColumnMappingStep({
       targetField: newField,
       confidence: newField ? 100 : 0,
       isAutoMapped: false,
-      needsConfirmation: false
+      needsConfirmation: false,
+      // A different field gets fresh defaults, not the old field's choices
+      required: undefined,
+      unique: undefined
     };
     setMappings(updated);
     // "Keep as info" is a per-file, freeform choice (BUGS.md #7) — don't teach
@@ -144,7 +151,16 @@ export default function ColumnMappingStep({
       alert("Please map at least the Bib Number field to continue.");
       return;
     }
-    onConfirm(mappings);
+    // Freeze the effective rules so the preview validates exactly what was shown
+    onConfirm(
+      mappings.map((m, i) => ({ ...m, ...resolveColumnRules(m, i, allRows) }))
+    );
+  };
+
+  const setRule = (index: number, rule: "required" | "unique", value: boolean) => {
+    setMappings((prev) =>
+      prev.map((m, i) => (i === index ? { ...m, [rule]: value } : m))
+    );
   };
 
   const FIELD_LABELS: Record<string, string> = {
@@ -370,6 +386,26 @@ export default function ColumnMappingStep({
               {mapping.targetField && FIELD_HINTS[mapping.targetField] && (
                 <div className={styles.fieldHint}>
                   {FIELD_HINTS[mapping.targetField]}
+                </div>
+              )}
+              {mapping.targetField && mapping.targetField !== "infoField" && (
+                <div className={styles.ruleRow}>
+                  <label title="Rows where this is empty are flagged in the preview">
+                    <input
+                      type="checkbox"
+                      checked={resolveColumnRules(mapping, index, allRows).required}
+                      onChange={(e) => setRule(index, "required", e.target.checked)}
+                    />{" "}
+                    Required
+                  </label>
+                  <label title="Rows repeating an earlier value are flagged in the preview">
+                    <input
+                      type="checkbox"
+                      checked={resolveColumnRules(mapping, index, allRows).unique}
+                      onChange={(e) => setRule(index, "unique", e.target.checked)}
+                    />{" "}
+                    Unique
+                  </label>
                 </div>
               )}
             </div>

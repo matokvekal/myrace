@@ -367,6 +367,23 @@ export async function autoMapColumns(
 }
 
 /**
+ * Effective "required" / "unique" rules for a mapped column. Unset flags fall
+ * back to the defaults: required unless the column is empty in every row (then
+ * demanding it would flag the whole file), and not unique.
+ */
+export function resolveColumnRules(
+   mapping: ColumnMapping,
+   colIdx: number,
+   rows: string[][]
+): { required: boolean; unique: boolean } {
+   const hasData = rows.some((r) => String(r[colIdx] ?? '').trim() !== '');
+   return {
+      required: mapping.required ?? hasData,
+      unique: mapping.unique ?? false
+   };
+}
+
+/**
  * Get suggestions for a specific column
  * Returns top 3 suggestions
  */

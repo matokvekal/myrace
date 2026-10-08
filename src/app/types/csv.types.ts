@@ -73,6 +73,10 @@ export interface ColumnMapping {
    confidence: number;        // 0-100
    isAutoMapped: boolean;     // True if auto-detected
    needsConfirmation: boolean; // True if confidence < 85%
+   /** Value must be present in every row. Unset → default: yes, unless the whole column is empty. */
+   required?: boolean;
+   /** Values must not repeat across rows. Unset → default: no. */
+   unique?: boolean;
 }
 
 export interface ColumnMappingSuggestion {
@@ -273,7 +277,10 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
       field: 'category',
       hebrew: [
          'קטגוריה', 'קט\'', 'קט.', 'קטגורייה',
-         'שכבה', 'ענף', 'סוג', 'מחלקה'
+         'שכבה', 'ענף', 'סוג', 'מחלקה',
+         // "מקצה" is the race class in start lists ("מקצה תחרות" = the category),
+         // not a wave. Waves come from a wave column or, absent one, start times.
+         'מקצה', 'מקצה תחרות'
       ],
       english: [
          'category', 'cat', 'cat.',
@@ -325,13 +332,15 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
       field: 'heat',
       hebrew: [
          'גל', 'גל התחלה', 'גל פתיחה', 'גל מס\'',
-         'מקצה', 'סבב', 'קבוצת התחלה', 'קבוצת פתיחה',
+         // Some organisers mark the wave by colour ("אדום" / "Red" → one wave)
+         'צבע', 'צבע גל', 'סבב', 'קבוצת התחלה', 'קבוצת פתיחה',
          'עלייה', 'שלב'
       ],
       english: [
          'wave', 'wave no', 'wave number', 'wave#', 'wave num',
          'heat', 'heat no', 'heat number', 'heat#',
          'flight', 'flight no',
+         'color', 'colour', 'wave color', 'wave colour',
          'start group', 'start wave', 'start heat', 'startgroup',
          'group no', 'group number'
       ],

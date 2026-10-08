@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { TrackMarker } from '@/types/types';
+import { directionArrows } from '@/utils/raceTracks';
 import styles from './raceMap.module.css';
 
 interface RaceMapProps {
@@ -12,6 +13,10 @@ interface RaceMapProps {
   trackPoints?: [number, number][];
   /** Named waypoints to drop on the map. */
   markers?: TrackMarker[];
+  /** Route colour (each map of a race has its own). */
+  trackColor?: string;
+  /** Live GPS fix to show as a "you are here" dot. */
+  myLocation?: { lat: number; lng: number; accuracy?: number } | null;
   location?: string;
   title?: string;
   /** When true the map fills its container without the card chrome. */
@@ -48,6 +53,8 @@ const RaceMap: React.FC<RaceMapProps> = ({
   zoom,
   trackPoints,
   markers,
+  trackColor = '#3b82f6',
+  myLocation,
   location,
   title = 'Race Location',
   bare = false,
@@ -59,6 +66,7 @@ const RaceMap: React.FC<RaceMapProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const trackLayerRef = useRef<L.LayerGroup | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const meLayerRef = useRef<L.LayerGroup | null>(null);
 
   // Keep latest callbacks without re-initialising the map.
   const clickRef = useRef(onMapClick);
@@ -81,6 +89,7 @@ const RaceMap: React.FC<RaceMapProps> = ({
 
     trackLayerRef.current = L.layerGroup().addTo(map);
     markerLayerRef.current = L.layerGroup().addTo(map);
+    meLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
     map.on('click', (e: L.LeafletMouseEvent) => {
@@ -101,7 +110,7 @@ const RaceMap: React.FC<RaceMapProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Render track polyline + start/finish ─────────────────────────────────────
+  // ── Render track polyline, direction arrows, start/finish ─────────────────────
   useEffect(() => {
     const layer = trackLayerRef.current;
     if (!layer) return;
@@ -109,13 +118,57 @@ const RaceMap: React.FC<RaceMapProps> = ({
 
     if (trackPoints && trackPoints.length > 0) {
       const latlngs = trackPoints.map(([la, ln]) => L.latLng(la, ln));
-      L.polyline(latlngs, { color: '#3b82f6', weight: 4, opacity: 0.85 }).addTo(layer);
+      L.polyline(latlngs, { color: trackColor, weight: 4, opacity: 0.85 }).addTo(layer);
+
+      // Arrows follow the order of the points: first point → last point.
+      directionArrows(trackPoints).forEach((a) => {
+        L.marker(a.at, {
+          interactive: false,
+          icon: L.divIcon({
+            className: '',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+            html:
+              `<div style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;` +
+              `transform:rotate(${a.bearing}deg);color:#fff;font-size:11px;line-height:1;` +
+              `background:${trackColor};border-radius:50%;border:1.5px solid #fff;` +
+              `box-shadow:0 1px 3px rgba(0,0,0,.4)">&#9650;</div>`,
+          }),
+        }).addTo(layer);
+      });
+
       circle(latlngs[0], MARKER_COLORS.start, 'Start').addTo(layer);
       if (latlngs.length > 1) {
         circle(latlngs[latlngs.length - 1], MARKER_COLORS.finish, 'Finish').addTo(layer);
       }
     }
-  }, [trackPoints]);
+  }, [trackPoints, trackColor]);
+
+  // ── "You are here" GPS dot ───────────────────────────────────────────────────
+  useEffect(() => {
+    const layer = meLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    if (!myLocation) return;
+    if (myLocation.accuracy) {
+      L.circle([myLocation.lat, myLocation.lng], {
+        radius: myLocation.accuracy,
+        color: '#2563eb',
+        weight: 1,
+        fillOpacity: 0.12,
+        interactive: false,
+      }).addTo(layer);
+    }
+    L.circleMarker([myLocation.lat, myLocation.lng], {
+      radius: 8,
+      color: '#fff',
+      weight: 3,
+      fillColor: '#2563eb',
+      fillOpacity: 1,
+    })
+      .bindPopup('My location')
+      .addTo(layer);
+  }, [myLocation]);
 
   // ── Render custom markers ────────────────────────────────────────────────────
   useEffect(() => {

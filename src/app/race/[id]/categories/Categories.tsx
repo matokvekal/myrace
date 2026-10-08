@@ -7,7 +7,7 @@ import { COLORS } from "@/constants/index";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey } from "../schedule/Schedule";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes } from "../schedule/Schedule";
 import { getCategoryStatusInfo } from "@/utils/statusChip";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
@@ -19,7 +19,32 @@ interface CategoriesProps {
 // Built-in category bank — single source of truth (BUGS.md #5).
 const PREDEFINED_TEMPLATES = PREDEFINED_CATEGORY_TEMPLATES;
 
+type SortMode = "now" | "upload";
+const SORT_KEY = "categoriesSortMode";
+
+/** The uploaded file's order is the race schedule. Races imported before the
+ *  order was recorded fall back to start time, then name. */
+const byUploadOrder = (a: CategoryProps, b: CategoryProps) =>
+  (a.importOrder ?? Infinity) - (b.importOrder ?? Infinity) ||
+  toMinutes(a.startTime) - toMinutes(b.startTime) ||
+  a.name.localeCompare(b.name);
+
 const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
+  const [sortMode, setSortMode] = useState<SortMode>(() => {
+    try {
+      return localStorage.getItem(SORT_KEY) === "upload" ? "upload" : "now";
+    } catch {
+      return "now";
+    }
+  });
+  const changeSortMode = (mode: SortMode) => {
+    setSortMode(mode);
+    try {
+      localStorage.setItem(SORT_KEY, mode);
+    } catch {
+      /* preference only */
+    }
+  };
   const [templates, setTemplates] = useState<CategoryTemplate[]>([]);
   const [showAddFromBank, setShowAddFromBank] = useState(false);
   const [showCreateNew, setShowCreateNew] = useState(false);
@@ -303,14 +328,35 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
       return true;
     })
     .sort((a, b) => {
+      if (sortMode === "upload") return byUploadOrder(a, b);
       const aFinished = a.status === "finished" ? 1 : 0;
       const bFinished = b.status === "finished" ? 1 : 0;
       return aFinished - bFinished;
     });
 
+  // Set Laps panel follows the same order, so it reads top to bottom like the schedule
+  const quickLapsCategories =
+    sortMode === "upload" ? [...raceCategories].sort(byUploadOrder) : raceCategories;
+
   return (
     <div className={styles.container}>
       <div className={styles.headerControls}>
+          <Button
+            variant={sortMode === "now" ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => changeSortMode("now")}
+            title="Current order (finished categories last)"
+          >
+            Now
+          </Button>
+          <Button
+            variant={sortMode === "upload" ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => changeSortMode("upload")}
+            title="Order of the uploaded file (the schedule)"
+          >
+            Upload order
+          </Button>
           {showQuickLaps ? (
             <>
               <Button
@@ -374,7 +420,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
         <div className={styles.quickLapsPanel}>
           <div className={styles.quickLapsTitle}>Set Laps per Category</div>
           <div className={styles.quickLapsList}>
-            {raceCategories.map((cat) => (
+            {quickLapsCategories.map((cat) => (
               <div key={cat.id} className={styles.quickLapsRow}>
                 <span className={styles.quickLapsDot} style={{ background: cat.color ?? "#ccc" }} />
                 <span className={styles.quickLapsCatName}>{cat.name}</span>

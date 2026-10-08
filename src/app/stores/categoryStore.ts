@@ -73,12 +73,26 @@ const useCategoryStore = create<CategoryState>()(
         try {
           const normTime = (t: string | null | undefined): string | null => {
             if (!t) return null;
-            const m = t.match(/^(\d{1,2}):(\d{2})/);
-            return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;
+            const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (!m) return null;
+            const hhmm = `${m[1].padStart(2, "0")}:${m[2]}`;
+            // Keep non-zero seconds: 08:22:30 is its own start, not 08:22
+            return m[3] && m[3] !== "00" ? `${hhmm}:${m[3]}` : hhmm;
           };
 
           const db = await initIndexedDB();
           let riders: RiderProps[] = await db.getAll("riders");
+
+          // Remember the order categories first appear in the uploaded file (rider ids
+          // ascend with row order) before the name sort below discards it.
+          const fileOrder = new Map<string, number>();
+          [...riders]
+            .filter((rider) => rider.raceUuid === raceUuid && rider.category)
+            .sort((a, b) => a.id - b.id)
+            .forEach((rider) => {
+              const key = rider.subCategory ? `${rider.category}::${rider.subCategory}` : rider.category;
+              if (!fileOrder.has(key)) fileOrder.set(key, fileOrder.size);
+            });
 
           // Filter riders by raceUuid and sort them
           riders = riders
@@ -117,6 +131,7 @@ const useCategoryStore = create<CategoryState>()(
                 // Provisional — replaced below once every start time is known
                 color: COLORS[colorIndex].code,
                 heat: rider.heat || null,
+                importOrder: fileOrder.get(categoryKey),
                 status: "upcoming",
               };
             }

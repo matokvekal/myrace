@@ -230,17 +230,28 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
         // last, after the data is in, or the store guards would block the writes
         // above. Merge mode deliberately does NOT adopt it: a partial merge is
         // still someone's own in-progress race.
+        // Course maps travel with the file (files from before multi-map support
+        // carry none, so the race keeps the maps it has). They go in the SAME
+        // update as the lock — a second write after it would be blocked.
+        const importedMaps =
+          pendingImport.tracks && pendingImport.tracks.length > 0
+            ? { tracks: pendingImport.tracks }
+            : {};
         if (pendingImport.finalized) {
           await updateRace({
             ...race,
+            ...importedMaps,
             status: "finished",
             finalized: pendingImport.finalized,
           });
+        } else if (importedMaps.tracks) {
+          await updateRace({ ...race, ...importedMaps });
         }
         toast.success(
-          pendingImport.finalized
+          (pendingImport.finalized
             ? `Imported final results — ${remappedRiders.length} riders. This race is now read-only.`
-            : `Imported ${remappedRiders.length} riders across ${remappedCats.length} categories`
+            : `Imported ${remappedRiders.length} riders across ${remappedCats.length} categories`) +
+            (importedMaps.tracks ? ` and ${importedMaps.tracks.length} maps` : "")
         );
         AuditLogService.log({
           race,

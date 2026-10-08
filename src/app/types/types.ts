@@ -29,6 +29,25 @@ export interface TrackMarker {
   type?: "start" | "finish" | "feed" | "point";
 }
 
+/**
+ * One course map. A race can hold several (e.g. Elite, Kids, Katkatim), each
+ * with its own title, route and points. Point ORDER is the direction of travel:
+ * first point = start, last = finish.
+ */
+export interface RaceTrack {
+  id: string;
+  title: string;
+  /** Free-text header/subtitle shown under the title (e.g. "2 laps · 4.2 km"). */
+  header?: string;
+  color: string;
+  points: [number, number][];
+  markers: TrackMarker[];
+  center?: { lat: number; lng: number };
+  zoom?: number;
+  /** Categories that ride this map, as catWaveKey(name, subCategory). Empty/unset = not assigned. */
+  categoryKeys?: string[];
+}
+
 export interface RaceProps {
   id: number;
   uuid: string;
@@ -70,6 +89,8 @@ export interface RaceProps {
   mapZoom?: number;                            // preferred zoom for the area
   trackPoints?: [number, number][];            // course polyline: [lat, lng] pairs
   mapMarkers?: TrackMarker[];                   // custom points (start, feed zone, etc.)
+  /** Multiple named maps. When set it wins over the single trackPoints/mapMarkers above (legacy). */
+  tracks?: RaceTrack[];
   distance: number;
   isPrivate?: boolean;  // If true, requires password to download
   password?: string;    // Password for private races
@@ -141,6 +162,8 @@ export interface CategoryProps {
   status?: "finished" | "running" | "upcoming";
   linkedFinish?: boolean;
   finishedAt?: number; // epoch ms when race was finished
+  /** Position of the category's first rider in the uploaded file (0-based) — the file's schedule order. */
+  importOrder?: number;
 }
 
 // Template for reusable categories across races

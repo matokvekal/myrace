@@ -353,6 +353,7 @@ export default function CSVImportWizard({
             headers={parseResult.headers}
             mappings={columnMappings}
             sampleRows={parseResult.rows.slice(0, 3)}
+            allRows={parseResult.rows}
             onConfirm={handleMappingConfirm}
             onBack={handleBack}
             suggestedName={suggestedName}

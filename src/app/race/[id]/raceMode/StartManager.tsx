@@ -503,6 +503,23 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
     }
   };
 
+  // Riders imported without a bib (bib 0) or sharing a bib can't be told apart in
+  // live recording, so their category can't start until the manager fixes them.
+  const getBibIssues = (cat: CategoryProps): string[] => {
+    const raceRiders = riders.filter((r) => r.raceUuid === raceUuid && r.status !== "DNS");
+    const bibCount = new Map<number, number>();
+    for (const r of raceRiders) {
+      if (r.bibNumber) bibCount.set(r.bibNumber, (bibCount.get(r.bibNumber) ?? 0) + 1);
+    }
+    const catRiders = raceRiders.filter((r) => riderInCategory(r, cat));
+    const noBib = catRiders.filter((r) => !r.bibNumber).length;
+    const dupBib = catRiders.filter((r) => r.bibNumber && (bibCount.get(r.bibNumber) ?? 0) > 1).length;
+    const issues: string[] = [];
+    if (noBib > 0) issues.push(`${noBib} rider${noBib > 1 ? "s" : ""} without a bib number`);
+    if (dupBib > 0) issues.push(`${dupBib} rider${dupBib > 1 ? "s" : ""} with a duplicate bib number`);
+    return issues;
+  };
+
   const validateGroup = (group: StartGroup): string[] => {
     const errors: string[] = [];
     const cats = group.categoryIds
@@ -518,6 +535,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       if (!cat.laps || cat.laps <= 0) {
         errors.push(`"${cat.name}": no laps configured`);
       }
+      getBibIssues(cat).forEach((i) => errors.push(`"${cat.name}": ${i}`));
       const catRiders = riders.filter(
         (r) => riderInCategory(r, cat) && r.raceUuid === raceUuid && r.status !== "DNS"
       );
@@ -540,6 +558,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
   const getCatIssues = (cat: CategoryProps): string[] => {
     const issues: string[] = [];
     if (!cat.laps || cat.laps <= 0) issues.push("No laps configured");
+    issues.push(...getBibIssues(cat));
     const catRiders = riders.filter(
       (r) => riderInCategory(r, cat) && r.raceUuid === raceUuid && r.status !== "DNS"
     );

@@ -20,6 +20,7 @@ export {
   verifyExportToken,
 };
 export type { ExportSignature };
+import { getRaceTracks } from "@/utils/raceTracks";
 
 function safeStr(v: unknown): string {
   if (v == null) return "";
@@ -178,7 +179,8 @@ export async function exportRaceToXlsx(
   // ── Sheet 2: Categories ─────────────────────────────────────────
   const catHeaders = [
     "id", "raceUuid", "name", "subCategory", "color", "laps", "heat",
-    "startTime", "status", "linkedFinish", "finishedAt", "lapsCounter", "riders"
+    "startTime", "status", "linkedFinish", "finishedAt", "lapsCounter", "riders",
+    "importOrder"
   ];
   const catData = [catHeaders, ...categories.map((c) => catHeaders.map((h) => safeStr(c[h as keyof CategoryProps])))];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(catData), "Categories");
@@ -193,7 +195,10 @@ export async function exportRaceToXlsx(
     "timeStartRace", "timeArrive",
     "elapsedLastLap", "elapsedTimeFromStart",
     "position_start", "position_category", "position_race",
-    "distance", "viewOrder", "comment"
+    "distance", "viewOrder", "comment",
+    // Start-list data — without these a rider handed to another device loses
+    // their seeding and the reference columns shown on the rider card.
+    "standing", "uciPoints", "uciNumber", "extraFields"
   ];
   const riderData = [
     riderHeaders,
@@ -205,6 +210,29 @@ export async function exportRaceToXlsx(
     )
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(riderData), "Riders");
+
+  // ── Sheets: Tracks + TrackPoints (course maps) ───────────────────────
+  // One row per point, not one JSON cell: a GPS route easily exceeds Excel's
+  // 32,767-character cell limit. Only written when the race has maps.
+  const tracks = getRaceTracks(race);
+  if (tracks.length > 0) {
+    const trackRows = [
+      ["id", "title", "header", "color", "centerLat", "centerLng", "zoom", "categories"],
+      ...tracks.map((t) => [
+        t.id, t.title, t.header ?? "", t.color,
+        t.center?.lat ?? "", t.center?.lng ?? "", t.zoom ?? "",
+        JSON.stringify(t.categoryKeys ?? []),
+      ]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(trackRows), "Tracks");
+
+    const pointRows: (string | number)[][] = [["trackId", "kind", "seq", "lat", "lng", "label", "type"]];
+    for (const t of tracks) {
+      t.points.forEach(([lat, lng], i) => pointRows.push([t.id, "route", i, lat, lng, "", ""]));
+      t.markers.forEach((m, i) => pointRows.push([t.id, "marker", i, m.lat, m.lng, m.label, m.type ?? "point"]));
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pointRows), "TrackPoints");
+  }
 
   // ── Sheet 4: Signature ──────────────────────────────────────────
   // Provenance + tamper-evidence: the token is a SHA-256 over the exporting
