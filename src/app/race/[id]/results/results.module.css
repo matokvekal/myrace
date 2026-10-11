@@ -447,3 +447,43 @@
   color: #c02060;
   border: 1px solid rgba(224, 85, 133, 0.25);
 }
+
+/* Not-classified divider between ranked finishers and DNS/DNF/DSQ riders */
+.outDivider {
+  padding: 4px 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  border-top: 1px dashed rgba(128, 128, 128, 0.5);
+}
+
+/* Category quick-jump chips (dedicated Results screen) */
+.catChips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 0 8px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: inherit;
+  -webkit-overflow-scrolling: touch;
+}
+.catChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: rgba(128, 128, 128, 0.1);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}

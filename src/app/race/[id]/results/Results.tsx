@@ -12,6 +12,10 @@ import { parseClockTime } from "@/utils/timeUtils";
 
 interface Props {
   raceUuid: string;
+  /** Initial grouping — the dedicated Results screen opens grouped Wave → Category. */
+  defaultGroupBy?: GroupBy;
+  /** Dedicated screen: adds a chip bar to jump between categories without leaving. */
+  quickNav?: boolean;
 }
 
 type SortKey = "place" | "name" | "bib" | "time";
@@ -86,13 +90,13 @@ function riderElapsed(rider: RiderProps): number {
   return ms >= 0 ? ms : Infinity;
 }
 
-const Results: React.FC<Props> = ({ raceUuid }) => {
+const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quickNav = false }) => {
   const { riders, getRiders } = useRiderStore();
   const { categories } = useCategoryStore();
   const [sortBy, setSortBy] = useState<SortKey>("place");
   const [filterCategory, setFilterCategory] = useState("all");
   const [waveFilter, setWaveFilter] = useState<"all" | number>("all");
-  const [groupBy, setGroupBy] = useState<GroupBy>("category");
+  const [groupBy, setGroupBy] = useState<GroupBy>(defaultGroupBy);
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
@@ -192,7 +196,9 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
     const podSize = getPodiumSize(catKey);
     const active = sorted.filter((r) => !["DNS", "DNF", "DSQ"].includes(r.status));
     const out = sorted.filter((r) => ["DNS", "DNF", "DSQ"].includes(r.status));
-    const display = podiumMode ? active.slice(0, podSize) : sorted;
+    // Ranked finishers first (positions count only them), then DNS/DNF/DSQ apart
+    // under their own divider — an out rider never takes or skips a position.
+    const display = podiumMode ? active.slice(0, podSize) : [...active, ...out];
     // Gap is always relative to the actual #1 by place, independent of whatever
     // column the list is currently sorted by (name/bib/time) — not `active[0]`.
     const leader = active.length > 0
@@ -202,7 +208,7 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
       : null;
 
     return (
-      <div key={catKey} className={styles.categoryBlock}>
+      <div key={catKey} id={`results-cat-${catKey}`} className={styles.categoryBlock} data-testid="results-category">
         <div className={styles.categoryHeader}>
           {catMeta && <span className={styles.dot} style={{ background: catMeta.color ?? "#ccc" }} />}
           <span className={styles.catHeaderName}>{name}{sub ? ` · ${sub}` : ""}</span>
@@ -241,8 +247,11 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
             : "";
 
           return (
+            <React.Fragment key={rider.id}>
+            {!podiumMode && isOut && idx === active.length && (
+              <div className={styles.outDivider} data-testid="results-out-divider">Not classified</div>
+            )}
             <div
-              key={rider.id}
               className={`${styles.row} ${isActive ? styles.active : ""} ${isOut ? styles.out : ""} ${podiumRowClass}`}
               onClick={() => setSelectedRider(rider)}
             >
@@ -275,6 +284,7 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
                 );
               })()}
             </div>
+            </React.Fragment>
           );
         })}
 
@@ -289,8 +299,29 @@ const Results: React.FC<Props> = ({ raceUuid }) => {
     );
   };
 
+  const jumpTo = (catKey: string) => {
+    setFilterCategory("all");
+    // let the (possibly filtered-out) block render before scrolling to it
+    setTimeout(() => document.getElementById(`results-cat-${catKey}`)?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 0);
+  };
+
   return (
     <div className={styles.container}>
+      {quickNav && filteredCatKeys.length > 1 && (
+        <div className={styles.catChips} data-testid="results-cat-chips">
+          {filteredCatKeys.map((k) => {
+            const ident = catIdents.get(k);
+            if (!ident) return null;
+            const meta = raceCategories.find((c) => c.name === ident.name && (c.subCategory ?? null) === ident.sub);
+            return (
+              <button key={k} type="button" className={styles.catChip} data-testid="results-cat-chip" onClick={() => jumpTo(k)}>
+                <span className={styles.dot} style={{ background: meta?.color ?? "#ccc" }} />
+                {ident.name}{ident.sub ? ` · ${ident.sub}` : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {waveNums.length > 1 && (
         <div className={styles.wavePills}>
           <button

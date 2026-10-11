@@ -9,7 +9,7 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Sliders, Flag, Radio } from "lucide-react";
+import { Sliders, Flag, Radio, Trophy } from "lucide-react";
 import useUIStore from "@/stores/uiStore";
 import useCategoryStore from "@/stores/categoryStore";
 import { getDefaultLiveWave } from "../../[id]/schedule/Schedule";
@@ -72,6 +72,24 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
     { key: "live", label: t("phase.live", "Live"), icon: <Radio size={16} />, onClick: goLive, activeClass: styles.liveActive, idleClass: styles.liveIdle },
   ];
 
+  // One Results entry for the Race and Live phases. The Create phase already has
+  // a Results tab in its tab bar (and a finalized race keeps that tab bar), so
+  // adding a second button there would only duplicate it. Opens the dedicated
+  // screen; Back there returns to the screen it was opened from.
+  const resultsBtn = phase === "setup" || finalized ? null : (
+    <button
+      type="button"
+      className={`${styles.btn} ${styles.resultsBtn}`}
+      data-testid="results-btn"
+      aria-label={t("phase.results", "Results")}
+      title={t("phase.results", "Results")}
+      onClick={() => navigate(`/race/${raceUuid}/results`)}
+    >
+      <Trophy size={16} />
+      <span className={styles.label}>{t("phase.results", "Results")}</span>
+    </button>
+  );
+
   if (finalized) {
     return (
       <div className={styles.finalTag} data-testid="phase-final">
@@ -105,6 +123,7 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
           </button>
         );
       })}
+      {resultsBtn}
     </div>
   );
 };

@@ -23,6 +23,7 @@ const PrivacyPage = lazy(() => import("./app/privacy/page"));
 const RacePage = lazy(() => import("./app/race/[id]/page"));
 const HeatPage = lazy(() => import("./app/race/[id]/heat/[heatId]/page"));
 const StandingPage = lazy(() => import("./app/race/[id]/standing/[heatId]/page"));
+const ResultsPage = lazy(() => import("./app/race/[id]/results/ResultsPage"));
 
 export default function App() {
   // Restore Supabase session + start the offline->online flush listener. Both
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/race/:id" element={<RacePage />} />
           <Route path="/race/:id/heat/:heatId" element={<HeatPage />} />
           <Route path="/race/:id/standing/:heatId" element={<StandingPage />} />
+          <Route path="/race/:id/results" element={<ResultsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

@@ -118,4 +118,35 @@ test.describe("UI smoke", () => {
     await expect(page.locator('[data-testid^="racing-rider-"] [title^="Last lap"]').first()).toBeVisible();
     await expect(page.locator('[data-testid^="racing-rider-"] [title^="2 laps left"]').first()).toBeVisible();
   });
+
+  test("Results: one click from Live, grouped Wave → Category, Back returns to Live", async ({ page }) => {
+    await openLiveDemo(page);
+    const liveUrl = page.url();
+    await page.getByTestId("results-btn").click();
+    await expect(page).toHaveURL(/\/results$/);
+    await expect(page.getByText(/^Wave 1$/).first()).toBeVisible();
+    await expect(page.getByTestId("results-category").first()).toBeVisible();
+    await expect(page.getByTestId("results-cat-chip").first()).toBeVisible();
+    // ranking rows carry bib, name and laps
+    await expect(page.getByTestId("results-category").first()).toContainText(/#\d+/);
+    await expect(page.getByTestId("results-category").first()).toContainText(/\d+\/\d+/);
+
+    // jump to another category without leaving
+    const chips = page.getByTestId("results-cat-chip");
+    if ((await chips.count()) > 1) await chips.nth(1).click();
+    await expect(page).toHaveURL(/\/results$/);
+
+    await page.getByTestId("results-back").click();
+    await expect(page).toHaveURL(liveUrl);
+    await expect(page.locator('[data-testid^="racing-rider-"]').first()).toBeVisible();
+  });
+
+  test("Results: also reachable from the Race screen and Back returns there", async ({ page }) => {
+    await loadDemoRace(page);
+    await page.getByRole("tab", { name: "Race", exact: true }).click();
+    await page.getByTestId("results-btn").click();
+    await expect(page.getByTestId("results-category").first()).toBeVisible();
+    await page.getByTestId("results-back").click();
+    await expect(page.getByRole("tab", { name: "Race", exact: true })).toHaveAttribute("aria-selected", "true");
+  });
 });

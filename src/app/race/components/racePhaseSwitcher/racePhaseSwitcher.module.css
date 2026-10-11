@@ -190,3 +190,15 @@
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+
+/* Results — a gold action beside the phase tabs (not a phase itself) */
+.resultsBtn {
+  flex: 0 0 auto;
+  background: rgba(224, 169, 44, 0.16);
+  color: #8a6200;
+  border-color: rgba(224, 169, 44, 0.55);
+}
+.resultsBtn:hover {
+  background: rgba(224, 169, 44, 0.3);
+  color: #6b4b00;
+}
