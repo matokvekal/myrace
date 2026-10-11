@@ -16,12 +16,16 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsDown,
-  ChevronsUp
+  ChevronsUp,
+  Palette,
+  Lock
 } from "lucide-react";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
+import { getCategoryLocks } from "@/utils/categoryLocks";
+import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 
 interface Props {
   raceUuid: string;
@@ -257,6 +261,22 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const [unassignedCategories, setUnassignedCategories] = useState<CategoryProps[]>([]);
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set());
   const [editLaps, setEditLaps] = useState(false);
+  const [selectedRider, setSelectedRider] = useState<{ rider: RiderProps; wave: number } | null>(null);
+  const [colorCat, setColorCat] = useState<CategoryProps | null>(null);
+  const [colorDraft, setColorDraft] = useState("#63A6FC");
+
+  // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
+  // colour and every rider in it carries a copy. Finished categories are refused
+  // here as well as in the UI.
+  const saveCategoryColor = async (cat: CategoryProps, color: string) => {
+    if (getCategoryLocks(cat, riders).color) return;
+    const updated = { ...cat, color };
+    await updateCategory(updated);
+    for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, cat))) {
+      await updateRider({ ...rider, color });
+    }
+    setColorCat(null);
+  };
 
   // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
   // laps, and every rider in it gets the new total (laps || rider.totalLaps).
@@ -544,7 +564,6 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                   <div className={styles.catAssignInfo}>
                     <span className={styles.catName}>{cat.name}</span>
                     {cat.subCategory && <span className={styles.subCategory}> · {cat.subCategory}</span>}
-                    <span className={styles.riderCount}>{cat.riders ?? 0} riders</span>
                   </div>
                   <select
                     className={styles.waveSelect}
@@ -726,6 +745,22 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                             );
                           })()}
                           <div className={styles.catActions} onClick={(e) => e.stopPropagation()}>
+                            {(() => {
+                              const locks = getCategoryLocks(cat, riders);
+                              return (
+                                <button
+                                  type="button"
+                                  className={styles.editColorBtn}
+                                  data-testid={`edit-color-${cat.id}`}
+                                  disabled={locks.color}
+                                  aria-label={`Edit color of ${cat.name}`}
+                                  title={locks.color ? "Color can't be changed — this category has finished" : "Edit color"}
+                                  onClick={() => { setColorDraft(cat.color ?? "#63A6FC"); setColorCat(cat); }}
+                                >
+                                  {locks.color ? <Lock size={12} /> : <Palette size={12} />}
+                                </button>
+                              );
+                            })()}
                             <Button
                               variant="secondary"
                               size="sm"
@@ -765,7 +800,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                               return (
                                 <div
                                   key={rider.id}
-                                  className={`${styles.standingRow} ${rider.checked ? styles.standingRowChecked : ""}`}
+                                  className={styles.standingRow}
                                 >
                                   <div
                                     className={styles.standingColorBar}
@@ -773,20 +808,24 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                   />
                                   <span className={styles.standingPos}>{isOut ? "—" : idx + 1}</span>
                                   <span className={styles.standingBib}>#{rider.bibNumber}</span>
-                                  <span className={styles.standingName}>
-                                    {rider.lastName} {rider.firstName}
-                                  </span>
+                                  <button
+                                    type="button"
+                                    className={styles.standingName}
+                                    dir="auto"
+                                    title="Rider details"
+                                    onClick={() => setSelectedRider({ rider, wave: waveNum })}
+                                  >
+                                    {`${rider.firstName ?? ""} ${rider.lastName ?? ""}`.trim() || "—"}
+                                    {isOut && (
+                                      <span className={`${styles.nameStatus} ${styles[`nameStatus${rider.status}`] ?? ""}`}>
+                                        {rider.status}
+                                      </span>
+                                    )}
+                                  </button>
                                   <span className={styles.standingLaps}>
                                     {rider.lapsCounter}/{rider.totalLaps}
                                   </span>
                                   <div className={styles.standingActions}>
-                                    <button
-                                      className={`${styles.vBtn} ${rider.checked ? styles.vBtnOn : ""}`}
-                                      title={rider.checked ? "Uncheck" : "Check in"}
-                                      onClick={() => updateRider({ ...rider, checked: !rider.checked })}
-                                    >
-                                      <Check size={11} />
-                                    </button>
                                     <button
                                       className={`${styles.statusBtn} ${isDNS ? styles.dnsOn : ""}`}
                                       onClick={() =>
@@ -834,6 +873,37 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           </div>
         );
       })}
+
+      {selectedRider && (
+        <RiderDetailModal
+          rider={riders.find((r) => r.id === selectedRider.rider.id) ?? selectedRider.rider}
+          wave={selectedRider.wave}
+          onClose={() => setSelectedRider(null)}
+        />
+      )}
+
+      {colorCat && (
+        <div className={styles.colorOverlay} onClick={() => setColorCat(null)}>
+          <div className={styles.colorModal} role="dialog" aria-label="Edit color" onClick={(e) => e.stopPropagation()}>
+            <div className={styles.colorTitle}>Color · {colorCat.name}{colorCat.subCategory ? ` · ${colorCat.subCategory}` : ""}</div>
+            <div className={styles.colorCurrent}>
+              <span className={styles.colorSwatch} style={{ background: colorCat.color ?? "#ccc" }} />
+              <span>Current {colorCat.color ?? "—"}</span>
+            </div>
+            <input
+              type="color"
+              className={styles.colorInput}
+              data-testid="color-input"
+              value={colorDraft}
+              onChange={(e) => setColorDraft(e.target.value)}
+            />
+            <div className={styles.colorActions}>
+              <Button variant="secondary" size="sm" onClick={() => setColorCat(null)}>Cancel</Button>
+              <Button variant="success" size="sm" onClick={() => void saveCategoryColor(colorCat, colorDraft)} data-testid="color-save">Save</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
         className={styles.scrollTopBtn}

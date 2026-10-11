@@ -9,10 +9,12 @@ interface Props {
   categories: CategoryProps[];
   /** When set, the rider is added to this category and the picker is hidden. */
   fixedCategory?: CategoryProps;
+  /** Wave for the chosen category — overrides `waveNum` when the picker is shown. */
+  waveOf?: (cat: CategoryProps) => number;
   onDone: () => void;
 }
 
-const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCategory, onDone }) => {
+const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCategory, waveOf, onDone }) => {
   const { riders, addNewRider } = useRiderStore();
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -55,7 +57,7 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
       chipNumber: form.chipNumber || undefined,
       category: form.category,
       subCategory: cat?.subCategory ?? null,
-      heat: waveNum,
+      heat: cat && waveOf ? waveOf(cat) : waveNum,
       color: cat?.color ?? null,
       // `totalLaps` is the only lap field on RiderProps. A stray `laps` used to be
       // written alongside it — not part of the model, dead data in IndexedDB, and

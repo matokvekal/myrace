@@ -704,3 +704,28 @@
     padding: 16px 20px;
   }
 }
+
+/* Collapsed colour control: shows the selected colour; click opens the palette. */
+.colorTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 130, 150, 0.35);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.colorTrigger:disabled { opacity: 0.5; cursor: not-allowed; }
+.colorTriggerDot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.2); }
+.lockNote {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 170, 0, 0.14);
+  color: #8a5a00;
+  font-size: 13px;
+  font-weight: 600;
+}

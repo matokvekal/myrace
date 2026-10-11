@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown, Plus, Search, X } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -15,6 +15,8 @@ import ScanDocumentButton from "@/components/importImage/ScanDocumentButton";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey } from "../schedule/Schedule";
+import QuickAddRider from "../raceMode/QuickAddRider";
+import { matchesRiderSearch, groupRidersByWaveAndCategory } from "@/utils/riderList";
 
 interface ManageHeatProps {
   raceUuid: string;
@@ -81,6 +83,8 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showAddRider, setShowAddRider] = useState(false);
   const [importMode, setImportMode] = useState<"file" | "scan">("file");
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
@@ -152,7 +156,9 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
           : null;
 
     let list = riders.filter((r) => r.raceUuid === raceUuid);
-    if (activeHeat != null) list = list.filter((r) => catWaveMap.get(catWaveKey(r.category, r.subCategory)) === activeHeat);
+    // Searching looks across ALL waves and categories, so it overrides the wave filter.
+    if (searchTerm.trim()) list = list.filter((r) => matchesRiderSearch(r, searchTerm));
+    else if (activeHeat != null) list = list.filter((r) => catWaveMap.get(catWaveKey(r.category, r.subCategory)) === activeHeat);
 
     const waveOf = (r: RiderProps) =>
       catWaveMap.get(catWaveKey(r.category, r.subCategory)) ?? r.heat ?? Infinity;
@@ -178,7 +184,12 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
       return sortDir === "asc" ? base : -base;
     });
     return sorted;
-  }, [riders, raceUuid, waveFilter, sortBy, sortDir, categories, catWaveMap]);
+  }, [riders, raceUuid, waveFilter, sortBy, sortDir, categories, catWaveMap, searchTerm]);
+
+  const waveGroups = useMemo(
+    () => groupRidersByWaveAndCategory(filteredAndSorted, categories),
+    [filteredAndSorted, categories]
+  );
 
   const handleSort = (key: SortKey) => {
     if (sortBy === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -250,6 +261,17 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
           </div>
         </div>
 
+        {!readOnly && (
+          <button
+            type="button"
+            className={styles.actionsTrigger}
+            data-testid="add-rider-btn"
+            onClick={() => setShowAddRider(true)}
+          >
+            <Plus size={14} /> Add Rider
+          </button>
+        )}
+
         {/* Actions dropdown — Import / Scan / Edit (right end of the bar).
             Gone entirely on a finalized race: nothing in it would work. */}
         {!readOnly && (
@@ -297,6 +319,25 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
               </div>
             )}
         </div>
+        )}
+      </div>
+
+      <div className={styles.searchBox}>
+        <Search size={15} aria-hidden="true" />
+        <input
+          type="search"
+          dir="auto"
+          className={styles.searchInput}
+          data-testid="rider-search"
+          placeholder="Search name or bib"
+          aria-label="Search riders"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        {searchTerm && (
+          <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
+            <X size={14} />
+          </button>
         )}
       </div>
 
@@ -360,60 +401,66 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                 <span className={styles.colWave} style={{ cursor: "pointer" }} onClick={() => handleSort("wave")} title="Sort by wave">Wave{sortArrow("wave")}</span>
                 <span className={styles.colStatus} style={{ cursor: "pointer" }} onClick={() => handleSort("status")} title="Sort by status">Status{sortArrow("status")}</span>
               </div>
-              {(() => {
-                let lastCat = "";
-                let catIdx = 0;
-                return filteredAndSorted.map((rider, idx) => {
-                  const isOut = ["DNS","DNF","DSQ"].includes(rider.status);
-                  const isRunning = rider.raceStatus === "running" && !isOut;
-                  const isFinished = rider.raceStatus === "finished" && !isOut;
-                  const showCatHeader = sortBy === "category" && rider.category !== lastCat;
-                  if (showCatHeader) { lastCat = rider.category; catIdx = 0; } else { catIdx++; }
-                  const catColor = categories.find((c) => c.name === rider.category)?.color ?? rider.color ?? "#ddd";
-                  return (
-                    <React.Fragment key={rider.id}>
-                      {showCatHeader && (
-                        <div className={styles.catSeparator} style={{ borderLeftColor: catColor }}>
+              {waveGroups.map((wg) => (
+                <div key={wg.wave ?? "none"} className={styles.waveGroup} data-testid={`wave-group-${wg.wave ?? "none"}`}>
+                  <div className={styles.waveGroupHeader}>
+                    {wg.wave != null ? `Wave ${wg.wave}` : "No wave"}
+                    <span className={styles.groupCount}>{wg.count}</span>
+                  </div>
+                  {wg.categories.map((cg) => {
+                    const catColor = cg.category?.color ?? cg.riders[0]?.color ?? "#ddd";
+                    return (
+                      <React.Fragment key={cg.key}>
+                        <div className={styles.catSeparator} style={{ borderLeftColor: catColor }} data-testid="rider-category-header">
                           <span className={styles.catSepDot} style={{ background: catColor }} />
-                          {rider.category}
+                          {cg.name}
+                          <span className={styles.groupCount}>{cg.riders.length}</span>
                         </div>
-                      )}
-                      <div
-                        className={`${styles.dataRow} ${isRunning ? styles.rowRunning : ""} ${isOut ? styles.rowOut : ""}`}
-                        onClick={() => setSelectedRider(rider)}
-                      >
-                        <span className={styles.colRow}>{idx + 1}</span>
-                        <span className={styles.colDot} style={{ background: rider.color ?? "#ddd" }} />
-                        <span className={styles.colFlag}>
-                          <RiderFlag flag={rider.flag} className={styles.flagIcon} />
-                        </span>
-                        <span className={styles.colBib}><strong>#{rider.bibNumber || "—"}</strong></span>
-                        <span className={styles.colName} dir="auto">
-                          {rider.lastName || rider.firstName
-                            ? `${rider.lastName} ${rider.firstName}`.trim()
-                            : "—"}
-                        </span>
-                        <span className={styles.colCat} dir="auto">
-                          {rider.category || "—"}
-                          {rider.subCategory && <span className={styles.subCatLabel}> · {rider.subCategory}</span>}
-                        </span>
-                        <span className={styles.colWave}>{catWaveMap.get(catWaveKey(rider.category, rider.subCategory)) ?? rider.heat ?? "—"}</span>
-                        <span className={styles.colStatus}>
-                          {isOut ? (
-                            <span className={`${styles.statusTag} ${styles[rider.status.toLowerCase() + "Tag"]}`}>
-                              {rider.status}
-                            </span>
-                          ) : isRunning ? (
-                            <span className={styles.statusRunning}><Play size={11} fill="currentColor" /> {formatElapsed(currentTime, rider.timeStartRace)}</span>
-                          ) : isFinished ? (
-                            <span className={styles.statusFinished}><Flag size={14} /></span>
-                          ) : null}
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  );
-                });
-              })()}
+                        {cg.riders.map((rider, idx) => {
+                          const isOut = ["DNS", "DNF", "DSQ"].includes(rider.status);
+                          const isRunning = rider.raceStatus === "running" && !isOut;
+                          const isFinished = rider.raceStatus === "finished" && !isOut;
+                          return (
+                            <div
+                              key={rider.id}
+                              className={`${styles.dataRow} ${isRunning ? styles.rowRunning : ""} ${isOut ? styles.rowOut : ""}`}
+                              onClick={() => setSelectedRider(rider)}
+                            >
+                              <span className={styles.colRow}>{idx + 1}</span>
+                              <span className={styles.colDot} style={{ background: rider.color ?? "#ddd" }} />
+                              <span className={styles.colFlag}>
+                                <RiderFlag flag={rider.flag} className={styles.flagIcon} />
+                              </span>
+                              <span className={styles.colBib}><strong>#{rider.bibNumber || "—"}</strong></span>
+                              <span className={styles.colName} dir="auto">
+                                {rider.lastName || rider.firstName
+                                  ? `${rider.lastName} ${rider.firstName}`.trim()
+                                  : "—"}
+                              </span>
+                              <span className={styles.colCat} dir="auto">
+                                {rider.category || "—"}
+                                {rider.subCategory && <span className={styles.subCatLabel}> · {rider.subCategory}</span>}
+                              </span>
+                              <span className={styles.colWave}>{catWaveMap.get(catWaveKey(rider.category, rider.subCategory)) ?? rider.heat ?? "—"}</span>
+                              <span className={styles.colStatus}>
+                                {isOut ? (
+                                  <span className={`${styles.statusTag} ${styles[rider.status.toLowerCase() + "Tag"]}`}>
+                                    {rider.status}
+                                  </span>
+                                ) : isRunning ? (
+                                  <span className={styles.statusRunning}><Play size={11} fill="currentColor" /> {formatElapsed(currentTime, rider.timeStartRace)}</span>
+                                ) : isFinished ? (
+                                  <span className={styles.statusFinished}><Flag size={14} /></span>
+                                ) : null}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           ) : groupByCategory && grouped ? (
             [...grouped.entries()].map(([catName, catRiders]) => (
@@ -478,9 +525,24 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
         />
       )}
 
+      {showAddRider && (
+        <div className={styles.wizardOverlay} onClick={() => setShowAddRider(false)}>
+          <div className={styles.addRiderModal} onClick={(e) => e.stopPropagation()} data-testid="add-rider-modal">
+            <QuickAddRider
+              raceUuid={raceUuid}
+              waveNum={waves[0] ?? 1}
+              waveOf={(c) => catWaveMap.get(catWaveKey(c.name, c.subCategory)) ?? waves[0] ?? 1}
+              categories={categories}
+              onDone={() => setShowAddRider(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {selectedRider && (
         <RiderDetailModal
           rider={selectedRider}
+          wave={catWaveMap.get(catWaveKey(selectedRider.category, selectedRider.subCategory)) ?? null}
           onClose={() => setSelectedRider(null)}
         />
       )}

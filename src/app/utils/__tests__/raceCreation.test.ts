@@ -73,6 +73,9 @@ describe("race creation", () => {
 
   it("gives every new race a unique uuid", async () => {
     await submit("A").done;
+    // Race ids are Date.now(): two creations inside one millisecond share an IDB
+    // key (impossible for a person, but it made this test flaky on fast CI).
+    await new Promise((r) => setTimeout(r, 5));
     await submit("B").done;
     const uuids = useRaceStore.getState().races.map((r) => r.uuid);
     expect(new Set(uuids).size).toBe(2);

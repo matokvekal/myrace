@@ -623,3 +623,50 @@
     max-width: 90vw;
   }
 }
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0 12px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 130, 150, 0.35);
+}
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+}
+.searchClear { background: none; border: 0; color: inherit; cursor: pointer; display: inline-flex; padding: 4px; }
+.waveGroup { margin-bottom: 12px; }
+.waveGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(99, 166, 252, 0.14);
+  border-radius: 8px;
+  margin: 8px 0 4px;
+}
+.groupCount { margin-inline-start: auto; font-size: 11px; font-weight: 700; opacity: 0.7; }
+.addRiderModal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #14243c);
+  border-radius: 14px;
+  padding: 16px;
+}

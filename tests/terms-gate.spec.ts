@@ -36,10 +36,11 @@ test.describe("Terms gate (landing page)", () => {
     await start.click();
     await page.waitForURL(/\/main/);
 
-    // Acceptance is persisted and versioned, so coming back doesn't re-ask.
+    // Acceptance is persisted and versioned, so coming back doesn't re-ask — and a
+    // returning user is taken straight into the app instead of the landing page.
     await page.goto("/");
+    await page.waitForURL(/\/main/);
     await expect(page.getByRole("checkbox", { name: /I have read and agree/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Press Start/ })).toBeEnabled();
   });
 
   test("the terms text is reachable from the landing page", async ({ page }) => {

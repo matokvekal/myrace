@@ -443,3 +443,38 @@
 :root[data-skin="gaming"] .row {
   border-top-color: rgba(224, 169, 44, 0.12);
 }
+
+.waveSection { margin-bottom: 14px; scroll-margin-top: 72px; }
+.waveHeading {
+  padding: 6px 10px;
+  margin: 8px 0 6px;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  border-bottom: 2px solid rgba(99, 166, 252, 0.4);
+}
+.expandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-inline-start: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 130, 150, 0.4);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.outRow { opacity: 0.8; }
+.outTag {
+  margin-inline-start: auto;
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(120, 130, 150, 0.2);
+}
+.outTag[data-status="DNF"], .outTag[data-status="DSQ"] { background: rgba(220, 53, 100, 0.15); color: #b8205c; }

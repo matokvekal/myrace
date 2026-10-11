@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import styles from "./liveBoard.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
 import calculatePositions from "@/utils/calculatePosition";
 import { parseClockTime } from "@/utils/timeUtils";
-import { riderInCategory, withCategoryLaps } from "../schedule/Schedule";
-import { Trophy, Flag, Zap, SlidersHorizontal } from "lucide-react";
+import { riderInCategory, withCategoryLaps, buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
+import { buildCategoryResults } from "@/utils/boardResults";
+import { Trophy, Flag, Zap, SlidersHorizontal, Plus, Minus } from "lucide-react";
 
 interface Props {
   raceUuid: string;
@@ -74,13 +75,33 @@ function riderSpeedKph(rider: RiderProps): string {
   return kph != null ? `${kph.toFixed(1)} km/h` : "—";
 }
 
-const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
+const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
   const { riders, getRiders } = useRiderStore();
   const [filterCat, setFilterCat] = useState("all");
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});
   const [visibleFields, setVisibleFields] = useState<Set<BoardField>>(loadVisibleFields);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
+  const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set());
+  const toggleExpanded = (id: number) =>
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  // Picking a wave in the top bar never filters the board - it just brings that
+  // wave's section into view. Skipped on first mount so opening the Board
+  // does not jump the page.
+  const firstWaveRender = useRef(true);
+  useEffect(() => {
+    if (firstWaveRender.current) {
+      firstWaveRender.current = false;
+      return;
+    }
+    document.getElementById(`board-wave-${waveNum}`)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [waveNum]);
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
 
@@ -102,9 +123,9 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
 
   // Only categories that have actually started (running/finished) belong on the
   // live board — riders from not-yet-started starts must not appear here.
-  const startedCategories = categories.filter(
-    (c) => c.status === "running" || c.status === "finished"
-  );
+  // The board always lists EVERY wave and category; not-started ones just read
+  // "Race not started" (their riders are never ranked).
+  const startedCategories = categories;
   // Laps resolved from the category so the board reads 0/5, not 0/? (BUGS.md #7)
   const waveRiders = withCategoryLaps(
     riders.filter(
@@ -114,16 +135,29 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
   );
   const positioned = calculatePositions([...waveRiders]);
 
-  const displayedCategories = useMemo(() => {
-    const sorted = [...startedCategories].sort((a, b) => {
-      const aFin = a.status === "finished", bFin = b.status === "finished";
-      if (aFin && bFin) return (b.finishedAt ?? 0) - (a.finishedAt ?? 0);
-      if (aFin) return -1;
-      if (bFin) return 1;
-      return 0;
-    });
-    return filterCat === "all" ? sorted : sorted.filter((c) => c.name === filterCat);
-  }, [startedCategories, filterCat]);
+  // Wave sections in schedule order; categories inside keep the finished-first order.
+  const waveSections = useMemo(() => {
+    const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
+    return [...schedule.keys()]
+      .sort((x, y) => x - y)
+      .map((wave) => {
+        const startMap = schedule.get(wave)!;
+        const time = [...startMap.keys()][0];
+        const cats = [...startMap.values()].flat().sort((x, y) => {
+          const xFin = x.status === "finished", yFin = y.status === "finished";
+          if (xFin && yFin) return (y.finishedAt ?? 0) - (x.finishedAt ?? 0);
+          if (xFin) return -1;
+          if (yFin) return 1;
+          return 0;
+        });
+        return {
+          wave,
+          time: time && time !== "TBD" ? time : null,
+          cats: filterCat === "all" ? cats : cats.filter((c) => c.name === filterCat),
+        };
+      })
+      .filter((w) => w.cats.length > 0);
+  }, [categories, filterCat]);
 
   const getPodiumSize = (catName: string): 3 | 5 => podiumSizes[catName] ?? 3;
   const togglePodiumSize = (catName: string) =>
@@ -184,11 +218,17 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
         </button>
       </div>
 
-      {displayedCategories.length === 0 && (
-        <div className={styles.empty}>No start has been started yet.</div>
-      )}
-
-      {displayedCategories.map((cat) => {
+      {waveSections.map((section) => (
+        <section
+          key={section.wave}
+          id={`board-wave-${section.wave}`}
+          className={styles.waveSection}
+          data-testid={`board-wave-${section.wave}`}
+        >
+          <div className={styles.waveHeading}>
+            Wave {section.wave}{section.time ? ` · ${section.time}` : ""}
+          </div>
+          {section.cats.map((cat) => {
         const catRiders = positioned.filter((r) => riderInCategory(r, cat));
         const activeRiders = catRiders.filter((r) => !["DNF", "DSQ", "DNS"].includes(r.status));
         const finished = activeRiders.filter((r) => r.raceStatus === "finished").length;
@@ -203,7 +243,11 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
         const display = podiumMode ? candidates.slice(0, podSize) : candidates.slice(0, 5);
         const leader = candidates[0] ?? null; // already place-ordered above
         // DNF/DSQ are shown (dropped from the race); DNS never started, so it's hidden.
-        const outRiders = catRiders.filter((r) => ["DNF", "DSQ"].includes(r.status));
+        // (calculatePositions drops out-status riders, so read them from the raw list.)
+        const catOut = waveRiders.filter(
+          (r) => riderInCategory(r, cat) && ["DNF", "DSQ", "DNS"].includes(r.status)
+        );
+        const outRiders = catOut.filter((r) => ["DNF", "DSQ"].includes(r.status));
 
         return (
           <div key={cat.id} className={`${styles.catBlock} ${allDone ? styles.catBlockDone : ""}`}>
@@ -213,6 +257,16 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
                 {allDone && <span className={styles.flagIcon}><Flag size={13} /></span>}
                 {cat.name}
               </span>
+              <button
+                type="button"
+                className={styles.expandBtn}
+                data-testid={`board-expand-${cat.id}`}
+                aria-expanded={expandedCats.has(cat.id)}
+                aria-label={`${expandedCats.has(cat.id) ? "Collapse" : "Expand"} ${cat.name} results`}
+                onClick={() => toggleExpanded(cat.id)}
+              >
+                {expandedCats.has(cat.id) ? <Minus size={14} /> : <Plus size={14} />}
+              </button>
               {podiumMode && (
                 <button
                   className={`${styles.podiumSizeBtn} ${podSize === 5 ? styles.podiumSize5 : ""}`}
@@ -241,7 +295,29 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
               );
             })()}
 
-            {display.length === 0 ? (
+            {expandedCats.has(cat.id) ? (
+              <div data-testid={`board-results-${cat.id}`}>
+                {buildCategoryResults([...catRiders, ...catOut]).map(({ rider, position, label }) => (
+                  <div
+                    key={rider.id}
+                    className={`${styles.row} ${position == null ? styles.outRow : rider.raceStatus === "finished" ? styles.finRow : styles.running}`}
+                    data-testid="board-result-row"
+                  >
+                    <span className={styles.pos}>{position != null ? `P${position}` : "—"}</span>
+                    <span className={styles.bib}>#{rider.bibNumber}</span>
+                    <span className={styles.name} dir="auto">{rider.lastName} {rider.firstName}</span>
+                    {label ? (
+                      <span className={styles.outTag} data-status={label}>{label}</span>
+                    ) : (
+                      <>
+                        <span className={styles.laps}>{rider.lapsCounter ?? 0}/{rider.totalLaps ?? "?"}</span>
+                        <span className={styles.time}>{elapsed(rider)}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : display.length === 0 ? (
               <div className={styles.noData}>{allDone ? "Race complete" : "Race not started"}</div>
             ) : (
               display.map((rider, i) => {
@@ -278,7 +354,9 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, categories }) => {
             )}
           </div>
         );
-      })}
+          })}
+        </section>
+      ))}
     </div>
   );
 };

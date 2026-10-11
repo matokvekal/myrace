@@ -7,8 +7,9 @@ import { COLORS } from "@/constants/index";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes } from "../schedule/Schedule";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes, normalizeTime } from "../schedule/Schedule";
 import { getCategoryStatusInfo } from "@/utils/statusChip";
+import { getCategoryLocks } from "@/utils/categoryLocks";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 
@@ -50,6 +51,8 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<CategoryProps>>({});
+  const [colorOpen, setColorOpen] = useState(false);
+  const [editError, setEditError] = useState("");
   const [showRidersFor, setShowRidersFor] = useState<CategoryProps | null>(null);
   const [riderFilter, setRiderFilter] = useState<"all" | "with" | "without">("with");
   const [showQuickLaps, setShowQuickLaps] = useState(false);
@@ -147,11 +150,15 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
   const startEdit = (category: CategoryProps) => {
     setEditingId(category.id);
     setEditForm({ ...category });
+    setColorOpen(false);
+    setEditError("");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({});
+    setColorOpen(false);
+    setEditError("");
   };
 
   /**
@@ -190,10 +197,18 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     const category = raceCategories.find((c) => c.id === editingId);
     if (!category) return;
 
-    const updatedCategory = {
-      ...category,
-      ...editForm
-    } as CategoryProps;
+    // Race safety: whatever the form says, fields the lifecycle has locked keep
+    // their stored value, and laps can't drop below what riders already rode.
+    const locks = getCategoryLocks(category, riders.filter((r) => r.raceUuid === raceUuid));
+    const updatedCategory = { ...category, ...editForm } as CategoryProps;
+    if (locks.color) updatedCategory.color = category.color;
+    if (locks.wave) updatedCategory.heat = category.heat;
+    if (locks.startTime) updatedCategory.startTime = category.startTime;
+    if (locks.laps) updatedCategory.laps = category.laps;
+    if ((updatedCategory.laps ?? 0) < locks.minLaps) {
+      setEditError(`Laps cannot be fewer than ${locks.minLaps} - riders have already completed that many.`);
+      return;
+    }
 
     await updateCategoryAndSyncRiders(updatedCategory);
     if (race) {
@@ -465,23 +480,44 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
               <div key={cat.id} className={`${styles.categoryCard} ${isDone ? styles.categoryCardDone : ""}`}>
                 {isEditing ? (
                   <div className={styles.editForm} style={{ padding: 16 }}>
+                    {(() => {
+                      const locks = getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid));
+                      return locks.reason ? (
+                        <div className={styles.lockNote} data-testid="category-lock-note">{locks.reason}</div>
+                      ) : null;
+                    })()}
                     <div className={styles.editRow}>
-                      <div className={styles.colorPicker}>
-                        {COLORS.map((color) => (
-                          <button
-                            key={color.code}
-                            className={`${styles.colorBtn} ${editForm.color === color.code ? styles.colorActive : ""}`}
-                            style={{ background: color.code }}
-                            onClick={() =>
-                              setEditForm({ ...editForm, color: color.code })
-                            }
-                            title={color.name}
-                          >
-                            {editForm.color === color.code && (
-                              <Check size={10} />
-                            )}
-                          </button>
-                        ))}
+                      <div className={styles.formGroup}>
+                        <label>Color</label>
+                        <button
+                          type="button"
+                          className={styles.colorTrigger}
+                          data-testid="category-color-trigger"
+                          disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).color}
+                          aria-expanded={colorOpen}
+                          onClick={() => setColorOpen((o) => !o)}
+                        >
+                          <span className={styles.colorTriggerDot} style={{ background: editForm.color ?? "#ccc" }} />
+                          {COLORS.find((c) => c.code === editForm.color)?.name ?? editForm.color}
+                        </button>
+                        {colorOpen && (
+                          <div className={styles.colorPicker} data-testid="category-color-palette">
+                            {COLORS.map((color) => (
+                              <button
+                                key={color.code}
+                                className={`${styles.colorBtn} ${editForm.color === color.code ? styles.colorActive : ""}`}
+                                style={{ background: color.code }}
+                                onClick={() => {
+                                  setEditForm({ ...editForm, color: color.code });
+                                  setColorOpen(false);
+                                }}
+                                title={color.name}
+                              >
+                                {editForm.color === color.code && <Check size={10} />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -492,28 +528,32 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                           <button
                             type="button"
                             className={styles.stepBtn}
+                            disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).laps}
                             onClick={() => setEditForm({ ...editForm, laps: Math.max(0, (editForm.laps || 0) - 1) })}
                           >−</button>
                           <input
                             type="number"
                             className={`${styles.input} ${styles.stepInput}`}
                             value={editForm.laps || 0}
-                            onChange={(e) => setEditForm({ ...editForm, laps: parseInt(e.target.value) || 0 })}
+                            disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).laps}
+                            onChange={(e) => { setEditError(""); setEditForm({ ...editForm, laps: parseInt(e.target.value) || 0 }); }}
                             min="0"
                           />
                           <button
                             type="button"
                             className={styles.stepBtn}
+                            disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).laps}
                             onClick={() => setEditForm({ ...editForm, laps: (editForm.laps || 0) + 1 })}
                           >+</button>
                         </div>
                       </div>
 
                       <div className={styles.formGroup}>
-                        <label>Heat/Wave</label>
+                        <label>Wave</label>
                         <input
                           type="number"
                           className={styles.input}
+                          disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).wave}
                           value={editForm.heat || 1}
                           onChange={(e) =>
                             setEditForm({
@@ -525,6 +565,21 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                         />
                       </div>
                     </div>
+
+                    <div className={styles.editRow}>
+                      <div className={styles.formGroup}>
+                        <label>Start time</label>
+                        <input
+                          type="time"
+                          className={styles.input}
+                          data-testid="category-start-time"
+                          disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).startTime}
+                          value={normalizeTime(editForm.startTime)?.slice(0, 5) ?? ""}
+                          onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value || null })}
+                        />
+                      </div>
+                    </div>
+                    {editError && <div className={styles.lockNote} role="alert" data-testid="category-edit-error">{editError}</div>}
 
                     <label className={styles.linkedFinishRow}>
                       <span className={styles.linkedFinishLabel}>
@@ -619,6 +674,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                         variant="icon"
                         size="sm"
                         iconOnly
+                        title={`Edit ${cat.name}`}
                         onClick={() => startEdit(cat)}
                       >
                         <Edit2 size={14} />
