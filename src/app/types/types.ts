@@ -161,6 +161,8 @@ export interface CategoryProps {
   heat: number | null;
   status?: "finished" | "running" | "upcoming";
   linkedFinish?: boolean;
+  /** Categories sharing a group ring the bell / finish together. Empty = own category (Masters auto-group). */
+  linkGroup?: string;
   finishedAt?: number; // epoch ms when race was finished
   /** Position of the category's first rider in the uploaded file (0-based) — the file's schedule order. */
   importOrder?: number;

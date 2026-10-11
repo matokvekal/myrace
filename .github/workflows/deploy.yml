@@ -15,7 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Required quality gates (typecheck, lint, unit tests, build, Playwright E2E).
+  # `build` needs this, and `deploy` needs `build`, so a failing test blocks
+  # production. Defined once in ci.yml and shared with pull-request runs.
+  quality:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,8 +37,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Firebase Analytics (GA4). These are repository *variables* (Settings →
+      # Secrets and variables → Actions → Variables), not secrets: a Firebase web
+      # config is public by design and ends up in the shipped JS anyway. Vite
+      # inlines them at build time; if any of the four is unset the app skips
+      # analytics entirely (see src/app/services/analytics/analyticsConfig.ts).
       - name: Build
         run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
 
       # Only ./dist is ever published. This fails the deploy if source maps,
       # markdown, agent files, tests or config leaked into the output —

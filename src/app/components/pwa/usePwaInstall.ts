@@ -24,11 +24,37 @@ export function isIos(): boolean {
   return iPhoneOrIpod || iPad;
 }
 
+// `beforeinstallprompt` fires ONCE, early. It is captured here at module level
+// and shared, so every consumer (the banner AND the side-menu "Install app"
+// item, which mounts much later) sees it. Per-hook listeners missed it.
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
+let appInstalled = false;
+const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((l) => l());
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e as BeforeInstallPromptEvent;
+    notify();
+  });
+  window.addEventListener('appinstalled', () => {
+    appInstalled = true;
+    deferredPrompt = null;
+    logAnalyticsEvent('pwa_install');
+    notify();
+  });
+}
+
 interface PwaInstall {
-  /** Native Chrome/Android/desktop prompt is available. */
+  /** Native Chrome/Android/desktop prompt is available (banner: not dismissed). */
   canInstall: boolean;
   /** iOS Safari — no native prompt, show manual Add-to-Home-Screen hint. */
   isIosSafari: boolean;
+  /** The native prompt is available right now, regardless of banner dismissal. */
+  hasNativePrompt: boolean;
+  /** Already running as an installed app (or just installed). */
+  installed: boolean;
   /** Fire the native install prompt. Resolves to true if the user accepted. */
   promptInstall: () => Promise<boolean>;
   /** User dismissed the banner — remembered so we don't nag. */
@@ -36,50 +62,44 @@ interface PwaInstall {
 }
 
 export function usePwaInstall(): PwaInstall {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
+  const [, setTick] = useState(0);
   const [dismissed, setDismissed] = useState(
     () => typeof localStorage !== 'undefined' && localStorage.getItem(DISMISS_KEY) === '1'
   );
 
   useEffect(() => {
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferred(null);
-      logAnalyticsEvent('pwa_install');
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
+    const l = () => setTick((n) => n + 1);
+    listeners.add(l);
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
+      listeners.delete(l);
     };
   }, []);
 
-  const hidden = installed || dismissed || isStandalone();
-
-  const promptInstall = async (): Promise<boolean> => {
-    if (!deferred) return false;
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    setDeferred(null);
-    if (outcome === 'dismissed') dismiss();
-    return outcome === 'accepted';
-  };
+  const installed = appInstalled || isStandalone();
+  const hidden = installed || dismissed;
 
   const dismiss = () => {
     setDismissed(true);
     try { localStorage.setItem(DISMISS_KEY, '1'); } catch { /* ignore */ }
   };
 
+  const promptInstall = async (): Promise<boolean> => {
+    const ev = deferredPrompt;
+    if (!ev) return false;
+    await ev.prompt();
+    const { outcome } = await ev.userChoice;
+    deferredPrompt = null;
+    notify();
+    if (outcome === 'dismissed') dismiss();
+    return outcome === 'accepted';
+  };
+
   return {
-    canInstall: !hidden && deferred !== null,
+    canInstall: !hidden && deferredPrompt !== null,
     // iOS Safari (not already installed) can't use the native prompt.
     isIosSafari: !hidden && isIos() && !isStandalone(),
+    hasNativePrompt: !installed && deferredPrompt !== null,
+    installed,
     promptInstall,
     dismiss,
   };

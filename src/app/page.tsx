@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import ArcadeTopbar from "@/components/arcade/ArcadeTopbar";
 import Footer from "@/components/Footer/Footer";
@@ -46,8 +46,18 @@ const TICKER = [
   "FINAL LAP — RING THE BELL",
 ];
 
+// Returning users go straight into the app — but only on the first load of a
+// session, so tapping the logo later still shows this page.
+let autoEnterDone = false;
+
 export default function LandingPage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (autoEnterDone) return;
+    autoEnterDone = true;
+    if (hasAcceptedCurrentTerms()) navigate("/main", { replace: true });
+  }, [navigate]);
 
   // The app is free with no login, so the Terms & Conditions are accepted right
   // here — before "Press Start" takes the user into the app. Acceptance is

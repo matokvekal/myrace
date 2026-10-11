@@ -527,15 +527,20 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                     </div>
 
                     <label className={styles.linkedFinishRow}>
-                      <input
-                        type="checkbox"
-                        checked={!!editForm.linkedFinish}
-                        onChange={(e) => setEditForm({ ...editForm, linkedFinish: e.target.checked })}
-                      />
                       <span className={styles.linkedFinishLabel}>
-                        <Bell size={14} /> First finishes = all finish
-                        <span className={styles.linkedFinishHint}>When the leader completes their last lap, show the bell for all other riders</span>
+                        <Bell size={14} /> Bell / finish group
+                        <span className={styles.linkedFinishHint}>
+                          When anyone in the group reaches the bell or finishes, every rider in it gets the bell / finishes on their next lap. Categories with the same group name share it. Leave empty for the category alone.
+                        </span>
                       </span>
+                      <input
+                        type="text"
+                        className={styles.input}
+                        dir="auto"
+                        value={editForm.linkGroup ?? ""}
+                        placeholder="e.g. Masters"
+                        onChange={(e) => setEditForm({ ...editForm, linkGroup: e.target.value })}
+                      />
                     </label>
 
                     <div className={styles.editActions}>
@@ -596,7 +601,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                             >+</button>
                           </span>
                           {" · "}Wave {catWaveMap.get(catWaveKey(cat.name, cat.subCategory)) ?? cat.heat ?? 1} · {riderCount} riders
-                          {cat.linkedFinish && <span className={styles.linkedBadge}><Bell size={11} /> linked</span>}
+                          {cat.linkGroup?.trim() && <span className={styles.linkedBadge}><Bell size={11} /> {cat.linkGroup.trim()}</span>}
                         </div>
                       </div>
                     </div>

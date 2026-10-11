@@ -10,7 +10,7 @@ interface RiderAction {
   timestamp: number;
   source: 'click' | 'voice';
   categoryColor: string;
-  statusChange?: 'DNF' | 'DSQ' | 'DNS';
+  statusChange?: 'DNF' | 'DSQ' | 'DNS' | 'FINISH';
 }
 
 interface RiderActionLogProps {

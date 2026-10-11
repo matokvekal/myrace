@@ -8,7 +8,10 @@ import { Bell } from "lucide-react";
 interface Props {
   rider: RiderProps;
   color: string;
+  /** Someone in this rider's bell group reached the bell lap — show the bell whatever the lap count. */
   forceBell?: boolean;
+  /** Someone in the group finished — this rider's next crossing is their finish. */
+  forceFinish?: boolean;
   isFlashing?: boolean;
   /**
    * Lap recorded, but the board hold is keeping the card in place until the
@@ -100,7 +103,7 @@ function roundedRectPathD(w: number, h: number, r: number): string {
 const PACE_RING_CARD_RADIUS = 12;
 const PACE_RING_INSET = 0;
 
-const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick }) => {
+const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFinish = false, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick }) => {
   const clickCountRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { skin } = useSkin();
@@ -135,8 +138,10 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, isFlash
   );
 
   const lapsRemaining = rider.totalLaps - rider.lapsCounter;
-  const showBell = forceBell || (lapsRemaining === 2);
-  const showStripes = forceBell || (lapsRemaining === 1);
+  // Individual bell at 2 to go is unchanged; a category-wide bell (leader at 1 to
+  // go) joins it; once the leader has finished, the finish flag replaces the bell.
+  const showBell = !forceFinish && (forceBell || lapsRemaining === 2);
+  const showStripes = forceFinish || (lapsRemaining === 1);
 
   // Live ticking clock: how long since this rider last crossed (or since race start if never).
   // Only ticks once the race has actually started — before that the card shows a frozen 00:00.

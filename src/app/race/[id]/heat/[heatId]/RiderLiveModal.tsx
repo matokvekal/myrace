@@ -12,6 +12,8 @@ interface Props {
   onRevertLap: (rider: RiderProps) => void;
   onStatusChange: (rider: RiderProps, status: RiderProps["status"]) => void;
   onSaveComment: (rider: RiderProps, comment: string) => void;
+  /** Manually finish just this rider (no lap added, no category-wide effect). */
+  onFinishRace?: (rider: RiderProps) => void;
 }
 
 const RiderLiveModal: React.FC<Props> = ({
@@ -22,6 +24,7 @@ const RiderLiveModal: React.FC<Props> = ({
   onRevertLap,
   onStatusChange,
   onSaveComment,
+  onFinishRace,
 }) => {
   const [comment, setComment] = useState(rider.comment ?? "");
   const [commentSaved, setCommentSaved] = useState(false);
@@ -143,6 +146,11 @@ const RiderLiveModal: React.FC<Props> = ({
           {(rider.lapsCounter ?? 0) > 0 && (
             <button className={styles.revertBtn} onClick={() => { onRevertLap(rider); onClose(); }}>
               ↩ Revert Last Lap
+            </button>
+          )}
+          {onFinishRace && !isOut && rider.raceStatus === "running" && (
+            <button className={`${styles.actionBtn} ${styles.clear}`} onClick={() => { onFinishRace(rider); onClose(); }}>
+              🏁 Finish Race
             </button>
           )}
           {rider.status !== "DNF" && (

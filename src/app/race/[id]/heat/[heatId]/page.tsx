@@ -16,6 +16,7 @@ import { formatTime, formatTimeWithLeadingZeroes, parseClockTime } from "../../.
 import { useLapRecording } from "./useLapRecording";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
+import { computeGroupSignals, categoryGroupKey } from "@/utils/linkedGroups";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -201,8 +202,23 @@ const Heat: React.FC = () => {
 
   // A rider "still on the track": their category's race has ended but they
   // haven't finished — the organizer must not lose sight of them.
-  const isOnTrackAfterEnd = (rider: RiderProps): boolean =>
-    categories.find((c) => riderInCategory(rider, c))?.status === "finished";
+  // Also true once anyone in the rider's bell/finish group has taken the finish:
+  // the rest of the group finishes on their next crossing, however many laps
+  // they have left. Derived from rider state, so undoing the leader's finish
+  // restores everyone.
+  const groupSignals = useMemo(
+    () => computeGroupSignals(waveCategories, filteredRiders),
+    [waveCategories, filteredRiders]
+  );
+  const groupOf = (rider: RiderProps) => {
+    const cat = waveCategories.find((c) => riderInCategory(rider, c));
+    return cat ? categoryGroupKey(cat) : null;
+  };
+  const isOnTrackAfterEnd = (rider: RiderProps): boolean => {
+    if (categories.find((c) => riderInCategory(rider, c))?.status === "finished") return true;
+    const g = groupOf(rider);
+    return g != null && rider.raceStatus !== "finished" && groupSignals.finish.has(g);
+  };
 
 
   // Persist the action log (and Joker queue) per wave so a mid-wave reload
@@ -231,6 +247,7 @@ const Heat: React.FC = () => {
     revertLap,
     cancelAction,
     logStatusChange,
+    finishRider,
     clearTimers,
   } = useLapRecording({
     raceUuid,
@@ -504,21 +521,6 @@ const Heat: React.FC = () => {
     ];
   }, [activeRiders, displayOrder, categories, clearedWave]);
 
-  // Per-category cascade bell: if linkedFinish AND the leader has finished,
-  // all remaining running riders in that category should show the last-lap bell
-  const cascadeBellCats = useMemo(() => {
-    const set = new Set<string>();
-    waveCategories.forEach((cat) => {
-      if (!cat.linkedFinish) return;
-      const catRunners = filteredRiders.filter((r) => riderInCategory(r, cat));
-      const anyFinished = catRunners.some(
-        (r) => r.raceStatus === "finished" && !["DNF", "DSQ", "DNS"].includes(r.status)
-      );
-      if (anyFinished) set.add(catKey(cat.name, cat.subCategory));
-    });
-    return set;
-  }, [waveCategories, filteredRiders]);
-
   const finishedRiders = useMemo(() => {
     if (clearedWave) return [] as RiderProps[];
     const outOrder = (r: RiderProps) => {
@@ -697,6 +699,7 @@ const Heat: React.FC = () => {
           onClose={() => setContextRider(null)}
           onRevertLap={handleRevertLap}
           onStatusChange={handleStatusChange}
+          onFinishRace={finishRider}
           onSaveComment={handleSaveComment}
         />
       )}
@@ -987,7 +990,8 @@ const Heat: React.FC = () => {
                   key={rider.id}
                   rider={rider}
                   color={getCatColor(rider)}
-                  forceBell={cascadeBellCats.has(riderCatKey(rider))}
+                  forceBell={(() => { const g = groupOf(rider); return g != null && groupSignals.bell.has(g); })()}
+                  forceFinish={(() => { const g = groupOf(rider); return g != null && groupSignals.finish.has(g); })()}
                   isFlashing={flashingRiderId === rider.id}
                   isRecorded={pendingMoveSet.has(rider.id)}
                   raceEnded={isOnTrackAfterEnd(rider)}

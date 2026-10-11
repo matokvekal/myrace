@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "paths": {
+      "@/components/*": ["src/app/components/*"],
+      "@/pages/*": ["src/app/pages/*"],
+      "@/services/*": ["src/app/services/*"],
+      "@/stores/*": ["src/app/stores/*"],
+      "@/styles/*": ["src/app/styles/*"],
+      "@/utils/*": ["src/app/utils/*"],
+      "@/constants/*": ["src/app/constants/*"],
+      "@/types/*": ["src/app/types/*"],
+      "@/helpers/*": ["src/app/stores/indexDb/*"],
+      "@/hooks/*": ["src/app/hooks/*"],
+      "@/test/*": ["src/app/test/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts", "src/vite-env.d.ts"],
+  "exclude": ["node_modules"]
+}

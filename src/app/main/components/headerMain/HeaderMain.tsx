@@ -16,7 +16,8 @@ import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useSkin, type Skin } from "@/hooks/useSkin";
 import { useJokerMode } from "@/hooks/useJokerMode";
 import { BOARD_HOLD_OPTIONS, useBoardHold } from "@/stores/boardHoldStore";
-import { usePwaInstall } from "@/components/pwa/usePwaInstall";
+import { usePwaInstall, isIos } from "@/components/pwa/usePwaInstall";
+import { toast } from "react-toastify";
 
 const THEME_OPTIONS: { value: Theme; label: string; bg: string; accent: string; text: string }[] = [
   { value: 'light',    label: 'Light',    bg: '#f5f8fc', accent: '#63a6fc', text: '#14243c' },
@@ -41,7 +42,7 @@ function HeaderMain() {
   const { skin, setSkin } = useSkin();
   const { jokerEnabled, toggleJokerEnabled } = useJokerMode();
   const { holdMs, setHoldMs } = useBoardHold();
-  const { canInstall, promptInstall } = usePwaInstall();
+  const { hasNativePrompt, installed, promptInstall } = usePwaInstall();
 
   useEffect(() => {
     getUser();
@@ -196,13 +197,24 @@ function HeaderMain() {
             <Download className={styles.navItemIcon} aria-hidden="true" />
             {t("nav.downloadTemplate", "Download start-list template")}
           </a>
-          {canInstall && (
+          {!installed && (
             <Button
               variant="ghost"
               size="lg"
               className={styles.navItem}
               onClick={async () => {
-                await promptInstall();
+                if (hasNativePrompt) {
+                  await promptInstall();
+                } else {
+                  // No native prompt (iOS, or the browser hasn't offered one):
+                  // tell the user where the browser keeps the install action.
+                  toast.info(
+                    isIos()
+                      ? "Tap the Share button, then “Add to Home Screen”."
+                      : "Open the browser menu (⋮) and choose “Install app” / “Add to Home screen”.",
+                    { autoClose: 8000 }
+                  );
+                }
                 setDrawerOpen(false);
               }}
             >

@@ -51,7 +51,7 @@ export interface RiderAction {
   timestamp: number;
   source: "click" | "voice";
   categoryColor: string;
-  statusChange?: "DNF" | "DSQ" | "DNS";
+  statusChange?: "DNF" | "DSQ" | "DNS" | "FINISH";
 }
 
 interface Params {
@@ -423,6 +423,35 @@ export function useLapRecording({
 
     const riderIdStr = actionId.split("-")[0];
     const rider = riders.find((r) => r.id === Number(riderIdStr));
+
+    // A manual "Finish Race" adds no lap: undo is a straight restore of the exact
+    // pre-finish snapshot, so every lap, time and position comes back untouched.
+    if (action.statusChange === "FINISH") {
+      if (!rider || !action.prevRider) return null;
+      const restored = { ...action.prevRider };
+      updateRider(restored);
+      updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
+      setRiderActions((prev) => prev.filter((a) => a.id !== actionId));
+      if (race) {
+        AuditLogService.log({
+          race, action: "CANCEL_ACTION", screen: "Heat", entityType: "rider",
+          entityId: rider.bibNumber, details: { statusChange: "FINISH" },
+        });
+      }
+      void recordRaceEvent({
+        raceUuid, riderId: rider.id, bibNumber: rider.bibNumber, eventType: "UNDO",
+        payload: {
+          riderLocalId: rider.id,
+          riderPatch: {
+            raceStatus: restored.raceStatus, timeArrive: restored.timeArrive,
+            elapsedTimeFromStart: restored.elapsedTimeFromStart,
+            position_category: restored.position_category,
+          },
+        },
+      });
+      return rider;
+    }
+
     if (!rider || rider.lapsCounter <= 0) return null;
 
     dropPendingMove(rider.id);
@@ -494,6 +523,71 @@ export function useLapRecording({
   };
 
   /**
+   * Manually finish ONE rider (operator action from the rider menu). Stamps the
+   * real finish time, keeps lapsCounter and lapsDetails exactly as recorded, and
+   * touches nobody else — in particular it never raises the category-wide finish
+   * flag, which requires a rider to have completed ALL laps (see linkedGroups).
+   * Undo goes through `cancelAction` with the snapshot stored on the log entry.
+   */
+  const finishRider = (rider: RiderProps): boolean => {
+    if (rider.raceStatus === "finished" || ["DNF", "DSQ", "DNS"].includes(rider.status)) return false;
+    if (!canForRace(raceUuid, "MARK_LAP")) {
+      toast.warn("No permission to finish riders");
+      return false;
+    }
+    dropPendingMove(rider.id);
+    const finishTime = new Date();
+    const raceStart = parseClockTime(rider.timeStartRace) ?? finishTime;
+    const finished: RiderProps = {
+      ...rider,
+      raceStatus: "finished",
+      timeArrive: finishTime.toISOString(),
+      elapsedTimeFromStart: formatTime((finishTime.getTime() - raceStart.getTime()) / 1000),
+    };
+    const sorted = calculatePositions(riders.map((r) => (r.id === finished.id ? finished : r)));
+    const withPos: RiderProps = {
+      ...finished,
+      position_category: sorted.find((r) => r.id === rider.id)?.position_category ?? rider.position_category,
+    };
+    updateRider(withPos);
+    updateAllRiders(sorted.map((r) => (r.id === withPos.id ? withPos : r)));
+
+    if (race) {
+      AuditLogService.log({
+        race, action: "STATUS_CHANGE", screen: "Heat", entityType: "rider",
+        entityId: rider.bibNumber, after: { status: "FINISH" },
+      });
+    }
+    void recordRaceEvent({
+      raceUuid, riderId: rider.id, bibNumber: rider.bibNumber, eventType: "RIDER_EDITED",
+      lapNumber: rider.lapsCounter,
+      payload: {
+        riderLocalId: rider.id,
+        riderPatch: {
+          raceStatus: "finished", timeArrive: withPos.timeArrive,
+          elapsedTimeFromStart: withPos.elapsedTimeFromStart,
+          position_category: withPos.position_category,
+        },
+      },
+    });
+
+    const now = Date.now();
+    setRiderActions((prev) => [
+      {
+        id: `${rider.id}-finish-${now}`,
+        rider: withPos,
+        prevRider: rider,
+        timestamp: now,
+        source: "click",
+        categoryColor: getCatColor(rider),
+        statusChange: "FINISH",
+      },
+      ...prev,
+    ]);
+    return true;
+  };
+
+  /**
    * Clear pending timers — call from the component's unmount effect.
    *
    * MUST be a stable reference: the page wires it as
@@ -519,6 +613,7 @@ export function useLapRecording({
     revertLap,
     cancelAction,
     logStatusChange,
+    finishRider,
     clearTimers,
   };
 }
