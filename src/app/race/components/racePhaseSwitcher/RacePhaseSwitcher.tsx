@@ -67,8 +67,8 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
     activeClass: string;
     idleClass: string;
   }[] = [
-    { key: "setup", label: t("phase.setup", "Race"), icon: <Sliders size={16} />, onClick: goSetup, activeClass: styles.setupActive, idleClass: styles.setupIdle },
-    { key: "race", label: t("phase.race", "Start"), icon: <Flag size={16} />, onClick: goRace, activeClass: styles.raceActive, idleClass: styles.raceIdle },
+    { key: "setup", label: t("phase.setup", "Create"), icon: <Sliders size={16} />, onClick: goSetup, activeClass: styles.setupActive, idleClass: styles.setupIdle },
+    { key: "race", label: t("phase.race", "Race"), icon: <Flag size={16} />, onClick: goRace, activeClass: styles.raceActive, idleClass: styles.raceIdle },
     { key: "live", label: t("phase.live", "Live"), icon: <Radio size={16} />, onClick: goLive, activeClass: styles.liveActive, idleClass: styles.liveIdle },
   ];
 
