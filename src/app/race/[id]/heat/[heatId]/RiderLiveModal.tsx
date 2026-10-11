@@ -1,23 +1,30 @@
 import React, { useState } from "react";
 import styles from "./riderLiveModal.module.css";
 import { RiderProps } from "@/types/types";
+import { riderTotalTime } from "@/utils/timeUtils";
 
 interface Props {
   rider: RiderProps;
   catColor: string;
+  /** "+M:SS" / "+NL" behind the category leader, or "—" for the leader themself. */
+  gapToLeader?: string;
   onClose: () => void;
   onRevertLap: (rider: RiderProps) => void;
   onStatusChange: (rider: RiderProps, status: RiderProps["status"]) => void;
   onSaveComment: (rider: RiderProps, comment: string) => void;
+  /** Manually finish just this rider (no lap added, no category-wide effect). */
+  onFinishRace?: (rider: RiderProps) => void;
 }
 
 const RiderLiveModal: React.FC<Props> = ({
   rider,
   catColor,
+  gapToLeader,
   onClose,
   onRevertLap,
   onStatusChange,
   onSaveComment,
+  onFinishRace,
 }) => {
   const [comment, setComment] = useState(rider.comment ?? "");
   const [commentSaved, setCommentSaved] = useState(false);
@@ -49,6 +56,9 @@ const RiderLiveModal: React.FC<Props> = ({
                 {rider.category}
                 {rider.subCategory && <span className={styles.sub}> · {rider.subCategory}</span>}
               </span>
+              {rider.team && (
+                <span className={styles.club} dir="auto">🏳️ {rider.team}</span>
+              )}
             </div>
           </div>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
@@ -64,13 +74,19 @@ const RiderLiveModal: React.FC<Props> = ({
             <span className={styles.statLabel}>Position</span>
             <span className={styles.statVal}>P{rider.position_category ?? "—"}</span>
           </div>
+          {gapToLeader && (
+            <div className={styles.stat}>
+              <span className={styles.statLabel}>Gap</span>
+              <span className={styles.statVal}>{gapToLeader}</span>
+            </div>
+          )}
           <div className={styles.stat}>
             <span className={styles.statLabel}>Last lap</span>
             <span className={styles.statVal}>{rider.elapsedLastLap || "—"}</span>
           </div>
           <div className={styles.stat}>
             <span className={styles.statLabel}>Total</span>
-            <span className={styles.statVal}>{rider.elapsedTimeFromStart || "—"}</span>
+            <span className={styles.statVal}>{riderTotalTime(rider)}</span>
           </div>
           {isOut && (
             <div className={`${styles.stat} ${styles.statOut}`}>
@@ -130,6 +146,11 @@ const RiderLiveModal: React.FC<Props> = ({
           {(rider.lapsCounter ?? 0) > 0 && (
             <button className={styles.revertBtn} onClick={() => { onRevertLap(rider); onClose(); }}>
               ↩ Revert Last Lap
+            </button>
+          )}
+          {onFinishRace && !isOut && rider.raceStatus === "running" && (
+            <button className={`${styles.actionBtn} ${styles.clear}`} onClick={() => { onFinishRace(rider); onClose(); }}>
+              🏁 Finish Race
             </button>
           )}
           {rider.status !== "DNF" && (

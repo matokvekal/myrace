@@ -1,7 +1,10 @@
+/* In normal flow — the heat page places it in the timer row's left column, so
+   it stays aligned with the clock/wave chip instead of floating on its own
+   fixed coordinates (which drifted whenever the header height changed).
+   `relative` is only here so the count badge can anchor to it. */
 .toggleBtn {
-  position: fixed;
-  top: 62px;
-  left: 16px;
+  position: relative;
+  flex-shrink: 0;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -453,7 +456,8 @@
   border: 1px solid rgba(220, 53, 100, 0.3);
 }
 
-.statusBadge.fin {
+.statusBadge.fin,
+.statusBadge.finish {
   font-size: 12px;
   background: rgba(40, 180, 100, 0.15);
   color: #1c7a45;
@@ -680,11 +684,6 @@
 }
 
 @media (max-width: 640px) {
-  .toggleBtn {
-    top: 62px;
-    left: 16px;
-  }
-
   .panel {
     max-height: 80vh;
   }

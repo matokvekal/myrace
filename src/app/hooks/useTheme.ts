@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 
-export type Theme = 'light' | 'dark' | 'contrast' | 'warm' | 'night';
+export type Theme = 'light' | 'dark' | 'contrast';
 const KEY = 'app-theme';
-const VALID: Theme[] = ['light', 'dark', 'contrast', 'warm', 'night'];
+const VALID: Theme[] = ['light', 'dark', 'contrast'];
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {

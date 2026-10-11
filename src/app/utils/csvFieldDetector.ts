@@ -1,5 +1,10 @@
 import fieldMappingDictionary from './fieldMappingDictionary.json';
 import type { RiderFieldKey } from '@/types/csv.types';
+import {
+  AMBIGUOUS_ALIASES,
+  AMBIGUOUS_ALIAS_CAP,
+  SEED_ORDER_ALIASES
+} from '@/types/csv.types';
 
 export type StandardField = keyof typeof fieldMappingDictionary;
 
@@ -110,9 +115,14 @@ function getEditDistance(s1: string, s2: string): number {
 export function detectFieldForHeader(header: string): DetectionResultCamelCase | null {
   const normalized = normalizeHeader(header);
 
+  // A serial/seed-order column is the pre-race standing, never the bib number.
+  const isSeedOrderHeader = SEED_ORDER_ALIASES.has(normalized);
+
   let bestMatch: DetectionResult | null = null;
 
   for (const [field, variations] of Object.entries(fieldMappingDictionary)) {
+    if (isSeedOrderHeader && field === 'bib') continue;
+
     for (const variation of variations as string[]) {
       const similarity = calculateSimilarity(header, variation);
 
@@ -130,9 +140,16 @@ export function detectFieldForHeader(header: string): DetectionResultCamelCase |
 
   if (!bestMatch) return null;
 
+  // A vague header ("מס'", "no") names its field too weakly to claim it
+  // outright — cap it so a specific header ("מספר רוכב") wins bibNumber and the
+  // seeding column stops being imported as the bib number (BUGS.md #3).
+  const confidence = AMBIGUOUS_ALIASES.has(normalized)
+    ? Math.min(bestMatch.confidence, AMBIGUOUS_ALIAS_CAP)
+    : bestMatch.confidence;
+
   return {
     field: fieldNameMap[bestMatch.field],
-    confidence: bestMatch.confidence
+    confidence
   };
 }
 

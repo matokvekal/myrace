@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { ColumnMapping, RiderFieldKey, MappingTemplate } from "@/types/csv.types";
-import { FIELD_KEYWORDS } from "@/types/csv.types";
+import { FIELD_KEYWORDS, IGNORED_FIELDS } from "@/types/csv.types";
 import {
   getColumnSuggestions,
   confirmMapping,
-  detectNameSplitting
+  detectNameSplitting,
+  resolveColumnRules
 } from "@/services/csvMapper";
 import {
   getAllTemplates,
@@ -21,6 +22,8 @@ interface ColumnMappingStepProps {
   headers: string[];
   mappings: ColumnMapping[];
   sampleRows: string[][];
+  /** Every data row — needed to tell whether a column is empty throughout. */
+  allRows: string[][];
   onConfirm: (mappings: ColumnMapping[]) => void;
   onBack: () => void;
   suggestedName?: string;
@@ -41,6 +44,7 @@ export default function ColumnMappingStep({
   headers,
   mappings: initialMappings,
   sampleRows,
+  allRows,
   onConfirm,
   onBack,
   suggestedName = ""
@@ -82,10 +86,15 @@ export default function ColumnMappingStep({
       targetField: newField,
       confidence: newField ? 100 : 0,
       isAutoMapped: false,
-      needsConfirmation: false
+      needsConfirmation: false,
+      // A different field gets fresh defaults, not the old field's choices
+      required: undefined,
+      unique: undefined
     };
     setMappings(updated);
-    if (newField) {
+    // "Keep as info" is a per-file, freeform choice (BUGS.md #7) — don't teach
+    // the fuzzy matcher to auto-map this column to info next time.
+    if (newField && newField !== "infoField") {
       await confirmMapping(updated[index].sourceColumn, newField);
     }
   };
@@ -142,7 +151,16 @@ export default function ColumnMappingStep({
       alert("Please map at least the Bib Number field to continue.");
       return;
     }
-    onConfirm(mappings);
+    // Freeze the effective rules so the preview validates exactly what was shown
+    onConfirm(
+      mappings.map((m, i) => ({ ...m, ...resolveColumnRules(m, i, allRows) }))
+    );
+  };
+
+  const setRule = (index: number, rule: "required" | "unique", value: boolean) => {
+    setMappings((prev) =>
+      prev.map((m, i) => (i === index ? { ...m, [rule]: value } : m))
+    );
   };
 
   const FIELD_LABELS: Record<string, string> = {
@@ -154,7 +172,7 @@ export default function ColumnMappingStep({
     firstNameEnglish: "First Name (English)",
     lastNameEnglish: "Last Name (English)",
     category: "Category",
-    subCategory: "Sub-Category",
+    subCategory: "Sub-Category (not imported)",
     team: "Team / Club",
     gender: "Gender",
     heat: "Wave Number",
@@ -164,6 +182,7 @@ export default function ColumnMappingStep({
     standing: "Standing / Ranking",
     raceDay: "Race Day",
     points: "Points",
+    uciPoints: "UCI Points",
     federation: "Federation",
     uciNumber: "UCI Number",
     idNumber: "ID Number",
@@ -173,11 +192,15 @@ export default function ColumnMappingStep({
     roadNumber: "Road Number",
     chip: "Chip",
     notes: "Notes",
+    infoField: "⭐ Keep as info (show on card)",
   };
 
   const FIELD_HINTS: Partial<Record<string, string>> = {
+    infoField:
+      "Stored as-is under this column's name and shown in the rider card's \"More info\" — not used by the app. Several columns can be info.",
     category: "Main group — e.g. Men Junior, Gravel, MTB",
-    subCategory: "Sub-group within a category — e.g. age range 19-29, 30-39",
+    subCategory:
+      "Not imported — categories are flat. Put the age band in the category itself, e.g. \"Man Masters 30-39\"",
     heat: "Wave group number — e.g. 1, 2, 3  (not a clock time)",
     startTime: "Clock start time — e.g. 09:00, 11:30  (not a wave number)",
   };
@@ -213,9 +236,16 @@ export default function ColumnMappingStep({
 
   const availableFields: (RiderFieldKey | null)[] = [
     null,
-    ...FIELD_KEYWORDS.map((f) => f.field).filter(
-      (f) => !usedFields.has(f) || mappings.find((m) => m.targetField === f)
-    )
+    // IGNORED_FIELDS stay out of the picker — they are detected only so their
+    // column isn't misread as something else, never imported (BUGS.md #2).
+    ...FIELD_KEYWORDS.map((f) => f.field)
+      .filter((f) => !IGNORED_FIELDS.has(f))
+      .filter(
+        (f) => !usedFields.has(f) || mappings.find((m) => m.targetField === f)
+      ),
+    // "Keep as info" is always offered and never deduped — many columns can be
+    // info at once (BUGS.md #7).
+    "infoField"
   ];
 
   const mappedCount = mappings.filter((m) => m.targetField !== null).length;
@@ -356,6 +386,26 @@ export default function ColumnMappingStep({
               {mapping.targetField && FIELD_HINTS[mapping.targetField] && (
                 <div className={styles.fieldHint}>
                   {FIELD_HINTS[mapping.targetField]}
+                </div>
+              )}
+              {mapping.targetField && mapping.targetField !== "infoField" && (
+                <div className={styles.ruleRow}>
+                  <label title="Rows where this is empty are flagged in the preview">
+                    <input
+                      type="checkbox"
+                      checked={resolveColumnRules(mapping, index, allRows).required}
+                      onChange={(e) => setRule(index, "required", e.target.checked)}
+                    />{" "}
+                    Required
+                  </label>
+                  <label title="Rows repeating an earlier value are flagged in the preview">
+                    <input
+                      type="checkbox"
+                      checked={resolveColumnRules(mapping, index, allRows).unique}
+                      onChange={(e) => setRule(index, "unique", e.target.checked)}
+                    />{" "}
+                    Unique
+                  </label>
                 </div>
               )}
             </div>

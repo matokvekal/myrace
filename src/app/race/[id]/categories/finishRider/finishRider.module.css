@@ -27,9 +27,39 @@
   filter: grayscale(0.4);
 }
 
+/* Mini checkered finish flag on a pole (matches the last-lap flag on racing cards) */
 .flag {
-  font-size: 13px;
-  line-height: 1;
+  display: flex;
+  align-items: flex-start;
+  height: 18px;
+  transform: rotate(12deg);
+}
+
+.flagCloth {
+  width: 15px;
+  height: 15px;
+  background-image:
+    conic-gradient(#111 90deg, #fff 90deg 180deg, #111 180deg 270deg, #fff 270deg);
+  background-size: 7.5px 7.5px;
+  clip-path: polygon(
+    0% 20%, 25% 0%, 50% 20%, 75% 0%, 100% 20%,
+    100% 80%, 75% 100%, 50% 80%, 25% 100%, 0% 80%
+  );
+}
+
+.flagPole {
+  width: 2px;
+  height: 18px;
+  margin-left: 1px;
+  background: #8a94a3;
+  border-radius: 1px;
+}
+
+.laps {
+  font-size: 11px;
+  font-weight: 800;
+  color: #2a3a55;
+  font-variant-numeric: tabular-nums;
 }
 
 .bib {

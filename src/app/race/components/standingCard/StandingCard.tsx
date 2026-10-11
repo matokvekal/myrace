@@ -5,6 +5,7 @@ import Icons from "@/constants/Icons";
 import Images from "@/constants/Images";
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
+import RiderFlag from "../riderFlag/RiderFlag";
 
 interface StandingCardProps {
   rider: RiderProps;
@@ -31,8 +32,8 @@ const StandingCard: React.FC<StandingCardProps> = ({
     <div className={styles.card}>
       <div className={styles.left}>
         <div className={styles.imageWrapper}>
-          <img className={styles.imageRider} src={Images.user} alt="Rider" width={36} height={36} />
-          <img className={styles.imageFlag} src={`/international/${rider.flag || "il"}.svg`} alt={rider.flag || "il"} width={14} height={14} />
+          <img className={styles.imageRider} src={Images.user} alt="" width={36} height={36} />
+          <RiderFlag flag={rider.flag} className={styles.imageFlag} />
         </div>
       </div>
 

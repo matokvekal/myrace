@@ -1,24 +1,15 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import styles from "./liveCards.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
 import RacingRider from "../categories/racingRider/RacingRider";
 import FinishRider from "../categories/finishRider/FinishRider";
 import calculatePositions from "@/utils/calculatePosition";
-import { formatTime } from "@/utils/timeUtils";
+import { riderInCategory, withCategoryLaps } from "../schedule/Schedule";
+import { formatTime, parseClockTime } from "@/utils/timeUtils";
 import { toast } from "react-toastify";
 
 const MIN_LAP_MS = 60 * 1000;
-
-function parseTimeStr(t: string | null | undefined): Date | null {
-  if (!t) return null;
-  if (t.includes("T")) return new Date(t);
-  const today = new Date();
-  const [h, m, s = 0] = t.split(":").map(Number);
-  today.setHours(h, m, s, 0);
-  return today;
-}
 
 interface Props {
   raceUuid: string;
@@ -26,25 +17,30 @@ interface Props {
   categories: CategoryProps[];
 }
 
-const LiveCards: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
-  const navigate = useNavigate();
+const LiveCards: React.FC<Props> = ({ raceUuid, categories }) => {
   const { riders, getRiders, updateRider, updateAllRiders } = useRiderStore();
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
 
-  const isRaceStarted = categories.some(
+  // Only categories that have actually started belong on the live cards view.
+  const startedCategories = categories.filter(
     (c) => c.status === "running" || c.status === "finished"
   );
+  const isRaceStarted = startedCategories.length > 0;
 
-  const catNames = new Set(categories.map((c) => c.name));
-  const waveRiders = riders.filter(
-    (r) => r.raceUuid === raceUuid && catNames.has(r.category) && r.checked
+  // Laps resolved from the category — without this a rider whose totalLaps is 0
+  // never satisfies the finish check below and can lap forever (BUGS.md #7).
+  const waveRiders = withCategoryLaps(
+    riders.filter(
+      (r) => r.raceUuid === raceUuid && startedCategories.some((c) => riderInCategory(r, c)) && r.checked
+    ),
+    startedCategories
   );
 
   const positioned = calculatePositions([...waveRiders]);
 
   const getCatColor = (rider: RiderProps) => {
-    const cat = categories.find((c) => c.name === rider.category);
+    const cat = startedCategories.find((c) => riderInCategory(rider, c));
     return cat?.color ?? rider.color ?? "#ccc";
   };
 
@@ -63,7 +59,7 @@ const LiveCards: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
     }
 
     const lapsCounter = (rider.lapsCounter || 0) + 1;
-    const raceStart = parseTimeStr(rider.timeStartRace) ?? clickTime;
+    const raceStart = parseClockTime(rider.timeStartRace) ?? clickTime;
     const lastLapStart = rider.timeArrive ? new Date(rider.timeArrive) : raceStart;
     const lapMs = clickTime.getTime() - lastLapStart.getTime();
     const lapTime = formatTime(lapMs / 1000);
@@ -102,31 +98,28 @@ const LiveCards: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
           Race hasn't started yet
         </div>
       )}
-      <button
-        className={styles.goLiveBtn}
-        onClick={() => navigate(`/race/${raceUuid}/heat/${waveNum}`)}
-      >
-        Go Live →
-      </button>
 
-      {categories.map((cat) => {
-        const catRiders = positioned.filter((r) => r.category === cat.name);
+      {startedCategories.map((cat) => {
+        const catRiders = positioned.filter((r) => riderInCategory(r, cat));
         if (catRiders.length === 0) return null;
 
-        const isOut = (r: RiderProps) => ["DNS", "DNF", "DSQ"].includes(r.status);
+        // DNF/DSQ ride to the end of the list with their status. DNS never started,
+        // so they are not shown on Live at all.
+        const isDropped = (r: RiderProps) => ["DNF", "DSQ"].includes(r.status);
+        const isDns = (r: RiderProps) => r.status === "DNS";
 
         const activeRiders = catRiders
-          .filter((r) => !isOut(r) && r.raceStatus !== "finished")
+          .filter((r) => !isDropped(r) && !isDns(r) && r.raceStatus !== "finished")
           .sort((a, b) =>
             (a.position_category ?? 999) - (b.position_category ?? 999) ||
             a.bibNumber - b.bibNumber
           );
 
         const finishedRiders = catRiders
-          .filter((r) => !isOut(r) && r.raceStatus === "finished")
+          .filter((r) => !isDropped(r) && !isDns(r) && r.raceStatus === "finished")
           .sort((a, b) => (a.position_category ?? 999) - (b.position_category ?? 999));
 
-        const outRiders = catRiders.filter(isOut);
+        const outRiders = catRiders.filter(isDropped);
 
         return (
           <div key={cat.id} className={styles.catSection}>

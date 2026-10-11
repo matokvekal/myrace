@@ -1,100 +1,71 @@
 import React, { useState, useEffect } from "react";
 import styles from "./categoryManager.module.css";
 import Button from "@/components/ui/Button";
-import { Plus, X, Check } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 import { CategoryTemplate } from "@/types/types";
 import { COLORS } from "@/constants/index";
+import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 
 interface Props {
+  /**
+   * `subCategory` is always null — categories are flat, one per age band
+   * (BUGS.md #2). The parameter is kept so legacy call sites still compile and
+   * keep writing null onto their riders.
+   */
   onSelect: (
     category: string,
     subCategory: string | null,
     color: string
   ) => void;
   currentCategory?: string;
+  /** @deprecated Legacy races only — no longer drives any UI. */
   currentSubCategory?: string | null;
   raceUuid: string;
 }
 
-const PREDEFINED_CATEGORIES: CategoryTemplate[] = [
-  {
-    id: "man-juniors",
-    name: "Man Juniors",
-    subCategories: [],
-    color: "#63A6FC",
-    createdAt: new Date(),
-    lastUsed: new Date()
-  },
-  {
-    id: "woman-juniors",
-    name: "Woman Juniors",
-    subCategories: [],
-    color: "#E05585",
-    createdAt: new Date(),
-    lastUsed: new Date()
-  },
-  {
-    id: "man-masters",
-    name: "Man Masters",
-    subCategories: ["19-29", "30-39", "40-49", "50-59", "60+"],
-    color: "#3EDDA4",
-    createdAt: new Date(),
-    lastUsed: new Date()
-  },
-  {
-    id: "woman-masters",
-    name: "Woman Masters",
-    subCategories: ["19-29", "30-39", "40-49", "50-59", "60+"],
-    color: "#FFC300",
-    createdAt: new Date(),
-    lastUsed: new Date()
-  },
-  {
-    id: "man-elite",
-    name: "Man Elite",
-    subCategories: [],
-    color: "#9D4EDD",
-    createdAt: new Date(),
-    lastUsed: new Date()
-  },
-  {
-    id: "woman-elite",
-    name: "Woman Elite",
-    subCategories: [],
-    color: "#FF006E",
-    createdAt: new Date(),
-    lastUsed: new Date()
-  }
-];
+// Built-in category bank — single source of truth (BUGS.md #5).
+const PREDEFINED_CATEGORIES = PREDEFINED_CATEGORY_TEMPLATES;
 
 const CategoryManager: React.FC<Props> = ({
   onSelect,
   currentCategory,
-  currentSubCategory,
   raceUuid
 }) => {
   const [templates, setTemplates] = useState<CategoryTemplate[]>([]);
   const [addingNew, setAddingNew] = useState(false);
   const [newCatName, setNewCatName] = useState("");
-  const [newSubCats, setNewSubCats] = useState<string[]>([]);
-  const [newSubCatInput, setNewSubCatInput] = useState("");
   const [selectedColor, setSelectedColor] = useState(COLORS[0].code);
   const [selectedCategory, setSelectedCategory] = useState(
     currentCategory || ""
-  );
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(
-    currentSubCategory || null
   );
 
   useEffect(() => {
     loadTemplates();
   }, []);
 
+  /**
+   * Templates saved before BUGS.md #2 may still carry sub-categories. Expand
+   * them into standalone flat templates ("Man Masters" + "30-39" → "Man Masters
+   * 30-39") so the picker never offers a nested category again.
+   */
+  const flattenLegacyTemplate = (t: CategoryTemplate): CategoryTemplate[] => {
+    if (!t.subCategories || t.subCategories.length === 0) {
+      return [{ ...t, subCategories: [] }];
+    }
+    return t.subCategories.map((sub) => ({
+      ...t,
+      id: `${t.id}-${sub}`,
+      name: `${t.name} ${sub}`.trim(),
+      subCategories: []
+    }));
+  };
+
   const loadTemplates = () => {
     const stored = localStorage.getItem("categoryTemplates");
     if (stored) {
-      const parsed = JSON.parse(stored);
-      setTemplates([...PREDEFINED_CATEGORIES, ...parsed]);
+      const parsed: CategoryTemplate[] = JSON.parse(stored);
+      const flattened = parsed.flatMap(flattenLegacyTemplate);
+      setTemplates([...PREDEFINED_CATEGORIES, ...flattened]);
     } else {
       setTemplates(PREDEFINED_CATEGORIES);
     }
@@ -114,7 +85,7 @@ const CategoryManager: React.FC<Props> = ({
     const newTemplate: CategoryTemplate = {
       id: `custom-${Date.now()}`,
       name: newCatName.trim(),
-      subCategories: newSubCats,
+      subCategories: [],
       color: selectedColor,
       createdAt: new Date(),
       lastUsed: new Date()
@@ -122,46 +93,18 @@ const CategoryManager: React.FC<Props> = ({
 
     saveTemplate(newTemplate);
     setSelectedCategory(newTemplate.name);
-    setSelectedSubCategory(newTemplate.subCategories[0] || null);
 
     // Reset form
     setAddingNew(false);
     setNewCatName("");
-    setNewSubCats([]);
-    setNewSubCatInput("");
 
-    onSelect(
-      newTemplate.name,
-      newTemplate.subCategories[0] || null,
-      newTemplate.color
-    );
-  };
-
-  const handleAddSubCategory = () => {
-    if (!newSubCatInput.trim()) return;
-    setNewSubCats([...newSubCats, newSubCatInput.trim()]);
-    setNewSubCatInput("");
-  };
-
-  const handleRemoveSubCategory = (index: number) => {
-    setNewSubCats(newSubCats.filter((_, i) => i !== index));
+    onSelect(newTemplate.name, null, newTemplate.color);
   };
 
   const handleSelectCategory = (template: CategoryTemplate) => {
     setSelectedCategory(template.name);
-    setSelectedSubCategory(template.subCategories[0] || null);
-    onSelect(template.name, template.subCategories[0] || null, template.color);
+    onSelect(template.name, null, template.color);
   };
-
-  const handleSelectSubCategory = (subCat: string | null) => {
-    setSelectedSubCategory(subCat);
-    const template = templates.find((t) => t.name === selectedCategory);
-    if (template) {
-      onSelect(selectedCategory, subCat, template.color);
-    }
-  };
-
-  const currentTemplate = templates.find((t) => t.name === selectedCategory);
 
   return (
     <div className={styles.container}>
@@ -207,42 +150,6 @@ const CategoryManager: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className={styles.subCatSection}>
-            <span className={styles.subLabel}>Sub-categories (optional):</span>
-            <div className={styles.subCatInput}>
-              <input
-                className={styles.input}
-                placeholder="e.g., 19-29, 30-39..."
-                value={newSubCatInput}
-                onChange={(e) => setNewSubCatInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddSubCategory()}
-              />
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleAddSubCategory}
-                disabled={!newSubCatInput.trim()}
-              >
-                Add
-              </Button>
-            </div>
-            {newSubCats.length > 0 && (
-              <div className={styles.subCatList}>
-                {newSubCats.map((sub, idx) => (
-                  <div key={idx} className={styles.subCatChip}>
-                    {sub}
-                    <button
-                      className={styles.removeBtn}
-                      onClick={() => handleRemoveSubCategory(idx)}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           <div className={styles.formActions}>
             <Button
               variant="secondary"
@@ -250,8 +157,6 @@ const CategoryManager: React.FC<Props> = ({
               onClick={() => {
                 setAddingNew(false);
                 setNewCatName("");
-                setNewSubCats([]);
-                setNewSubCatInput("");
               }}
             >
               Cancel
@@ -280,31 +185,9 @@ const CategoryManager: React.FC<Props> = ({
                   style={{ background: template.color }}
                 />
                 {template.name}
-                {template.subCategories.length > 0 && (
-                  <span className={styles.badge}>
-                    {template.subCategories.length}
-                  </span>
-                )}
               </button>
             ))}
           </div>
-
-          {currentTemplate && currentTemplate.subCategories.length > 0 && (
-            <div className={styles.subCategorySection}>
-              <span className={styles.label}>Sub-category:</span>
-              <div className={styles.subCategoryList}>
-                {currentTemplate.subCategories.map((sub) => (
-                  <button
-                    key={sub}
-                    className={`${styles.subCategoryBtn} ${selectedSubCategory === sub ? styles.active : ""}`}
-                    onClick={() => handleSelectSubCategory(sub)}
-                  >
-                    {sub}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

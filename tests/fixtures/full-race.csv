@@ -1,0 +1,31 @@
+timeStartRace,heat,bibNumber,position_start,firstName,lastName,category,team,totalLaps
+08:00,1,1,1,Tyler,Brooks,Elite Men,Summit Velo,2
+08:00,1,2,2,Gareth,Ashworth,Elite Men,Albion Wheelers,2
+08:00,1,3,3,Matteo,Bellandi,Elite Men,Velo Aurora,2
+08:00,1,4,4,Cody,Sullivan,Elite Men,Iron Peak Cycling,2
+08:00,1,5,5,Alistair,Pemberton,Elite Men,Thames Velo Club,2
+08:10,1,11,1,Ashley,Harper,Elite Women,Redwood Racing,3
+08:10,1,12,2,Chiara,Moretti,Elite Women,Ciclismo Marino,3
+08:10,1,13,3,Imogen,Wetherby,Elite Women,Pennine CC,3
+08:10,1,14,4,Brittany,Callahan,Elite Women,Summit Velo,3
+08:10,1,15,5,Giulia,Ferraro,Elite Women,Velo Aurora,3
+08:20,1,21,1,Trevor,Hargreaves,Junior Men,Albion Wheelers,4
+08:20,1,22,2,Brandon,Whitaker,Junior Men,Iron Peak Cycling,4
+08:20,1,23,3,Lorenzo,Colombo,Junior Men,Ciclismo Marino,4
+08:20,1,24,4,Chase,Reeves,Junior Men,Redwood Racing,4
+08:20,1,25,5,Barnaby,Whitmore,Junior Men,Thames Velo Club,4
+09:00,2,31,1,Travis,Miller,Masters Men 30-39,Redwood Racing,3
+09:00,2,32,2,Clive,Fairbanks,Masters Men 30-39,Pennine CC,3
+09:00,2,33,3,Alessandro,Fontana,Masters Men 30-39,Velo Aurora,3
+09:00,2,34,4,Wyatt,Carver,Masters Men 30-39,Iron Peak Cycling,3
+09:00,2,35,5,Malcolm,Cheshire,Masters Men 30-39,Thames Velo Club,3
+09:10,2,41,1,Francesca,Gallo,Masters Women 30-39,Ciclismo Marino,4
+09:10,2,42,2,Chelsea,Monroe,Masters Women 30-39,Summit Velo,4
+09:10,2,43,3,Harriet,Ashby,Masters Women 30-39,Albion Wheelers,4
+09:10,2,44,4,Serena,Marchetti,Masters Women 30-39,Velo Aurora,4
+09:10,2,45,5,Bailey,Hutchins,Masters Women 30-39,Redwood Racing,4
+09:20,2,51,1,Nigel,Ashcroft,Masters Men 50+,Pennine CC,5
+09:20,2,52,2,Fabrizio,Greco,Masters Men 50+,Ciclismo Marino,5
+09:20,2,53,3,Dwayne,Foster,Masters Men 50+,Iron Peak Cycling,5
+09:20,2,54,4,Rupert,Wexley,Masters Men 50+,Thames Velo Club,5
+09:20,2,55,5,Rocco,Esposito,Masters Men 50+,Velo Aurora,5

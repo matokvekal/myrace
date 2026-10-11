@@ -39,6 +39,7 @@ const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
   standing: "Standing",
   raceDay: "Race Day",
   points: "Points",
+  uciPoints: "UCI Points",
   federation: "Federation",
   uciNumber: "UCI #",
   idNumber: "ID #",
@@ -48,6 +49,7 @@ const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
   roadNumber: "Road #",
   chip: "Chip",
   notes: "Notes",
+  infoField: "Info (on card)",
   general: "General"
 };
 

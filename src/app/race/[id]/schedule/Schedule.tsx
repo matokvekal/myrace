@@ -16,12 +16,17 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsDown,
-  ChevronsUp
+  ChevronsUp,
+  Palette,
+  Lock
 } from "lucide-react";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
+import useRaceStore from "@/stores/racesStore";
 import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
+import { getCategoryLocks } from "@/utils/categoryLocks";
+import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 
 interface Props {
   raceUuid: string;
@@ -43,24 +48,122 @@ interface Wave {
 
 export const DEFAULT_WAVE_GAP_MINUTES = 30;
 
-export function normalizeTime(t: string | null | undefined): string | null {
-  if (!t) return null;
-  const m = t.match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return null;
-  return `${m[1].padStart(2, "0")}:${m[2]}`;
+// A category's identity is name + subCategory, NOT name alone — the same name
+// (e.g. "Masters Men ") can exist in multiple waves with different sub-categories.
+// Any map from category → wave MUST key by this composite, or waves collide.
+export function catWaveKey(name: string, subCategory?: string | null): string {
+  return `${name}::${subCategory ?? ""}`;
 }
 
+// True when a rider belongs to a category — matched by name AND subCategory, so a
+// shared category name (e.g. "Masters Men " 19-29 vs 30-49) never pulls in riders
+// from another start/wave. Use this everywhere riders are filtered by category.
+export function riderInCategory(
+  rider: { category: string; subCategory?: string | null },
+  cat: { name: string; subCategory?: string | null }
+): boolean {
+  return rider.category === cat.name && (rider.subCategory ?? null) === (cat.subCategory ?? null);
+}
+
+/**
+ * The category owns the lap count; a rider's own totalLaps is only a cache of
+ * it. Riders imported without a laps column sit at 0, which not only displays
+ * as "0/0" but stops them ever reaching the finish check (BUGS.md #7).
+ * Resolve laps through here wherever they are shown or compared.
+ */
+export function effectiveTotalLaps(
+  rider: { category: string; subCategory?: string | null; totalLaps: number },
+  categories: { name: string; subCategory?: string | null; laps: number | null }[]
+): number {
+  const cat = categories.find((c) => riderInCategory(rider, c));
+  return cat?.laps || rider.totalLaps || 0;
+}
+
+/** Riders with totalLaps resolved from their category. */
+export function withCategoryLaps<
+  T extends { category: string; subCategory?: string | null; totalLaps: number }
+>(
+  riders: T[],
+  categories: { name: string; subCategory?: string | null; laps: number | null }[]
+): T[] {
+  return riders.map((rider) => {
+    const laps = effectiveTotalLaps(rider, categories);
+    return laps === rider.totalLaps ? rider : { ...rider, totalLaps: laps };
+  });
+}
+
+export function normalizeTime(t: string | null | undefined): string | null {
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const hhmm = `${m[1].padStart(2, "0")}:${m[2]}`;
+  // Seconds are kept when non-zero: 08:22 and 08:22:30 are two separate starts
+  // (a category released 30 s after the previous one), not the same slot.
+  return m[3] && m[3] !== "00" ? `${hhmm}:${m[3]}` : hhmm;
+}
+
+/** Minutes since midnight; seconds count as a fraction (08:22:30 → 502.5). */
 export function toMinutes(t: string | null | undefined): number {
   const norm = normalizeTime(t);
   if (!norm) return Infinity;
-  const [h, m] = norm.split(":").map(Number);
-  return h * 60 + m;
+  const [h, m, s = 0] = norm.split(":").map(Number);
+  return h * 60 + m + s / 60;
+}
+
+export function minutesToTime(mins: number): string {
+  const clamped = ((Math.round(mins) % 1440) + 1440) % 1440;
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 export function buildSchedule(
   categories: CategoryProps[],
   waveGapMinutes = DEFAULT_WAVE_GAP_MINUTES
 ) {
+  // Once categories have been assigned to explicit waves (via the Schedule
+  // editor, which writes `heat`), that assignment is authoritative — group by
+  // wave number so a wave shows even if its start time is close to another's.
+  const hasExplicitWaves = categories.some((c) => Number(c.heat) > 0);
+
+  if (hasExplicitWaves) {
+    const waveMap = new Map<number, Map<string, CategoryProps[]>>();
+    const addCat = (waveNum: number, cat: CategoryProps) => {
+      const startKey = normalizeTime(cat.startTime) ?? "TBD";
+      if (!waveMap.has(waveNum)) waveMap.set(waveNum, new Map());
+      const startMap = waveMap.get(waveNum)!;
+      if (!startMap.has(startKey)) startMap.set(startKey, []);
+      startMap.get(startKey)!.push(cat);
+    };
+
+    // Assigned categories → grouped by their wave number
+    const assigned = [...categories]
+      .filter((c) => Number(c.heat) > 0)
+      .sort((a, b) => {
+        const dh = Number(a.heat) - Number(b.heat);
+        return dh !== 0 ? dh : toMinutes(a.startTime) - toMinutes(b.startTime);
+      });
+    assigned.forEach((cat) => addCat(Number(cat.heat), cat));
+
+    // Leftovers with a start time but no wave (e.g. imported after an edit)
+    // → appended as time-derived waves after the last assigned wave.
+    const maxHeat = assigned.reduce((m, c) => Math.max(m, Number(c.heat)), 0);
+    const leftovers = [...categories]
+      .filter((c) => !(Number(c.heat) > 0) && Number.isFinite(toMinutes(c.startTime)))
+      .sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
+    let waveNum = maxHeat;
+    let lastStartMinutes = -Infinity;
+    for (const cat of leftovers) {
+      const catMinutes = toMinutes(cat.startTime);
+      if (catMinutes - lastStartMinutes > waveGapMinutes) waveNum++;
+      lastStartMinutes = catMinutes;
+      addCat(waveNum, cat);
+    }
+
+    return waveMap;
+  }
+
+  // Fallback for unedited schedules: derive waves from start-time gaps.
   const sorted = [...categories].sort(
     (a, b) => toMinutes(a.startTime) - toMinutes(b.startTime)
   );
@@ -85,7 +188,61 @@ export function buildSchedule(
   return waveMap;
 }
 
+export interface WaveStatusEntry {
+  waveNum: number;
+  status: "upcoming" | "running" | "finished" | "partial";
+  startTime: string | null;
+}
+
+/** Every wave number in schedule order, each tagged with its aggregate status
+ *  (same rule as getWaveStatusInfo) and first start time — for wave pickers. */
+export function getScheduleWaves(
+  categories: CategoryProps[],
+  waveGapMinutes = DEFAULT_WAVE_GAP_MINUTES
+): WaveStatusEntry[] {
+  const schedule = buildSchedule(categories, waveGapMinutes);
+  return [...schedule.keys()]
+    .sort((a, b) => a - b)
+    .map((waveNum) => {
+      const startMap = schedule.get(waveNum)!;
+      const cats = [...startMap.values()].flat();
+      const firstTime = [...startMap.keys()][0] ?? null;
+      let status: WaveStatusEntry["status"] = "upcoming";
+      if (cats.length && cats.every((c) => c.status === "finished")) status = "finished";
+      else if (cats.some((c) => c.status === "running")) status = "running";
+      else if (cats.some((c) => c.status === "finished")) status = "partial";
+      return { waveNum, status, startTime: firstTime === "TBD" ? null : firstTime };
+    });
+}
+
+/**
+ * Which wave the Live phase should open by default: the wave that's actually
+ * running right now, or — once nothing is live (race not started yet, or
+ * every wave already finished) — the first wave in the schedule. Never the
+ * Start folder's `selectedWave`, which tracks whatever wave the commissaire
+ * was last administering there and can be well behind (or ahead of) reality.
+ */
+export function getDefaultLiveWave(
+  categories: CategoryProps[],
+  waveGapMinutes = DEFAULT_WAVE_GAP_MINUTES
+): number | null {
+  const waves = getScheduleWaves(categories, waveGapMinutes);
+  if (waves.length === 0) return null;
+  return waves.find((w) => w.status === "running")?.waveNum ?? waves[0].waveNum;
+}
+
 const OUT_STATUSES = new Set(["DNS", "DSQ", "DNF"]);
+
+// A wave is "locked" once it has started or finished — its start time can no
+// longer be edited. "finished" = every category finished; "running" = at least
+// one category running or finished (but not all finished yet).
+type WaveLock = "running" | "finished" | null;
+
+function getWaveLock(statuses: (string | null | undefined)[]): WaveLock {
+  if (statuses.length && statuses.every((s) => s === "finished")) return "finished";
+  if (statuses.some((s) => s === "running" || s === "finished")) return "running";
+  return null;
+}
 
 function sortRidersForStanding(riderList: RiderProps[]): RiderProps[] {
   return [...riderList].sort((a, b) => a.bibNumber - b.bibNumber);
@@ -101,10 +258,49 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   }));
 
   const [editMode, setEditMode] = useState(false);
-  const [waveGap, setWaveGap] = useState(DEFAULT_WAVE_GAP_MINUTES);
   const [waves, setWaves] = useState<Wave[]>([]);
   const [unassignedCategories, setUnassignedCategories] = useState<CategoryProps[]>([]);
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set());
+  const [editLaps, setEditLaps] = useState(false);
+  const [selectedRider, setSelectedRider] = useState<{ rider: RiderProps; wave: number } | null>(null);
+  const [colorCat, setColorCat] = useState<CategoryProps | null>(null);
+  const [colorDraft, setColorDraft] = useState("#63A6FC");
+  const [colorWave, setColorWave] = useState<number | null>(null);
+  const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
+  const updateRace = useRaceStore((s) => s.updateRace);
+
+  // A wave owns its own colour (race.waveColors), separate from its categories'.
+  // Locked once every category in the wave has finished.
+  const saveWaveColor = async (waveNum: number, color: string) => {
+    if (!race) return;
+    await updateRace({ ...race, waveColors: { ...(race.waveColors ?? {}), [String(waveNum)]: color } });
+    setColorWave(null);
+  };
+
+  // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
+  // colour and every rider in it carries a copy. Finished categories are refused
+  // here as well as in the UI.
+  const saveCategoryColor = async (cat: CategoryProps, color: string) => {
+    if (getCategoryLocks(cat, riders).color) return;
+    const updated = { ...cat, color };
+    await updateCategory(updated);
+    for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, cat))) {
+      await updateRider({ ...rider, color });
+    }
+    setColorCat(null);
+  };
+
+  // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
+  // laps, and every rider in it gets the new total (laps || rider.totalLaps).
+  const setCategoryLaps = async (cat: CategoryProps, laps: number) => {
+    const next = Math.max(0, laps);
+    if (next === (cat.laps ?? 0)) return;
+    const updated = { ...cat, laps: next };
+    await updateCategory(updated);
+    for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, cat))) {
+      await updateRider({ ...rider, color: updated.color, totalLaps: updated.laps || rider.totalLaps });
+    }
+  };
 
   const toggleCat = (catId: number) => {
     setExpandedCats((prev) => {
@@ -125,7 +321,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     getRiders(raceUuid);
   }, [raceUuid, getRiders]);
 
-  const schedule = buildSchedule(categories, waveGap);
+  const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
 
   const enterEditMode = () => {
     const waveData: Wave[] = [];
@@ -155,7 +351,19 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
 
   const addWave = () => {
     const maxWave = waves.length > 0 ? Math.max(...waves.map((w) => w.number)) : 0;
-    setWaves([...waves, { id: Date.now(), number: maxWave + 1, startTime: "08:00", startSlots: [] }]);
+    // New wave starts 1.5 hours after the latest existing wave (default 08:00 if none)
+    const times = waves.map((w) => toMinutes(w.startTime)).filter((n) => Number.isFinite(n));
+    const startTime = times.length ? minutesToTime(Math.max(...times) + 90) : "08:00";
+    setWaves([...waves, { id: Date.now(), number: maxWave + 1, startTime, startSlots: [] }]);
+  };
+
+  // Nudge a wave's start time by ±minutes (used by the −5 / +5 buttons)
+  const nudgeWaveTime = (waveId: number, delta: number) => {
+    const wave = waves.find((w) => w.id === waveId);
+    if (!wave) return;
+    const base = toMinutes(wave.startTime);
+    const mins = Number.isFinite(base) ? base : toMinutes("08:00");
+    updateWaveTime(waveId, minutesToTime(mins + delta));
   };
 
   const updateWaveTime = (waveId: number, time: string) => {
@@ -297,26 +505,57 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           {waves.length === 0 ? (
             <div className={styles.emptyMessage}>No waves yet — click "Add Wave" to create one.</div>
           ) : (
-            waves.map((wave, waveIdx) => (
-              <div key={wave.id} className={styles.waveTimeRow}>
-                <div className={styles.dragButtons}>
-                  <button className={styles.iconBtn} onClick={() => moveWave(wave.id, "up")} disabled={waveIdx === 0} title="Move up">↑</button>
-                  <button className={styles.iconBtn} onClick={() => moveWave(wave.id, "down")} disabled={waveIdx === waves.length - 1} title="Move down">↓</button>
+            waves.map((wave, waveIdx) => {
+              const waveLock = getWaveLock(
+                wave.startSlots
+                  .flatMap((s) => s.categoryIds)
+                  .map((id) => categories.find((c) => c.id === id)?.status)
+              );
+              const locked = waveLock !== null;
+              return (
+                <div key={wave.id} className={styles.waveTimeRow} data-wave-lock={waveLock ?? undefined}>
+                  <div className={styles.dragButtons}>
+                    <button className={styles.iconBtn} onClick={() => moveWave(wave.id, "up")} disabled={waveIdx === 0} title="Move up">↑</button>
+                    <button className={styles.iconBtn} onClick={() => moveWave(wave.id, "down")} disabled={waveIdx === waves.length - 1} title="Move down">↓</button>
+                  </div>
+                  <span className={styles.waveLabel}>Wave {wave.number}</span>
+                  <button
+                    className={styles.nudgeBtn}
+                    onClick={() => nudgeWaveTime(wave.id, -5)}
+                    disabled={locked}
+                    title={locked ? "Time locked — wave already started" : "5 minutes earlier"}
+                  >
+                    −5
+                  </button>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={wave.startTime}
+                    onChange={(e) => updateWaveTime(wave.id, e.target.value)}
+                    disabled={locked}
+                    title={locked ? "Time locked — wave already started" : undefined}
+                  />
+                  <button
+                    className={styles.nudgeBtn}
+                    onClick={() => nudgeWaveTime(wave.id, 5)}
+                    disabled={locked}
+                    title={locked ? "Time locked — wave already started" : "5 minutes later"}
+                  >
+                    +5
+                  </button>
+                  {locked && (
+                    <span className={styles.lockTag} data-wave-lock={waveLock}>
+                      🔒 {waveLock === "finished" ? "Finished" : "Started"}
+                    </span>
+                  )}
+                  <div style={{ marginLeft: "auto" }}>
+                    <Button variant="icon" size="sm" iconOnly onClick={() => deleteWave(wave.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
                 </div>
-                <span className={styles.waveLabel}>Wave {wave.number}</span>
-                <input
-                  type="time"
-                  className={styles.timeInput}
-                  value={wave.startTime}
-                  onChange={(e) => updateWaveTime(wave.id, e.target.value)}
-                />
-                <div style={{ marginLeft: "auto" }}>
-                  <Button variant="icon" size="sm" iconOnly onClick={() => deleteWave(wave.id)}>
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -337,7 +576,6 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                   <div className={styles.catAssignInfo}>
                     <span className={styles.catName}>{cat.name}</span>
                     {cat.subCategory && <span className={styles.subCategory}> · {cat.subCategory}</span>}
-                    <span className={styles.riderCount}>{cat.riders ?? 0} riders</span>
                   </div>
                   <select
                     className={styles.waveSelect}
@@ -371,21 +609,15 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
         >
           {allExpanded ? <ChevronsUp size={16} /> : <ChevronsDown size={16} />}
         </button>
-        <label className={styles.gapLabel}>
-          Wave gap
-          <select
-            className={styles.gapSelect}
-            value={waveGap}
-            onChange={(e) => setWaveGap(Number(e.target.value))}
-          >
-            <option value={15}>15 min</option>
-            <option value={30}>30 min</option>
-            <option value={45}>45 min</option>
-            <option value={60}>1 hour</option>
-            <option value={90}>1.5 hrs</option>
-          </select>
-        </label>
-        <Button variant="primary" size="sm" startIcon={<Edit2 size={14} />} onClick={enterEditMode}>
+        <Button
+          variant={editLaps ? "primary" : "secondary"}
+          size="sm"
+          startIcon={editLaps ? <Check size={14} /> : <Edit2 size={14} />}
+          onClick={() => setEditLaps((v) => !v)}
+        >
+          {editLaps ? "Done" : "Edit Laps"}
+        </Button>
+        <Button variant="secondary" size="sm" startIcon={<Edit2 size={14} />} onClick={enterEditMode}>
           Edit Schedule
         </Button>
       </div>
@@ -403,11 +635,27 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
         );
         const waveFinished = waveRiders.filter((r) => r.status === "finished").length;
         const waveStatusInfo = getWaveStatusInfo(allWaveCats.map((c) => c.status));
+        const waveLock = getWaveLock(allWaveCats.map((c) => c.status));
 
         return (
           <div key={waveNum} className={styles.wave}>
-            <div className={styles.waveHeader}>
+            <div
+              className={styles.waveHeader}
+              data-wave-lock={waveLock ?? undefined}
+              style={race?.waveColors?.[String(waveNum)] ? { boxShadow: `inset 8px 0 0 ${race.waveColors[String(waveNum)]}` } : undefined}
+            >
               <span className={styles.waveLabel}>Wave {waveNum}</span>
+              <button
+                type="button"
+                className={styles.editColorBtn}
+                data-testid={`edit-wave-color-${waveNum}`}
+                disabled={waveLock === "finished"}
+                aria-label={`Edit color of Wave ${waveNum}`}
+                title={waveLock === "finished" ? "Color can't be changed — this wave has finished" : "Edit wave color"}
+                onClick={() => { setColorDraft(race?.waveColors?.[String(waveNum)] ?? "#63A6FC"); setColorWave(waveNum); }}
+              >
+                {waveLock === "finished" ? <Lock size={12} /> : <Palette size={12} />}
+              </button>
               <span
                 className={styles.statusBadge}
                 style={{ background: `${waveStatusInfo.color}1f`, color: waveStatusInfo.color }}
@@ -416,20 +664,13 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
               </span>
               {firstTime !== "TBD" && <span className={styles.waveTime}>{firstTime}</span>}
               {waveRiders.length > 0 && (
-                <span className={styles.waveStat}>{waveFinished}/{waveRiders.length} ✓</span>
+                <span className={styles.waveStat} title="Finishers">🏁 {waveFinished}/{waveRiders.length}</span>
               )}
-              <Button
-                variant="success"
-                size="sm"
-                className={styles.liveBtn}
-                onClick={() => navigate(`/race/${raceUuid}/heat/${waveNum}`)}
-              >
-                <Radio size={13} /> Go Live
-              </Button>
             </div>
 
             {[...startMap.entries()].map(([startTime, cats], si) => {
               const anyRunning = cats.some((c) => c.status === "running");
+              const startLock = getWaveLock(cats.map((c) => c.status));
               const startRiders = cats.flatMap((cat) =>
                 riders.filter(
                   (r) =>
@@ -442,24 +683,23 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
 
               return (
                 <div key={startTime} className={styles.startGroup}>
-                  <div className={styles.startHeader} data-wave-running={anyRunning ? "true" : "false"}>
+                  <div className={styles.startHeader} data-wave-running={anyRunning ? "true" : "false"} data-wave-lock={startLock ?? undefined}>
                     <div className={styles.startInfo}>
-                      <span>Start {si + 1}</span>
-                      {si === 0 && firstTime !== "TBD" && (
-                        <span className={styles.startTime}> · WAVE START: {firstTime}</span>
+                      <span className={styles.startLabel}>Start {si + 1}</span>
+                      {(si === 0 ? firstTime : startTime) !== "TBD" && (
+                        <span className={styles.startTime}>{si === 0 ? firstTime : startTime}</span>
                       )}
-                      {si > 0 && startTime !== "TBD" && (
-                        <span className={styles.startTime}> · {startTime}</span>
+                      {anyRunning && (
+                        <button
+                          className={styles.liveChipBtn}
+                          onClick={() => navigate(`/race/${raceUuid}/heat/${waveNum}`)}
+                          title="Open live view"
+                        >
+                          <Radio size={12} /> Live
+                        </button>
                       )}
                       {startRiders.length > 0 && (
-                        <span className={styles.startStat}>{startFinished}/{startRiders.length}</span>
-                      )}
-                    </div>
-                    <div className={styles.startActions}>
-                      {anyRunning && (
-                        <Button variant="secondary" size="md" onClick={() => navigate(`/race/${raceUuid}/heat/${waveNum}`)}>
-                          <Radio size={14} /> Live View
-                        </Button>
+                        <span className={styles.startStat} title="Finishers">🏁 {startFinished}/{startRiders.length}</span>
                       )}
                     </div>
                   </div>
@@ -496,7 +736,28 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                               <span className={styles.catMeta}> · {cat.subCategory}</span>
                             )}
                             <span className={styles.catMeta}>
-                              {catRiders.length} riders · {cat.laps ?? 0} laps
+                              {catRiders.length} riders
+                            </span>
+                            <span
+                              className={`${styles.lapsEditor} ${(cat.laps ?? 0) > 0 ? "" : styles.lapsMissing} ${editLaps ? styles.lapsEditing : ""}`}
+                              title={(cat.laps ?? 0) > 0 ? "Laps" : "Laps not set"}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {editLaps && (cat.laps ?? 0) > 0 && (
+                                <button
+                                  type="button"
+                                  className={styles.lapsBtn}
+                                  onClick={() => setCategoryLaps(cat, (cat.laps ?? 0) - 1)}
+                                >−</button>
+                              )}
+                              <span className={styles.lapsValue}>{cat.laps ?? 0} laps</span>
+                              {editLaps && (
+                                <button
+                                  type="button"
+                                  className={styles.lapsBtn}
+                                  onClick={() => setCategoryLaps(cat, (cat.laps ?? 0) + 1)}
+                                >+</button>
+                              )}
                             </span>
                           </div>
                           {(() => {
@@ -511,6 +772,22 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                             );
                           })()}
                           <div className={styles.catActions} onClick={(e) => e.stopPropagation()}>
+                            {(() => {
+                              const locks = getCategoryLocks(cat, riders);
+                              return (
+                                <button
+                                  type="button"
+                                  className={styles.editColorBtn}
+                                  data-testid={`edit-color-${cat.id}`}
+                                  disabled={locks.color}
+                                  aria-label={`Edit color of ${cat.name}`}
+                                  title={locks.color ? "Color can't be changed — this category has finished" : "Edit color"}
+                                  onClick={() => { setColorDraft(cat.color ?? "#63A6FC"); setColorCat(cat); }}
+                                >
+                                  {locks.color ? <Lock size={12} /> : <Palette size={12} />}
+                                </button>
+                              );
+                            })()}
                             <Button
                               variant="secondary"
                               size="sm"
@@ -550,7 +827,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                               return (
                                 <div
                                   key={rider.id}
-                                  className={`${styles.standingRow} ${rider.checked ? styles.standingRowChecked : ""}`}
+                                  className={styles.standingRow}
                                 >
                                   <div
                                     className={styles.standingColorBar}
@@ -558,20 +835,24 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                   />
                                   <span className={styles.standingPos}>{isOut ? "—" : idx + 1}</span>
                                   <span className={styles.standingBib}>#{rider.bibNumber}</span>
-                                  <span className={styles.standingName}>
-                                    {rider.lastName} {rider.firstName}
-                                  </span>
+                                  <button
+                                    type="button"
+                                    className={styles.standingName}
+                                    dir="auto"
+                                    title="Rider details"
+                                    onClick={() => setSelectedRider({ rider, wave: waveNum })}
+                                  >
+                                    {`${rider.firstName ?? ""} ${rider.lastName ?? ""}`.trim() || "—"}
+                                    {isOut && (
+                                      <span className={`${styles.nameStatus} ${styles[`nameStatus${rider.status}`] ?? ""}`}>
+                                        {rider.status}
+                                      </span>
+                                    )}
+                                  </button>
                                   <span className={styles.standingLaps}>
                                     {rider.lapsCounter}/{rider.totalLaps}
                                   </span>
                                   <div className={styles.standingActions}>
-                                    <button
-                                      className={`${styles.vBtn} ${rider.checked ? styles.vBtnOn : ""}`}
-                                      title={rider.checked ? "Uncheck" : "Check in"}
-                                      onClick={() => updateRider({ ...rider, checked: !rider.checked })}
-                                    >
-                                      <Check size={11} />
-                                    </button>
                                     <button
                                       className={`${styles.statusBtn} ${isDNS ? styles.dnsOn : ""}`}
                                       onClick={() =>
@@ -619,6 +900,60 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           </div>
         );
       })}
+
+      {selectedRider && (
+        <RiderDetailModal
+          rider={riders.find((r) => r.id === selectedRider.rider.id) ?? selectedRider.rider}
+          wave={selectedRider.wave}
+          onClose={() => setSelectedRider(null)}
+        />
+      )}
+
+      {colorWave != null && (
+        <div className={styles.colorOverlay} onClick={() => setColorWave(null)}>
+          <div className={styles.colorModal} role="dialog" aria-label="Edit wave color" onClick={(e) => e.stopPropagation()}>
+            <div className={styles.colorTitle}>Color · Wave {colorWave}</div>
+            <div className={styles.colorCurrent}>
+              <span className={styles.colorSwatch} style={{ background: race?.waveColors?.[String(colorWave)] ?? "#ccc" }} />
+              <span>Current {race?.waveColors?.[String(colorWave)] ?? "—"}</span>
+            </div>
+            <input
+              type="color"
+              className={styles.colorInput}
+              data-testid="wave-color-input"
+              value={colorDraft}
+              onChange={(e) => setColorDraft(e.target.value)}
+            />
+            <div className={styles.colorActions}>
+              <Button variant="secondary" size="sm" onClick={() => setColorWave(null)}>Cancel</Button>
+              <Button variant="success" size="sm" onClick={() => void saveWaveColor(colorWave, colorDraft)} data-testid="wave-color-save">Save</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {colorCat && (
+        <div className={styles.colorOverlay} onClick={() => setColorCat(null)}>
+          <div className={styles.colorModal} role="dialog" aria-label="Edit color" onClick={(e) => e.stopPropagation()}>
+            <div className={styles.colorTitle}>Color · {colorCat.name}{colorCat.subCategory ? ` · ${colorCat.subCategory}` : ""}</div>
+            <div className={styles.colorCurrent}>
+              <span className={styles.colorSwatch} style={{ background: colorCat.color ?? "#ccc" }} />
+              <span>Current {colorCat.color ?? "—"}</span>
+            </div>
+            <input
+              type="color"
+              className={styles.colorInput}
+              data-testid="color-input"
+              value={colorDraft}
+              onChange={(e) => setColorDraft(e.target.value)}
+            />
+            <div className={styles.colorActions}>
+              <Button variant="secondary" size="sm" onClick={() => setColorCat(null)}>Cancel</Button>
+              <Button variant="success" size="sm" onClick={() => void saveCategoryColor(colorCat, colorDraft)} data-testid="color-save">Save</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
         className={styles.scrollTopBtn}

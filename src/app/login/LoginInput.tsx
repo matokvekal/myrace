@@ -16,6 +16,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
   value,
   onChange,
   error,
+  name,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
 
@@ -47,6 +48,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
       )}
       <input
         id={label}
+        name={name}
         className={getInputClassName()}
         type={type}
         value={value}

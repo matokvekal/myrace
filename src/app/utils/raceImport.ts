@@ -1,12 +1,38 @@
 import * as XLSX from "xlsx";
-import type { CategoryProps, RiderProps } from "@/types/types";
+import type { CategoryProps, RiderProps, RaceFinalization, RaceTrack, TrackMarker } from "@/types/types";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
+import { riderInCategory, catWaveKey } from "../race/[id]/schedule/Schedule";
+import { verifyExportToken } from "./raceSignature";
 
-interface ImportResult {
+export interface ImportResult {
   raceUuid: string;
   categories: CategoryProps[];
   riders: RiderProps[];
   raceName: string;
+  /**
+   * Set when the file came from a race that was closed with "Finish Race" AND
+   * the record verifies against itself. A full "replace" import adopts it, so a
+   * final result handed to another commissaire arrives locked on their device
+   * too — they can read and export it, not edit it.
+   *
+   * Unverifiable records are dropped rather than trusted: a hand-written
+   * "finalized" row must not be able to lock someone else's race.
+   */
+  finalized?: RaceFinalization;
+  /** Course maps carried in the file (absent in files exported before multi-map support). */
+  tracks?: RaceTrack[];
+}
+
+/** Parse + self-verify the finalization record stored on the Race sheet. */
+async function parseFinalized(raw: string | undefined): Promise<RaceFinalization | undefined> {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as RaceFinalization;
+    if (!parsed?.payload || !parsed?.token) return undefined;
+    return (await verifyExportToken(parsed.payload, parsed.token)) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function parseNum(v: unknown): number {
@@ -35,6 +61,15 @@ function sheetToObjects(sheet: XLSX.WorkSheet): Record<string, string>[] {
     headers.forEach((h, i) => { obj[h] = String(row[i] ?? "").trim(); });
     return obj;
   });
+}
+
+function parseKeyList(v: string | undefined): string[] {
+  try {
+    const arr = v ? JSON.parse(v) : [];
+    return Array.isArray(arr) ? arr.filter((k) => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
@@ -73,6 +108,7 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     lapsCounter: parseNum(row.lapsCounter),
     riders: parseNum(row.riders),
     isConnected: false,
+    importOrder: row.importOrder ? parseNum(row.importOrder) : undefined,
   }));
 
   // ── Riders ──────────────────────────────────────────────────────
@@ -88,9 +124,21 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
       }
     } catch { lapsDetails = []; }
 
+    let extraFields: RiderProps["extraFields"];
+    try {
+      if (row.extraFields) {
+        const parsed = JSON.parse(row.extraFields);
+        if (parsed && typeof parsed === "object") extraFields = parsed;
+      }
+    } catch { extraFields = undefined; }
+
     return {
       id: parseNum(row.id),
       raceUuid,
+      standing: row.standing !== "" && row.standing !== undefined ? parseNum(row.standing) : null,
+      uciPoints: row.uciPoints ? parseNum(row.uciPoints) : null,
+      uciNumber: parseNullableStr(row.uciNumber),
+      extraFields,
       bibNumber: parseNum(row.bibNumber),
       firstName: row.firstName ?? "",
       middleName: parseNullableStr(row.middleName),
@@ -124,7 +172,121 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     };
   });
 
-  return { raceUuid, categories, riders, raceName };
+  // ── Course maps (optional sheets) ───────────────────────────────
+  let tracks: RaceTrack[] | undefined;
+  const trackSheet = wb.Sheets["Tracks"];
+  if (trackSheet) {
+    const byId = new Map<string, RaceTrack>();
+    for (const row of sheetToObjects(trackSheet)) {
+      if (!row.id) continue;
+      const lat = parseFloat(row.centerLat);
+      const lng = parseFloat(row.centerLng);
+      byId.set(row.id, {
+        id: row.id,
+        title: row.title ?? "",
+        header: row.header ?? "",
+        color: row.color || "#3b82f6",
+        points: [],
+        markers: [],
+        center: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined,
+        zoom: row.zoom !== "" && row.zoom !== undefined ? parseNum(row.zoom) : undefined,
+        categoryKeys: parseKeyList(row.categories),
+      });
+    }
+    const pointSheet = wb.Sheets["TrackPoints"];
+    if (pointSheet) {
+      // seq keeps the original order — point order IS the direction of travel
+      const rows = sheetToObjects(pointSheet).sort((a, b) => parseNum(a.seq) - parseNum(b.seq));
+      for (const row of rows) {
+        const t = byId.get(row.trackId);
+        const lat = parseFloat(row.lat);
+        const lng = parseFloat(row.lng);
+        if (!t || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        if (row.kind === "route") t.points.push([lat, lng]);
+        else if (row.kind === "marker") {
+          t.markers.push({ lat, lng, label: row.label, type: (row.type || "point") as TrackMarker["type"] });
+        }
+      }
+    }
+    tracks = [...byId.values()];
+  }
+
+  return {
+    raceUuid,
+    categories,
+    riders,
+    raceName,
+    tracks,
+    finalized: await parseFinalized(raceRows["finalized"]),
+  };
+}
+
+export interface MergeResult {
+  categories: CategoryProps[];
+  riders: RiderProps[];
+}
+
+// Replaces ONLY the given categories (matched by name + subCategory) and their
+// riders inside one race — everything else in the race is untouched. This is the
+// multi-commissaire flow: each device records its own categories, and the main
+// device merges the result files one by one at the end of the race.
+export async function mergeCategoriesIntoRace(
+  raceUuid: string,
+  importedCats: CategoryProps[],
+  importedRiders: RiderProps[]
+): Promise<MergeResult> {
+  const db = await initIndexedDB();
+  const allCats: CategoryProps[] = await db.getAll("categories");
+  const allRiders: RiderProps[] = await db.getAll("riders");
+
+  const selectedKeys = new Set(importedCats.map((c) => catWaveKey(c.name, c.subCategory)));
+
+  const catsToDelete = allCats.filter(
+    (c) => c.raceUuid === raceUuid && selectedKeys.has(catWaveKey(c.name, c.subCategory))
+  );
+  const ridersToDelete = allRiders.filter(
+    (r) => r.raceUuid === raceUuid && importedCats.some((c) => riderInCategory(r, c))
+  );
+
+  // Only riders that belong to the merged categories may come in
+  const incomingRiders = importedRiders.filter((r) =>
+    importedCats.some((c) => riderInCategory(r, c))
+  );
+
+  // ids are global across the whole store (other races too) — an imported record
+  // must never overwrite a record we are not deliberately replacing.
+  const deletedCatIds = new Set(catsToDelete.map((c) => c.id));
+  const deletedRiderIds = new Set(ridersToDelete.map((r) => r.id));
+  const takenCatIds = new Set(allCats.filter((c) => !deletedCatIds.has(c.id)).map((c) => c.id));
+  const takenRiderIds = new Set(allRiders.filter((r) => !deletedRiderIds.has(r.id)).map((r) => r.id));
+
+  let nextId = Date.now();
+  const freshId = (taken: Set<number>): number => {
+    while (taken.has(nextId)) nextId++;
+    return nextId++;
+  };
+
+  const finalCats = importedCats.map((c) =>
+    takenCatIds.has(c.id) ? { ...c, id: freshId(takenCatIds) } : c
+  );
+  const finalRiders = incomingRiders.map((r) =>
+    takenRiderIds.has(r.id) ? { ...r, id: freshId(takenRiderIds) } : r
+  );
+
+  const catTx = db.transaction("categories", "readwrite");
+  const catStore = catTx.objectStore("categories");
+  for (const c of catsToDelete) await catStore.delete(c.id);
+  for (const c of finalCats) await catStore.put(c);
+  await catTx.done;
+
+  const riderTx = db.transaction("riders", "readwrite");
+  const riderStore = riderTx.objectStore("riders");
+  for (const r of ridersToDelete) await riderStore.delete(r.id);
+  for (const r of finalRiders) await riderStore.put(r);
+  await riderTx.done;
+
+  db.close();
+  return { categories: finalCats, riders: finalRiders };
 }
 
 export async function replaceCategoriesForRace(

@@ -2,6 +2,7 @@ import React from "react";
 import { RiderProps } from "@/types/types";
 import styles from "./riderCard.module.css";
 import { getRiderStatusInfo } from "@/utils/statusChip";
+import RiderFlag from "../riderFlag/RiderFlag";
 
 const RiderCard: React.FC<RiderProps> = (rider) => {
   const isRacing = rider.raceStatus === "running" || rider.raceStatus === "finished";
@@ -29,11 +30,7 @@ const RiderCard: React.FC<RiderProps> = (rider) => {
       <div className={styles.topRow}>
         <div className={styles.bibBlock}>
           <span className={styles.bib}>#{rider.bibNumber || "—"}</span>
-          <img
-            src={`/international/${rider.flag || "il"}.svg`}
-            alt={rider.flag || "il"}
-            className={styles.cardFlag}
-          />
+          <RiderFlag flag={rider.flag} className={styles.cardFlag} />
         </div>
 
         <div className={styles.middle}>

@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import styles from "./raceCard.module.css";
 import { RaceCardProps } from "@/types/types";
-import Images from "@/constants/Images";
+import { resolveRaceImage } from "@/utils/resolveRaceImage";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -9,8 +9,10 @@ import {
   Clock3,
   Heart,
   MapPin,
+  Trash2,
   Users
 } from "lucide-react";
+import { effectiveRaceStatus } from "@/utils/raceStatus";
 
 const STATUS_LABEL: Record<string, string> = {
   running: "Live",
@@ -28,22 +30,33 @@ const RaceCard: React.FC<RaceCardProps> = ({
   location,
   ridersCount,
   isFavorite,
-  onToggleFavorite
+  onToggleFavorite,
+  viewOnly,
+  finalized,
+  onDelete
 }) => {
   const navigate = useNavigate();
+  // A view-only race deletes in one interaction: tap trash → tap again to
+  // confirm (auto-reverts after 3s). No heavy modal — it's disposable (BUGS.md #8).
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const resolvedImage = (() => {
-    if (!image) return Images.defaultRaceBike;
-    if (image.startsWith("data:") || image.startsWith("http") || image.startsWith("/")) return image;
-    if (image.startsWith("images/")) return import.meta.env.BASE_URL + image;
-    return Images[image as keyof typeof Images] ?? Images.defaultRaceBike;
-  })();
+  const resolvedImage = resolveRaceImage(image);
 
-  const statusKey = status ?? "upcoming";
+  const statusKey = effectiveRaceStatus(status, date);
 
   const handleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggleFavorite?.(uuid);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    onDelete?.(uuid);
   };
 
   return (
@@ -60,10 +73,22 @@ const RaceCard: React.FC<RaceCardProps> = ({
       <div className={styles.body}>
         <div className={styles.topRow}>
           <span className={styles.name}>{name}</span>
-          <span className={`${styles.badge} ${styles[`badge_${statusKey}`]}`}>
-            {status === "running" && <span className={styles.dot} />}
-            {STATUS_LABEL[statusKey]}
-          </span>
+          {/* "Final" outranks the date-derived status: a closed race is locked,
+              which is more useful to know at a glance than "Finished". */}
+          {finalized ? (
+            <span
+              className={`${styles.badge} ${styles.badge_final}`}
+              title="Race closed — results are final and locked"
+              data-testid="race-final-badge"
+            >
+              🔒 Final
+            </span>
+          ) : (
+            <span className={`${styles.badge} ${styles[`badge_${statusKey}`]}`}>
+              {status === "running" && <span className={styles.dot} />}
+              {STATUS_LABEL[statusKey]}
+            </span>
+          )}
         </div>
 
         <div className={styles.meta}>
@@ -95,17 +120,32 @@ const RaceCard: React.FC<RaceCardProps> = ({
       </div>
 
       <div className={styles.right}>
-        <button
-          className={`${styles.favBtn} ${isFavorite ? styles.favBtnActive : ""}`}
-          onClick={handleFavorite}
-          aria-label="favorite"
-        >
-          <Heart
-            className={styles.favIcon}
-            aria-hidden="true"
-            fill={isFavorite ? "currentColor" : "none"}
-          />
-        </button>
+        {viewOnly && onDelete ? (
+          <button
+            className={`${styles.deleteBtn} ${confirmDelete ? styles.deleteBtnConfirm : ""}`}
+            onClick={handleDelete}
+            aria-label={confirmDelete ? "tap again to remove" : "remove downloaded race"}
+            title={confirmDelete ? "Tap again to remove" : "Remove downloaded race"}
+          >
+            {confirmDelete ? (
+              <span className={styles.deleteConfirmText}>Remove?</span>
+            ) : (
+              <Trash2 className={styles.favIcon} aria-hidden="true" />
+            )}
+          </button>
+        ) : (
+          <button
+            className={`${styles.favBtn} ${isFavorite ? styles.favBtnActive : ""}`}
+            onClick={handleFavorite}
+            aria-label="favorite"
+          >
+            <Heart
+              className={styles.favIcon}
+              aria-hidden="true"
+              fill={isFavorite ? "currentColor" : "none"}
+            />
+          </button>
+        )}
         <ChevronRight className={styles.chevron} aria-hidden="true" />
       </div>
     </div>
