@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import styles from "./liveBoard.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
+import useRaceStore from "@/stores/racesStore";
 import calculatePositions from "@/utils/calculatePosition";
 import { parseClockTime } from "@/utils/timeUtils";
 import { riderInCategory, withCategoryLaps, buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
@@ -77,6 +78,7 @@ function riderSpeedKph(rider: RiderProps): string {
 
 const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
   const { riders, getRiders } = useRiderStore();
+  const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
   const [filterCat, setFilterCat] = useState("all");
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});
@@ -225,7 +227,10 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
           className={styles.waveSection}
           data-testid={`board-wave-${section.wave}`}
         >
-          <div className={styles.waveHeading}>
+          <div
+            className={styles.waveHeading}
+            style={race?.waveColors?.[String(section.wave)] ? { borderLeft: `6px solid ${race.waveColors[String(section.wave)]}` } : undefined}
+          >
             Wave {section.wave}{section.time ? ` · ${section.time}` : ""}
           </div>
           {section.cats.map((cat) => {

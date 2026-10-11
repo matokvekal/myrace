@@ -4,6 +4,7 @@ import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Cam
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
+import useRaceStore from "@/stores/racesStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import RiderCard from "../../components/riderCard/RiderCard";
 import RiderFlag from "../../components/riderFlag/RiderFlag";
@@ -74,6 +75,7 @@ function getNowWave(categories: CategoryProps[], catWaveMap: Map<string, number>
 }
 
 const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, readOnly = false }) => {
+  const waveColors = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid)?.waveColors);
   const { t } = useTranslation();
   const previousRaceUuid = useRef<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -403,7 +405,10 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
               </div>
               {waveGroups.map((wg) => (
                 <div key={wg.wave ?? "none"} className={styles.waveGroup} data-testid={`wave-group-${wg.wave ?? "none"}`}>
-                  <div className={styles.waveGroupHeader}>
+                  <div
+                    className={styles.waveGroupHeader}
+                    style={wg.wave != null && waveColors?.[String(wg.wave)] ? { borderLeft: `6px solid ${waveColors[String(wg.wave)]}` } : undefined}
+                  >
                     {wg.wave != null ? `Wave ${wg.wave}` : "No wave"}
                     <span className={styles.groupCount}>{wg.count}</span>
                   </div>

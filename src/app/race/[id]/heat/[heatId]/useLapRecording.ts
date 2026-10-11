@@ -30,6 +30,19 @@ export const MIN_LAP_MS = 60 * 1000;
  */
 const LOG_STORAGE_PREFIX = "commissaire.actionLog.";
 
+/** Manual-finish entries that were undone and can still be redone (per wave). */
+const REDO_STORAGE_PREFIX = "commissaire.finishRedo.";
+
+function loadPersistedRedo(key: string | null): RiderAction[] {
+  if (!key || typeof localStorage === "undefined") return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(REDO_STORAGE_PREFIX + key) ?? "[]");
+    return Array.isArray(parsed) ? (parsed as RiderAction[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function loadPersistedActions(key: string | null): RiderAction[] {
   if (!key || typeof localStorage === "undefined") return [];
   try {
@@ -103,6 +116,24 @@ export function useLapRecording({
     loadPersistedActions(persistKey)
   );
   const [flashingRiderId, setFlashingRiderId] = useState<number | null>(null);
+  // Undone manual finishes, newest first. Kept (and persisted) so Redo restores the
+  // ORIGINAL finish stamp from the action history instead of re-finishing "now".
+  const [undoneFinishes, setUndoneFinishesState] = useState<RiderAction[]>(() => loadPersistedRedo(persistKey));
+  const redoKeyRef = useRef<string | null>(persistKey);
+  const setUndoneFinishes = (next: RiderAction[]) => {
+    setUndoneFinishesState(next);
+    const key = redoKeyRef.current;
+    if (!key || typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(REDO_STORAGE_PREFIX + key, JSON.stringify(next));
+    } catch {
+      /* convenience only */
+    }
+  };
+  useEffect(() => {
+    redoKeyRef.current = persistKey;
+    setUndoneFinishesState(loadPersistedRedo(persistKey));
+  }, [persistKey]);
 
   // Re-hydrate when the wave changes, and persist every edit back to storage.
   // `pendingHydrationRef` holds the array we just loaded so the save effect can
@@ -410,7 +441,7 @@ export function useLapRecording({
     // Prefer the exact pre-tap snapshot over rebuilding from lapsDetails, which
     // silently drops elapsedTimeFromStart and position_category (BUGS.md #10).
     const snapshot = riderActions.find(
-      (a) => a.prevRider && a.prevRider.id === rider.id && a.rider.lapsCounter === rider.lapsCounter
+      (a) => a.prevRider && a.statusChange !== "FINISH" && a.prevRider.id === rider.id && a.rider.lapsCounter === rider.lapsCounter
     );
     restoreFromSnapshot(rider, snapshot);
     return true;
@@ -432,6 +463,7 @@ export function useLapRecording({
       updateRider(restored);
       updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
       setRiderActions((prev) => prev.filter((a) => a.id !== actionId));
+      setUndoneFinishes([action, ...undoneFinishes.filter((u) => u.id !== actionId)]);
       if (race) {
         AuditLogService.log({
           race, action: "CANCEL_ACTION", screen: "Heat", entityType: "rider",
@@ -587,6 +619,47 @@ export function useLapRecording({
     return true;
   };
 
+  /** Undone finishes whose rider is still exactly as it was right after the undo. */
+  const redoableFinishes = undoneFinishes.filter((u) => {
+    const cur = riders.find((r) => r.id === u.rider.id);
+    const prev = u.prevRider;
+    return !!cur && !!prev && cur.lapsCounter === prev.lapsCounter && cur.raceStatus === prev.raceStatus &&
+      cur.status === prev.status && cur.timeArrive === prev.timeArrive;
+  });
+
+  /**
+   * Redo an undone manual finish: restores the stored post-finish snapshot, so the
+   * original finish time/elapsed/position come back. Like the finish itself it never
+   * touches any other rider. Refused once the rider has changed since the undo.
+   */
+  const redoFinish = (actionId: string): boolean => {
+    const action = redoableFinishes.find((u) => u.id === actionId);
+    if (!action) return false;
+    if (!canForRace(raceUuid, "MARK_LAP")) {
+      toast.warn("No permission to finish riders");
+      return false;
+    }
+    dropPendingMove(action.rider.id);
+    const restored = { ...action.rider };
+    updateRider(restored);
+    updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
+    setUndoneFinishes(undoneFinishes.filter((u) => u.id !== actionId));
+    setRiderActions((prev) => [{ ...action, rider: restored, timestamp: Date.now() }, ...prev.filter((a) => a.id !== actionId)]);
+    void recordRaceEvent({
+      raceUuid, riderId: restored.id, bibNumber: restored.bibNumber, eventType: "RIDER_EDITED",
+      lapNumber: restored.lapsCounter,
+      payload: {
+        riderLocalId: restored.id,
+        riderPatch: {
+          raceStatus: "finished", timeArrive: restored.timeArrive,
+          elapsedTimeFromStart: restored.elapsedTimeFromStart,
+          position_category: restored.position_category,
+        },
+      },
+    });
+    return true;
+  };
+
   /**
    * Clear pending timers — call from the component's unmount effect.
    *
@@ -614,6 +687,8 @@ export function useLapRecording({
     cancelAction,
     logStatusChange,
     finishRider,
+    redoableFinishes,
+    redoFinish,
     clearTimers,
   };
 }

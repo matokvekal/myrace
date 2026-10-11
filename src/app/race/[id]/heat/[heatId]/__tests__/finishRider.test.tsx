@@ -69,7 +69,7 @@ describe("manual Finish Race", () => {
     expect(computeGroupSignals([cat], result.current.riders).finish.size).toBe(0);
   });
 
-  it("undo restores the exact pre-finish rider; redo (finish again) works", () => {
+  it("undo restores the exact pre-finish rider and offers redo", () => {
     const { result } = mount([rider(1, "Man Pro")]);
     const before = result.current.byId(1);
     act(() => { result.current.lap.finishRider(before); });
@@ -83,8 +83,71 @@ describe("manual Finish Race", () => {
     expect(result.current.byId(1).lapsDetails).toEqual(before.lapsDetails);
     expect(result.current.lap.riderActions).toHaveLength(0);
 
+    // the undone finish is offered for redo
+    expect(result.current.lap.redoableFinishes.map((a) => a.id)).toEqual([entry.id]);
+  });
+
+  it("redo restores the ORIGINAL finish time and state from the history, not 'now'", () => {
+    const { result } = mount([rider(1, "Man Pro"), rider(2, "Man Pro")]);
     act(() => { result.current.lap.finishRider(result.current.byId(1)); });
-    expect(result.current.byId(1).raceStatus).toBe("finished");
+    const finished = result.current.byId(1);
+    const entry = result.current.lap.riderActions[0];
+    act(() => { result.current.lap.cancelAction(entry.id); });
+    expect(result.current.byId(1).raceStatus).toBe("running");
+
+    vi.setSystemTime(new Date(Date.now() + 90_000)); // time passes before the redo
+    let ok = false;
+    act(() => { ok = result.current.lap.redoFinish(entry.id); });
+    expect(ok).toBe(true);
+    const redone = result.current.byId(1);
+    expect(redone).toMatchObject({
+      raceStatus: "finished", timeArrive: finished.timeArrive,
+      elapsedTimeFromStart: finished.elapsedTimeFromStart, lapsCounter: 2,
+    });
+    expect(redone.lapsDetails).toEqual(finished.lapsDetails);
+    expect(result.current.byId(2).raceStatus).toBe("running"); // nobody else touched
+    expect(result.current.lap.redoableFinishes).toHaveLength(0);
+    expect(result.current.lap.riderActions[0]).toMatchObject({ id: entry.id, statusChange: "FINISH" });
+    // and it can be undone again
+    act(() => { result.current.lap.cancelAction(entry.id); });
+    expect(result.current.byId(1).raceStatus).toBe("running");
+  });
+
+  it("redo of a manual finish never raises the category-wide finish", () => {
+    const cat = { id: 1, raceUuid: "race-1", name: "Man Pro", subCategory: null, laps: 5, lapsCounter: 0, riders: 0,
+      startTime: null, isConnected: false, color: null, heat: 1 } as CategoryProps;
+    const { result } = mount([rider(1, "Man Pro"), rider(2, "Man Pro")]);
+    act(() => { result.current.lap.finishRider(result.current.byId(1)); });
+    const id = result.current.lap.riderActions[0].id;
+    act(() => { result.current.lap.cancelAction(id); });
+    act(() => { result.current.lap.redoFinish(id); });
+    expect(computeGroupSignals([cat], result.current.riders).finish.size).toBe(0);
+  });
+
+  it("redo is refused once the rider changed after the undo", () => {
+    const { result } = mount([rider(1, "Man Pro")]);
+    act(() => { result.current.lap.finishRider(result.current.byId(1)); });
+    const id = result.current.lap.riderActions[0].id;
+    act(() => { result.current.lap.cancelAction(id); });
+    act(() => { result.current.lap.recordLap(result.current.byId(1), "click"); });
+    expect(result.current.byId(1).lapsCounter).toBe(3);
+    expect(result.current.lap.redoableFinishes).toHaveLength(0);
+    let ok = true;
+    act(() => { ok = result.current.lap.redoFinish(id); });
+    expect(ok).toBe(false);
+  });
+
+  it("the redo option survives a reload", () => {
+    const first = mount([rider(1, "Man Pro")]);
+    act(() => { first.result.current.lap.finishRider(first.result.current.byId(1)); });
+    const id = first.result.current.lap.riderActions[0].id;
+    act(() => { first.result.current.lap.cancelAction(id); });
+    first.unmount();
+
+    const second = mount([rider(1, "Man Pro")]); // same pre-finish rider, fresh mount
+    expect(second.result.current.lap.redoableFinishes.map((a) => a.id)).toEqual([id]);
+    act(() => { second.result.current.lap.redoFinish(id); });
+    expect(second.result.current.byId(1).raceStatus).toBe("finished");
   });
 
   it("refuses finished/out riders and missing permission", () => {

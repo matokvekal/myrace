@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
+import useRaceStore from "@/stores/racesStore";
 import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
@@ -264,6 +265,17 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const [selectedRider, setSelectedRider] = useState<{ rider: RiderProps; wave: number } | null>(null);
   const [colorCat, setColorCat] = useState<CategoryProps | null>(null);
   const [colorDraft, setColorDraft] = useState("#63A6FC");
+  const [colorWave, setColorWave] = useState<number | null>(null);
+  const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
+  const updateRace = useRaceStore((s) => s.updateRace);
+
+  // A wave owns its own colour (race.waveColors), separate from its categories'.
+  // Locked once every category in the wave has finished.
+  const saveWaveColor = async (waveNum: number, color: string) => {
+    if (!race) return;
+    await updateRace({ ...race, waveColors: { ...(race.waveColors ?? {}), [String(waveNum)]: color } });
+    setColorWave(null);
+  };
 
   // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
   // colour and every rider in it carries a copy. Finished categories are refused
@@ -627,8 +639,23 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
 
         return (
           <div key={waveNum} className={styles.wave}>
-            <div className={styles.waveHeader} data-wave-lock={waveLock ?? undefined}>
+            <div
+              className={styles.waveHeader}
+              data-wave-lock={waveLock ?? undefined}
+              style={race?.waveColors?.[String(waveNum)] ? { boxShadow: `inset 8px 0 0 ${race.waveColors[String(waveNum)]}` } : undefined}
+            >
               <span className={styles.waveLabel}>Wave {waveNum}</span>
+              <button
+                type="button"
+                className={styles.editColorBtn}
+                data-testid={`edit-wave-color-${waveNum}`}
+                disabled={waveLock === "finished"}
+                aria-label={`Edit color of Wave ${waveNum}`}
+                title={waveLock === "finished" ? "Color can't be changed — this wave has finished" : "Edit wave color"}
+                onClick={() => { setColorDraft(race?.waveColors?.[String(waveNum)] ?? "#63A6FC"); setColorWave(waveNum); }}
+              >
+                {waveLock === "finished" ? <Lock size={12} /> : <Palette size={12} />}
+              </button>
               <span
                 className={styles.statusBadge}
                 style={{ background: `${waveStatusInfo.color}1f`, color: waveStatusInfo.color }}
@@ -880,6 +907,29 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           wave={selectedRider.wave}
           onClose={() => setSelectedRider(null)}
         />
+      )}
+
+      {colorWave != null && (
+        <div className={styles.colorOverlay} onClick={() => setColorWave(null)}>
+          <div className={styles.colorModal} role="dialog" aria-label="Edit wave color" onClick={(e) => e.stopPropagation()}>
+            <div className={styles.colorTitle}>Color · Wave {colorWave}</div>
+            <div className={styles.colorCurrent}>
+              <span className={styles.colorSwatch} style={{ background: race?.waveColors?.[String(colorWave)] ?? "#ccc" }} />
+              <span>Current {race?.waveColors?.[String(colorWave)] ?? "—"}</span>
+            </div>
+            <input
+              type="color"
+              className={styles.colorInput}
+              data-testid="wave-color-input"
+              value={colorDraft}
+              onChange={(e) => setColorDraft(e.target.value)}
+            />
+            <div className={styles.colorActions}>
+              <Button variant="secondary" size="sm" onClick={() => setColorWave(null)}>Cancel</Button>
+              <Button variant="success" size="sm" onClick={() => void saveWaveColor(colorWave, colorDraft)} data-testid="wave-color-save">Save</Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {colorCat && (

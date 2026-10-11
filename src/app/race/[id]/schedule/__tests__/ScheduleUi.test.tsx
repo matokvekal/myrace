@@ -10,6 +10,7 @@ vi.mock("@/services/cloud/raceEvents", () => ({ recordRaceEvent: (...a: unknown[
 import Schedule from "../Schedule";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
+import useRaceStore from "@/stores/racesStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { makeCategory, makeRider } from "@/test/factories";
 import type { CategoryProps, RiderProps } from "@/types/types";
@@ -143,6 +144,39 @@ describe("Schedule: edit colour", () => {
     // timing and results are untouched
     const cat = useCategoryStore.getState().categories.find((c) => c.id === upcoming.id)!;
     expect(cat).toMatchObject({ startTime: "09:00", heat: 1, status: "upcoming" });
+  });
+});
+
+describe("Schedule: wave colour", () => {
+  const race = { id: 1, uuid: RACE, name: "Test", status: "upcoming" } as any;
+
+  it("sets an independent wave colour, persists it and leaves category colours alone", async () => {
+    const user = userEvent.setup();
+    useRaceStore.setState({ races: [race] });
+    setup();
+    await user.click(screen.getByTestId("edit-wave-color-1"));
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(screen.getByTestId("wave-color-input"), { target: { value: "#00aa55" } });
+    await user.click(screen.getByTestId("wave-color-save"));
+
+    await waitFor(() => expect(useRaceStore.getState().races[0].waveColors).toEqual({ "1": "#00aa55" }));
+    await waitFor(async () => {
+      const db = await initIndexedDB();
+      const stored = (await db.getAll("races")) as any[];
+      db.close();
+      expect(stored.find((r) => r.uuid === RACE)?.waveColors).toEqual({ "1": "#00aa55" });
+    });
+    expect(useCategoryStore.getState().categories.find((c) => c.id === upcoming.id)?.color).toBe("#112233");
+    expect(useCategoryStore.getState().categories.find((c) => c.id === finished.id)?.color).toBe("#445566");
+  });
+
+  it("is locked, with an explanation, once every category in the wave has finished", () => {
+    useRaceStore.setState({ races: [race] });
+    setup();
+    const btn = screen.getByTestId("edit-wave-color-2"); // wave 2 holds only the finished category
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("title", expect.stringMatching(/finished/i));
+    expect(screen.getByTestId("edit-wave-color-1")).toBeEnabled();
   });
 });
 

@@ -38,7 +38,7 @@ export async function loadDemoRace(page: Page): Promise<void> {
   // be either side of our first look.
   await expect(async () => {
     if (/\/heat\//.test(page.url())) {
-      await page.getByRole("tab", { name: "Race", exact: true }).click();
+      await page.getByRole("tab", { name: "Create", exact: true }).click();
     }
     // The race tab bar is up once the Riders tab button is present.
     await expect(page.getByRole("button", { name: "Riders", exact: true })).toBeVisible({

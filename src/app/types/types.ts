@@ -83,6 +83,11 @@ export interface RaceProps {
    * races keep the behaviour. Off means the organizer picks colours by hand.
    */
   autoColor?: boolean;
+  /**
+   * Optional colour per wave, keyed by wave number (heat). Independent of the
+   * category colours — a wave without an entry simply has no colour of its own.
+   */
+  waveColors?: Record<string, string>;
   map: string;
   // Map / course area
   mapCenter?: { lat: number; lng: number };  // race area center

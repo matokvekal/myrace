@@ -124,10 +124,10 @@ test.describe("Finish Race", () => {
     await loadDemoRace(page);
     await finishRace(page);
 
-    // The Setup/Start/Live switcher collapses to a seal — no phase left to enter.
+    // The Create/Race/Live switcher collapses to a seal — no phase left to enter.
     await expect(page.getByTestId("phase-final")).toBeVisible();
     await expect(page.getByRole("tab", { name: "Live", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("tab", { name: "Start", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Race", exact: true })).toHaveCount(0);
 
     // Setup-only tabs are gone; results-facing ones stay.
     await expect(page.getByRole("button", { name: "Schedule", exact: true })).toHaveCount(0);

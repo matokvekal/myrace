@@ -248,6 +248,8 @@ const Heat: React.FC = () => {
     cancelAction,
     logStatusChange,
     finishRider,
+    redoableFinishes,
+    redoFinish,
     clearTimers,
   } = useLapRecording({
     raceUuid,
@@ -813,6 +815,20 @@ const Heat: React.FC = () => {
                 }}
               />
             </div>
+            {redoableFinishes.length > 0 && (
+              <button
+                type="button"
+                className={styles.waveInfoBtn}
+                data-testid="redo-finish"
+                title="Redo the finish you just undid"
+                onClick={() => {
+                  const a = redoableFinishes[0];
+                  if (redoFinish(a.id)) toast.success(`Finish restored: #${a.rider.bibNumber} ${a.rider.firstName} ${a.rider.lastName}`);
+                }}
+              >
+                ↷ Redo finish #{redoableFinishes[0].rider.bibNumber}
+              </button>
+            )}
             <p className={styles.timerText}>{elapsedTime}</p>
             <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
               {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}

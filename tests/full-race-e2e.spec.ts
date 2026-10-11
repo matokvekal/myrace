@@ -113,9 +113,9 @@ async function advanceLap(page: Page): Promise<void> {
 
 // ─── Navigation helpers ──────────────────────────────────────────────────────
 
-/** Setup / Race / Live phase switcher (labelled "Race" / "Start" / "Live"). */
+/** Phase switcher. Call-site names are the old ids (Race=setup, Start=race mode); the tabs now read Create / Race / Live. */
 async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<void> {
-  await page.getByRole("tab", { name: phase, exact: true }).click();
+  await page.getByRole("tab", { name: ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase], exact: true }).click();
 }
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / Map / Info). */

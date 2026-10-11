@@ -14,7 +14,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     // Bound each action so a wrong selector fails in seconds instead of eating
     // the whole test timeout (the full-race spec runs for minutes).
     actionTimeout: 15_000,
@@ -29,7 +29,8 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
     },
   ],
-  webServer: {
+  // E2E_BASE_URL points the suite at an already-deployed site, so no dev server.
+  webServer: process.env.E2E_BASE_URL ? undefined : {
     command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,

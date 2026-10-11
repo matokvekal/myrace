@@ -50,8 +50,8 @@ test.describe("Commissaire race flow", () => {
 
     // ── 5. Enter Race mode ───────────────────────────────────────────────────
     await test.step("enter Race mode", async () => {
-      // Phase switcher: "Race" = setup, "Start" = race mode, "Live" = live.
-      await page.getByRole("tab", { name: "Start", exact: true }).click();
+      // Phase switcher: "Create" = setup, "Race" = race mode, "Live" = live.
+      await page.getByRole("tab", { name: "Race", exact: true }).click();
       // Sub-tab bar of race mode
       await expect(page.getByRole("button", { name: "Grid", exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "Check-In", exact: true })).toBeVisible();
@@ -99,8 +99,8 @@ test.describe("Commissaire race flow", () => {
 
     // ── 9. Results tab renders ───────────────────────────────────────────────
     await test.step("view results", async () => {
-      // Return to setup (the "Race" phase) to reach the Results tab.
-      await page.getByRole("tab", { name: "Race", exact: true }).click();
+      // Return to setup (the "Create" phase) to reach the Results tab.
+      await page.getByRole("tab", { name: "Create", exact: true }).click();
       await page.getByRole("button", { name: "Results", exact: true }).click();
       // Results tab mounts without crashing (page still shows the tab bar).
       await expect(page.getByRole("button", { name: "Results", exact: true })).toBeVisible();
