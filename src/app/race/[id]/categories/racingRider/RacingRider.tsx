@@ -321,7 +321,10 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
       </div>
       {rider.totalLaps > 0 && (
         <div className={styles.remaining}>
-          {lapsRemaining === 1 ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
+          {/* Category-wide signals override the rider's own count: once the
+              leader is on the last lap everyone is, and once the leader has
+              finished everyone finishes on the next crossing. */}
+          {forceFinish ? 'Finish' : forceBell || lapsRemaining === 1 ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
         </div>
       )}
       {!hasStarted ? (

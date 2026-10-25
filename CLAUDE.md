@@ -104,6 +104,7 @@ public/data/
 - Schedule builder with wave grouping
 - Standing/leaderboard page per wave
 - Results tab
+- Finish Race — signed, irreversible close-out (see section below)
 
 ### Known Issues
 See `BUGS.md` for current open items (BUG-01 and BUG-10 from the old bug list are
@@ -237,6 +238,63 @@ still open).
 - `recordLap`'s duplicate-tap debounce (`lastActionRef`) is keyed off real
   `Date.now()`, not the (possibly backdated) `atTime` — backdating a Joker
   resolution must never produce a negative, always-truthy diff there.
+
+### Finish Race (finalizing) — the one irreversible action
+- The footer button on the **Info** tab. It computes the final classification,
+  closes every category, and stamps `RaceProps.finalized` (a `RaceFinalization`:
+  SHA-256 token over who/when/nonce + a digest of every rider's result). There is
+  deliberately **no unfinish** — that's the whole guarantee. `utils/finalizeRace.ts`
+  is the only thing that writes it.
+- **Order is load-bearing**: riders → categories → race. The race is stamped LAST,
+  because stamping it is what turns the lock on and the store guards would then
+  reject the finalize flow's own writes.
+- Riders still on the road become **finishers on the laps they completed**, never
+  DNF — same rule as `closeOutRiderOnTrack` in StartManager. DNF is a human
+  classification; never infer it from the clock. DNF/DSQ/DNS are preserved.
+- **The lock is enforced in the STORES, not the UI** (`utils/raceLock.ts`).
+  `ridersStore` (add/insert/update/patch/updateAll/delete/deleteByRace),
+  `categoryStore` (upsert/update/rebuild/recolour) and `racesStore.updateRace`
+  all no-op for a finalized race. Hiding buttons is the courtesy half; the guard
+  is what makes "nothing can change" true for screens nobody remembered to gate.
+  Never write to IndexedDB directly to get around it.
+  - `racesStore.updateRace` allows an explicit field allowlist
+    (`FINALIZED_WRITABLE_FIELDS`: isFavorite, viewOnly, syncedAt, serverVersion,
+    lastUpdateAt, finalized) — local bookkeeping that says nothing about results.
+  - `createCategoriesFromRiders` is intentionally NOT guarded: it only fires when
+    a race has zero categories, and blocking it would leave a finalized race with
+    nothing to group results by.
+  - Deleting the whole race still works because `page.tsx` calls `deleteRace`
+    BEFORE `deleteRidersByRace` — removing the race lifts the lock for the
+    cache-cleanup step. Don't swap that order back.
+- UI consequences: `RacePhaseSwitcher` collapses to a "Final results" seal (no
+  Start/Live), the heat route redirects to the race, `FINALIZED_TABS` drops
+  Schedule/Categories and leads with Results, Riders loses its Actions menu and
+  Delete All, `RiderDetailModal` loses Edit (it reads the lock itself, so all
+  three callers are covered), and Info swaps Edit/Import for the certificate.
+- **Import adopts the lock**: `raceImport` reads `finalized` off the Race sheet
+  and self-verifies it; a "replace" import applies it, so a final result handed to
+  another commissaire arrives read-only on their device. Merge mode does not — a
+  partial merge is still someone's own in-progress race. An unverifiable record is
+  dropped, so a hand-typed row can't lock someone else's race.
+- Signing primitives live in `utils/raceSignature.ts`, which is **xlsx-free on
+  purpose** — `raceExport`/`raceImport` are dynamic-import-only (BUGS.md #1) and
+  finalizing runs from eager code. raceExport imports from raceSignature, never
+  the reverse.
+
+### First finish – all finish (category bell / finish)
+- `utils/linkedGroups.ts` `computeGroupSignals`: when a category's leader has 1
+  lap left every rider in it shows the bell and the card's counter reads "Last";
+  once the leader has finished all laps everyone finishes on their next crossing
+  ("Finish"), whatever their lap count. Derived, never stored — undo restores all.
+- Per race, `race.leaderFinishAll` (undefined = ON). Toggle on the Categories tab
+  and in the live screen's Live Settings gear. Off = every rider rides full laps.
+
+### Bib warning before Start
+- `utils/bibIssues.ts` is the ONE bib check (missing bib / race-wide duplicate,
+  DNS ignored). StartManager blocks on it; `race/components/bibWarning/BibWarning`
+  shows the same issues for UPCOMING categories at the top of Race and Live, so
+  the organizer sees them on arrival. Tapping a row selects that wave and opens
+  Check-In (on Race) or the Race screen (from Live).
 
 ### View-only (downloaded) races
 - `RaceProps.viewOnly` marks a race pulled in via "Download a Race" — a read-only

@@ -10,6 +10,7 @@ import useRaceStore from "@/stores/racesStore";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes, normalizeTime } from "../schedule/Schedule";
 import { getCategoryStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
+import { isLeaderFinishAll } from "@/utils/linkedGroups";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 
@@ -67,6 +68,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
   const { categories, updateCategory, getCategories } = useCategoryStore();
   const { riders, updateRider } = useRiderStore();
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
+  const updateRace = useRaceStore((s) => s.updateRace);
 
   const raceCategories = categories.filter((c) => c.raceUuid === raceUuid);
 
@@ -430,6 +432,24 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
             </>
           )}
       </div>
+
+      {race && (
+        <label className={styles.linkedFinishRow}>
+          <input
+            type="checkbox"
+            data-testid="leader-finish-all"
+            checked={isLeaderFinishAll(race)}
+            disabled={!!race.finalized}
+            onChange={(e) => void updateRace({ ...race, leaderFinishAll: e.target.checked })}
+          />
+          <span className={styles.linkedFinishLabel}>
+            <span><Bell size={14} /> First finish – all finish</span>
+            <span className={styles.linkedFinishHint}>
+              When a category's first rider starts the last lap, every rider in it gets the bell. When the first rider finishes, everyone finishes on their next crossing, however many laps they did.
+            </span>
+          </span>
+        </label>
+      )}
 
       {showQuickLaps && (
         <div className={styles.quickLapsPanel}>

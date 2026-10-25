@@ -88,6 +88,13 @@ export interface RaceProps {
    * category colours — a wave without an entry simply has no colour of its own.
    */
   waveColors?: Record<string, string>;
+  /**
+   * "First finish – all finish": when a category's leader takes the bell, every
+   * rider in it gets the bell; when the leader finishes, everyone finishes on
+   * their next crossing whatever their lap count. On by default — undefined
+   * counts as true. Off means each rider rides their own full lap count.
+   */
+  leaderFinishAll?: boolean;
   map: string;
   // Map / course area
   mapCenter?: { lat: number; lng: number };  // race area center

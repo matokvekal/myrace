@@ -3,8 +3,8 @@
 Purpose
 
 - Race Info tab: race metadata, partial export, merge-import, info-field
-  persistence, category export, and (for downloaded races) the lightweight
-  "Remove downloaded race" action.
+  persistence, category export, the "Finish Race" close-out, and (for
+  downloaded races) the lightweight "Remove downloaded race" action.
 
 Read Order
 
@@ -21,6 +21,7 @@ Immediate Children Summary
     view-only/downloaded-race Danger-Zone-lite delete)
   - ExportCategoriesModal.tsx + (shares transferModal.module.css)
   - MergeImportModal.tsx + (shares transferModal.module.css)
+  - FinishRaceModal.tsx + finishRaceModal.module.css (the "Finish Race" confirm)
   - info.module.css, transferModal.module.css
 
 Conventions
@@ -34,9 +35,16 @@ Conventions
   (root CLAUDE.md "Bundle / code-splitting").
 - `RaceProps.viewOnly` races get the light one-tap-trash delete here instead of
   the heavy Danger-Zone confirm (root CLAUDE.md "View-only (downloaded) races").
+- "Finish Race" is the footer action and the only caller of
+  `utils/finalizeRace.ts`. It must stay the LAST section before the Danger Zone
+  and must never gain an "unfinish" counterpart — see root CLAUDE.md
+  "Finish Race (finalizing)".
+- Anything gated on `race.finalized` in this file is a convenience, not the
+  enforcement: the stores reject the writes anyway (`utils/raceLock.ts`).
 
 When To Update
 
 - Export/import field coverage changes
 - View-only/downloaded-race delete behavior changes
 - Race metadata fields change
+- Finalize/lock behaviour changes

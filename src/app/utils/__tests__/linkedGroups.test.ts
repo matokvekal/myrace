@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeGroupSignals, categoryGroupKey } from "../linkedGroups";
+import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "../linkedGroups";
 import type { CategoryProps } from "@/types/types";
 
 const cat = (name: string, over: Partial<CategoryProps> = {}) =>
@@ -50,5 +50,23 @@ describe("linkedGroups", () => {
   it("ignores DNF riders as a trigger", () => {
     const s = computeGroupSignals([cat("Man Pro")], [rider("Man Pro", 5, { raceStatus: "finished", status: "DNF" })]);
     expect(s.finish.size).toBe(0);
+  });
+});
+
+describe("first finish – all finish (race.leaderFinishAll)", () => {
+  it("is on by default: undefined and true both count as on, only false turns it off", () => {
+    expect(isLeaderFinishAll(undefined)).toBe(true);
+    expect(isLeaderFinishAll({})).toBe(true);
+    expect(isLeaderFinishAll({ leaderFinishAll: true })).toBe(true);
+    expect(isLeaderFinishAll({ leaderFinishAll: false })).toBe(false);
+  });
+
+  it("off: no category-wide bell or finish, whatever the leader did", () => {
+    const cats = [cat("Man Pro")];
+    const riders = [rider("Man Pro", 5, { raceStatus: "finished" }), rider("Man Pro", 4), rider("Man Pro", 2)];
+    expect(computeGroupSignals(cats, riders).finish.size).toBe(1);
+    const off = computeGroupSignals(cats, riders, false);
+    expect(off.bell.size).toBe(0);
+    expect(off.finish.size).toBe(0);
   });
 });

@@ -44,3 +44,21 @@ When To Update
 - Speech recognition language/command set changes
 - Voice-to-lap-recording wiring changes
 - Mic-permission UX changes
+
+Recognition rules (useVoiceRecognition.ts)
+
+- Walk EVERY changed result from `event.resultIndex` — several bibs called fast
+  can finalize in one event; reading only the last result dropped them.
+- `maxAlternatives` = 5 and `pickBibsFromAlternatives` (numberParser.ts) choose
+  the guess whose numbers are real bibs. The bib list is the strongest signal we
+  have — keep using it.
+- Restart immediately in `onend` (Chrome ends sessions after silence / ~60s).
+- Never clear `enabledRef` in the effect cleanup — on a language change that ran
+  after the render that synced it and left the new session unable to restart.
+  The per-session `disposed` flag is what stops a dead session.
+- Experimental browser features, always feature-detected with fallback:
+  `recognition.phrases` (bib list as contextual biasing) and `processLocally`
+  (on-device, offline) — used only when `SpeechRecognition.available()` says the
+  model is already installed; we never trigger a download mid-race. The mode is
+  shown in Live Settings → Engine.
+- Tests: `__tests__/useVoiceRecognition.test.ts` uses a fake SpeechRecognition.

@@ -25,12 +25,19 @@ export interface GroupSignals {
   finish: Set<string>;
 }
 
+/** `race.leaderFinishAll` — undefined counts as on, so existing races keep the behaviour. */
+export function isLeaderFinishAll(race: { leaderFinishAll?: boolean } | null | undefined): boolean {
+  return race?.leaderFinishAll !== false;
+}
+
 export function computeGroupSignals(
   categories: CategoryProps[],
-  riders: Pick<RiderProps, "category" | "subCategory" | "totalLaps" | "lapsCounter" | "raceStatus" | "status">[]
+  riders: Pick<RiderProps, "category" | "subCategory" | "totalLaps" | "lapsCounter" | "raceStatus" | "status">[],
+  enabled = true
 ): GroupSignals {
   const bell = new Set<string>();
   const finish = new Set<string>();
+  if (!enabled) return { bell, finish };
   for (const cat of categories) {
     const key = categoryGroupKey(cat);
     for (const r of riders) {

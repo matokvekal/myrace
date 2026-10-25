@@ -16,7 +16,9 @@ import { formatTime, formatTimeWithLeadingZeroes, parseClockTime } from "../../.
 import { useLapRecording } from "./useLapRecording";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
-import { computeGroupSignals, categoryGroupKey } from "@/utils/linkedGroups";
+import BibWarning from "../../../components/bibWarning/BibWarning";
+import useUIStore from "@/stores/uiStore";
+import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -207,8 +209,8 @@ const Heat: React.FC = () => {
   // they have left. Derived from rider state, so undoing the leader's finish
   // restores everyone.
   const groupSignals = useMemo(
-    () => computeGroupSignals(waveCategories, filteredRiders),
-    [waveCategories, filteredRiders]
+    () => computeGroupSignals(waveCategories, filteredRiders, isLeaderFinishAll(currentRace)),
+    [waveCategories, filteredRiders, currentRace]
   );
   const groupOf = (rider: RiderProps) => {
     const cat = waveCategories.find((c) => riderInCategory(rider, c));
@@ -550,7 +552,7 @@ const Heat: React.FC = () => {
     return set;
   }, [filteredRiders]);
 
-  const { isListening, lastTranscript } = useVoiceRecognition({
+  const { isListening, lastTranscript, onDevice: voiceOnDevice } = useVoiceRecognition({
     language: voiceSettings.language,
     validBibs,
     commands: [],
@@ -692,6 +694,23 @@ const Heat: React.FC = () => {
     <div className={styles.heat}>
       <HeaderHeats raceId={raceUuid} onSettingsClick={() => setShowVoiceSettings(true)} />
 
+      {/* Upcoming categories Start would refuse — tap one to open its wave in Race */}
+      <BibWarning
+        raceUuid={raceUuid}
+        categories={categories}
+        riders={riders}
+        onFix={(cat) => {
+          const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
+          const wave = [...schedule.keys()].find((w) =>
+            [...(schedule.get(w)?.values() ?? [])].flat().some((c) => c.id === cat.id)
+          );
+          const ui = useUIStore.getState();
+          if (wave != null) ui.setSelectedWave(wave);
+          ui.setRaceMode(true);
+          navigate(`/race/${raceUuid}`);
+        }}
+      />
+
       {/* Rider detail modal (double-click) */}
       {contextRider && (
         <RiderLiveModal
@@ -721,6 +740,13 @@ const Heat: React.FC = () => {
       {showVoiceSettings && (
         <VoiceSettingsModal
           onClose={() => setShowVoiceSettings(false)}
+          voiceOnDevice={voiceActive && voiceSettings.enabled ? voiceOnDevice : null}
+          leaderFinishAll={isLeaderFinishAll(currentRace)}
+          onLeaderFinishAllChange={
+            currentRace && !currentRace.finalized
+              ? (on) => void useRaceStore.getState().updateRace({ ...currentRace, leaderFinishAll: on })
+              : undefined
+          }
           canClearBoard={waveStopped && !clearedWave}
           onClearBoard={() => {
             setShowVoiceSettings(false);

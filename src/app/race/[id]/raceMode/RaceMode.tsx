@@ -5,6 +5,7 @@ import StartManager from "./StartManager";
 import CheckIn from "./CheckIn";
 import LiveBoard from "./LiveBoard";
 import WaveStatus from "./WaveStatus";
+import BibWarning from "../../components/bibWarning/BibWarning";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, getDefaultLiveWave } from "../schedule/Schedule";
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
@@ -117,6 +118,20 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           })}
         </div>
       </div>
+
+      {/* Bib problems anywhere in the race, before anyone reaches Start */}
+      <BibWarning
+        raceUuid={raceUuid}
+        categories={categories}
+        riders={riders}
+        onFix={(cat) => {
+          const wave = waveNums.find((w) =>
+            [...(schedule.get(w)?.values() ?? [])].flat().some((c) => c.id === cat.id)
+          );
+          if (wave != null) setSelectedWave(wave);
+          setSubTab("checkin");
+        }}
+      />
 
       {/* Sub-tab bar */}
       <div className={styles.subTabs}>

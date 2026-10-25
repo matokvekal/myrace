@@ -729,7 +729,23 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                               : <span style={{ width: 14 }} />
                             }
                           </span>
-                          <div className={styles.colorDot} style={{ background: cat.color ?? "#ccc" }} />
+                          {/* The colour bar itself opens the colour editor (same lock as the palette button) */}
+                          {(() => {
+                            const colorLocked = getCategoryLocks(cat, riders).color;
+                            return (
+                              <button
+                                type="button"
+                                className={styles.colorDotBtn}
+                                data-testid={`color-dot-${cat.id}`}
+                                disabled={colorLocked}
+                                aria-label={`Edit color of ${cat.name}`}
+                                title={colorLocked ? "Color can't be changed — this category has finished" : "Edit color"}
+                                onClick={(e) => { e.stopPropagation(); setColorDraft(cat.color ?? "#63A6FC"); setColorCat(cat); }}
+                              >
+                                <span className={styles.colorDot} style={{ background: cat.color ?? "#ccc", display: "block" }} />
+                              </button>
+                            );
+                          })()}
                           <div className={styles.catInfo}>
                             <span className={styles.catName}>{cat.name}</span>
                             {cat.subCategory && (

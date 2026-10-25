@@ -275,6 +275,25 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
+/* Bigger tap target around the thin colour bar */
+.colorDotBtn {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  margin: -4px -4px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.colorDotBtn:disabled {
+  cursor: default;
+}
+
+.colorDotBtn:not(:disabled):hover {
+  background: rgba(99, 166, 252, 0.12);
+}
+
 .catInfo {
   flex: 1;
   display: flex;

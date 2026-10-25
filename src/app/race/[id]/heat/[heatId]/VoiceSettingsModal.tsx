@@ -8,6 +8,12 @@ interface VoiceSettingsModalProps {
   canClearBoard?: boolean;
   /** Opens the clear-board confirmation (BUGS.md #14); owned by the Heat page. */
   onClearBoard?: () => void;
+  /** Where recognition runs while the mic is on; null = mic off (unknown). */
+  voiceOnDevice?: boolean | null;
+  /** Race's "first finish – all finish" rule (race.leaderFinishAll). */
+  leaderFinishAll?: boolean;
+  /** Absent = read-only (e.g. finalized race). */
+  onLeaderFinishAllChange?: (on: boolean) => void;
 }
 
 /**
@@ -28,7 +34,7 @@ function isIosStandalonePwa(): boolean {
   return isIos && isStandalone;
 }
 
-export function VoiceSettingsModal({ onClose, canClearBoard, onClearBoard }: VoiceSettingsModalProps) {
+export function VoiceSettingsModal({ onClose, canClearBoard, onClearBoard, voiceOnDevice = null, leaderFinishAll = true, onLeaderFinishAllChange }: VoiceSettingsModalProps) {
   const { settings, setLanguage, setAutoConfirm } = useVoiceSettingsStore();
   const { holdMs, setHoldMs } = useBoardHold();
   const iosPwa = isIosStandalonePwa();
@@ -93,6 +99,27 @@ export function VoiceSettingsModal({ onClose, canClearBoard, onClearBoard }: Voi
           </div>
 
           <div className={styles.section}>
+            <label className={styles.label}>First finish – all finish</label>
+            <div className={styles.toggleContainer}>
+              <label className={styles.toggleLabel}>
+                <input
+                  type="checkbox"
+                  data-testid="leader-finish-all"
+                  checked={leaderFinishAll}
+                  disabled={!onLeaderFinishAllChange}
+                  onChange={(e) => onLeaderFinishAllChange?.(e.target.checked)}
+                />
+                <span>Leader's bell / finish applies to the whole category</span>
+              </label>
+              <p className={styles.hint}>
+                {leaderFinishAll
+                  ? "When a category's first rider starts the last lap, every rider in it gets the bell and is on the last lap. When the first rider finishes, everyone else finishes on their next crossing — however many laps they did."
+                  : 'Off — every rider rides their own full lap count.'}
+              </p>
+            </div>
+          </div>
+
+          <div className={styles.section}>
             <label className={styles.label}>Language</label>
             <div className={styles.languageToggle}>
               <button
@@ -114,6 +141,11 @@ export function VoiceSettingsModal({ onClose, canClearBoard, onClearBoard }: Voi
             <label className={styles.label}>Engine</label>
             <div className={styles.engineInfo}>
               <span className={styles.badge}>Web Speech API</span>
+              {voiceOnDevice != null && (
+                <span className={styles.badge} data-testid="voice-engine-mode">
+                  {voiceOnDevice ? 'On device — works offline' : 'Cloud — needs internet'}
+                </span>
+              )}
             </div>
           </div>
 

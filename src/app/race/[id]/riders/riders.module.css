@@ -468,23 +468,44 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The name is what people look for — let it wrap to two lines instead of
+   being cut to "…" on a phone. */
 .colName {
   flex: 4;
-  font-weight: 600;
-  color: #1a304f;
-  min-width: 120px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #10233f;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .colCat {
   flex: 2;
   color: #3a5080;
-  min-width: 80px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Phone: drop the row counter and let the category wrap, so the name gets the room */
+@media (max-width: 600px) {
+  .colRow {
+    display: none;
+  }
+
+  .colCat {
+    flex: 1.5;
+    font-size: 12px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
 }
 
 .subCatLabel {
