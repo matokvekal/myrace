@@ -38,8 +38,8 @@ const permissionsSchema = z.unknown().superRefine((v, c) => {
 async function logMemberChange(d: Db, raceUuid: string, actorId: string, payload: { userId: string; roles: MemberRole[] | null; permissions: MemberPermissions }) {
   const s = await d.one<{ lastSeq: number }>(`UPDATE races SET "lastSeq" = "lastSeq" + 1 WHERE uuid = $1 RETURNING "lastSeq"`, [raceUuid]);
   await d.query(
-    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "deviceId", "protocolVersion", "userId", applied)
-     VALUES ($1, $2, $3, 'MemberChanged', $4, NULL, now(), 0, 'server', $5, $6, true)`,
+    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "eventAt", "deviceId", "protocolVersion", "userId", applied)
+     VALUES ($1, $2, $3, 'MemberChanged', $4, NULL, now(), 0, now(), 'server', $5, $6, true)`,
     [randomUUID(), raceUuid, s!.lastSeq, JSON.stringify(payload), PROTOCOL_VERSION, actorId],
   );
   return s!.lastSeq;

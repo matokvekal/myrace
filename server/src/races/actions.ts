@@ -18,7 +18,7 @@ import { ApiError, logger } from "../lib/core.js";
 import { publishChanges, type CommittedChanges } from "../realtime/socket.js";
 import { authorizeAction } from "../../../src/shared/race/access.js";
 import { PROTOCOL_VERSION, type RaceAction } from "../../../src/shared/race/actions.js";
-import { actionHeat, actionTime, applyAction, deriveRider, groupRiders, rankRiders } from "../../../src/shared/race/engine.js";
+import { actionHeat, applyAction, deriveRider, groupRiders, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
 import { loadMarks, loadState, saveChanges } from "./repo.js";
@@ -32,6 +32,29 @@ export interface ActionResult {
 }
 
 const FUTURE_TOLERANCE_MS = 5_000;
+const MAX_CLOCK_OFFSET_MS = 24 * 3_600_000;
+
+/**
+ * The event's time on the server clock (AD-9): device time + measured offset.
+ * Never the arrival time, except an event dated after its own arrival, which is
+ * held to the arrival time and flagged. An offset beyond +/-24 h is a broken
+ * measurement: the device time is used as is, and flagged. Nothing the Device
+ * sent is overwritten; the result is stored separately as eventAt.
+ */
+export function eventTime(a: Pick<RaceAction, "deviceTime" | "clockOffsetMs">, receivedAt: number): { at: number; clockCheck: "future" | "offset_ignored" | null } {
+  const device = Date.parse(a.deviceTime);
+  let clockCheck: "future" | "offset_ignored" | null = null;
+  let at = device + (a.clockOffsetMs || 0);
+  if (Math.abs(a.clockOffsetMs || 0) > MAX_CLOCK_OFFSET_MS) {
+    at = device;
+    clockCheck = "offset_ignored";
+  }
+  if (at > receivedAt + FUTURE_TOLERANCE_MS) {
+    at = receivedAt;
+    clockCheck = "future";
+  }
+  return { at, clockCheck };
+}
 
 /** Re-derives riders from their marks; follows first-finish effects through the group. */
 export async function rederive(d: Db, state: RaceState, riderUuids: Iterable<string>, touched: Set<string>): Promise<void> {
@@ -60,13 +83,14 @@ async function appendEvent(
   heat: number | null,
   applied: boolean,
   reason: string | null,
+  time: { at: number; clockCheck: string | null },
 ): Promise<number> {
   const s = await d.one<{ lastSeq: number }>(`UPDATE races SET "lastSeq" = "lastSeq" + 1 WHERE uuid = $1 RETURNING "lastSeq"`, [raceUuid]);
   await d.query(
-    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "deviceId", "protocolVersion", "userId", applied, reason)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "eventAt", "clockCheck", "deviceId", "protocolVersion", "userId", applied, reason)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [action.actionId, raceUuid, s!.lastSeq, action.type, JSON.stringify(action.payload ?? {}), heat, action.deviceTime,
-      action.clockOffsetMs, action.deviceId, action.protocolVersion, userId, applied, reason],
+      action.clockOffsetMs, new Date(time.at), time.clockCheck, action.deviceId, action.protocolVersion, userId, applied, reason],
   );
   return s!.lastSeq;
 }
@@ -142,28 +166,25 @@ export async function processActions(raceUuid: string, userId: string, items: un
       }
 
       const heat = reason === "invalid" ? null : actionHeat(state, a);
+      const time = eventTime(a, Date.now());
       if (reason) {
-        const seq = await appendEvent(d, raceUuid, a, userId, heat, false, reason);
+        const seq = await appendEvent(d, raceUuid, a, userId, heat, false, reason, time);
         out.push({ actionId: a.actionId, seq, applied: false, reason });
         committed.results.push({ actionId: a.actionId, seq, applied: false, reason, userId });
         committed.seq = seq;
         continue;
       }
 
-      const receivedAt = Date.now();
-      const at = Math.min(actionTime(a), receivedAt + FUTURE_TOLERANCE_MS);
-      const applied = applyAction(state, a, at);
+      const applied = applyAction(state, a, time.at);
       if (!applied.applied) {
-        const seq = await appendEvent(d, raceUuid, a, userId, heat, false, applied.reason);
+        const seq = await appendEvent(d, raceUuid, a, userId, heat, false, applied.reason, time);
         out.push({ actionId: a.actionId, seq, applied: false, reason: applied.reason });
         committed.results.push({ actionId: a.actionId, seq, applied: false, reason: applied.reason, userId });
         committed.seq = seq;
         continue;
       }
 
-      // Store the offset actually used, so re-deriving from the log gives the same lap times.
-      const effective = { ...a, clockOffsetMs: at - Date.parse(a.deviceTime) };
-      const seq = await appendEvent(d, raceUuid, effective, userId, heat, true, null);
+      const seq = await appendEvent(d, raceUuid, a, userId, heat, true, null, time);
       const ch = applied.changes;
       const touched = new Set<string>(ch.riders);
       const toDerive = new Set(ch.rederive);

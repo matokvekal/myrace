@@ -90,7 +90,8 @@ export const envelope = z.object({
   type: z.enum(ACTION_TYPES),
   payload: z.unknown(),
   deviceTime: z.string().datetime({ offset: true }),
-  clockOffsetMs: z.number().int().min(-86_400_000).max(86_400_000),
+  // Wide on purpose: a broken clock is flagged by the server (clockCheck), never refused.
+  clockOffsetMs: z.number().int().min(-30 * 86_400_000).max(30 * 86_400_000),
   deviceId: text(100).min(1),
   protocolVersion: z.number().int().min(1),
 });

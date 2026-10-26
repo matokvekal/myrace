@@ -19,12 +19,18 @@ CREATE TABLE race_events (
                       'MemberChanged', 'Finalized', 'Amended')),
   payload           jsonb NOT NULL,              -- refers to riders/categories by uuid
   heat              integer,                     -- wave the action concerns (set by the server); null = whole race
-  "deviceTime"      timestamptz NOT NULL,        -- device clock at tap time
-  "clockOffsetMs"   integer NOT NULL DEFAULT 0,  -- device → server clock offset measured before the tap
+  "deviceTime"      timestamptz NOT NULL,        -- device clock at tap time, as sent
+  "clockOffsetMs"   integer NOT NULL DEFAULT 0,  -- device → server clock offset measured before the tap, as sent
+  -- The event's time on the server clock: deviceTime + clockOffsetMs. Laps are
+  -- timed by it; a late (offline) delivery never changes it. See "clockCheck".
+  "eventAt"         timestamptz NOT NULL,
+  -- null = plausible; 'future' = dated after its own arrival, held to serverReceivedAt;
+  -- 'offset_ignored' = offset beyond +/-24 h, device time used as is.
+  "clockCheck"      text CHECK ("clockCheck" IN ('future', 'offset_ignored')),
   "deviceId"        text NOT NULL,
   "protocolVersion" integer NOT NULL,
   "userId"          uuid REFERENCES users (id) ON DELETE SET NULL, -- author (the signed-in account)
-  "receivedAt"      timestamptz NOT NULL DEFAULT now(),            -- server clock
+  "serverReceivedAt" timestamptz NOT NULL DEFAULT now(),           -- server clock on arrival (audit)
   applied           boolean NOT NULL,
   reason            text CHECK (reason IN ('not_member', 'forbidden', 'out_of_scope', 'race_official', 'locked', 'invalid', 'upgrade_required')),
   CONSTRAINT race_events_race_seq_key UNIQUE ("raceUuid", seq),
