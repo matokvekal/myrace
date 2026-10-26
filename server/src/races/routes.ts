@@ -217,7 +217,7 @@ racesRouter.get("/:raceUuid/history", route(async (req, res) => {
     throw new ApiError(403, "forbidden", "The audit history needs access to Team");
   }
   const rows = await db.query<Record<string, unknown>>(
-    `SELECT e.seq, e."actionId", e.type, e.payload, e.heat, e."deviceTime", e."clockOffsetMs", e."receivedAt", e.applied, e.reason,
+    `SELECT e.seq, e."actionId", e.type, e.payload, e.heat, e."deviceTime", e."clockOffsetMs", e."eventAt", e."clockCheck", e."serverReceivedAt", e.applied, e.reason,
             e."deviceId", e."userId", u.name AS "userName"
      FROM race_events e LEFT JOIN users u ON u.id = e."userId"
      WHERE e."raceUuid" = $1 AND e.seq > $2 AND ($3::text IS NULL OR e.payload->>'riderUuid' = $3)
@@ -226,7 +226,7 @@ racesRouter.get("/:raceUuid/history", route(async (req, res) => {
     [m.raceUuid, qs.afterSeq, qs.riderUuid ?? null, m.access.waves, qs.limit],
   );
   res.json({
-    events: rows.map((e) => (audit ? e : { seq: e.seq, type: e.type, deviceTime: e.deviceTime, applied: e.applied, reason: e.reason })),
+    events: rows.map((e) => (audit ? e : { seq: e.seq, type: e.type, eventAt: e.eventAt, applied: e.applied, reason: e.reason })),
   });
 }));
 

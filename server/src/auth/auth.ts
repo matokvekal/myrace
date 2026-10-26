@@ -26,6 +26,7 @@ import {
 import { sendMail, sendSms, smsEnabled } from "../lib/messaging.js";
 import {
   createSession,
+  RefreshReuseError,
   refreshSession,
   revokeAllSessions,
   revokeSession,
@@ -164,7 +165,7 @@ const password = z.string().min(8, "Use at least 8 characters").max(200);
 const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Phone in international format, e.g. +972501234567");
 
 export const authRouter = Router();
-const limiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
+const limiter = rateLimit({ windowMs: 60_000, limit: Number(process.env.AUTH_RATE_LIMIT ?? 20), standardHeaders: true, legacyHeaders: false });
 authRouter.use(["/register", "/login", "/google", "/email-code", "/sms-code"], limiter);
 
 authRouter.post("/register", route(async (req, res) => {
@@ -245,7 +246,16 @@ authRouter.post("/sms-code/verify", route(async (req, res) => {
 
 authRouter.post("/refresh", route(async (req, res) => {
   const { refreshToken } = z.object({ refreshToken: z.string().min(10) }).parse(req.body);
-  const out = await tx((d) => refreshSession(d, refreshToken));
+  let out;
+  try {
+    out = await tx((d) => refreshSession(d, refreshToken));
+  } catch (err) {
+    if (err instanceof RefreshReuseError) {
+      await revokeAllSessions(db, err.userId);
+      logger.warn({ userId: err.userId }, "refresh token reuse — all sessions revoked");
+    }
+    throw err;
+  }
   res.json({ accessToken: out.accessToken, refreshToken: out.refreshToken, expiresIn: out.expiresIn });
 }));
 

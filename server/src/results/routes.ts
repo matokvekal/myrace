@@ -80,8 +80,8 @@ function buildRecord(state: RaceState, by: string, officialVersion: number, prev
 async function appendServerEvent(d: Db, raceUuid: string, userId: string, type: string, payload: unknown, heat: number | null): Promise<number> {
   const s = await d.one<{ lastSeq: number }>(`UPDATE races SET "lastSeq" = "lastSeq" + 1 WHERE uuid = $1 RETURNING "lastSeq"`, [raceUuid]);
   await d.query(
-    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "deviceId", "protocolVersion", "userId", applied)
-     VALUES ($1, $2, $3, $4, $5, $6, now(), 0, 'server', $7, $8, true)`,
+    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "eventAt", "deviceId", "protocolVersion", "userId", applied)
+     VALUES ($1, $2, $3, $4, $5, $6, now(), 0, now(), 'server', $7, $8, true)`,
     [randomUUID(), raceUuid, s!.lastSeq, type, JSON.stringify(payload), heat, PROTOCOL_VERSION, userId],
   );
   return s!.lastSeq;
@@ -176,8 +176,9 @@ resultsRouter.post("/amend", route(async (req, res) => {
     );
     if (!prev) throw new ApiError(409, "not_official", "Finalize the race first");
     // Only Actions kept back because the race was official can be included.
-    const late = await d.query<RaceAction & { seq: number }>(
-      `SELECT "actionId", "raceUuid", type, payload, "deviceTime", "clockOffsetMs", "deviceId", "protocolVersion", seq
+    const late = await d.query<RaceAction & { seq: number; eventAtMs: number }>(
+      `SELECT "actionId", "raceUuid", type, payload, "deviceTime", "clockOffsetMs", "deviceId", "protocolVersion", seq,
+              (extract(epoch FROM "eventAt") * 1000)::bigint AS "eventAtMs"
        FROM race_events WHERE "raceUuid" = $1 AND "actionId" = ANY($2::uuid[]) AND NOT applied AND reason = 'race_official' ORDER BY seq`,
       [m.raceUuid, body.includeActionIds],
     );
@@ -186,7 +187,8 @@ resultsRouter.post("/amend", route(async (req, res) => {
     const rederiveSet = new Set<string>();
     for (const a of late) {
       const action = { ...a, deviceTime: new Date(a.deviceTime as unknown as Date).toISOString() } as RaceAction;
-      const r = applyAction(state, action, actionTime(action));
+      // A held-back late action keeps its original event time (never its arrival or amendment time).
+      const r = applyAction(state, action, Number(a.eventAtMs));
       if (!r.applied) continue;
       included.push(a.actionId);
       r.changes.rederive.forEach((x) => rederiveSet.add(x));

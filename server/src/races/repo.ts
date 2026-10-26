@@ -62,7 +62,7 @@ export async function loadMarks(d: Db, raceUuid: string, riderUuids: string[]): 
   if (riderUuids.length === 0) return out;
   const rows = await d.query<{ actionId: string; seq: number; type: RiderMark["type"]; riderUuid: string; laps: number | null; at: number }>(
     `SELECT "actionId", seq, type, payload->>'riderUuid' AS "riderUuid", (payload->>'laps')::int AS laps,
-            (extract(epoch FROM "deviceTime") * 1000)::bigint + "clockOffsetMs" AS at
+            (extract(epoch FROM "eventAt") * 1000)::bigint AS at
      FROM race_events
      WHERE "raceUuid" = $1 AND type IN ('AddLap', 'RiderFinished', 'LapCountCorrection')
        AND payload->>'riderUuid' = ANY($2::text[])

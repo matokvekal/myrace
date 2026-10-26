@@ -56,6 +56,12 @@ export async function createSession(db: Db, userId: string, deviceId: string | n
   return { accessToken: await signAccessToken({ userId, sessionId: s!.id }), refreshToken, expiresIn: 15 * 60 };
 }
 
+export class RefreshReuseError extends ApiError {
+  constructor(readonly userId: string) {
+    super(401, "unauthorized", "Sign in again");
+  }
+}
+
 /** Rotates a refresh token. Re-using an already-rotated token revokes the whole chain. */
 export async function refreshSession(db: Db, refreshToken: string): Promise<SessionTokens & { userId: string }> {
   const s = await db.one<{ id: string; userId: string; revokedAt: Date | null; expiresAt: Date; replacedBy: string | null; isActive: boolean }>(
@@ -65,10 +71,9 @@ export async function refreshSession(db: Db, refreshToken: string): Promise<Sess
   );
   if (!s) throw new ApiError(401, "unauthorized", "Sign in again");
   if (s.revokedAt || s.replacedBy) {
-    // Token reuse: someone holds an old token. Revoke every session of this user.
-    await db.query(`UPDATE sessions SET "revokedAt" = now() WHERE "userId" = $1 AND "revokedAt" IS NULL`, [s.userId]);
-    logger.warn({ userId: s.userId }, "refresh token reuse — all sessions revoked");
-    throw new ApiError(401, "unauthorized", "Sign in again");
+    // Token reuse: someone holds an old token. The caller revokes every session of
+    // this user OUTSIDE this transaction, so the revocation is not rolled back.
+    throw new RefreshReuseError(s.userId);
   }
   if (s.expiresAt < new Date() || !s.isActive) throw new ApiError(401, "unauthorized", "Sign in again");
   const nextToken = randomToken();
