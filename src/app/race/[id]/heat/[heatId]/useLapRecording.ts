@@ -441,7 +441,7 @@ export function useLapRecording({
     // Prefer the exact pre-tap snapshot over rebuilding from lapsDetails, which
     // silently drops elapsedTimeFromStart and position_category (BUGS.md #10).
     const snapshot = riderActions.find(
-      (a) => a.prevRider && a.statusChange !== "FINISH" && a.prevRider.id === rider.id && a.rider.lapsCounter === rider.lapsCounter
+      (a) => a.prevRider && !a.statusChange && a.prevRider.id === rider.id && a.rider.lapsCounter === rider.lapsCounter
     );
     restoreFromSnapshot(rider, snapshot);
     return true;
@@ -482,6 +482,25 @@ export function useLapRecording({
         },
       });
       return rider;
+    }
+
+    // A DNF / DSQ / DNS entry: undo the classification, never a lap. Restore the
+    // status the rider had before (older log entries without a snapshot go back
+    // to racing, the same as the live screen's "Clear").
+    if (action.statusChange === "DNF" || action.statusChange === "DSQ" || action.statusChange === "DNS") {
+      if (!rider) return null;
+      const restored: RiderProps = action.prevRider
+        ? { ...rider, status: action.prevRider.status, raceStatus: action.prevRider.raceStatus }
+        : { ...rider, status: "standing", raceStatus: "running" };
+      updateRider(restored);
+      setRiderActions((prev) => prev.filter((a) => a.id !== actionId));
+      if (race) {
+        AuditLogService.log({
+          race, action: "CANCEL_ACTION", screen: "Heat", entityType: "rider",
+          entityId: rider.bibNumber, details: { statusChange: action.statusChange },
+        });
+      }
+      return restored;
     }
 
     if (!rider || rider.lapsCounter <= 0) return null;
@@ -530,7 +549,7 @@ export function useLapRecording({
   };
 
   /** Log a DNF/DSQ/DNS so it shows in the action log alongside laps. */
-  const logStatusChange = (rider: RiderProps, status: "DNF" | "DSQ" | "DNS"): void => {
+  const logStatusChange = (rider: RiderProps, status: "DNF" | "DSQ" | "DNS", prevRider?: RiderProps): void => {
     if (race) {
       AuditLogService.log({
         race,
@@ -545,6 +564,7 @@ export function useLapRecording({
       {
         id: `${rider.id}-status-${status}-${Date.now()}`,
         rider,
+        prevRider,
         timestamp: Date.now(),
         source: "click",
         categoryColor: getCatColor(rider),

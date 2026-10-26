@@ -378,7 +378,7 @@ const Heat: React.FC = () => {
 
     // Add status change to action log for DNF/DSQ/DNS
     if (isOut) {
-      logStatusChange(updatedRider, status as 'DNF' | 'DSQ' | 'DNS');
+      logStatusChange(updatedRider, status as 'DNF' | 'DSQ' | 'DNS', rider);
     }
 
     setContextRider(null);

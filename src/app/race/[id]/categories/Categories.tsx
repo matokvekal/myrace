@@ -174,7 +174,15 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
    * `laps || rider.totalLaps` is deliberate: a category sitting at 0/null means
    * "not set yet" and must not wipe lap counts that came from the start list.
    */
-  const updateCategoryAndSyncRiders = async (updated: CategoryProps) => {
+  const updateCategoryAndSyncRiders = async (updated: CategoryProps): Promise<boolean> => {
+    // Race safety for EVERY laps write (edit dialog, Set Laps, ± stepper): a
+    // finished category's laps are fixed, and laps never drop below what a rider
+    // already rode. Returns false when the change was refused.
+    const stored = raceCategories.find((c) => c.id === updated.id) ?? updated;
+    const locks = getCategoryLocks(stored, riders.filter((r) => r.raceUuid === raceUuid));
+    if (locks.laps && (updated.laps ?? 0) !== (stored.laps ?? 0)) return false;
+    if ((updated.laps ?? 0) !== (stored.laps ?? 0) && (updated.laps ?? 0) < locks.minLaps) return false;
+
     await updateCategory(updated);
 
     const categoryRiders = riders.filter(
@@ -191,6 +199,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
         totalLaps: updated.laps || rider.totalLaps
       });
     }
+    return true;
   };
 
   const saveEdit = async () => {

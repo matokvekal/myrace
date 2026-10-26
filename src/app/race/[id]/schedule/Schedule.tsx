@@ -26,6 +26,7 @@ import useRaceStore from "@/stores/racesStore";
 import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
+import { withStatus } from "@/utils/riderStatus";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 
 interface Props {
@@ -295,6 +296,10 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const setCategoryLaps = async (cat: CategoryProps, laps: number) => {
     const next = Math.max(0, laps);
     if (next === (cat.laps ?? 0)) return;
+    // Same race-safety rule as the category edit dialog: a finished category's
+    // laps are fixed, and laps never drop below what a rider already rode.
+    const locks = getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid));
+    if (locks.laps || next < locks.minLaps) return;
     const updated = { ...cat, laps: next };
     await updateCategory(updated);
     for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, cat))) {
@@ -872,11 +877,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                     <button
                                       className={`${styles.statusBtn} ${isDNS ? styles.dnsOn : ""}`}
                                       onClick={() =>
-                                        updateRider({
-                                          ...rider,
-                                          status: isDNS ? "standing" : "DNS",
-                                          raceStatus: "upcoming"
-                                        })
+                                        updateRider(withStatus(rider, isDNS ? "standing" : "DNS"))
                                       }
                                     >
                                       DNS
@@ -884,11 +885,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                     <button
                                       className={`${styles.statusBtn} ${isDNF ? styles.dnfOn : ""}`}
                                       onClick={() =>
-                                        updateRider({
-                                          ...rider,
-                                          status: isDNF ? "standing" : "DNF",
-                                          raceStatus: "upcoming"
-                                        })
+                                        updateRider(withStatus(rider, isDNF ? "standing" : "DNF"))
                                       }
                                     >
                                       DNF
@@ -896,7 +893,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                     <button
                                       className={`${styles.statusBtn} ${isDSQ ? styles.dsqOn : ""}`}
                                       onClick={() =>
-                                        updateRider({ ...rider, status: isDSQ ? "running" : "DSQ" })
+                                        updateRider(withStatus(rider, isDSQ ? "standing" : "DSQ"))
                                       }
                                     >
                                       DSQ

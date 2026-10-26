@@ -84,8 +84,11 @@ const MainPage = () => {
   // Light delete for downloaded view-only races, straight from the list
   // (BUGS.md #8). Same data cleanup as the Info Danger Zone, no heavy modal.
   const handleDeleteRace = async (uuid: string) => {
-    await deleteRidersByRace(uuid);
+    // Race first, then its riders — the same order as the race page. Removing the
+    // race lifts a finalized race's write lock, so the rider cleanup is allowed;
+    // the reverse order left orphan riders behind for finalized downloads.
     await deleteRace(uuid);
+    await deleteRidersByRace(uuid);
     await getRaces();
   };
 
