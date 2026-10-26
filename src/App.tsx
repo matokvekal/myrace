@@ -29,6 +29,9 @@ const ResultsPage = lazy(() => import("./app/race/[id]/results/ResultsPage"));
 const DbUpdateNotice = lazy(() =>
   import("./app/components/pwa/DbUpdateNotice").then((m) => ({ default: m.DbUpdateNotice }))
 );
+// The one toast host (Story 1.4). Loaded on demand so react-toastify and its CSS
+// stay out of the eager bundle; toasts are only raised from lazily loaded screens.
+const AppToasts = lazy(() => import("./app/components/toast/AppToasts"));
 
 export default function App() {
   // Restore Supabase session + start the offline->online flush listener. Both
@@ -83,6 +86,7 @@ export default function App() {
       <UpdatePrompt />
       <Suspense fallback={null}>
         <DbUpdateNotice />
+        <AppToasts />
       </Suspense>
     </>
   );
