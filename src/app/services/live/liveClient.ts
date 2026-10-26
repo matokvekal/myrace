@@ -249,7 +249,15 @@ export function accessFor(local: string): AccessSummary | null {
 // ---------------------------------------------------------------------------
 // Clock alignment (AD-9)
 
-let clockOffsetMs = 0;
+const CLOCK_KEY = "commissaire.live.clock";
+/** Last measured offset to the server clock; kept so laps taken offline after a reload still use it. */
+let clockOffsetMs: number = (() => {
+  try {
+    return Number(JSON.parse(localStorage.getItem(CLOCK_KEY) ?? "{}").offsetMs) || 0;
+  } catch {
+    return 0;
+  }
+})();
 async function measureClock() {
   const samples: number[] = [];
   for (let i = 0; i < 3; i++) {
@@ -264,7 +272,10 @@ async function measureClock() {
       /* keep the last offset */
     }
   }
-  if (samples.length) clockOffsetMs = Math.round(samples.sort((a, b) => a - b)[Math.floor(samples.length / 2)]);
+  if (samples.length) {
+    clockOffsetMs = Math.round(samples.sort((a, b) => a - b)[Math.floor(samples.length / 2)]);
+    localStorage.setItem(CLOCK_KEY, JSON.stringify({ offsetMs: clockOffsetMs, measuredAt: new Date().toISOString() }));
+  }
 }
 
 /** ISO time with the Device's local offset (the server shows wave starts on this clock). */

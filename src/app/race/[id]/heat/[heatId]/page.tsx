@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import styles from "./heat.module.css";
@@ -38,6 +38,8 @@ import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
 import { Bike, List, ChevronDown } from "lucide-react";
 import { canViewScreen, isLiveRace } from "@/services/live/liveBridge";
+// Shared races: the sync state where it matters most (offline / waiting to send).
+const SyncBadge = lazy(() => import("../../../../live/SyncBadge"));
 
 // Category identity is name + subCategory: the same name can exist in several
 // waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
@@ -704,6 +706,13 @@ const Heat: React.FC = () => {
   return (
     <div className={styles.heat}>
       <HeaderHeats raceId={raceUuid} onSettingsClick={() => setShowVoiceSettings(true)} />
+      {isLiveRace(raceUuid) && (
+        <Suspense fallback={null}>
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 0" }}>
+            <SyncBadge raceUuid={raceUuid} />
+          </div>
+        </Suspense>
+      )}
 
       {/* Upcoming categories Start would refuse — tap one to open its wave in Race */}
       <BibWarning
