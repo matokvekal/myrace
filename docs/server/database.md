@@ -74,15 +74,24 @@ erDiagram
 | `sync_cursors` | Last `seq` and queue depth per device, for catch-up and the owner's team sync view. |
 | `official_versions` | Signed official results and amendments, kept as a chain. |
 
-## Roles
+## Access: roles, screen permissions, data scope
 
-`race_members.roles` (and `invitations.roles`) hold any set of the FR-10 roles
-`admin`, `start`, `counter`, `checkin`; a member with several roles gets the
-union of their grants. The fifth role, owner, is `races."ownerUserId"`
-(finalize, amend, delete, transfer). An empty set is a viewer.
-`"categoryScope"` (null = all) limits a counter to those categories. The
-database only checks the names; what each role allows is
-`src/shared/race/roles.ts`.
+Per race and per member, three independent parts (rules in `src/shared/race/access.ts`):
+
+| Part | Stored in | Meaning |
+|---|---|---|
+| Roles | `race_members.roles` | Any set of `admin`, `start`, `counter`, `checkin`, `viewer` (FR-10). The owner is `races."ownerUserId"` and always has full access; nothing can override it. Roles give default screen permissions. |
+| Screen permissions | `race_members.permissions.screens` | Per screen (`info`, `map`, `schedule`, `categories`, `riders`, `results`, `start`, `checkin`, `board`, `status`, `live`, `team`, `settings`): `view`, `create`, `update`, `delete`. Overrides of the role defaults set by the owner or an admin. No write without view. |
+| Data scope | `race_members.permissions.waves` / `.categories` | Waves (heat numbers) and, for counters, categories the member may see and act on. Unset = all. |
+
+Examples: a spectator is `roles: []`, `permissions: {"screens": {"live": {"view": true}, "results": {"view": true}}, "waves": [3]}`; a wave-1 lap commissaire is `roles: ["counter"]`, `permissions: {"waves": [1]}`.
+
+The API checks the exact operation each Action needs (e.g. Undo needs `live.delete`) and
+filters everything it sends (responses, snapshots, catch-up, socket events) with the
+same rules: hidden waves, out-of-scope riders, lap data without a results-type screen,
+and private rider details without Riders or Check-In are never sent.
+`race_events.heat` (wave of each action) and `"changedSeq"` on races, categories and
+riders let catch-up return only rows a member may see.
 
 ## Timing
 

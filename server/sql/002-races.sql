@@ -48,6 +48,7 @@ CREATE TABLE races (
   -- Multi-user
   "joinCode"        text UNIQUE,                -- race code for the join link / QR (≥ 8 chars)
   "lastSeq"         bigint NOT NULL DEFAULT 0,  -- last race_events.seq (AD-6)
+  "changedSeq"      bigint NOT NULL DEFAULT 0,  -- seq that last changed this row (catch-up)
   "createdAt"       timestamptz NOT NULL DEFAULT now(),
   "lastUpdateAt"    timestamptz NOT NULL DEFAULT now()
 );
@@ -68,9 +69,11 @@ CREATE TABLE categories (
   "linkGroup"     text,
   "finishedAt"    bigint,                       -- epoch ms, as in CategoryProps
   "importOrder"   integer,
+  "changedSeq"    bigint NOT NULL DEFAULT 0,    -- seq that last changed this row (catch-up)
   CONSTRAINT categories_name_key UNIQUE NULLS NOT DISTINCT ("raceUuid", name, "subCategory")
 );
 CREATE INDEX categories_race_heat_idx ON categories ("raceUuid", heat);
+CREATE INDEX categories_race_changed_idx ON categories ("raceUuid", "changedSeq");
 
 CREATE TABLE riders (
   uuid                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -110,10 +113,12 @@ CREATE TABLE riders (
   position_category      integer NOT NULL DEFAULT 0,
   position_race          integer NOT NULL DEFAULT 0,
   color                  text,
+  "changedSeq"           bigint NOT NULL DEFAULT 0, -- seq that last changed this row (catch-up)
   "createdAt"            timestamptz NOT NULL DEFAULT now(),
   "updatedAt"            timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX riders_race_idx ON riders ("raceUuid");
 CREATE INDEX riders_race_bib_idx ON riders ("raceUuid", "bibNumber");
+CREATE INDEX riders_race_changed_idx ON riders ("raceUuid", "changedSeq");
 
 INSERT INTO schema_migrations (version) VALUES ('002-races');

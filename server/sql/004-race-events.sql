@@ -18,6 +18,7 @@ CREATE TABLE race_events (
                       'RiderCheckedIn', 'CommentSet', 'RaceEdited', 'SettingChanged',
                       'MemberChanged', 'Finalized', 'Amended')),
   payload           jsonb NOT NULL,              -- refers to riders/categories by uuid
+  heat              integer,                     -- wave the action concerns (set by the server); null = whole race
   "deviceTime"      timestamptz NOT NULL,        -- device clock at tap time
   "clockOffsetMs"   integer NOT NULL DEFAULT 0,  -- device → server clock offset measured before the tap
   "deviceId"        text NOT NULL,
@@ -29,6 +30,8 @@ CREATE TABLE race_events (
   CONSTRAINT race_events_race_seq_key UNIQUE ("raceUuid", seq),
   CONSTRAINT race_events_reason_when_not_applied CHECK (applied = (reason IS NULL))
 );
+-- Catch-up and history for a member limited to some waves.
+CREATE INDEX race_events_race_heat_idx ON race_events ("raceUuid", heat, seq);
 -- Per-rider history ("what happened to bib 42").
 CREATE INDEX race_events_rider_idx ON race_events ("raceUuid", (payload ->> 'riderUuid'))
   WHERE payload ? 'riderUuid';

@@ -2,15 +2,17 @@
 -- organizer's reusable commissaire directory. All new: the local app has no
 -- equivalent (its IndexedDB "roles" store is a device-only preset list).
 --
--- Roles are composable (PRD FR-10): a member holds any set of
---   admin    organizer / administrator: race setup, riders, members, settings
---   start    start commissaire: start / finish waves and categories, start times
---   counter  lap commissaire: laps (manual, voice, Joker), undo, finish, DNF/DSQ,
---            lap-count corrections — limited to "categoryScope" when set
---   checkin  registration: check-in, riders and bibs, DNS before start
--- The fifth role, owner, is races."ownerUserId" (finalize, amend, delete,
--- transfer). No roles = viewer. What each role may do is data in
--- src/shared/race/roles.ts; a member's grant is the union of their roles.
+-- Access is per race, in three independent parts (src/shared/race/access.ts):
+--   roles        any set of admin, start, counter, checkin, viewer (FR-10).
+--                The owner is races."ownerUserId" and always has full access.
+--                No roles and no screen permissions = no access.
+--   permissions  JSONB with overrides and data scope (MemberPermissions):
+--                { "screens": { "<screen>": { "view": true, "create": false,
+--                                              "update": false, "delete": false } },
+--                  "waves": [3],              -- unset = all waves
+--                  "categories": ["<uuid>"] } -- unset = all categories
+--                Unset operations keep the role defaults. The API validates the
+--                content (validatePermissions); the database checks the shape.
 
 CREATE TABLE invitations (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,7 +21,7 @@ CREATE TABLE invitations (
   "userId"        uuid REFERENCES users (id) ON DELETE CASCADE, -- set: invite of an existing user
   "tokenHash"     text NOT NULL UNIQUE,                         -- hash of the link/QR secret; the secret is not stored
   roles           text[] NOT NULL DEFAULT '{}',
-  "categoryScope" uuid[],                                       -- null = all categories
+  permissions     jsonb NOT NULL DEFAULT '{}'::jsonb,
   "maxUses"       integer NOT NULL DEFAULT 1 CHECK ("maxUses" >= 1),
   "useCount"      integer NOT NULL DEFAULT 0,
   "createdBy"     uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -27,7 +29,8 @@ CREATE TABLE invitations (
   "expiresAt"     timestamptz NOT NULL,
   "sentAt"        timestamptz,                                  -- invitation email sent
   "revokedAt"     timestamptz,
-  CONSTRAINT invitations_roles_known CHECK (roles <@ ARRAY['admin', 'start', 'counter', 'checkin']::text[]),
+  CONSTRAINT invitations_roles_known CHECK (roles <@ ARRAY['admin', 'start', 'counter', 'checkin', 'viewer']::text[]),
+  CONSTRAINT invitations_permissions_object CHECK (jsonb_typeof(permissions) = 'object'),
   CONSTRAINT invitations_use_count CHECK ("useCount" BETWEEN 0 AND "maxUses")
 );
 CREATE INDEX invitations_race_idx ON invitations ("raceUuid");
@@ -41,14 +44,15 @@ CREATE TABLE race_members (
   "raceUuid"      uuid NOT NULL REFERENCES races (uuid) ON DELETE CASCADE,
   "userId"        uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   roles           text[] NOT NULL DEFAULT '{}',
-  "categoryScope" uuid[],                                       -- null = all categories
+  permissions     jsonb NOT NULL DEFAULT '{}'::jsonb,
   "invitationId"  uuid REFERENCES invitations (id) ON DELETE SET NULL,
   "addedBy"       uuid REFERENCES users (id) ON DELETE SET NULL,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now(),
   "revokedAt"     timestamptz,
   CONSTRAINT race_members_race_user_key UNIQUE ("raceUuid", "userId"),
-  CONSTRAINT race_members_roles_known CHECK (roles <@ ARRAY['admin', 'start', 'counter', 'checkin']::text[])
+  CONSTRAINT race_members_roles_known CHECK (roles <@ ARRAY['admin', 'start', 'counter', 'checkin', 'viewer']::text[]),
+  CONSTRAINT race_members_permissions_object CHECK (jsonb_typeof(permissions) = 'object')
 );
 CREATE INDEX race_members_user_idx ON race_members ("userId") WHERE "revokedAt" IS NULL; -- "My races"
 
