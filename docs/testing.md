@@ -31,6 +31,15 @@ add-rider, edit-bib, check-in / DNS / Check All, standing + bib + name sorting, 
 recording (debounce, min lap time, finish, undo, board hold, persisted log), store
 persistence across reload, and the finalized-race write lock.
 
+## Local-race regression gate
+Every change must keep a Local (never published) race working exactly as before.
+The CI job "Playwright E2E (local-race regression)" runs the whole Playwright suite
+with `VITE_SERVER_URL` unset (no sync server), and
+`tests/local-race-regression.spec.ts` records laps, undoes one, reloads (the data
+must come back from IndexedDB), opens Results, and fails if the app makes any
+request outside its own origin. Run it alone with
+`npx playwright test local-race-regression`.
+
 ## CI
 `.github/workflows/ci.yml` runs on every PR / non-main push and is **called by
 `deploy.yml`**: `build` needs `quality`, and `deploy` needs `build`. A failing

@@ -52,8 +52,12 @@ jobs:
         run: npm run build
 
   # Slower gate: real browser, full user flows. Runs in parallel with `quality`.
+  # Also the "local-race regression" gate (Epic 1, Story 1.1): the whole suite runs
+  # with no sync server configured, so every PR proves a Local race still works
+  # exactly as before. tests/local-race-regression.spec.ts additionally asserts a
+  # Local race makes no external network requests.
   e2e:
-    name: Playwright E2E
+    name: Playwright E2E (local-race regression)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -73,6 +77,8 @@ jobs:
         run: npx playwright test
         env:
           CI: "true"
+          # Multi-user sync must stay off for the regression gate.
+          VITE_SERVER_URL: ""
 
       - name: Upload Playwright report
         if: always()
