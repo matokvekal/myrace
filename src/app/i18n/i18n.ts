@@ -18,7 +18,38 @@ export const SUPPORTED_LANGUAGES = [
   { code: "zh", label: "中文", flag: "cn" },
   { code: "ja", label: "日本語", flag: "jp" },
   { code: "hi", label: "हिन्दी", flag: "in" },
+  { code: "he", label: "עברית", flag: "il" },
 ] as const;
+
+/** Languages written right-to-left. The whole document flips only for these. */
+const RTL_LANGUAGES = new Set(["he"]);
+
+/**
+ * Hebrew is offered as an explicit choice only: a browser set to Hebrew keeps
+ * the English UI it has today (no surprise layout flip on race day) until the
+ * user picks עברית in the side menu, which stores it under commissaire.language.
+ */
+function convertDetectedLanguage(lng: string): string {
+  if (!lng.toLowerCase().startsWith("he")) return lng;
+  let chosen: string | null = null;
+  try {
+    chosen = localStorage.getItem("commissaire.language");
+  } catch {
+    /* storage unavailable — treat as not chosen */
+  }
+  return chosen && chosen.toLowerCase().startsWith("he") ? "he" : "en";
+}
+
+/** Set <html lang/dir> for the active language; LTR languages keep today's markup. */
+function applyDocumentLanguage(lng: string | undefined) {
+  if (typeof document === "undefined") return;
+  const code = (lng || "en").split("-")[0];
+  document.documentElement.lang = code;
+  if (RTL_LANGUAGES.has(code)) document.documentElement.setAttribute("dir", "rtl");
+  else document.documentElement.removeAttribute("dir");
+}
+
+i18n.on("languageChanged", applyDocumentLanguage);
 
 i18n
   .use(HttpBackend)
@@ -38,6 +69,7 @@ i18n
       order: ["localStorage", "navigator"],
       lookupLocalStorage: "commissaire.language",
       caches: ["localStorage"],
+      convertDetectedLanguage,
     },
     // Translation keys use flat dotted strings ("scan.list") as literal keys,
     // not nested-object paths — disable i18next's default "." path traversal
