@@ -24,6 +24,11 @@ const RacePage = lazy(() => import("./app/race/[id]/page"));
 const HeatPage = lazy(() => import("./app/race/[id]/heat/[heatId]/page"));
 const StandingPage = lazy(() => import("./app/race/[id]/standing/[heatId]/page"));
 const ResultsPage = lazy(() => import("./app/race/[id]/results/ResultsPage"));
+// Loaded on demand like the routes, so the IndexedDB helper stays out of the
+// eager bundle. It reads the shared DB-health flag set by initIndexedDB().
+const DbUpdateNotice = lazy(() =>
+  import("./app/components/pwa/DbUpdateNotice").then((m) => ({ default: m.DbUpdateNotice }))
+);
 
 export default function App() {
   // Restore Supabase session + start the offline->online flush listener. Both
@@ -76,6 +81,9 @@ export default function App() {
       </Suspense>
       <InstallPrompt />
       <UpdatePrompt />
+      <Suspense fallback={null}>
+        <DbUpdateNotice />
+      </Suspense>
     </>
   );
 }

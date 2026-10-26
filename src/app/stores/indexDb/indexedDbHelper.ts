@@ -22,39 +22,53 @@ function createStores(db: IDBPDatabase) {
   }
 }
 
-async function deleteAndRecreate(): Promise<IDBPDatabase> {
-  await new Promise<void>((resolve, reject) => {
-    const del = indexedDB.deleteDatabase(DB_NAME);
-    del.onerror = () => reject(del.error);
-    del.onsuccess = () => resolve();
-    del.onblocked = () => resolve(); // proceed even if another tab holds it
-  });
-  return openDB(DB_NAME, DB_VERSION, { upgrade: createStores });
+/**
+ * Health of the local database as seen by this app version.
+ * "needs-update" = the saved database is newer than this app and is missing a
+ * store this version expects, or could not be opened. Data is never deleted in
+ * that case; the user is asked to update the app (see DbUpdateNotice).
+ */
+export type DbHealth = "ok" | "needs-update";
+
+let dbHealth: DbHealth = "ok";
+const dbHealthListeners = new Set<() => void>();
+
+export const getDbHealth = (): DbHealth => dbHealth;
+
+export const subscribeDbHealth = (listener: () => void): (() => void) => {
+  dbHealthListeners.add(listener);
+  return () => {
+    dbHealthListeners.delete(listener);
+  };
+};
+
+function markDbNeedsUpdate() {
+  if (dbHealth === "needs-update") return;
+  dbHealth = "needs-update";
+  dbHealthListeners.forEach((listener) => listener());
 }
 
 export const initIndexedDB = async (): Promise<IDBPDatabase> => {
   try {
     return await openDB(DB_NAME, DB_VERSION, { upgrade: createStores });
   } catch (err: any) {
-    if (err?.name === "VersionError") {
-      // The stored DB is NEWER than this bundle — happens when an older cached
-      // build loads after a newer deploy. Preferred recovery: open at whatever
-      // version already exists on disk, preserving all data (BUG-02 — never wipe
-      // silently). BUT only if that DB actually has every store the app needs; a
-      // partially-migrated DB with a missing store would make reads return
-      // nothing ("no riders"). If it's incomplete or won't open, fall back to a
-      // clean rebuild so the app is always usable.
-      try {
-        const existing = await openDB(DB_NAME);
-        const hasAll = REQUIRED_STORES.every((s) => existing.objectStoreNames.contains(s));
-        if (hasAll) return existing;
-        existing.close();
-      } catch {
-        /* fall through to rebuild */
-      }
-      return deleteAndRecreate();
+    if (err?.name !== "VersionError") throw err;
+    // The stored DB is NEWER than this bundle — happens when an older cached
+    // build loads after a newer deploy. Open it at whatever version is on disk
+    // and keep every byte of race data (BUG-02; AGENTS.md policy: never delete or
+    // reset a database holding race data as a recovery mechanism). If it lacks a
+    // store this version expects, reads from that store fail (callers already
+    // treat that as empty) and the user is asked to update the app.
+    let existing: IDBPDatabase;
+    try {
+      existing = await openDB(DB_NAME);
+    } catch (openErr) {
+      markDbNeedsUpdate();
+      throw openErr;
     }
-    throw err;
+    const hasAll = REQUIRED_STORES.every((s) => existing.objectStoreNames.contains(s));
+    if (!hasAll) markDbNeedsUpdate();
+    return existing;
   }
 };
 // Fetch all races from IndexedDB
