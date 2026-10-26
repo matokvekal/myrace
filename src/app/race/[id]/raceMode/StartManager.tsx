@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { Plus, Edit2, GripVertical, X, Trash2, AlertTriangle, Play, Pause, Flag, ChevronUp, ChevronDown } from "lucide-react";
 import { riderInCategory } from "../schedule/Schedule";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
+import { isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 
 interface Props {
   raceUuid: string;
@@ -574,6 +575,14 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       setStartError(errors);
       return;
     }
+    // Shared race: one WaveStarted for this start group (the server stamps the start time).
+    const groupCats = group.categoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) as CategoryProps[];
+    const startPayload = {
+      heat: groupCats[0]?.heat ?? Number(waveNum),
+      categoryUuids: groupCats.filter((c) => c.status === "upcoming" && c.uuid).map((c) => c.uuid!),
+    };
+    if (!liveAllows(raceUuid, "WaveStarted", startPayload)) return;
+    if (isLiveRace(raceUuid) && startPayload.categoryUuids.length) void liveDispatch(raceUuid, "WaveStarted", startPayload);
 
     const now = new Date().toLocaleTimeString("en-GB", {
       hour: "2-digit",
@@ -701,6 +710,11 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       .map((id) => categories.find((c) => c.id === id))
       .filter(Boolean) as CategoryProps[];
 
+    if (isLiveRace(raceUuid)) {
+      const running = cats.filter((c) => c.status === "running" && c.uuid);
+      if (running.some((c) => !liveAllows(raceUuid, "CategoryFinished", { categoryUuid: c.uuid! }))) return;
+      for (const c of running) void liveDispatch(raceUuid, "CategoryFinished", { categoryUuid: c.uuid! });
+    }
     for (const cat of cats) {
       // Never-started categories have nothing to finalize.
       if (cat.status === "upcoming") continue;
@@ -722,6 +736,8 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
    */
   const finishCategory = async (cat: CategoryProps) => {
     if (cat.status !== "running") return;
+    if (cat.uuid && !liveAllows(raceUuid, "CategoryFinished", { categoryUuid: cat.uuid })) return;
+    if (isLiveRace(raceUuid) && cat.uuid) void liveDispatch(raceUuid, "CategoryFinished", { categoryUuid: cat.uuid });
     const now = new Date();
     await updateCategory({ ...cat, status: "finished" as const, finishedAt: now.getTime() });
     const updatedRiders = closeOutCategoryRiders(cat, now);
@@ -732,6 +748,9 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
   // finalized in the DB, and never-started categories are marked finished so
   // the wave signs off as done (no new start groups can be added afterwards).
   const finishWave = async () => {
+    const heat = Number(waveNum);
+    if (!liveAllows(raceUuid, "WaveFinished", { heat })) return;
+    if (isLiveRace(raceUuid)) void liveDispatch(raceUuid, "WaveFinished", { heat });
     const now = new Date();
     setCountdown(null);
 

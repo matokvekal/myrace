@@ -27,6 +27,7 @@ import {
   type FinalizationCheck,
 } from "@/utils/raceSignature";
 import { toast } from "react-toastify";
+import { isLiveRace } from "@/services/live/liveBridge";
 
 interface Props {
   race: RaceProps;
@@ -85,7 +86,8 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   );
 
   useEffect(() => {
-    if (!finalized) { setFinalCheck(null); return; }
+    // A shared race's official result is keyed by rider uuid and signed by the server.
+    if (!finalized || isLiveRace(race.uuid)) { setFinalCheck(null); return; }
     let cancelled = false;
     verifyRaceFinalization(finalized, raceRiders)
       .then((result) => { if (!cancelled) setFinalCheck(result); })
@@ -96,6 +98,18 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   }, [finalized, storedDigest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFinishRace = async () => {
+    if (isLiveRace(race.uuid)) {
+      // Shared race: the server closes every wave, computes and signs the official result.
+      try {
+        const { finalizeShared } = await import("@/services/live/liveClient");
+        const n = await finalizeShared(race.uuid);
+        setShowFinishRace(false);
+        toast.success(`Race finished — ${n} results are official (signed by the server).`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not finish the race");
+      }
+      return;
+    }
     const result = await finalizeRace(race, actingUser);
     AuditLogService.log({
       race,

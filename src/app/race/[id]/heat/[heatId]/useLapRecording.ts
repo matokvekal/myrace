@@ -9,6 +9,7 @@ import { logAnalyticsEvent } from "@/services/analytics/analyticsClient";
 import useRaceStore from "@/stores/racesStore";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 import { maxBoardHoldMs, normalizeBoardHoldMs } from "@/stores/boardHoldStore";
+import { isLiveRace, liveAllows, liveDispatch, newActionId } from "@/services/live/liveBridge";
 
 /**
  * The lap-recording core of the live heat screen (BUGS.md #29).
@@ -65,6 +66,8 @@ export interface RiderAction {
   source: "click" | "voice";
   categoryColor: string;
   statusChange?: "DNF" | "DSQ" | "DNS" | "FINISH";
+  /** Shared races: the AddLap / RiderFinished Action this entry sent (Undo targets it). */
+  liveActionId?: string;
 }
 
 interface Params {
@@ -269,6 +272,10 @@ export function useLapRecording({
       }
     }
 
+    // Shared race: the member's role and scope must allow this lap before anything changes.
+    if (!liveAllows(raceUuid, "AddLap", { riderUuid: rider.uuid ?? "" })) return;
+    const liveActionId = isLiveRace(raceUuid) && rider.uuid ? newActionId() : undefined;
+
     const lapsCounter = (rider.lapsCounter || 0) + 1;
     const raceStart = parseClockTime(rider.timeStartRace) ?? clickTime;
     const lastLapStart = rider.timeArrive ? new Date(rider.timeArrive) : raceStart;
@@ -300,12 +307,14 @@ export function useLapRecording({
       position_category: positionAtLap,
       lapsDetails: [
         ...(rider.lapsDetails ?? []),
-        { lap: lapsCounter, startTime: lastLapStart, endTime: clickTime, lapTime, position: positionAtLap, speed_kph },
+        { lap: lapsCounter, startTime: lastLapStart, endTime: clickTime, lapTime, position: positionAtLap, speed_kph, ...(liveActionId ? { actionId: liveActionId } : {}) },
       ],
     };
 
     const finalSorted = sorted.map((r) => (r.id === updatedRider.id ? updatedRider : r));
     lastActionRef.current = { riderId: rider.id, timestamp: now };
+    // Shared race: the lap goes to the outbox at the tap's time (a Joker keeps its captured time).
+    if (liveActionId) void liveDispatch(raceUuid, "AddLap", { riderUuid: rider.uuid! }, { actionId: liveActionId, atMs: clickTime.getTime() });
     updateRider(updatedRider);
     updateAllRiders(finalSorted);
     logAnalyticsEvent("lap_recorded", { source, race_uuid: raceUuid });
@@ -366,6 +375,7 @@ export function useLapRecording({
         timestamp: actionTimestamp,
         source,
         categoryColor: catColor,
+        liveActionId,
       },
       ...prev,
     ]);
@@ -443,6 +453,16 @@ export function useLapRecording({
     const snapshot = riderActions.find(
       (a) => a.prevRider && !a.statusChange && a.prevRider.id === rider.id && a.rider.lapsCounter === rider.lapsCounter
     );
+    if (isLiveRace(raceUuid)) {
+      // Shared race: undo exactly the last lap's AddLap (never "a lap"), whoever recorded it.
+      const target = rider.lapsDetails?.[rider.lapsDetails.length - 1]?.actionId ?? snapshot?.liveActionId;
+      if (!target) {
+        toast.info("This lap is still being synced — try again in a moment");
+        return false;
+      }
+      if (!liveAllows(raceUuid, "Undo", { targetActionId: target })) return false;
+      void liveDispatch(raceUuid, "Undo", { targetActionId: target });
+    }
     restoreFromSnapshot(rider, snapshot);
     return true;
   };
@@ -459,6 +479,10 @@ export function useLapRecording({
     // pre-finish snapshot, so every lap, time and position comes back untouched.
     if (action.statusChange === "FINISH") {
       if (!rider || !action.prevRider) return null;
+      if (isLiveRace(raceUuid)) {
+        if (!action.liveActionId || !liveAllows(raceUuid, "Undo", { targetActionId: action.liveActionId })) return null;
+        void liveDispatch(raceUuid, "Undo", { targetActionId: action.liveActionId });
+      }
       const restored = { ...action.prevRider };
       updateRider(restored);
       updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
@@ -504,6 +528,12 @@ export function useLapRecording({
     }
 
     if (!rider || rider.lapsCounter <= 0) return null;
+
+    if (isLiveRace(raceUuid)) {
+      const target = action.liveActionId ?? action.rider.lapsDetails?.[action.rider.lapsDetails.length - 1]?.actionId;
+      if (!target || !liveAllows(raceUuid, "Undo", { targetActionId: target })) return null;
+      void liveDispatch(raceUuid, "Undo", { targetActionId: target });
+    }
 
     dropPendingMove(rider.id);
 
@@ -587,6 +617,9 @@ export function useLapRecording({
       toast.warn("No permission to finish riders");
       return false;
     }
+    if (!liveAllows(raceUuid, "RiderFinished", { riderUuid: rider.uuid ?? "" })) return false;
+    const liveActionId = isLiveRace(raceUuid) && rider.uuid ? newActionId() : undefined;
+    if (liveActionId) void liveDispatch(raceUuid, "RiderFinished", { riderUuid: rider.uuid! }, { actionId: liveActionId });
     dropPendingMove(rider.id);
     const finishTime = new Date();
     const raceStart = parseClockTime(rider.timeStartRace) ?? finishTime;
@@ -633,6 +666,7 @@ export function useLapRecording({
         source: "click",
         categoryColor: getCatColor(rider),
         statusChange: "FINISH",
+        liveActionId,
       },
       ...prev,
     ]);
@@ -659,12 +693,19 @@ export function useLapRecording({
       toast.warn("No permission to finish riders");
       return false;
     }
+    let redoAction = action;
+    if (isLiveRace(raceUuid)) {
+      if (!action.rider.uuid || !liveAllows(raceUuid, "RiderFinished", { riderUuid: action.rider.uuid })) return false;
+      const liveActionId = newActionId();
+      void liveDispatch(raceUuid, "RiderFinished", { riderUuid: action.rider.uuid }, { actionId: liveActionId });
+      redoAction = { ...action, liveActionId };
+    }
     dropPendingMove(action.rider.id);
     const restored = { ...action.rider };
     updateRider(restored);
     updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
     setUndoneFinishes(undoneFinishes.filter((u) => u.id !== actionId));
-    setRiderActions((prev) => [{ ...action, rider: restored, timestamp: Date.now() }, ...prev.filter((a) => a.id !== actionId)]);
+    setRiderActions((prev) => [{ ...redoAction, rider: restored, timestamp: Date.now() }, ...prev.filter((a) => a.id !== actionId)]);
     void recordRaceEvent({
       raceUuid, riderId: restored.id, bibNumber: restored.bibNumber, eventType: "RIDER_EDITED",
       lapNumber: restored.lapsCounter,

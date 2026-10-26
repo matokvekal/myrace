@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import styles from "./main.module.css";
@@ -22,6 +22,9 @@ import {
   Plus,
   Search
 } from "lucide-react";
+// Multi-user (only with a configured server): My shared races and invitations.
+const SharedRacesSection = lazy(() => import("../live/SharedRacesSection"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 type SortKey = "date" | "name" | "status";
 const SORT_CYCLE: SortKey[] = ["date", "name", "status"];
@@ -44,6 +47,10 @@ const parseRaceDate = (d: string | null | undefined): number => {
 const HOME_ROW_LIMIT = 10;
 
 const MainPage = () => {
+  // Back on the race list: leave the open shared race's live room (its queue keeps syncing).
+  useEffect(() => {
+    if (serverConfigured) void import("@/services/live/liveClient").then((m) => m.openLiveRace(null));
+  }, []);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [addNewRace, setAddNewRace] = useState(false);
@@ -145,6 +152,13 @@ const MainPage = () => {
   return (
     <div className={styles.main}>
       <HeaderMain />
+      {serverConfigured && (
+        <Suspense fallback={null}>
+          <div style={{ padding: "8px 16px 0" }}>
+            <SharedRacesSection />
+          </div>
+        </Suspense>
+      )}
 
       {isEmpty ? (
         <>

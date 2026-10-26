@@ -261,21 +261,8 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
       return;
     }
 
-    // Remove from store and IndexedDB
-    const updatedCategories = categories.filter((c) => c.id !== category.id);
-    useCategoryStore.setState({ categories: updatedCategories });
-
-    try {
-      const { initIndexedDB } =
-        await import("@/stores/indexDb/indexedDbHelper");
-      const db = await initIndexedDB();
-      const tx = db.transaction("categories", "readwrite");
-      await tx.objectStore("categories").delete(category.id);
-      await tx.done;
-      db.close();
-    } catch (error) {
-      console.error("Error deleting category from IDB:", error);
-    }
+    // Through the store, so the finalized lock and shared races (CategoryDeleted) apply.
+    await useCategoryStore.getState().deleteCategory(category.id);
 
     if (race) {
       AuditLogService.log({

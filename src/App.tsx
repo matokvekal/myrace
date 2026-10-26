@@ -32,8 +32,19 @@ const DbUpdateNotice = lazy(() =>
 // The one toast host (Story 1.4). Loaded on demand so react-toastify and its CSS
 // stay out of the eager bundle; toasts are only raised from lazily loaded screens.
 const AppToasts = lazy(() => import("./app/components/toast/AppToasts"));
+// Multi-user screens: only reachable when a Commissaire server is configured.
+const LiveAccountPage = lazy(() => import("./app/live/AccountPage"));
+const LiveInvitePage = lazy(() => import("./app/live/InvitePage"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 export default function App() {
+  // Shared races (multi-user): the live client loads only when VITE_SERVER_URL is
+  // set, so local-only use downloads none of it (AD-2).
+  useEffect(() => {
+    if (!serverConfigured) return;
+    void import("./app/services/live/liveClient").then((m) => m.startLive());
+  }, []);
+
   // Restore Supabase session + start the offline->online flush listener. Both
   // are no-ops when cloud is not configured, and the whole cloud module (incl.
   // the Supabase SDK) is dynamically imported so it stays out of the initial
@@ -79,6 +90,8 @@ export default function App() {
           <Route path="/race/:id/heat/:heatId" element={<HeatPage />} />
           <Route path="/race/:id/standing/:heatId" element={<StandingPage />} />
           <Route path="/race/:id/results" element={<ResultsPage />} />
+          {serverConfigured && <Route path="/account" element={<LiveAccountPage />} />}
+          {serverConfigured && <Route path="/invite/:token" element={<LiveInvitePage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

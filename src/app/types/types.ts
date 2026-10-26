@@ -161,6 +161,8 @@ export interface RaceFinalization {
 
 export interface CategoryProps {
   id: number;
+  /** Shared races only: the category's id on the server (same on every Device). */
+  uuid?: string;
   raceUuid: string;
   name: string;
   subCategory?: string | null;  // Optional sub-category (e.g., age groups: "19-29", "30-39")
@@ -191,6 +193,8 @@ export interface CategoryTemplate {
 }
 
 export interface RiderProps {
+  /** Shared races only: the rider's id on the server (same on every Device). */
+  uuid?: string;
   bibNumber: number;
   category: string;
   subCategory?: string | null;  // Optional sub-category
@@ -205,7 +209,8 @@ export interface RiderProps {
   flag: string | null;
   id: number;
   lapsCounter: number | 0;
-  lapsDetails: Array<{ lap: number; startTime: Date; endTime: Date; lapTime: string; position?: number; speed_kph?: number }>;
+  /** `actionId`: shared races only — the AddLap that recorded the lap (Undo targets it). */
+  lapsDetails: Array<{ lap: number; startTime: Date; endTime: Date; lapTime: string; position?: number; speed_kph?: number; actionId?: string }>;
   lastName: string;
   position_start: number | null;
   position_category: number;

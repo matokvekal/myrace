@@ -25,6 +25,11 @@ import { DEMO_RACE_UUID, DEMO_LIVE_ONBOARD_KEY } from "@/utils/demoSeed";
 import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { canForRace } from "@/services/cloud/permissions";
 import { isRaceFinalized } from "@/utils/raceLock";
+import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
+// Multi-user (only with a configured server): sharing, members, sync state.
+const TeamPanel = lazy(() => import("../../live/TeamPanel"));
+const SyncBadge = lazy(() => import("../../live/SyncBadge"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 const TABS = [
   "schedule",
@@ -33,7 +38,8 @@ const TABS = [
   "results",
   "map",
   // "cloud", // hidden for now
-  "info"
+  "info",
+  "team"
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -65,6 +71,14 @@ const Race: React.FC = () => {
   const isRaceMode = useUIStore((s) => s.isRaceMode);
   const setRaceMode = useUIStore((s) => s.setRaceMode);
   const { activeTab, setActiveTab } = useDataStore();
+  // Shared race: re-render when this member's access changes (screens appear/disappear at once).
+  const [, setAccessTick] = useState(0);
+  useEffect(() => {
+    const onAccess = () => setAccessTick((n) => n + 1);
+    window.addEventListener(LIVE_ACCESS_EVENT, onAccess);
+    return () => window.removeEventListener(LIVE_ACCESS_EVENT, onAccess);
+  }, []);
+  const live = isLiveRace(raceUuid);
 
   // no-op unless this race is cloud-linked and the user is logged in
   useCloudRaceSync(raceUuid);
@@ -122,7 +136,10 @@ const Race: React.FC = () => {
   if (loading) return <div className={styles.loading}>Loading race...</div>;
   if (!race) return <div className={styles.loading}>Race not found.</div>;
 
-  const visibleTabs: readonly Tab[] = finalized ? FINALIZED_TABS : TABS;
+  // Shared race: only the screens this member may view (team is always there to show your own access).
+  const visibleTabs: readonly Tab[] = (finalized ? [...FINALIZED_TABS, "team" as Tab] : TABS).filter(
+    (tab) => (tab === "team" ? serverConfigured : canViewScreen(raceUuid, tab))
+  );
   const activeTabSafe = (
     visibleTabs.includes(activeTab as Tab) ? activeTab : visibleTabs[0]
   ) as Tab;
@@ -168,6 +185,11 @@ const Race: React.FC = () => {
                 </span>
               </div>
             )}
+            {live && (
+              <Suspense fallback={null}>
+                <SyncBadge raceUuid={raceUuid} />
+              </Suspense>
+            )}
             <div className={styles.tabs}>
               {visibleTabs.map((tab) => (
                 <Button
@@ -212,6 +234,11 @@ const Race: React.FC = () => {
                   <Map raceUuid={raceUuid} />
                 </Suspense>
               )}
+              {activeTabSafe === "team" && (
+                <Suspense fallback={<Loader />}>
+                  <TeamPanel raceUuid={raceUuid} />
+                </Suspense>
+              )}
               {/* Cloud tab hidden for now */}
               {activeTabSafe === "info" && (
                 <Info
@@ -225,6 +252,18 @@ const Race: React.FC = () => {
                     // riders and categories from IndexedDB, and removing the
                     // race lifts the finalized lock so the Zustand-cache
                     // cleanup below isn't rejected for a finished race.
+                    if (isLiveRace(raceUuid)) {
+                      // Shared race: the owner deletes it for everyone; others just remove their copy.
+                      const live = await import("@/services/live/liveClient");
+                      if (live.accessFor(raceUuid)?.isOwner) {
+                        try {
+                          await live.team.deleteRace(raceUuid);
+                        } catch {
+                          /* offline or already gone: the local copy still goes */
+                        }
+                      }
+                      live.detachRace(raceUuid);
+                    }
                     await deleteRace(raceUuid);
                     await deleteRidersByRace(raceUuid);
                     // Back to the races list, NOT the marketing landing. /main

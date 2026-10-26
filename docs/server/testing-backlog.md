@@ -18,6 +18,20 @@ stabilization phase. Add to it whenever something is deferred.
 - Laps are re-derived per rider from that rider's marks; first-finish-all-finish
   across riders is re-derived for the group, up to three rounds per Action.
 
+- Client: a store write on a shared race shows locally a few ms before its
+  Action is in the IndexedDB outbox (the bridge enqueues asynchronously); the
+  lap screen writes its AddLap first. Tighten if a crash test shows a loss.
+- Client: screen names in the permission grid fall back to English keys
+  ("checkin") when the language is English; add English labels.
+- Client: hidden screens are enforced (tabs, race-mode sub-tabs, Live, and
+  store writes refused by the bridge); individual edit buttons are not yet
+  hidden one by one — a refused write shows a toast.
+- Client: `liveClient` applies server rows only for the race that is open;
+  other shared races catch up when opened.
+- A two-browser smoke (sign-up, share, invite link, accept, wave scope,
+  check-in A→B, lap B→A, start-wave denial, offline lap after reconnect) passed
+  against the local dev server; it is a scratch script, to become a Playwright spec.
+
 ## Deferred test cases
 
 Server (vitest + supertest against PGlite):

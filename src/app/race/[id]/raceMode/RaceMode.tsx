@@ -10,6 +10,7 @@ import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, getDefaultLiv
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
 import { Flag, Circle } from "lucide-react";
+import { canViewScreen } from "@/services/live/liveBridge";
 
 interface Props {
   raceUuid: string;
@@ -135,10 +136,10 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
 
       {/* Sub-tab bar */}
       <div className={styles.subTabs}>
-        <button className={`${styles.subTab} ${styles.tabGrid} ${subTab === "start" ? styles.subTabActive : ""}`} onClick={() => setSubTab("start")}>
+        {canViewScreen(raceUuid, "start") && <button className={`${styles.subTab} ${styles.tabGrid} ${subTab === "start" ? styles.subTabActive : ""}`} onClick={() => setSubTab("start")}>
           Grid
-        </button>
-        <button
+        </button>}
+        {canViewScreen(raceUuid, "checkin") && <button
           className={[
             styles.subTab,
             styles.tabCheckin,
@@ -148,24 +149,25 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           onClick={() => setSubTab("checkin")}
         >
           Check-In
-        </button>
-        <button className={`${styles.subTab} ${styles.tabBoard} ${subTab === "board" ? styles.subTabActive : ""}`} onClick={() => setSubTab("board")}>
+        </button>}
+        {canViewScreen(raceUuid, "board") && <button className={`${styles.subTab} ${styles.tabBoard} ${subTab === "board" ? styles.subTabActive : ""}`} onClick={() => setSubTab("board")}>
           Board
-        </button>
+        </button>}
         {/* Everyone in the wave with their current status (BUGS.md #24) */}
-        <button
+        {canViewScreen(raceUuid, "status") && <button
           className={`${styles.subTab} ${styles.tabStatus} ${subTab === "status" ? styles.subTabActive : ""}`}
           onClick={() => setSubTab("status")}
         >
           All Riders
-        </button>
+        </button>}
       </div>
 
       <div className={styles.content}>
-        {subTab === "start"   && <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
-        {subTab === "checkin" && <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} slots={schedule.get(selectedWave)} />}
-        {subTab === "board"   && <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={categories} />}
-        {subTab === "status"  && <WaveStatus raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
+        {!canViewScreen(raceUuid, subTab) && <p style={{ padding: 16 }}>Your role in this race does not include this screen.</p>}
+        {subTab === "start"   && canViewScreen(raceUuid, "start") && <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
+        {subTab === "checkin" && canViewScreen(raceUuid, "checkin") && <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} slots={schedule.get(selectedWave)} />}
+        {subTab === "board"   && canViewScreen(raceUuid, "board") && <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={categories} />}
+        {subTab === "status"  && canViewScreen(raceUuid, "status") && <WaveStatus raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
       </div>
     </div>
   );

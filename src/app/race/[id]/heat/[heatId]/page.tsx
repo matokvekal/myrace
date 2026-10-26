@@ -37,6 +37,7 @@ import { useJokerQueue, type JokerEntry } from "./useJokerQueue";
 import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
 import { Bike, List, ChevronDown } from "lucide-react";
+import { canViewScreen, isLiveRace } from "@/services/live/liveBridge";
 
 // Category identity is name + subCategory: the same name can exist in several
 // waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
@@ -112,6 +113,16 @@ const Heat: React.FC = () => {
   useEffect(() => {
     if (currentRace?.finalized) navigate(`/race/${raceUuid}`, { replace: true });
   }, [currentRace?.finalized, navigate, raceUuid]);
+
+  // Shared race: join its live room, and leave the screen if this member may not view Live.
+  useEffect(() => {
+    if (!isLiveRace(raceUuid)) return;
+    if (!canViewScreen(raceUuid, "live")) {
+      navigate(`/race/${raceUuid}`, { replace: true });
+      return;
+    }
+    void import("@/services/live/liveClient").then((m) => m.openLiveRace(raceUuid));
+  }, [raceUuid, navigate]);
 
   // treat race.distance as circuit km per lap (if set and reasonable)
   const circuitKm = currentRace?.distance && currentRace.distance > 0 ? currentRace.distance : null;

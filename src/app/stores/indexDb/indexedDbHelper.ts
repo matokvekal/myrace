@@ -4,10 +4,10 @@ import { Role, User } from "@/types/rbac.types";
 import type { RaceEvent, SyncStatus } from "@/types/cloud.types";
 
 const DB_NAME = "commissireDb";
-const DB_VERSION = 9; // v9: race_events store for cloud sync
+const DB_VERSION = 10; // v10: live_outbox for shared (multi-user) races
 
 // Every store the app reads/writes. Used to sanity-check a recovered DB.
-const REQUIRED_STORES = ["riders", "categories", "races", "roles", "users", "race_events"];
+const REQUIRED_STORES = ["riders", "categories", "races", "roles", "users", "race_events", "live_outbox"];
 
 function createStores(db: IDBPDatabase) {
   if (!db.objectStoreNames.contains("riders")) db.createObjectStore("riders", { keyPath: "id" });
@@ -19,6 +19,12 @@ function createStores(db: IDBPDatabase) {
     const store = db.createObjectStore("race_events", { keyPath: "id" });
     store.createIndex("byRace", "raceId");
     store.createIndex("bySyncStatus", "syncStatus");
+  }
+  // Shared races: Actions written here BEFORE the UI shows them, removed once
+  // the server acknowledges them (AD-4). Each entry keeps its race (AD-20).
+  if (!db.objectStoreNames.contains("live_outbox")) {
+    const store = db.createObjectStore("live_outbox", { keyPath: "actionId" });
+    store.createIndex("byRace", "localRaceUuid");
   }
 }
 
