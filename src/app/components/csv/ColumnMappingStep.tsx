@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { ColumnMapping, RiderFieldKey, MappingTemplate } from "@/types/csv.types";
-import { FIELD_KEYWORDS, IGNORED_FIELDS } from "@/types/csv.types";
+import { FIELD_KEYWORDS, IGNORED_FIELDS, isIdColumnHeader } from "@/types/csv.types";
 import {
   getColumnSuggestions,
   confirmMapping,
@@ -185,7 +185,6 @@ export default function ColumnMappingStep({
     uciPoints: "UCI Points",
     federation: "Federation",
     uciNumber: "UCI Number",
-    idNumber: "ID Number",
     birthDate: "Birth Date",
     federationNumber: "Federation Number",
     federationChip: "Federation Chip",
@@ -367,6 +366,12 @@ export default function ColumnMappingStep({
             <div className={styles.colArrow}>→</div>
 
             <div className={styles.colField} data-label="App Field">
+              {isIdColumnHeader(mapping.sourceColumn) ? (
+                <div className={styles.fieldHint} data-testid="id-column-skipped" dir="auto">
+                  Not imported — ID and passport numbers are never stored.
+                </div>
+              ) : (
+              <>
               <select
                 value={mapping.targetField || ""}
                 onChange={(e) =>
@@ -407,6 +412,8 @@ export default function ColumnMappingStep({
                     Unique
                   </label>
                 </div>
+              )}
+              </>
               )}
             </div>
 

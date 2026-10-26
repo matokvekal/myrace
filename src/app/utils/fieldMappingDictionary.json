@@ -272,22 +272,6 @@
     "קוד UCI",
     "ID UCI"
   ],
-  "id_number": [
-    "id",
-    "id number",
-    "id no",
-    "passport",
-    "passport number",
-    "identity",
-    "identity number",
-    "personal id",
-    "ת\"ז",
-    "תז",
-    "ת\"ז/דרכון",
-    "דרכון",
-    "מספר זהות",
-    "מספר תעודה"
-  ],
   "birth_date": [
     "birth date",
     "date of birth",

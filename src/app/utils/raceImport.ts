@@ -3,6 +3,7 @@ import type { CategoryProps, RiderProps, RaceFinalization, RaceTrack, TrackMarke
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { riderInCategory, catWaveKey } from "../race/[id]/schedule/Schedule";
 import { verifyExportToken } from "./raceSignature";
+import { withoutIdFields } from "@/types/csv.types";
 
 export interface ImportResult {
   raceUuid: string;
@@ -128,7 +129,7 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     try {
       if (row.extraFields) {
         const parsed = JSON.parse(row.extraFields);
-        if (parsed && typeof parsed === "object") extraFields = parsed;
+        if (parsed && typeof parsed === "object") extraFields = withoutIdFields(parsed);
       }
     } catch { extraFields = undefined; }
 

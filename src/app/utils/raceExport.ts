@@ -21,6 +21,7 @@ export {
 };
 export type { ExportSignature };
 import { getRaceTracks } from "@/utils/raceTracks";
+import { withoutIdFields } from "@/types/csv.types";
 
 function safeStr(v: unknown): string {
   if (v == null) return "";
@@ -205,6 +206,8 @@ export async function exportRaceToXlsx(
     ...riders.map((r) =>
       riderHeaders.map((h) => {
         if (h === "lapsDetails") return JSON.stringify(r.lapsDetails ?? []);
+        // ID / passport numbers never leave the device (PRD FR-45).
+        if (h === "extraFields") return safeStr(withoutIdFields(r.extraFields));
         return safeStr(r[h as keyof RiderProps]);
       })
     )

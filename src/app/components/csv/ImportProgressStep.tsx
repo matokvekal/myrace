@@ -42,7 +42,6 @@ const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
   uciPoints: "UCI Points",
   federation: "Federation",
   uciNumber: "UCI #",
-  idNumber: "ID #",
   birthDate: "Birth Date",
   federationNumber: "Federation #",
   federationChip: "Federation Chip",

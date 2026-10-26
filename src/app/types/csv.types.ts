@@ -54,7 +54,6 @@ export type RiderFieldKey =
    | 'uciPoints'
    | 'federation'
    | 'uciNumber'
-   | 'idNumber'
    | 'birthDate'
    | 'federationNumber'
    | 'federationChip'
@@ -440,6 +439,45 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
  * category column. It is simply never written onto the rider.
  */
 export const IGNORED_FIELDS = new Set<RiderFieldKey>(['subCategory']);
+
+/**
+ * Columns that hold government identity numbers (national ID / passport).
+ *
+ * Commissaire never collects, stores, synchronizes or exports these (PRD FR-45,
+ * AGENTS.md privacy policy). A start list may still contain such a column: the
+ * import succeeds and the column is skipped — never auto-mapped, never storable
+ * by a manual mapping, never kept as "info". This is the ONE shared list.
+ */
+export const ID_COLUMN_HEADERS = new Set<string>([
+   'id', 'id number', 'id no', 'id no.', 'id #', 'national id', 'personal id',
+   'identity', 'identity number', 'passport', 'passport number', 'passport no',
+   'תז', 'ת"ז', 'ת.ז', 'ת.ז.', 'תעודת זהות', 'מספר זהות', 'מספר תעודה',
+   'זהות', 'דרכון', 'מספר דרכון', 'תז/דרכון', 'ת"ז/דרכון', 'ת.ז/דרכון'
+]);
+
+const normalizeIdHeader = (header: string) =>
+   header.trim().toLowerCase().replace(/[״׳]/g, '"').replace(/\s+/g, ' ');
+
+/** True when a column header names a national ID / passport number column. */
+export function isIdColumnHeader(header: string): boolean {
+   const h = normalizeIdHeader(header);
+   if (ID_COLUMN_HEADERS.has(h)) return true;
+   // Same header written without quote marks ("תז/דרכון", "ID Number").
+   return ID_COLUMN_HEADERS.has(h.replace(/["']/g, ''));
+}
+
+/**
+ * A rider's reference columns with any ID / passport entry removed. Races
+ * imported before FR-45 may still hold one (e.g. "ID Number") — it is left in
+ * the local store untouched (D-14) but never leaves the device in an export.
+ */
+export function withoutIdFields(
+   extra: Record<string, string> | undefined
+): Record<string, string> | undefined {
+   if (!extra) return extra;
+   const kept = Object.fromEntries(Object.entries(extra).filter(([label]) => !isIdColumnHeader(label)));
+   return Object.keys(kept).length > 0 ? kept : undefined;
+}
 
 /**
  * Aliases that name a rider field only weakly — they are just as likely to head
