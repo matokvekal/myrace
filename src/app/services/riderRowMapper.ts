@@ -1,4 +1,5 @@
 import type { ColumnMapping } from "@/types/csv.types";
+import { isIdColumnHeader } from "@/types/csv.types";
 import type { RiderProps } from "@/types/types";
 import { splitFullName } from "@/services/csvMapper";
 import useClubDictionaryStore from "@/stores/clubDictionaryStore";
@@ -26,6 +27,9 @@ export function rowToRider(
 
   mappings.forEach((mapping, colIdx) => {
     if (!mapping.targetField) return;
+    // National ID / passport values are never stored, whatever the column was
+    // mapped to — including a saved template or a manual "Keep as info" (FR-45).
+    if (isIdColumnHeader(mapping.sourceColumn)) return;
     const value = row[colIdx]?.trim() || "";
 
     switch (mapping.targetField) {
@@ -114,9 +118,6 @@ export function rowToRider(
       case "uciNumber":
         data.uciNumber = value || null;
         break;
-      case "idNumber":
-        data.idNumber = value || null;
-        break;
       case "birthDate":
         data.birthDate = value || null;
         break;
@@ -148,7 +149,6 @@ export function rowToRider(
   const EXTRA_LABELS: Array<[string, string]> = [
     ["uciNumber", "UCI Number"],
     ["uciPoints", "UCI Points"],
-    ["idNumber", "ID Number"],
     ["birthDate", "Birth Date"],
     ["federationNumber", "Federation Number"],
     ["federationChip", "Federation Chip"],

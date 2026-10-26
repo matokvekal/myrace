@@ -16,7 +16,8 @@ import {
    FIELD_KEYWORDS,
    AMBIGUOUS_ALIASES,
    AMBIGUOUS_ALIAS_CAP,
-   SEED_ORDER_ALIASES
+   SEED_ORDER_ALIASES,
+   isIdColumnHeader
 } from '@/types/csv.types';
 import { fuzzyMatchScore, normalize, contains } from '@/utils/levenshtein';
 import { detectFieldForHeader } from '@/utils/csvFieldDetector';
@@ -277,6 +278,11 @@ export async function autoMapColumns(
 
    for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
+
+      // National ID / passport columns are never imported (PRD FR-45): no
+      // candidate at all, not even a learned mapping, so the column stays
+      // unmapped and can't steal another field by fuzzy match.
+      if (isIdColumnHeader(header)) continue;
 
       const memory = await getMappingFromMemory(header);
       if (memory) {
