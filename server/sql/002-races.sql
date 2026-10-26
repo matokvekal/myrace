@@ -67,6 +67,7 @@ CREATE TABLE categories (
   status          text CHECK (status IN ('upcoming', 'running', 'finished')),
   "linkedFinish"  boolean,
   "linkGroup"     text,
+  "startedAt"     bigint,                       -- epoch ms, server clock (WaveStarted)
   "finishedAt"    bigint,                       -- epoch ms, as in CategoryProps
   "importOrder"   integer,
   "changedSeq"    bigint NOT NULL DEFAULT 0,    -- seq that last changed this row (catch-up)

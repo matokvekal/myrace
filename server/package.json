@@ -1,0 +1,49 @@
+{
+  "name": "commissaire-live",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Commissaire multi-user race server (API + Socket.IO)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "db:dev": "tsx src/db/dev-db.ts",
+    "migrate": "tsx src/db/migrate.ts",
+    "build": "node build.mjs",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "google-auth-library": "^10.2.0",
+    "helmet": "^8.1.0",
+    "jose": "^6.0.12",
+    "nodemailer": "^7.0.5",
+    "pg": "^8.16.3",
+    "pino": "^9.7.0",
+    "pino-http": "^10.5.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.7",
+    "@electric-sql/pglite-socket": "^0.0.15",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.17.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.15.5",
+    "@types/qrcode": "^1.5.5",
+    "@types/supertest": "^6.0.3",
+    "esbuild": "^0.25.8",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.3",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

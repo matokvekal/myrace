@@ -76,7 +76,8 @@ export interface ActionPayloads {
   RiderFinished: { riderUuid: RiderUuid };
   LapCountCorrection: { riderUuid: RiderUuid; laps: number };
   StatusCorrection: { riderUuid: RiderUuid; status: StatusCorrectionValue };
-  WaveStarted: { heat: number };
+  /** Start a wave, or only some of its categories (a start group). */
+  WaveStarted: { heat: number; categoryUuids?: CategoryUuid[] };
   WaveFinished: { heat: number };
   CategoryFinished: { categoryUuid: CategoryUuid };
   CategoryAdded: { category: NewCategory };

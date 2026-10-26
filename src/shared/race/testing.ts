@@ -75,6 +75,7 @@ export const makeCategory = (over: Partial<SharedCategory> = {}): SharedCategory
   status: "upcoming",
   linkedFinish: null,
   linkGroup: null,
+  startedAt: null,
   finishedAt: null,
   importOrder: null,
   ...over,
