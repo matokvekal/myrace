@@ -10,7 +10,7 @@ import { openDB } from "idb";
  */
 
 const DB_NAME = "commissireDb";
-const ALL_STORES = ["riders", "categories", "races", "roles", "users", "race_events"];
+const ALL_STORES = ["riders", "categories", "races", "roles", "users", "race_events", "live_outbox"];
 
 async function seedNewerDb(stores: string[]) {
   const db = await openDB(DB_NAME, 99, {

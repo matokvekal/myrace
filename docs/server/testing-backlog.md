@@ -3,6 +3,22 @@
 Implementation runs first; this list is worked through in the final testing and
 stabilization phase. Add to it whenever something is deferred.
 
+## Testing phase results (2026-10-27)
+
+| Suite | Result |
+|---|---|
+| Server integration (vitest + supertest + socket.io-client, PGlite PostgreSQL 17) | 44/44 |
+| Shared model + engine unit tests | 91/91 |
+| App unit tests (incl. live laps + store bridge) | 354/354 |
+| Playwright, local-only app (CI mode) | 60/60 |
+| Playwright multi-user, two signed-in browsers (`MULTIUSER_E2E=1`) | 1/1 |
+
+Bugs found and fixed in this phase: refresh-token reuse revocation rolled back
+with its own error; clock offsets above 1 day refused instead of flagged;
+`server/src/config/env.ts` was never committed (root `.gitignore` ignores
+`env.ts`); the sync badge was missing on the Live screen; the measured clock
+offset was lost on reload.
+
 ## Known issues / decisions to confirm
 
 - Role defaults: start, counter and check-in see every screen except Team, so
@@ -11,6 +27,10 @@ stabilization phase. Add to it whenever something is deferred.
   defaults in `src/shared/race/access.ts`.
 - `src/app/race/[id]/raceMode/__tests__/CheckIn.test.tsx` "saves a new bib…"
   is flaky (about 1 run in 4, on main too): it reads "✓ Saved" synchronously.
+- Pre-existing, local app: `timeStartRace` is an "HH:MM:SS" clock string pinned
+  to today's date, so a wave started just before midnight shows "—" as a total
+  time after midnight (tests/waves-leaderboard.spec.ts failed once at 00:15).
+  Shared races also store the wave start as an instant (`categories.startedAt`).
 - PGlite's socket adapter serves one connection at a time, so local dev uses
   `DB_POOL_MAX=1`; concurrency is only exercised against real PostgreSQL.
 - `timeStartRace` on the server is the starting Device's local clock
