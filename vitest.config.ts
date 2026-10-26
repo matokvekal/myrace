@@ -18,6 +18,7 @@ export default defineConfig({
       reporter: ["text-summary", "json-summary", "html", "lcov"],
       include: [
         "src/app/utils/**",
+        "src/shared/**",
         "src/app/stores/**",
         "src/app/services/riderRowMapper.ts",
         "src/app/race/[[]id]/raceMode/**",

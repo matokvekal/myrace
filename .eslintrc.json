@@ -13,5 +13,23 @@
     "react-hooks/exhaustive-deps": "warn",
     "prefer-const": "warn",
     "no-empty": ["error", { "allowEmptyCatch": true }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/shared/**/*.ts"],
+      "excludedFiles": ["src/shared/**/__tests__/**", "src/shared/**/*.test.ts"],
+      "env": { "browser": false, "node": false, "es2022": true },
+      "rules": {
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["react", "react/*", "react-dom", "react-dom/*", "react-router*", "zustand", "zustand/*", "idb", "idb/*", "fake-indexeddb*", "react-toastify*", "i18next*", "react-i18next*", "xlsx", "leaflet*", "tesseract*", "@supabase/*", "socket.io*"],
+            "message": "src/shared/race is pure TypeScript: no React, IndexedDB, DOM or app libraries (Architecture AD-5)." },
+          { "group": ["node:*", "fs", "fs/*", "path", "os", "crypto", "http", "https", "url", "util", "events", "stream", "buffer", "child_process", "worker_threads", "process"],
+            "message": "src/shared/race must not use Node APIs; the client and the Server both import it." },
+          { "group": ["@/*", "../*", "*/app/*", "*/server/*"],
+            "message": "src/shared/race must not import app or server code; they import it, never the reverse." }
+        ] }],
+        "no-restricted-globals": ["error", "window", "document", "navigator", "localStorage", "sessionStorage", "indexedDB", "IDBKeyRange", "location", "fetch", "XMLHttpRequest", "WebSocket", "process", "Buffer", "require", "__dirname", "__filename", "setTimeout", "setInterval", "requestAnimationFrame", "crypto"]
+      }
+    }
+  ]
 }
