@@ -16,6 +16,8 @@ async function importAndSnapshot(page: Page, name: string, file: string) {
   await expect(page.getByText("Add Race", { exact: true })).toBeVisible();
   await page.getByPlaceholder("Race Name").fill(name);
   await page.locator("#ridersFileUpload").setInputFiles(file);
+  // The import preview must be confirmed before Done is enabled.
+  await page.getByTestId("import-preview-confirm").check();
   await page.getByRole("button", { name: /Done|Saving/ }).click();
 
   await expect(page.getByText(name).first()).toBeVisible();

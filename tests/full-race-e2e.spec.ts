@@ -219,6 +219,8 @@ test.describe("Full race day", () => {
       await page.getByPlaceholder("Race Name").fill(RACE_NAME);
       await page.getByPlaceholder("Location").fill("E2E Test Circuit");
       await page.locator("#ridersFileUpload").setInputFiles(CSV_FIXTURE);
+      // The import preview must be confirmed before Done is enabled.
+      await page.getByTestId("import-preview-confirm").check();
       await page.getByRole("button", { name: /Done|Saving/ }).click();
 
       // Back on the races list, with the new race on it.
