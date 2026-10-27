@@ -5,6 +5,9 @@ import useRaceStore from "@/stores/racesStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import CategoryManager from "../../components/categoryManager/CategoryManager";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import { riderDeletionBlock, riderLabel } from "@/utils/riderDeletion";
+import { toast } from "react-toastify";
 
 interface Props {
   raceUuid: string;
@@ -368,12 +371,23 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
     setImportPreview(null);
   };
 
-  const handleDelete = async (id: number) => {
-    if (deleteConfirm !== id) {
-      setDeleteConfirm(id);
+  // Delete → a confirmation dialog with the rider's name and bib; nothing changes
+  // until Confirm. Riders with race activity are refused (give them a status).
+  const askDelete = (rider: RiderProps) => {
+    const blocked = riderDeletionBlock(rider);
+    if (blocked) {
+      toast.warn(`${riderLabel(rider)} cannot be deleted: ${blocked}. Set a status (DNS/DNF/DSQ) instead.`);
       return;
     }
+    setDeleteConfirm(rider.id);
+  };
+
+  const handleDelete = async (id: number) => {
     const existing = raceRiders.find((r) => r.id === id);
+    if (existing && riderDeletionBlock(existing)) {
+      setDeleteConfirm(null);
+      return;
+    }
     await deleteRider(id);
     if (race && existing) {
       AuditLogService.log({
@@ -598,16 +612,31 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
                 ✎
               </button>
               <button
-                className={`${styles.deleteBtn} ${deleteConfirm === rider.id ? styles.deleteConfirming : ""}`}
-                onClick={() => handleDelete(rider.id)}
-                onBlur={() => setDeleteConfirm(null)}
+                className={styles.deleteBtn}
+                onClick={() => askDelete(rider)}
+                aria-label={`Delete ${riderLabel(rider)}`}
+                title="Delete rider"
               >
-                {deleteConfirm === rider.id ? "Sure?" : "✕"}
+                ✕
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      {deleteConfirm !== null && (() => {
+        const target = raceRiders.find((r) => r.id === deleteConfirm);
+        if (!target) return null;
+        return (
+          <DeleteConfirmModal
+            requireTyping={false}
+            title="Delete rider?"
+            description={`${riderLabel(target)} will be removed from this race. This cannot be undone.`}
+            onConfirm={() => handleDelete(target.id)}
+            onCancel={() => setDeleteConfirm(null)}
+          />
+        );
+      })()}
     </div>
   );
 };

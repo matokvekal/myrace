@@ -8,18 +8,21 @@ interface DeleteConfirmModalProps {
   description: string;
   onConfirm: () => Promise<void> | void;
   onCancel: () => void;
+  /** Ask the user to type DELETE (bulk deletes). Off: a plain Delete button, for one item. */
+  requireTyping?: boolean;
 }
 
 export default function DeleteConfirmModal({
   title,
   description,
   onConfirm,
-  onCancel
+  onCancel,
+  requireTyping = true
 }: DeleteConfirmModalProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isValid = input.toUpperCase() === "DELETE";
+  const isValid = !requireTyping || input.toUpperCase() === "DELETE";
 
   const handleConfirm = async () => {
     if (!isValid || loading) return;
@@ -33,11 +36,12 @@ export default function DeleteConfirmModal({
 
   return (
     <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className={styles.icon}>⚠️</div>
         <h3 className={styles.title}>{title}</h3>
         <p className={styles.description}>{description}</p>
 
+        {requireTyping && (
         <div className={styles.confirmGroup}>
           <label className={styles.label}>
             Type <strong>DELETE</strong> to confirm
@@ -52,6 +56,7 @@ export default function DeleteConfirmModal({
             autoFocus
           />
         </div>
+        )}
 
         <div className={styles.actions}>
           <button className={styles.cancelBtn} onClick={onCancel} disabled={loading}>
