@@ -101,3 +101,23 @@ Client and end-to-end (after client integration):
 - Offline: queue actions, reconnect, all applied once; switching races keeps
   each race's outbox and data separate.
 - Local-only races unchanged (local-race regression gate).
+
+## Future work
+
+### Socket.IO lifecycle when a race is closed (not started)
+
+Recorded 2026-10-27 for later development; nothing is implemented yet. "Closed"
+means finalized (Finish Race / official result) or deleted. Server:
+`server/src/realtime/socket.ts`; client: `src/app/services/live/`.
+
+When a race is closed:
+- Notify connected clients with a `race:closed` event (race uuid and reason:
+  finalized or deleted).
+- Remove every socket from that race's room.
+- Refuse new subscriptions to a closed race.
+- On reconnect, revalidate the race's status and the member's permissions
+  before rejoining its room; never rejoin from cached client state.
+- Remove the React socket listeners when the user leaves a race screen.
+- Disconnect a socket that has no active race subscriptions left (idle).
+- Keep historical results readable over REST (snapshot, results, official
+  versions); only live updates stop.
