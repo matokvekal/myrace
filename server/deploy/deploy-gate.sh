@@ -54,7 +54,9 @@ lock() {
 }
 
 # Target release id of a link (current/previous), or empty.
-link_target() { [[ -L "$BASE/$1" ]] && basename "$(readlink "$BASE/$1")" || true; }
+link_target() {
+  if [[ -L "$BASE/$1" ]]; then basename "$(readlink "$BASE/$1")"; fi
+}
 # Atomic: a new link is renamed over the old one (rename(2)).
 set_link() {
   ln -sfn "releases/$2" "$BASE/.$1.tmp"
@@ -82,8 +84,8 @@ schema_check() { # read-only; never migrates (dist/db/migrate-cli.js --check)
 }
 
 health() { # 30 s for {"ok":true,"release":<rev>}
-  local rev=$1 i
-  for i in $(seq 1 30); do
+  local rev=$1 _
+  for _ in $(seq 1 30); do
     if "$NODE_BIN" -e '
       fetch(process.argv[1]).then((r) => r.json())
         .then((j) => process.exit(j.ok === true && j.release === process.argv[2] ? 0 : 1))

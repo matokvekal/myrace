@@ -17,7 +17,7 @@ PIDS=()
 finish() {
   local p
   for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
-  [[ -f "$T/api.pid" ]] && kill "$(cat "$T/api.pid")" 2>/dev/null || true
+  if [[ -f "$T/api.pid" ]]; then kill "$(cat "$T/api.pid")" 2>/dev/null || true; fi
   chmod -R u+w "$T" 2>/dev/null || true
   rm -rf "$T"
 }
@@ -34,8 +34,8 @@ free_port() { node -e 'const s=require("net").createServer().listen(0,"127.0.0.1
 db() { # <full|recorded-only> → URL
   node --import tsx test/support/pg-server.ts "$1" < <(sleep 100000) > "$T/db-$1.out" 2>&1 &
   PIDS+=($!)
-  local i
-  for i in $(seq 1 60); do
+  local _
+  for _ in $(seq 1 60); do
     if grep -q '^PORT ' "$T/db-$1.out"; then echo "postgresql://postgres:postgres@127.0.0.1:$(awk '/^PORT /{print $2}' "$T/db-$1.out")/postgres"; return; fi
     sleep 0.5
   done
