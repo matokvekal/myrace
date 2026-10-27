@@ -29,8 +29,11 @@ describe("startup schema check", () => {
     expect(r.missingTables).toEqual(REQUIRED_TABLES.filter((t) => !["schema_migrations", "users", "user_identities", "sessions", "otp_codes"].includes(t)).sort());
     expect(r.foreignKeys).toBe(3); // 001's, before 006/008
 
-    // 008 repairs it.
+    // 008 repairs 001–007; 009 (run after it, as in production) adds its own table.
     await db.exec(sql("008-recover-missing-schema.sql"));
+    await db.exec(`BEGIN;
+${sql("009-waves-bibs-laps-preferences.sql")}
+COMMIT;`);
     expect(await checkSchema(db)).toEqual({ missingMigrations: [], missingTables: [], foreignKeys: 0 });
     await db.close();
   });

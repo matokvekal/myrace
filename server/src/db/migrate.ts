@@ -62,12 +62,13 @@ export async function missingMigrations(pool: Queryable): Promise<string[]> {
   return migrationFiles().filter((f) => !done.has(f.replace(/\.sql$/, "")));
 }
 
-/** Every table the API uses (001–005). schema_migrations alone is no proof: a file can be recorded without its tables. */
+/** Every table the API uses (001–005, 009). schema_migrations alone is no proof: a file can be recorded without its tables. */
 export const REQUIRED_TABLES = [
   "schema_migrations", "users", "user_identities", "sessions", "otp_codes",
   "races", "categories", "riders",
   "invitations", "race_members", "contact_groups", "contacts", "contact_group_members",
   "race_events", "race_snapshots", "sync_cursors", "official_versions",
+  "user_preferences", // 009
 ];
 
 /**

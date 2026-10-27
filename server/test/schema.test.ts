@@ -12,13 +12,13 @@ describe("schema", () => {
     const rows = await db.query<{ version: string }>(verify[0]);
     expect(rows.map((r) => r.version)).toEqual([
       "001-users-auth", "002-races", "003-members-invitations-contacts", "004-race-events", "005-official-results",
-      "006-remove-foreign-keys", "007-add-basic-indexes", "008-recover-missing-schema",
+      "006-remove-foreign-keys", "007-add-basic-indexes", "008-recover-missing-schema", "009-waves-bibs-laps-preferences",
     ]);
   });
 
   it("every table exists", async () => {
     const rows = await db.query<{ missing: boolean }>(verify[1]);
-    expect(rows).toHaveLength(17);
+    expect(rows).toHaveLength(18);
     expect(rows.every((r) => !r.missing)).toBe(true);
   });
 
