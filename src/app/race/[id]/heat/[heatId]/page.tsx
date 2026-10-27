@@ -18,7 +18,7 @@ import { minLapMsFor } from "@/utils/minLap";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
 import useUIStore from "@/stores/uiStore";
-import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
+import { computeGroupPhases, phaseOfRider, isLeaderFinishAll } from "@/utils/linkedGroups";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -224,27 +224,21 @@ const Heat: React.FC = () => {
     return `+${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
 
-  // A rider "still on the track": their category's race has ended but they
-  // haven't finished — the organizer must not lose sight of them.
-  // Also true once anyone in the rider's bell/finish group has taken the finish:
-  // the rest of the group finishes on their next crossing, however many laps
-  // they have left. Derived from rider state, so undoing the leader's finish
-  // restores everyone.
-  // Computed over the WHOLE race (every started category), not just this wave:
-  // an explicit Finish Group shares its bell and finish across waves.
-  const groupSignals = useMemo(() => {
+  // Bell / flag phases of each category or explicit Finish Group (shared with
+  // the server engine: shared/race/finishPhases). Computed over the WHOLE race
+  // (every started category), not just this wave, so a Finish Group spans
+  // waves. Derived from recorded crossings only: undo and reload just recompute.
+  const groupPhases = useMemo(() => {
     const started = categories.filter((c) => c.status === "running" || c.status === "finished");
     const raceRiders = riders.filter((r) => r.raceUuid === raceUuid && r.raceStatus !== "upcoming");
-    return computeGroupSignals(started, withCategoryLaps(raceRiders, categories), isLeaderFinishAll(currentRace));
+    return computeGroupPhases(started, withCategoryLaps(raceRiders, categories), isLeaderFinishAll(currentRace));
   }, [categories, riders, raceUuid, currentRace]);
-  const groupOf = (rider: RiderProps) => {
-    const cat = categories.find((c) => riderInCategory(rider, c));
-    return cat ? categoryGroupKey(cat) : null;
-  };
+  const phaseOf = (rider: RiderProps) => phaseOfRider(rider, categories, groupPhases);
+  // The next crossing finishes this rider: their category was ended (Finish
+  // Wave), or they show the FLAG (got the bell, or the group's first finish).
   const isOnTrackAfterEnd = (rider: RiderProps): boolean => {
     if (categories.find((c) => riderInCategory(rider, c))?.status === "finished") return true;
-    const g = groupOf(rider);
-    return g != null && rider.raceStatus !== "finished" && groupSignals.finish.has(g);
+    return rider.raceStatus !== "finished" && phaseOf(rider).nextCrossingFinishes;
   };
   // The ON TRACK badge / count: only once the rider's category was actually ended
   // (Finish Wave / Finish Race) and they are still out — never during normal
@@ -1184,8 +1178,7 @@ const Heat: React.FC = () => {
                   key={rider.id}
                   rider={rider}
                   color={getCatColor(rider)}
-                  forceBell={(() => { const g = groupOf(rider); return g != null && groupSignals.bell.has(g); })()}
-                  forceFinish={(() => { const g = groupOf(rider); return g != null && groupSignals.finish.has(g); })()}
+                  phase={phaseOf(rider)}
                   isFlashing={flashingRiderId === rider.id}
                   isRecorded={pendingMoveSet.has(rider.id)}
                   raceEnded={isLeftOnTrack(rider)}

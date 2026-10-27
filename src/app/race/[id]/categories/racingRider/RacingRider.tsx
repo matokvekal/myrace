@@ -5,14 +5,14 @@ import { RiderProps } from "@/types/types";
 import { formatTime, parseClockTimeMs } from "@/utils/timeUtils";
 import { useSkin } from "@/hooks/useSkin";
 import { Bell } from "lucide-react";
+import { toPhaseRider } from "@/utils/linkedGroups";
+import { riderPhase, NO_GROUP_PHASE, type RiderPhase } from "../../../../../shared/race/finishPhases";
 
 interface Props {
   rider: RiderProps;
   color: string;
-  /** Someone in this rider's bell group reached the bell lap — show the bell whatever the lap count. */
-  forceBell?: boolean;
-  /** Someone in the group finished — this rider's next crossing is their finish. */
-  forceFinish?: boolean;
+  /** Bell / flag phase from the category or Finish Group (shared/race/finishPhases). */
+  phase?: RiderPhase;
   isFlashing?: boolean;
   /**
    * Lap recorded, but the board hold is keeping the card in place until the
@@ -105,7 +105,7 @@ function roundedRectPathD(w: number, h: number, r: number): string {
 const PACE_RING_CARD_RADIUS = 12;
 const PACE_RING_INSET = 0;
 
-const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFinish = false, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick }) => {
+const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick }) => {
   const clickCountRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { skin } = useSkin();
@@ -139,14 +139,13 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
     [paceRingW, paceRingH, paceRingR]
   );
 
-  const lapsRemaining = rider.totalLaps - rider.lapsCounter;
-  // Bell = final lap: the rider's own, or the category / Finish Group's once its
-  // first rider started the final lap — and it stays through the finish phase
-  // until this rider's next crossing. The finish flag means only one thing:
-  // THIS rider has finished.
-  const hasFinished = rider.raceStatus === "finished";
-  const showBell = !hasFinished && (forceBell || forceFinish || (rider.totalLaps > 0 && lapsRemaining <= 1));
-  const showStripes = hasFinished;
+  // What the official shows this rider at their NEXT crossing: BELL (bell
+  // next), FLAG (finish next) — or Finished (their own finish is recorded).
+  // Laps to go follow the phase, not target − laps.
+  const phase = groupPhase ?? riderPhase(toPhaseRider(rider), NO_GROUP_PHASE);
+  const hasFinished = phase.icon === "finished";
+  const showBell = phase.icon === "bell";
+  const showStripes = phase.icon === "flag";
 
   // Live ticking clock: how long since this rider last crossed (or since race start if never).
   // Only ticks once the race has actually started — before that the card shows a frozen 00:00.
@@ -310,12 +309,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
         </div>
       )}
       {showBell && (
-        <div className={styles.bellBadge} data-testid="bell" title={forceFinish ? "Finishes at the next crossing" : `Final lap (${rider.lapsCounter}/${rider.totalLaps})`}>
+        <div className={styles.bellBadge} data-testid="bell" title={`Give the bell at the next crossing (${rider.lapsCounter}/${rider.totalLaps})`}>
           <Bell size={16} color="#ffd60a" fill="#ffd60a" />
         </div>
       )}
       {showStripes && (
-        <div className={styles.flagBadge} data-testid="finish-flag" title={`Finished (${rider.lapsCounter}/${rider.totalLaps})`}>
+        <div className={styles.flagBadge} data-testid="finish-flag" title={phase.finishPhase ? "Category finished: this rider finishes at the next crossing" : `Final lap: finish at the next crossing (${rider.lapsCounter}/${rider.totalLaps})`}>
           <div className={styles.flagCloth} />
           <div className={styles.flagPole} />
         </div>
@@ -330,7 +329,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
           {/* Category-wide signals override the rider's own count: once the
               leader is on the last lap everyone is, and once the leader has
               finished everyone finishes on the next crossing. */}
-          {hasFinished ? 'Finished' : forceFinish ? 'Finish' : showBell ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
+          {hasFinished ? 'Finished' : `${phase.remaining} left`}
         </div>
       )}
       {!hasStarted ? (

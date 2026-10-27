@@ -119,14 +119,16 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("redo-finish")).toHaveCount(0);
   });
 
-  test("Live: the leader's final lap rings the bell for the whole category; no finish flag before a finish", async ({ page }) => {
+  test("Live: the leader got the bell → leader FLAG (1 left), the rest of the category BELL (2 left)", async ({ page }) => {
     await openLiveDemo(page);
-    // The demo seeds Elite Men mid-race: leader on 6/7 with others further back —
-    // every Elite Men card shows the bell, and no racing card shows a finish flag.
-    const bells = page.locator('[data-testid^="racing-rider-"] [data-testid="bell"]');
-    await expect(bells.first()).toBeVisible();
+    // The demo seeds Elite Men mid-race: leader on 6/7 (got the bell) with others
+    // further back — the leader shows the FLAG, the others the BELL with 2 to go.
+    const flags = page.locator('[data-testid^="racing-rider-"]:has([data-testid="finish-flag"])');
+    await expect(flags.first()).toBeVisible();
+    await expect(flags.first()).toContainText("1 left");
+    const bells = page.locator('[data-testid^="racing-rider-"]:has([data-testid="bell"])');
     expect(await bells.count()).toBeGreaterThan(1);
-    await expect(page.locator('[data-testid^="racing-rider-"] [data-testid="finish-flag"]')).toHaveCount(0);
+    await expect(bells.first()).toContainText("2 left");
   });
 
   test("Results: one click from Live, grouped Wave → Category, Back returns to Live", async ({ page }) => {

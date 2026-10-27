@@ -111,6 +111,27 @@ describe("finish rules across riders", () => {
     expect(state.riders[m.uuid]).toMatchObject({ lapsCounter: 2, raceStatus: "finished" });
   });
 
+  it("server derives the 5-lap bell/flag example (112, 102, 107) like the live screen", () => {
+    const { state, riders } = race({ laps: 5, riders: 3 });
+    const [r112, r102, r107] = riders;
+    deriveRider(state, r107.uuid, [lap(T0 + 6 * MIN)]);
+    deriveRider(state, r102.uuid, [lap(T0 + 5 * MIN), lap(T0 + 11 * MIN)]);
+    // 112 gets the bell (lap 4) at 20 min.
+    deriveRider(state, r112.uuid, [lap(T0 + 5 * MIN), lap(T0 + 10 * MIN), lap(T0 + 15 * MIN), lap(T0 + 20 * MIN)]);
+    // 102 crosses after the bell: gets the bell, not a finish.
+    deriveRider(state, r102.uuid, [lap(T0 + 5 * MIN), lap(T0 + 11 * MIN), lap(T0 + 21 * MIN)]);
+    expect(state.riders[r102.uuid]).toMatchObject({ lapsCounter: 3, raceStatus: "running" });
+    // 112 finishes at 25 min (first finish).
+    deriveRider(state, r112.uuid, [lap(T0 + 5 * MIN), lap(T0 + 10 * MIN), lap(T0 + 15 * MIN), lap(T0 + 20 * MIN), lap(T0 + 25 * MIN)]);
+    expect(state.riders[r112.uuid]).toMatchObject({ lapsCounter: 5, raceStatus: "finished" });
+    // 107 never got the bell: still finishes at their next crossing, on their own 2 laps.
+    deriveRider(state, r107.uuid, [lap(T0 + 6 * MIN), lap(T0 + 26 * MIN)]);
+    expect(state.riders[r107.uuid]).toMatchObject({ lapsCounter: 2, raceStatus: "finished" });
+    // 102 (FLAG) finishes at their next crossing with 4 laps.
+    deriveRider(state, r102.uuid, [lap(T0 + 5 * MIN), lap(T0 + 11 * MIN), lap(T0 + 21 * MIN), lap(T0 + 27 * MIN)]);
+    expect(state.riders[r102.uuid]).toMatchObject({ lapsCounter: 4, raceStatus: "finished" });
+  });
+
   it("without a Finish Group, another category's finish never finishes a rider", () => {
     const a = makeCategory({ name: "Men L2", heat: 1, laps: 6, status: "running", startedAt: T0 });
     const b = makeCategory({ name: "Women L2", heat: 1, laps: 2, status: "running", startedAt: T0 });

@@ -23,6 +23,7 @@
 import type { RaceAction } from "./actions";
 import { RACE_INFO_FIELDS, RIDER_IDENTITY_FIELDS } from "./state";
 import type { CategoryUuid, LapDetail, RaceState, RiderUuid, SharedCategory, SharedRider } from "./state";
+import { crossingFinishes, groupPhase, NO_GROUP_PHASE, type GroupPhase, type PhaseRider } from "./finishPhases";
 
 /** The legacy minimum (60 s); a race's own is raceMinLapMs(state). */
 export const MIN_LAP_MS = 60_000;
@@ -74,24 +75,29 @@ export const effectiveTotalLaps = (c: SharedCategory | undefined, r: SharedRider
 
 const leaderFinishAll = (state: RaceState) => state.race.leaderFinishAll !== false;
 
-/** When the first rider of the group (category or Finish Group, any wave) completed every lap, or null. */
-export function groupFinishAt(state: RaceState, c: SharedCategory, except?: RiderUuid): number | null {
-  if (!leaderFinishAll(state)) return null;
+/** Bell / first-finish times of the group (category or Finish Group, any wave), from its riders but `except`. */
+export function groupPhaseOf(state: RaceState, c: SharedCategory, except?: RiderUuid): GroupPhase {
+  if (!leaderFinishAll(state)) return NO_GROUP_PHASE;
   const key = groupKey(c);
-  let first: number | null = null;
+  const riders: PhaseRider[] = [];
   for (const cat of Object.values(state.categories)) {
     if (groupKey(cat) !== key || isIgnored(cat)) continue;
     for (const r of ridersOfCategory(state, cat)) {
-      if (r.uuid === except || OUT.has(r.status)) continue;
-      const laps = effectiveTotalLaps(cat, r);
-      if (laps <= 0 || r.lapsCounter < laps || r.raceStatus !== "finished") continue;
-      const end = r.lapsDetails[laps - 1]?.endTime;
-      const t = end ? Date.parse(end) : NaN;
-      if (Number.isFinite(t) && (first === null || t < first)) first = t;
+      if (r.uuid === except) continue;
+      riders.push({
+        laps: effectiveTotalLaps(cat, r),
+        crossings: r.lapsDetails.slice(0, r.lapsCounter).map((l) => Date.parse(l.endTime)).filter((t) => Number.isFinite(t)).sort((a, b) => a - b),
+        finished: r.raceStatus === "finished",
+        out: OUT.has(r.status),
+      });
     }
   }
-  return first;
+  return groupPhase(riders);
 }
+
+/** When the group's first rider finished on the line, or null. */
+export const groupFinishAt = (state: RaceState, c: SharedCategory, except?: RiderUuid): number | null =>
+  groupPhaseOf(state, c, except).finishAt;
 
 // ---------------------------------------------------------------------------
 // Per-rider derivation
@@ -122,7 +128,9 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
   const totalLaps = effectiveTotalLaps(cat, r);
   const startMs = cat?.startedAt ?? null;
   const catFinishedAt = cat?.finishedAt ?? null;
-  const groupDoneAt = cat ? groupFinishAt(state, cat, r.uuid) : null;
+  // Bell / flag phases from the OTHER riders of the group (shared/race/finishPhases).
+  const others = cat ? groupPhaseOf(state, cat, r.uuid) : NO_GROUP_PHASE;
+  const me: PhaseRider = { laps: totalLaps, crossings: [], finished: false, out: OUT.has(r.status) };
 
   const minLap = raceMinLapMs(state);
   const sorted = marks.filter((m) => !m.undone).slice().sort((a, b) => a.at - b.at || a.seq - b.seq);
@@ -161,7 +169,8 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
     });
     lastArrive = m.at;
     if (!m.recovered) lastTapped = m.at;
-    if ((totalLaps > 0 && count >= totalLaps) || (catFinishedAt !== null && m.at >= catFinishedAt) || (groupDoneAt !== null && m.at > groupDoneAt)) {
+    const before = laps.slice(0, -1).map((l) => Date.parse(l.endTime));
+    if ((catFinishedAt !== null && m.at >= catFinishedAt) || crossingFinishes(me, before, m.at, others)) {
       finished = true;
     }
   }
