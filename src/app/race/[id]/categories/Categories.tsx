@@ -10,6 +10,7 @@ import useRaceStore from "@/stores/racesStore";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes, normalizeTime } from "../schedule/Schedule";
 import { getCategoryStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
+import { finishGroupLabel } from "@/utils/finishGroups";
 import { isLeaderFinishAll } from "@/utils/linkedGroups";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
@@ -672,7 +673,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                             >+</button>
                           </span>
                           {" · "}Wave {catWaveMap.get(catWaveKey(cat.name, cat.subCategory)) ?? cat.heat ?? 1} · {riderCount} riders
-                          {cat.linkGroup?.trim() && <span className={styles.linkedBadge}><Bell size={11} /> {cat.linkGroup.trim()}</span>}
+                          {cat.linkGroup?.trim() && <span className={styles.linkedBadge}><Bell size={11} /> {finishGroupLabel(cat.linkGroup)}</span>}
                         </div>
                       </div>
                     </div>

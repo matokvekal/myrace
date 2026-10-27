@@ -26,6 +26,7 @@ import useRaceStore from "@/stores/racesStore";
 import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
+import { finishGroupLabel, finishGroupOptions } from "@/utils/finishGroups";
 import { withStatus } from "@/utils/riderStatus";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 
@@ -307,6 +308,25 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     }
   };
 
+  // Finish Group = category.linkGroup (shared bell and finish, independent of the
+  // wave). "" = None. Same category write as colour and laps, so it syncs the
+  // same way. Fixed once the category has started.
+  const setFinishGroup = async (cat: CategoryProps, value: string) => {
+    if ((cat.status ?? "upcoming") !== "upcoming") return;
+    if ((cat.linkGroup?.trim() ?? "") === value) return;
+    await updateCategory({ ...cat, linkGroup: value });
+  };
+
+  const resetFinishGroups = async () => {
+    // From the store, not the prop: the latest assignments, including ones made a moment ago.
+    const assigned = useCategoryStore
+      .getState()
+      .categories.filter((c) => c.raceUuid === raceUuid && c.linkGroup?.trim() && (c.status ?? "upcoming") === "upcoming");
+    if (assigned.length === 0) return;
+    if (!window.confirm(`Clear the Finish Group of ${assigned.length} categor${assigned.length === 1 ? "y" : "ies"}? Each will get its own bell and finish.`)) return;
+    for (const cat of assigned) await updateCategory({ ...cat, linkGroup: "" });
+  };
+
   const toggleCat = (catId: number) => {
     setExpandedCats((prev) => {
       const next = new Set(prev);
@@ -567,14 +587,19 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
         {/* Category assignments */}
         <div className={styles.categoryAssignSection}>
           <div className={styles.sectionHeader}>
-            <span>Category → Wave</span>
-            <span className={styles.assignHint}>Choose a wave for each category</span>
+            <span>Category → Wave · Finish Group</span>
+            <span className={styles.assignHint}>Choose a wave for each category. Same Finish Group = shared bell and finish, in any wave.</span>
+            <Button variant="secondary" size="sm" data-testid="finish-group-reset-all" onClick={() => void resetFinishGroups()}>
+              Reset All
+            </Button>
           </div>
           {allEditCats.length === 0 ? (
             <div className={styles.emptyMessage}>No categories found. Import riders first.</div>
           ) : (
             allEditCats.map((cat) => {
               const currentWaveId = getCategoryWaveId(cat.id);
+              const fgValue = cat.linkGroup?.trim() ?? "";
+              const fgLocked = (cat.status ?? "upcoming") !== "upcoming";
               return (
                 <div key={cat.id} className={styles.categoryAssignRow}>
                   <div className={styles.colorDot} style={{ background: cat.color ?? "#ccc" }} />
@@ -592,6 +617,19 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                     <option value="">— Unassigned —</option>
                     {waves.map((w) => (
                       <option key={w.id} value={w.id}>Wave {w.number}  ·  {w.startTime}</option>
+                    ))}
+                  </select>
+                  <select
+                    className={styles.waveSelect}
+                    aria-label={`Finish Group for ${cat.name}`}
+                    data-testid={`finish-group-${cat.id}`}
+                    title={fgLocked ? "Fixed once the category has started" : "Categories in the same Finish Group share the bell and the finish"}
+                    value={fgValue}
+                    disabled={fgLocked}
+                    onChange={(e) => void setFinishGroup(cat, e.target.value)}
+                  >
+                    {finishGroupOptions(categories.filter((c) => c.raceUuid === raceUuid)).map((v) => (
+                      <option key={v} value={v}>{finishGroupLabel(v)}</option>
                     ))}
                   </select>
                 </div>

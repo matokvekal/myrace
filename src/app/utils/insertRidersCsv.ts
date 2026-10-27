@@ -3,7 +3,7 @@ import useRiderStore from "@/stores/ridersStore";
 import { RiderProps } from "@/types/types";
 import { RiderFieldKey } from "@/types/csv.types";
 import { autoMapColumns } from "@/services/csvMapper";
-import { rowToRider } from "@/services/riderRowMapper";
+import { buildHeatNameMap, filterImportRows, rowToRider } from "@/services/riderRowMapper";
 import Papa from "papaparse";
 
 /**
@@ -65,24 +65,22 @@ export const saveRidersFromRows = async (rows: string[][], raceUuid: string) => 
          );
       }
 
-      // Text heats ("Wave A") become numbers — same rule as the wizard.
-      const heatNameToNumber = new Map<string, number>();
-      const heatIdx = col.get("heat");
-      if (heatIdx != null) {
-         let next = 1;
-         for (const row of rows.slice(1)) {
-            const val = row[heatIdx]?.trim();
-            if (val && isNaN(Number(val)) && !heatNameToNumber.has(val)) {
-               heatNameToNumber.set(val, next++);
-            }
-         }
+      // Blank rows, repeated header rows and rows without a bib or a name never
+      // become riders — and never number a wave (a repeated header used to
+      // create a rider "שם פרטי שם משפחה" in an extra wave).
+      const { rows: dataRows, skipped } = filterImportRows(rows.slice(1), headers, mappings);
+      if (dataRows.length === 0) {
+         throw new Error("The file has no rider rows (only headers, blank or invalid rows).");
       }
+
+      // Text heats ("Wave A") become numbers — same rule as the wizard.
+      const heatNameToNumber = buildHeatNameMap(dataRows, mappings);
 
       // ONE shared row builder for both import paths (BUGS.md #20), so the same
       // file produces the same riders wherever it is dropped.
-      const riders: RiderProps[] = rows
-         .slice(1)
-         .map((row, index) => rowToRider(row, mappings, raceUuid, index, heatNameToNumber));
+      const riders: RiderProps[] = dataRows.map((row, index) =>
+         rowToRider(row, mappings, raceUuid, index, heatNameToNumber)
+      );
 
       // Save riders to IndexedDB
       const db = await initIndexedDB();
@@ -93,6 +91,8 @@ export const saveRidersFromRows = async (rows: string[][], raceUuid: string) => 
 
       const { insertRiders } = useRiderStore.getState();
       await insertRiders(riders);
+      if (skipped.length) console.warn(`Import: ${skipped.length} row(s) skipped`, skipped);
+      return { imported: riders.length, skipped };
    } catch (error) {
       if (error instanceof Error) {
          console.error("Error saving riders:", error.message);
