@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { RiderProps } from "@/types/types";
 import Images from "@/constants/Images";
 import useRiderStore from "@/stores/ridersStore";
@@ -16,6 +16,8 @@ interface Props {
   wave?: number | null;
   /** Open straight into edit mode. */
   startInEdit?: boolean;
+  /** Extra section below the rider information (Results: the lap-by-lap performance). */
+  children?: ReactNode;
 }
 
 const EDITABLE_STATUSES: { value: RiderProps["status"]; label: string }[] = [
@@ -37,7 +39,7 @@ const RACE_STATUS_LABEL: Record<string, string> = {
   finished: "Finished"
 };
 
-export default function RiderDetailModal({ rider, onClose, wave, startInEdit = false }: Props) {
+export default function RiderDetailModal({ rider, onClose, wave, startInEdit = false, children }: Props) {
   const [editMode, setEditMode] = useState(startInEdit);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<RiderProps["status"]>(rider.status);
@@ -335,6 +337,7 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
           )}
 
         </div>
+        {children}
       </div>
     </div>
   );

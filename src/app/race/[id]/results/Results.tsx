@@ -8,6 +8,7 @@ import { isAdministrativeFinish } from "@/utils/waveFinish";
 import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
+import RiderLapTable from "./RiderLapTable";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
 import { Trophy, SlidersHorizontal } from "lucide-react";
 import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
@@ -430,7 +431,10 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
       </div>
 
       {selectedRider && (
-        <RiderDetailModal rider={selectedRider} onClose={() => setSelectedRider(null)} />
+        <RiderDetailModal rider={selectedRider} onClose={() => setSelectedRider(null)}>
+          {/* Lap-by-lap performance below the rider's details; the latest rider data, laps resolved */}
+          <RiderLapTable rider={raceRiders.find((r) => r.id === selectedRider.id) ?? selectedRider} field={raceRiders} />
+        </RiderDetailModal>
       )}
 
       {groupBy === "wave"
