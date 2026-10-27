@@ -7,13 +7,18 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { authed, requireAuth } from "../auth/auth.js";
-import { db } from "../db/pool.js";
+import { db, tx } from "../db/pool.js";
 import { ApiError, normalizeEmail, route } from "../lib/core.js";
 
 export const directoryRouter = Router();
 directoryRouter.use(requireAuth);
 
 const contactBody = z.object({ name: z.string().trim().max(150).default(""), email: z.string().email().optional(), userId: z.string().uuid().optional() });
+
+/** A contact's account must exist (no foreign keys: checked here). */
+async function requireUser(userId: string | undefined) {
+  if (userId && !(await db.one(`SELECT 1 FROM users WHERE id = $1`, [userId]))) throw new ApiError(400, "invalid", "No such account");
+}
 
 const linkUser = async (email: string | undefined) =>
   email ? (await db.one<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [normalizeEmail(email)]))?.id ?? null : null;
@@ -32,6 +37,7 @@ directoryRouter.get("/contacts", route(async (req, res) => {
 directoryRouter.post("/contacts", route(async (req, res) => {
   const b = contactBody.parse(req.body);
   if (!b.email && !b.userId) throw new ApiError(400, "invalid", "A contact needs an email or an account");
+  await requireUser(b.userId);
   const email = b.email ? normalizeEmail(b.email) : null;
   const userId = b.userId ?? (await linkUser(email ?? undefined));
   const row = await db.one(
@@ -45,6 +51,7 @@ directoryRouter.post("/contacts", route(async (req, res) => {
 
 directoryRouter.patch("/contacts/:id", route(async (req, res) => {
   const b = contactBody.partial().parse(req.body);
+  await requireUser(b.userId);
   const email = b.email ? normalizeEmail(b.email) : undefined;
   const row = await db.one(
     `UPDATE contacts SET name = COALESCE($3, name), email = COALESCE($4, email),
@@ -56,8 +63,14 @@ directoryRouter.patch("/contacts/:id", route(async (req, res) => {
   res.json({ contact: row });
 }));
 
+/** Removes the contact and its group memberships (no database cascade), in one transaction. */
 directoryRouter.delete("/contacts/:id", route(async (req, res) => {
-  await db.query(`DELETE FROM contacts WHERE id = $1 AND "ownerUserId" = $2`, [String(req.params.id), authed(req).userId]);
+  await tx(async (d) => {
+    const c = await d.one(`SELECT 1 FROM contacts WHERE id = $1 AND "ownerUserId" = $2 FOR UPDATE`, [String(req.params.id), authed(req).userId]);
+    if (!c) return;
+    await d.query(`DELETE FROM contact_group_members WHERE "contactId" = $1`, [String(req.params.id)]);
+    await d.query(`DELETE FROM contacts WHERE id = $1`, [String(req.params.id)]);
+  });
   res.status(204).end();
 }));
 
@@ -87,21 +100,34 @@ directoryRouter.patch("/groups/:id", route(async (req, res) => {
   res.json({ group: row });
 }));
 
+/** Removes the group and its member rows (the contacts stay), in one transaction. */
 directoryRouter.delete("/groups/:id", route(async (req, res) => {
-  await db.query(`DELETE FROM contact_groups WHERE id = $1 AND "ownerUserId" = $2`, [String(req.params.id), authed(req).userId]);
+  await tx(async (d) => {
+    const g = await d.one(`SELECT 1 FROM contact_groups WHERE id = $1 AND "ownerUserId" = $2 FOR UPDATE`, [String(req.params.id), authed(req).userId]);
+    if (!g) return;
+    await d.query(`DELETE FROM contact_group_members WHERE "groupId" = $1`, [String(req.params.id)]);
+    await d.query(`DELETE FROM contact_groups WHERE id = $1`, [String(req.params.id)]);
+  });
   res.status(204).end();
 }));
 
 directoryRouter.put("/groups/:id/contacts", route(async (req, res) => {
   const { contactIds } = z.object({ contactIds: z.array(z.string().uuid()).max(1000) }).parse(req.body);
-  const g = await db.one(`SELECT 1 FROM contact_groups WHERE id = $1 AND "ownerUserId" = $2`, [String(req.params.id), authed(req).userId]);
-  if (!g) throw new ApiError(404, "not_found", "No such group");
-  await db.query(`DELETE FROM contact_group_members WHERE "groupId" = $1`, [String(req.params.id)]);
-  await db.query(
-    `INSERT INTO contact_group_members ("groupId", "contactId")
-     SELECT $1, c.id FROM contacts c WHERE c.id = ANY($2::uuid[]) AND c."ownerUserId" = $3`,
-    [String(req.params.id), contactIds, authed(req).userId],
-  );
+  // One transaction; the group and the chosen contacts are locked so a concurrent delete
+  // of either cannot leave member rows behind (no foreign keys). Only the owner's own contacts.
+  await tx(async (d) => {
+    const g = await d.one(`SELECT 1 FROM contact_groups WHERE id = $1 AND "ownerUserId" = $2 FOR UPDATE`, [String(req.params.id), authed(req).userId]);
+    if (!g) throw new ApiError(404, "not_found", "No such group");
+    const owned = await d.query<{ id: string }>(
+      `SELECT id FROM contacts WHERE id = ANY($1::uuid[]) AND "ownerUserId" = $2 FOR SHARE`,
+      [contactIds, authed(req).userId],
+    );
+    await d.query(`DELETE FROM contact_group_members WHERE "groupId" = $1`, [String(req.params.id)]);
+    await d.query(
+      `INSERT INTO contact_group_members ("groupId", "contactId") SELECT $1, unnest($2::uuid[])`,
+      [String(req.params.id), owned.map((c) => c.id)],
+    );
+  });
   res.status(204).end();
 }));
 

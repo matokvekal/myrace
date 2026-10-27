@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "db:dev": "tsx src/db/dev-db.ts",
-    "migrate": "tsx src/db/migrate.ts",
+    "migrate": "tsx src/db/migrate-cli.ts",
+    "check:schema": "node dist/db/migrate-cli.js --check",
     "build": "node build.mjs",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",

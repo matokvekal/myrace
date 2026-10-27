@@ -23,7 +23,8 @@ export function createApp() {
 
   app.get("/api/v1/health", async (_req, res) => {
     await db.one("SELECT 1");
-    res.json({ ok: true, time: Date.now() });
+    // release: the deployed commit (PM2 sets it from the release's REVISION); deployments check it.
+    res.json({ ok: true, time: Date.now(), release: process.env.COMMISSAIRE_RELEASE ?? "dev" });
   });
   // Clock alignment over HTTP (AD-9); the socket has a "time" event too.
   app.get("/api/v1/time", (_req, res) => res.json({ now: Date.now() }));

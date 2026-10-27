@@ -1,22 +1,24 @@
 import pg from "pg";
 import { env } from "../config/env.js";
 import { logger } from "../lib/core.js";
+import { databaseConnection, isLocal } from "./tls.js";
+
+export { isLocal };
 
 // bigint (seq, epoch ms) as JS numbers: they stay far below 2^53.
 pg.types.setTypeParser(20, (v: string) => Number(v));
 
-const isLocal = (url: string) => {
-  try {
-    return ["localhost", "127.0.0.1", "::1"].includes(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-};
+// A non-local database always uses verified TLS (src/db/tls.ts).
+const { connectionString, ssl } = databaseConnection(env.DATABASE_URL, {
+  caCert: env.DATABASE_CA_CERT,
+  caCertFile: env.DATABASE_CA_CERT_FILE,
+  servername: env.DATABASE_TLS_SERVERNAME,
+});
 
 export const pool = new pg.Pool({
-  connectionString: env.COMMISSAIRE_DATABASE_URL,
+  connectionString,
   options: "-c timezone=UTC",
-  ssl: isLocal(env.COMMISSAIRE_DATABASE_URL) ? false : { rejectUnauthorized: false },
+  ssl,
   max: Number(process.env.DB_POOL_MAX ?? 10),
 });
 pool.on("error", (err) => logger.error({ err }, "idle database client error"));
@@ -55,3 +57,6 @@ export async function tx<T>(fn: (t: Db) => Promise<T>): Promise<T> {
 }
 
 export const closePool = () => pool.end();
+
+/** The API may run migrations only on the local PGlite dev database: DEV_PGLITE=true and a loopback host. */
+export const autoMigrateAllowed = () => env.DEV_PGLITE && isLocal(env.DATABASE_URL);

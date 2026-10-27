@@ -27,7 +27,8 @@ export async function setup() {
   });
   server = new PGLiteSocketServer({ db, port, host: "127.0.0.1" });
   await server.start();
-  process.env.COMMISSAIRE_DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${port}/postgres`;
+  process.env.COMMISSAIRE_SKIP_DOTENV = "1"; // never read server/.env: tests use only this database
+  process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${port}/postgres`;
   process.env.DB_POOL_MAX = "1";
   process.env.NODE_ENV = "test";
   process.env.JWT_ACCESS_SECRET = "test-secret-test-secret-test-secret-123";

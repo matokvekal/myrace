@@ -3,7 +3,8 @@
  * compiled to WebAssembly) served on 127.0.0.1:5433 over the normal wire
  * protocol, data kept in server/.pgdata. Migrations run on start.
  *
- *   npm run db:dev   →  COMMISSAIRE_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5433/postgres
+ *   npm run db:dev   →  DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5433/postgres
+ *                       DEV_PGLITE=true   (lets the API migrate this database; never set it for any other)
  *
  * Development only; production uses the real commissaire_live database.
  */
@@ -37,3 +38,9 @@ const stop = async () => {
 };
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
+// A client that drops its connection (the API killed or restarted) must not stop the database.
+process.on("uncaughtException", (err) => {
+  if ((err as NodeJS.ErrnoException).code === "ECONNRESET") return void console.warn("A client connection was reset; still serving.");
+  console.error(err);
+  process.exit(1);
+});

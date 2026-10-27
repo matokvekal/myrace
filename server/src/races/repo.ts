@@ -138,3 +138,24 @@ export async function insertRace(d: Db, state: RaceState): Promise<void> {
   for (const c of Object.values(state.categories)) await upsert(d, "categories", CATEGORY_COLUMNS, c as unknown as Record<string, unknown>, 0);
   for (const x of Object.values(state.riders)) await upsert(d, "riders", RIDER_COLUMNS, x as unknown as Record<string, unknown>, 0);
 }
+
+/**
+ * Every table holding a race's rows (no foreign keys, so no database cascade).
+ * A new race table must be added here, or deleting a race leaves its rows behind.
+ */
+export const RACE_TABLES = [
+  "official_versions", "sync_cursors", "race_snapshots", "race_events",
+  "race_members", "invitations", "riders", "categories",
+] as const;
+
+/**
+ * Deletes a race and all its rows. Run inside tx(): takes the race row lock
+ * first, so a write that holds it (Actions, members, invitations) finishes
+ * before, and one that comes after finds no race. False if the race is gone.
+ */
+export async function deleteRaceRows(d: Db, raceUuid: string): Promise<boolean> {
+  if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR UPDATE`, [raceUuid]))) return false;
+  for (const t of RACE_TABLES) await d.query(`DELETE FROM ${t} WHERE "raceUuid" = $1`, [raceUuid]);
+  await d.query(`DELETE FROM races WHERE uuid = $1`, [raceUuid]);
+  return true;
+}

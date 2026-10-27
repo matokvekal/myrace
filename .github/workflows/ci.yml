@@ -51,13 +51,21 @@ jobs:
       - name: Production build
         run: npm run build
 
+      # The live (multi-user) code path, as production builds it for GitHub Pages.
+      - name: Production build with the API configured
+        run: npm run build
+        env:
+          VITE_SERVER_URL: https://api.commissaire.us
+
   # The multi-user server (server/, its own package): typecheck, build, and its
   # integration tests against an in-process PostgreSQL (PGlite) — no database
-  # service or secrets needed.
+  # service or secrets needed. The tests include the real dist/server.js and
+  # dist/db/migrate-cli.js bundles (test/dist-smoke.test.ts), and the deploy
+  # gate is exercised end to end with real release archives.
   server:
-    name: Server typecheck, tests, build
+    name: Server typecheck, tests, build, deploy gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: server
@@ -75,11 +83,17 @@ jobs:
       - name: TypeScript (server + shared race model)
         run: npm run typecheck
 
-      - name: Integration tests (Vitest + PGlite)
+      - name: Integration tests (Vitest + PGlite, incl. the built bundles)
         run: npm test
 
       - name: Build
         run: npm run build
+
+      - name: Deploy scripts (shellcheck)
+        run: shellcheck deploy/*.sh deploy/test/*.sh
+
+      - name: Deploy gate end to end (receive, activate, automatic rollback, rollback)
+        run: bash deploy/test/gate-e2e.sh
 
   # Slower gate: real browser, full user flows. Runs in parallel with `quality`.
   # Also the "local-race regression" gate (Epic 1, Story 1.1): the whole suite runs
