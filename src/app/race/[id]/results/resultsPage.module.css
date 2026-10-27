@@ -45,3 +45,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.switcherRow {
+  padding: 6px 12px;
+}

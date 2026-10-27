@@ -5,6 +5,7 @@ import useRaceStore from "@/stores/racesStore";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import Results from "./Results";
+import RacePhaseSwitcher from "../../components/racePhaseSwitcher/RacePhaseSwitcher";
 import styles from "./resultsPage.module.css";
 
 /**
@@ -51,6 +52,10 @@ const ResultsPage: React.FC = () => {
           {race?.name && <span className={styles.raceName}>{race.name}</span>}
         </div>
       </header>
+      {/* The same Create / Race / Live / Results buttons as the other screens, Results active. */}
+      <div className={styles.switcherRow}>
+        <RacePhaseSwitcher compact />
+      </div>
       <Results raceUuid={raceUuid} defaultGroupBy="wave" quickNav />
     </div>
   );

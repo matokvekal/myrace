@@ -45,3 +45,37 @@ describe("Results button in the phase header", () => {
     expect(screen.getAllByTestId("results-btn")).toHaveLength(1);
   });
 });
+
+describe("Results button: prominent, and shows when Results is the active screen", () => {
+  const renderResults = () =>
+    render(
+      <MemoryRouter initialEntries={["/race/r1/results"]}>
+        <Routes>
+          <Route path="/race/:id/results" element={<RacePhaseSwitcher compact />} />
+          <Route path="/race/:id/heat/:heatId" element={<div data-testid="live-route" />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+  it("on the Results screen: Results is current, no phase is selected, Live is one tap away", async () => {
+    useUIStore.setState({ isRaceMode: true });
+    const user = userEvent.setup();
+    renderResults();
+    const btn = screen.getByTestId("results-btn");
+    expect(btn).toHaveAttribute("aria-current", "page");
+    expect(btn.className).toMatch(/resultsActive/);
+    expect(screen.getAllByRole("tab").every((t) => t.getAttribute("aria-selected") === "false")).toBe(true);
+    await user.click(screen.getByRole("tab", { name: /Live/ }));
+    expect(screen.getByTestId("live-route")).toBeInTheDocument();
+  });
+
+  it("elsewhere it is a solid blue action with a trophy and the label Results, not marked current", () => {
+    useUIStore.setState({ isRaceMode: false });
+    renderAt("/race/r1/heat/1");
+    const btn = screen.getByTestId("results-btn");
+    expect(btn).not.toHaveAttribute("aria-current");
+    expect(btn.className).toMatch(/resultsBtn/);
+    expect(btn).toHaveTextContent("Results");
+    expect(btn.querySelector("svg")).not.toBeNull();
+  });
+});

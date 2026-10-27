@@ -7,7 +7,7 @@
  * they are; the active button is filled, the others are muted.
  */
 import React from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sliders, Flag, Radio, Trophy } from "lucide-react";
 import useUIStore from "@/stores/uiStore";
@@ -27,6 +27,8 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
   const raceUuid = params?.id as string;
   // On the live lap screen the route carries :heatId — that means we're in Live.
   const onLiveRoute = params?.heatId != null;
+  // On the Results screen no phase is active: the Results button is.
+  const onResultsRoute = useLocation().pathname.replace(/\/+$/, "").endsWith("/results");
 
   const isRaceMode = useUIStore((s) => s.isRaceMode);
   const setRaceMode = useUIStore((s) => s.setRaceMode);
@@ -36,14 +38,14 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
   // Setup alone rather than offering two dead ends (see utils/raceLock.ts).
   const finalized = useRaceFinalized(raceUuid);
 
-  const phase: Phase = onLiveRoute ? "live" : isRaceMode ? "race" : "setup";
+  const phase: Phase | null = onResultsRoute ? null : onLiveRoute ? "live" : isRaceMode ? "race" : "setup";
 
   const goSetup = () => {
-    if (onLiveRoute) navigate(`/race/${raceUuid}`);
+    if (onLiveRoute || onResultsRoute) navigate(`/race/${raceUuid}`);
     setRaceMode(false);
   };
   const goRace = () => {
-    if (onLiveRoute) navigate(`/race/${raceUuid}`);
+    if (onLiveRoute || onResultsRoute) navigate(`/race/${raceUuid}`);
     setRaceMode(true);
   };
   // Opens whichever wave is actually live right now, never the Start folder's
@@ -79,11 +81,12 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
   const resultsBtn = phase === "setup" || finalized ? null : (
     <button
       type="button"
-      className={`${styles.btn} ${styles.resultsBtn}`}
+      className={`${styles.btn} ${styles.resultsBtn} ${onResultsRoute ? styles.resultsActive : ""}`}
       data-testid="results-btn"
       aria-label={t("phase.results", "Results")}
+      aria-current={onResultsRoute ? "page" : undefined}
       title={t("phase.results", "Results")}
-      onClick={() => navigate(`/race/${raceUuid}/results`)}
+      onClick={() => { if (!onResultsRoute) navigate(`/race/${raceUuid}/results`); }}
     >
       <Trophy size={16} />
       <span className={styles.label}>{t("phase.results", "Results")}</span>
