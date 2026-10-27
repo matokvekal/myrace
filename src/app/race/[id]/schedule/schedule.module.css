@@ -1326,3 +1326,66 @@ button.standingName {
   font-weight: 800;
   white-space: nowrap;
 }
+
+/* Finish Group on each category row */
+.fgRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 6px;
+  flex-wrap: wrap;
+}
+.fgCaption {
+  font-size: 11px;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fgSelect {
+  min-height: 36px;
+  padding: 2px 6px;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.fgSelectSuggested {
+  border-style: dashed;
+  border-color: #1d4ed8;
+  color: #1d4ed8;
+}
+.fgApplyAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-weight: 700;
+  min-height: 36px;
+}
+
+/* Phones: the category's actions (Finish Group, colour, standings) move to their
+   own line under the name, so nothing is squeezed or pushed off-screen. */
+@media (max-width: 640px) {
+  .categoryRow {
+    flex-wrap: wrap;
+  }
+  .catInfo {
+    min-width: 0;
+    flex: 1 1 60%;
+  }
+  .catActions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding-inline-start: 22px;
+  }
+  .fgRow {
+    flex: 1 1 auto;
+  }
+  .fgSelect {
+    flex: 1 1 140px;
+    min-width: 140px;
+  }
+}

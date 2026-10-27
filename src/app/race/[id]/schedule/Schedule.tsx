@@ -269,6 +269,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const [editLaps, setEditLaps] = useState(false);
   const [selectedRider, setSelectedRider] = useState<{ rider: RiderProps; wave: number } | null>(null);
   const [colorCat, setColorCat] = useState<CategoryProps | null>(null);
+  const [colorWholeGroup, setColorWholeGroup] = useState(false);
   const [colorDraft, setColorDraft] = useState("#63A6FC");
   const [colorWave, setColorWave] = useState<number | null>(null);
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
@@ -287,12 +288,20 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   // here as well as in the UI.
   const saveCategoryColor = async (cat: CategoryProps, color: string) => {
     if (getCategoryLocks(cat, riders).color) return;
-    const updated = { ...cat, color };
-    await updateCategory(updated);
-    for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, cat))) {
-      await updateRider({ ...rider, color });
+    // Optionally the same colour for every category of its Finish Group (locked ones keep theirs).
+    const group = cat.linkGroup?.trim();
+    const targets =
+      colorWholeGroup && group
+        ? useCategoryStore.getState().categories.filter((c) => c.raceUuid === raceUuid && c.linkGroup?.trim() === group && !getCategoryLocks(c, riders).color)
+        : [cat];
+    for (const target of targets) {
+      await updateCategory({ ...target, color });
+      for (const rider of riders.filter((r) => r.raceUuid === raceUuid && riderInCategory(r, target))) {
+        await updateRider({ ...rider, color });
+      }
     }
     setColorCat(null);
+    setColorWholeGroup(false);
   };
 
   // Same write as Categories' updateCategoryAndSyncRiders: the category owns the
@@ -913,6 +922,30 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                           })()}
                           <div className={styles.catActions} onClick={(e) => e.stopPropagation()}>
                             {(() => {
+                              // Finish Group, right on the category row (same write as Edit Schedule).
+                              const saved = cat.linkGroup?.trim() ?? "";
+                              const suggested = !saved ? fgSuggestions.get(cat.id) : undefined;
+                              const locked = (cat.status ?? "upcoming") !== "upcoming";
+                              return (
+                                <label className={styles.fgRow} title={locked ? "Fixed once the category has started" : "Categories in the same Finish Group share the bell and the finish, in any wave"}>
+                                  <span className={styles.fgCaption}>Finish Group</span>
+                                  <select
+                                    className={`${styles.fgSelect} ${suggested ? styles.fgSelectSuggested : ""}`}
+                                    aria-label={`Finish Group for ${cat.name}${cat.subCategory ? ` ${cat.subCategory}` : ""}`}
+                                    data-testid={`finish-group-row-${cat.id}`}
+                                    value={saved || suggested || ""}
+                                    disabled={locked}
+                                    onChange={(e) => void setFinishGroup(cat, e.target.value)}
+                                  >
+                                    {finishGroupOptions(categories.filter((c) => c.raceUuid === raceUuid)).map((v) => (
+                                      <option key={v} value={v}>{finishGroupLabel(v)}</option>
+                                    ))}
+                                  </select>
+                                  {suggested && <span className={styles.fgSuggested}>Suggested</span>}
+                                </label>
+                              );
+                            })()}
+                            {(() => {
                               const locks = getCategoryLocks(cat, riders);
                               return (
                                 <button
@@ -1068,6 +1101,17 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
               <span className={styles.colorSwatch} style={{ background: colorCat.color ?? "#ccc" }} />
               <span>Current {colorCat.color ?? "—"}</span>
             </div>
+            {colorCat.linkGroup?.trim() && (
+              <label className={styles.fgApplyAll}>
+                <input
+                  type="checkbox"
+                  data-testid="color-whole-finish-group"
+                  checked={colorWholeGroup}
+                  onChange={(e) => setColorWholeGroup(e.target.checked)}
+                />
+                Apply to all categories in {finishGroupLabel(colorCat.linkGroup)}
+              </label>
+            )}
             <ColorSwatchPicker
               value={colorCat.color}
               onPick={(c) => void saveCategoryColor(colorCat, c)}
