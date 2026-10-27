@@ -161,6 +161,7 @@ type AuthResponse = { accessToken: string; refreshToken: string; user: LiveUser 
 const signedIn = (r: AuthResponse) => {
   saveSession({ accessToken: r.accessToken, refreshToken: r.refreshToken, user: r.user });
   void flushAll();
+  void publishPending();
   return r.user;
 };
 
@@ -862,6 +863,62 @@ export async function publishRace(local: string): Promise<string> {
   return res.race.uuid;
 }
 
+// ---------------------------------------------------------------------------
+// New races go to the server automatically
+
+/**
+ * Races created on this Device that still have to be published. Only races
+ * created after this was introduced are ever added (by Create Race), so
+ * existing local races are never uploaded without the owner asking.
+ */
+export const PENDING_PUBLISH_KEY = "commissaire.live.pendingPublish";
+const readPending = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(PENDING_PUBLISH_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const writePending = (list: string[]) => localStorage.setItem(PENDING_PUBLISH_KEY, JSON.stringify([...new Set(list)]));
+export const isPendingPublish = (local: string) => readPending().includes(local);
+
+/** A new race persists to the server: now when signed in, otherwise as soon as the user signs in. */
+export async function persistNewRace(local: string): Promise<boolean> {
+  if (local === DEMO_RACE_UUID || linkOf(local)) return !!linkOf(local);
+  writePending([...readPending(), local]);
+  await publishPending();
+  return !!linkOf(local);
+}
+
+let publishing: Promise<void> | null = null;
+/** Publishes the queued new races (signed in only). A failure keeps the race queued for the next try. */
+export function publishPending(): Promise<void> {
+  if (publishing) return publishing;
+  publishing = (async () => {
+    if (!session || readPending().length === 0) return;
+    if (useRaceStore.getState().races.length === 0) await useRaceStore.getState().getRaces();
+    for (const local of readPending()) {
+      if (linkOf(local)) {
+        writePending(readPending().filter((x) => x !== local));
+        continue;
+      }
+      if (!useRaceStore.getState().races.some((r) => r.uuid === local)) continue; // not loaded here — keep it
+      try {
+        await publishRace(local);
+        writePending(readPending().filter((x) => x !== local));
+      } catch (e) {
+        // Offline / server down: retried by the sync timer. A race that started
+        // before it could be published can no longer be (the owner is told on the race page).
+        console.warn("[live] new race not published yet", local, e instanceof Error ? e.message : e);
+      }
+    }
+  })().finally(() => {
+    publishing = null;
+  });
+  return publishing;
+}
+
 export interface MyRace {
   race: Partial<SharedRace>;
   access: AccessSummary;
@@ -975,9 +1032,13 @@ export function startLive() {
     void flushAll();
   });
   window.addEventListener("offline", () => useLiveStore.setState({ online: false }));
-  setInterval(() => void flushAll(), 15_000);
+  setInterval(() => {
+    void flushAll();
+    void publishPending();
+  }, 15_000);
   if (session) {
     void auth.me().catch(() => {});
     void flushAll();
+    void publishPending();
   }
 }

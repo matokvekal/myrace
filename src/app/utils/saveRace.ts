@@ -148,6 +148,13 @@ export const saveRace = async (
       details: { name: newRace.name, date: newRace.date, riderCount: useRiderStore.getState().riders.length },
     });
 
+    // With a server: the new race is saved there too (PostgreSQL), now or on sign-in.
+    if (import.meta.env.VITE_SERVER_URL) {
+      void import("@/services/live/liveClient")
+        .then((m) => m.persistNewRace(newRace.uuid))
+        .catch((e) => console.warn("[live] could not queue the new race for the server", e));
+    }
+
     setAddNewwRace(false);
   } catch (error) {
 

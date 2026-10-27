@@ -29,6 +29,7 @@ import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/li
 // Multi-user (only with a configured server): sharing, members, sync state.
 const TeamPanel = lazy(() => import("../../live/TeamPanel"));
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
+const LocalOnlyBadge = lazy(() => import("../../live/LocalOnlyBadge"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 const TABS = [
@@ -188,6 +189,11 @@ const Race: React.FC = () => {
             {live && (
               <Suspense fallback={null}>
                 <SyncBadge raceUuid={raceUuid} />
+              </Suspense>
+            )}
+            {serverConfigured && !live && raceUuid !== DEMO_RACE_UUID && (
+              <Suspense fallback={null}>
+                <LocalOnlyBadge raceUuid={raceUuid} />
               </Suspense>
             )}
             <div className={styles.tabs}>
