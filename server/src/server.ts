@@ -37,7 +37,7 @@ try {
 
 const http = createServer(createApp());
 attachRealtime(http);
-http.listen(env.PORT, () => logger.info({ port: env.PORT }, "Commissaire server listening"));
+http.listen(env.PORT, env.HOST, () => logger.info({ port: env.PORT, host: env.HOST ?? "all interfaces" }, "Commissaire server listening"));
 
 let stopping = false;
 async function shutdown(signal: string) {

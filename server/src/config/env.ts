@@ -1,14 +1,30 @@
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 /** The database URL in server/.env beats an inherited one: a shell's DATABASE_URL may be El Niño's. */
 const DB_KEYS = ["DATABASE_URL", "COMMISSAIRE_DATABASE_URL"];
 
 /**
+ * server/.env: next to the nearest package.json above this module, so the same
+ * file is found from src/config/env.ts (tsx) and from the dist/server.js bundle.
+ */
+export function envFilePath(from: string = import.meta.url): string {
+  let dir = dirname(fileURLToPath(from));
+  while (!existsSync(join(dir, "package.json"))) {
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return join(dir, ".env");
+}
+
+/**
  * Loads server/.env into process.env (values already set win, except the
  * database URL). No dependency needed. Tests set COMMISSAIRE_SKIP_DOTENV=1.
  */
-function loadDotEnv(path = new URL("../../.env", import.meta.url)) {
+function loadDotEnv(path = envFilePath()) {
   if (process.env.COMMISSAIRE_SKIP_DOTENV === "1" || !existsSync(path)) return;
   const fromFile: Record<string, string> = {};
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
@@ -37,6 +53,9 @@ const list = z
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
+  // Interface to listen on. Production behind Nginx: 127.0.0.1, so only the proxy reaches the API.
+  // Unset: every interface (local development).
+  HOST: z.string().optional().transform((v) => v || undefined),
   // DATABASE_URL is primary; COMMISSAIRE_DATABASE_URL is the older name, still read (see parse()).
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   // Only the local PGlite dev database (`npm run db:dev`) may be migrated by the API, and only
@@ -67,8 +86,8 @@ const schema = z.object({
 
 export type Env = z.infer<typeof schema>;
 
-function parse(): Env {
-  const source = { ...process.env, DATABASE_URL: process.env.DATABASE_URL || process.env.COMMISSAIRE_DATABASE_URL };
+export function parseEnv(vars: NodeJS.ProcessEnv = process.env): Env {
+  const source = { ...vars, DATABASE_URL: vars.DATABASE_URL || vars.COMMISSAIRE_DATABASE_URL };
   const result = schema.safeParse(source);
   if (!result.success) {
     const problems = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
@@ -78,11 +97,21 @@ function parse(): Env {
   if (env.NODE_ENV === "production" && env.MAIL_TRANSPORT === "smtp" && !env.SMTP_URL) {
     throw new Error("Invalid server configuration — SMTP_URL is required when MAIL_TRANSPORT=smtp");
   }
-  // Tests create users and races: never against a real (non-local) database.
-  if (env.NODE_ENV === "test" && !["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(env.DATABASE_URL).hostname)) {
-    throw new Error("Invalid server configuration — tests run only against a local database");
+  // The production database may be on loopback (same server), so loopback alone never allows migrating it.
+  if (env.NODE_ENV === "production" && env.DEV_PGLITE) {
+    throw new Error("Invalid server configuration — DEV_PGLITE is for the local PGlite dev database only; remove it in production");
+  }
+  // Tests create users and races: never against a real database. They use the in-memory
+  // database of test/global-setup.ts, which also skips server/.env (it may hold production's URL).
+  if (env.NODE_ENV === "test") {
+    if (vars.COMMISSAIRE_SKIP_DOTENV !== "1") {
+      throw new Error("Invalid server configuration — tests must not read server/.env (run them with vitest)");
+    }
+    if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(env.DATABASE_URL).hostname)) {
+      throw new Error("Invalid server configuration — tests run only against a local database");
+    }
   }
   return env;
 }
 
-export const env: Env = parse();
+export const env: Env = parseEnv();
