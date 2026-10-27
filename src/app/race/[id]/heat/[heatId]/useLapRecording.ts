@@ -99,6 +99,8 @@ interface Params {
    */
   boardHoldMs: number;
   onLapRecorded?: (rider: RiderProps, catColor: string, source: "click" | "voice") => void;
+  /** RECAP MODE: a longer duplicate-protection interval (ms) instead of the race's own. */
+  minLapMsOverride?: number;
 }
 
 export function useLapRecording({
@@ -114,6 +116,7 @@ export function useLapRecording({
   setDisplayOrder,
   boardHoldMs,
   onLapRecorded,
+  minLapMsOverride,
 }: Params) {
   const holdMs = normalizeBoardHoldMs(boardHoldMs);
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
@@ -275,7 +278,7 @@ export function useLapRecording({
 
     if (rider.timeArrive) {
       const msSinceLast = clickTime.getTime() - new Date(rider.timeArrive).getTime();
-      const minLapMs = minLapMsFor(race);
+      const minLapMs = minLapMsOverride ?? minLapMsFor(race);
       if (msSinceLast < minLapMs) {
         const remaining = Math.ceil((minLapMs - msSinceLast) / 1000);
         toast.info(`Wait ${remaining}s before next lap`);

@@ -1,9 +1,5 @@
-import React from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, it, expect } from "vitest";
 import { checkRecovery, withRecoveredPassage, hhmm } from "../passageRecovery";
-import RecapPanel from "../../race/[id]/heat/[heatId]/RecapPanel";
 import { makeRider } from "@/test/factories";
 
 /** RECAP and missed-passage recovery (times on today's date). */
@@ -45,33 +41,5 @@ describe("withRecoveredPassage", () => {
       [3, hhmm(at("00:30")), "10:00", false],
     ]);
     expect(out.timeArrive).toBe(at("00:30").toISOString());
-  });
-});
-
-describe("RECAP panel", () => {
-  it("lists passages (bib + HH:mm) and Unknown Rider; recovery needs confirmation when a passage is near", async () => {
-    const user = userEvent.setup();
-    const onRecover = vi.fn();
-    render(<RecapPanel riders={[rider()]} jokers={[{ id: "j", sequence: 1, capturedAt: at("00:35").toISOString() }]} minLapMs={MIN3} onRecover={onRecover} />);
-    const items = screen.getByTestId("recap-list").querySelectorAll("li");
-    expect([...items].map((li) => li.textContent)).toEqual([`#42${hhmm(at("00:10"))}`, `#42${hhmm(at("00:30"))}`, `? Unknown Rider${hhmm(at("00:35"))}`]);
-
-    await user.type(screen.getByTestId("recap-bib"), "42");
-    await user.clear(screen.getByTestId("recap-time"));
-    await user.type(screen.getByTestId("recap-time"), "00:31");
-    await user.click(screen.getByTestId("recap-check"));
-    expect(screen.getByRole("alert")).toHaveTextContent(/may be this same crossing/);
-    expect(screen.queryByTestId("recap-add")).toBeNull();
-    await user.click(screen.getByTestId("recap-add-anyway"));
-    expect(onRecover).toHaveBeenCalledTimes(1);
-
-    await user.clear(screen.getByTestId("recap-bib")); // the selected bib stays after a correction
-    await user.type(screen.getByTestId("recap-bib"), "42");
-    await user.clear(screen.getByTestId("recap-time"));
-    await user.type(screen.getByTestId("recap-time"), "00:20");
-    await user.click(screen.getByTestId("recap-check"));
-    await user.click(screen.getByTestId("recap-add"));
-    expect(onRecover).toHaveBeenCalledTimes(2);
-    expect(onRecover.mock.calls[1][1].getTime()).toBe(at("00:20").getTime());
   });
 });

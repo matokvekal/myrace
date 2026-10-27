@@ -21,7 +21,8 @@ interface Props {
    */
   isRecorded?: boolean;
   raceEnded?: boolean;
-  onClick: () => void;
+  /** A single tap, with the moment it happened (the card waits 300 ms to rule out a double-tap). */
+  onClick: (tappedAt?: Date) => void;
   onDoubleClick: () => void;
 }
 
@@ -217,11 +218,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
     clickCountRef.current++;
 
     if (clickCountRef.current === 1) {
+      const tappedAt = new Date(); // the passage time is the tap, not the end of the wait
       // Wait to see if a second click comes within 300ms
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = setTimeout(() => {
         if (clickCountRef.current === 1) {
-          onClick(); // Single click
+          onClick(tappedAt); // Single click
           setNow(Date.now()); // snap the "since arrive" clock to 0 right away, don't wait for the next tick
         }
         clickCountRef.current = 0;

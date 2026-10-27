@@ -1323,8 +1323,10 @@
   letter-spacing: 0.04em;
   cursor: pointer;
 }
-.recapOn {
-  background: #1d4ed8;
+/* RECAP active: the button itself shows it too (same brown as the RECAP ACTIVE banner) */
+.recapBtn.recapOn {
+  background: #78350f;
+  border-color: #78350f;
   color: #fff;
 }
 

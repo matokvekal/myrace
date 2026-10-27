@@ -40,9 +40,7 @@ import JokerResolveModal from "./JokerResolveModal";
 import { jokerResolveBlock } from "./jokerResolve";
 import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { planWaveFinish } from "@/utils/waveFinish";
-import { withRecoveredPassage } from "@/utils/passageRecovery";
-import RecapPanel from "./RecapPanel";
-import { useRecapMode } from "./useRecapMode";
+import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { Bike, List, ChevronDown } from "lucide-react";
 import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
@@ -96,10 +94,7 @@ const Heat: React.FC = () => {
   const VOICE_LOG_LIMIT = 30;
   // Always-fresh refs so setTimeout callbacks can see latest store + handler
   const ridersRef = useRef(riders);
-  const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice') => void) | null>(null);
-  // RECAP MODE state read by the tap/voice handler (the hook is declared further down).
-  const recapActiveRef = useRef(false);
-  const recapSelectRef = useRef<((rider: RiderProps) => void) | null>(null);
+  const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice', at?: Date) => void) | null>(null);
   // Voice buffer: queue of pending bib detections + 30s cooldown map per bib
   const voiceQueueRef = useRef<Array<{ bib: string; detectedAt: number }>>([]);
   const bibCooldownRef = useRef<Map<string, number>>(new Map());
@@ -268,6 +263,7 @@ const Heat: React.FC = () => {
 
   // Lap recording + rollback live in a dedicated hook (BUGS.md #29). Same rules
   // and side effects as before — this component just drives it.
+  const recap = useRecapMode();
   const {
     riderActions,
     setRiderActions,
@@ -293,6 +289,8 @@ const Heat: React.FC = () => {
     displayOrder,
     setDisplayOrder,
     boardHoldMs,
+    // RECAP MODE: 6-minute duplicate check instead of the race's minimum.
+    minLapMsOverride: recap.active ? RECAP_MIN_LAP_SECONDS * 1000 : undefined,
     // The voice path renders its own detected-number chip, so only the tap path
     // adds one here — exactly as before the extraction.
     onLapRecorded: (rider, catColor, source) => {
@@ -306,13 +304,11 @@ const Heat: React.FC = () => {
     },
   });
 
-  const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
-    // RECAP MODE: a tap (or voice) selects the rider for review — never a lap.
-    if (recapActiveRef.current) {
-      recapSelectRef.current?.(rider);
-      return;
-    }
-    recordLap(rider, source);
+  // A tap records at the moment of the tap (the card waits 300 ms to tell a
+  // double-tap — rider history — from a single tap, and passes the tap time).
+  // In RECAP MODE the same flow applies, with the 6-minute duplicate check.
+  const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click', at?: Date) => {
+    recordLap(rider, source, at);
   };
 
   const handleRevertLap = (rider: RiderProps) => {
@@ -452,10 +448,7 @@ const Heat: React.FC = () => {
   // only THIS wave; recorded laps and times kept; riders still racing become
   // administrative finishers (no invented crossing time). Idempotent.
   const [showFinishWave, setShowFinishWave] = useState(false);
-  // RECAP MODE: a distinct Live mode (useRecapMode) — selecting a rider shows passages and corrections, never records a lap.
-  const recap = useRecapMode();
-  recapActiveRef.current = recap.active;
-  recapSelectRef.current = recap.select;
+  // RECAP MODE (useRecapMode, declared before useLapRecording): normal recording with a 6-minute duplicate check; ends after 30 s idle.
   useEffect(() => {
     if (!recap.active) return;
     const onActivity = () => recap.touch();
@@ -466,12 +459,6 @@ const Heat: React.FC = () => {
       document.removeEventListener("keydown", onActivity);
     };
   }, [recap.active, recap.touch]); // eslint-disable-line react-hooks/exhaustive-deps
-  // In RECAP MODE an exact bib in the search box selects that rider (no lap).
-  useEffect(() => {
-    if (!recap.active || !searchTerm.trim()) return;
-    const hit = runningRiders.find((r) => String(r.bibNumber) === searchTerm.trim());
-    if (hit) recap.select(hit);
-  }, [recap.active, searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
   const exitRecap = () => recap.exit();
   // Leaving RECAP MODE (Exit, toggle or 30 s idle) restores normal Live: no review filter left on the board.
   const wasRecapRef = useRef(false);
@@ -480,30 +467,6 @@ const Heat: React.FC = () => {
     wasRecapRef.current = recap.active;
   }, [recap.active]);
 
-  // RECAP recovery: a missed passage, confirmed in the panel, inserted at its
-  // ESTIMATED time (entry time kept separately) and marked recovered. Shared
-  // races send AddLap {recovered, enteredAt} at the estimated time; the engine
-  // re-derives in time order and exempts it from the minimum lap time.
-  const recoverPassage = (rider: RiderProps, estimatedAt: Date) => {
-    if (!liveAllows(raceUuid, "AddLap", { riderUuid: rider.uuid ?? "" })) return;
-    const enteredAt = new Date();
-    const updated = withRecoveredPassage(rider, estimatedAt, enteredAt);
-    if (isLiveRace(raceUuid) && rider.uuid) {
-      void liveDispatch(raceUuid, "AddLap", { riderUuid: rider.uuid, recovered: true, enteredAt: enteredAt.toISOString() }, { atMs: estimatedAt.getTime() });
-    }
-    void updateRider(updated);
-    if (currentRace) {
-      AuditLogService.log({
-        race: currentRace,
-        action: "RECOVER_PASSAGE",
-        screen: "Live",
-        entityType: "rider",
-        entityId: rider.bibNumber,
-        details: { recovered: true, estimatedAt: estimatedAt.toISOString(), enteredAt: enteredAt.toISOString(), lapsBefore: rider.lapsCounter, lapsAfter: updated.lapsCounter },
-      });
-    }
-    toast.success(`Bib ${rider.bibNumber}: recovered passage at ${estimatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })} added (laps ${rider.lapsCounter} → ${updated.lapsCounter})`);
-  };
   const finishingWaveRef = useRef(false);
   const waveAllRiders = useMemo(
     () => riders.filter((r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))),
@@ -975,9 +938,9 @@ const Heat: React.FC = () => {
         <div className={`${styles.controlPanel} ${recap.active ? styles.controlPanelRecap : ""}`}>
           {recap.active && (
             <div className={styles.recapBanner} role="status" data-testid="recap-mode-banner">
-              <span className={styles.recapBannerTitle}>RECAP MODE</span>
+              <span className={styles.recapBannerTitle}>RECAP ACTIVE</span>
               <span className={styles.recapBannerHint}>
-                {recap.busy ? "Correction in progress" : "Tap a rider or type a bib — no laps are recorded · ends after 30 s idle"}
+                Passages are recorded as usual, with a 6-minute duplicate check · ends after 30 s idle
               </span>
               <button type="button" className={styles.recapExit} onClick={exitRecap} data-testid="recap-exit">
                 Exit RECAP
@@ -1051,9 +1014,16 @@ const Heat: React.FC = () => {
                 maxLength={5}
                 className={styles.searchInput}
                 placeholder="#"
-                aria-label={recap.active ? "Bib to review" : "Bib"}
+                aria-label="Bib"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter records the rider with exactly this bib (same flow and duplicate check as a tap).
+                  if (e.key !== "Enter") return;
+                  const hit = activeRiders.find((r) => String(r.bibNumber) === searchTerm.trim());
+                  if (hit) handleRiderClick(hit, "click", new Date());
+                  else if (searchTerm.trim()) toast.info(`No racing rider with bib ${searchTerm.trim()}`);
+                }}
               />
               {searchTerm ? (
                 <button className={styles.clearSearch} onClick={() => setSearchTerm("")} aria-label="Clear bib">✕</button>
@@ -1067,7 +1037,7 @@ const Heat: React.FC = () => {
               aria-pressed={recap.active}
               data-testid="recap-btn"
               onClick={() => (recap.active ? exitRecap() : recap.enter())}
-              title={recap.active ? "Exit RECAP MODE" : "RECAP MODE: review riders' passages and correct missed ones (no laps are recorded)"}
+              title={recap.active ? "Exit RECAP" : "RECAP: record with a 6-minute duplicate check (ends after 30 s idle)"}
             >
               RECAP
             </button>
@@ -1126,21 +1096,6 @@ const Heat: React.FC = () => {
             )}
           </div>
         </div>
-
-        {recap.active && (
-          <RecapPanel
-            riders={waveAllRiders}
-            jokers={jokers}
-            minLapMs={minLapMsFor(currentRace)}
-            onRecover={(rider, at) => {
-              recoverPassage(rider, at);
-              recap.touch();
-            }}
-            selectedRider={recap.selected}
-            onBusyChange={recap.setBusy}
-            onActivity={recap.touch}
-          />
-        )}
 
         {/* Filter panel popup */}
         {showFilterPanel && (
@@ -1243,7 +1198,7 @@ const Heat: React.FC = () => {
                   isFlashing={flashingRiderId === rider.id}
                   isRecorded={pendingMoveSet.has(rider.id)}
                   raceEnded={isOnTrackAfterEnd(rider)}
-                  onClick={() => handleRiderClick(rider)}
+                  onClick={(at) => handleRiderClick(rider, "click", at)}
                   onDoubleClick={() => setContextRider(rider)}
                 />
               ))}
