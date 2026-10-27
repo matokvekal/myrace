@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeGroupSignals, categoryGroupKey, riderGroupKey, isLeaderFinishAll } from "../linkedGroups";
+import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "../linkedGroups";
 import type { CategoryProps } from "@/types/types";
 
 const cat = (name: string, over: Partial<CategoryProps> = {}) =>
@@ -22,7 +22,7 @@ describe("linkedGroups", () => {
   it("category-wide bell at exactly 1 lap remaining, scoped to that category", () => {
     const cats = [cat("Man Pro"), cat("Man Elite")];
     const s = computeGroupSignals(cats, [rider("Man Pro", 4), rider("Man Pro", 1), rider("Man Elite", 1)]);
-    expect([...s.bell]).toEqual([riderGroupKey(cats[0], { totalLaps: 5 })]);
+    expect([...s.bell]).toEqual([categoryGroupKey(cats[0])]);
     expect(s.finish.size).toBe(0);
   });
 
@@ -43,31 +43,39 @@ describe("linkedGroups", () => {
     const b = cat("Women Masters 40-49", { linkGroup: " masters " });
     const c = cat("Man Pro");
     const s = computeGroupSignals([a, b, c], [rider("Man Masters 30-39", 4), rider("Man Pro", 1)]);
-    expect(s.bell.has(riderGroupKey(b, { totalLaps: 5 }))).toBe(true);
-    expect(s.bell.has(riderGroupKey(c, { totalLaps: 5 }))).toBe(false);
+    expect(s.bell.has(categoryGroupKey(b))).toBe(true);
+    expect(s.bell.has(categoryGroupKey(c))).toBe(false);
   });
 
-  it("a Finish Group mixing distances: the shorter race's finish never finishes the longer race", () => {
-    // Men Level 2 (6 laps) and Women Level 2 (2 laps) share Finish Group 1.
-    const men = cat("Men Level 2", { linkGroup: "1", laps: 6 });
-    const women = cat("Women Level 2", { linkGroup: "1", laps: 2 });
-    const riders = [
-      rider("Women Level 2", 2, { totalLaps: 2, raceStatus: "finished" }),
-      rider("Men Level 2", 2, { totalLaps: 6 }), // 4 laps left
-    ];
-    const s = computeGroupSignals([men, women], riders);
-    expect(s.finish.has(riderGroupKey(women, { totalLaps: 2 }))).toBe(true);
-    expect(s.finish.has(riderGroupKey(men, { totalLaps: 6 }))).toBe(false);
-    // …and a 1-lap-to-go women's leader rings no bell for the men either.
-    const bell = computeGroupSignals([men, women], [rider("Women Level 2", 1, { totalLaps: 2 })]);
-    expect(bell.bell.has(riderGroupKey(men, { totalLaps: 6 }))).toBe(false);
+  it("bell: the leader starting the final lap rings it for every rider, whatever laps they have left", () => {
+    const cats = [cat("Man Pro", { laps: 5 })];
+    const s = computeGroupSignals(cats, [rider("Man Pro", 4), rider("Man Pro", 1), rider("Man Pro", 2)]);
+    expect(s.bell.has(categoryGroupKey(cats[0]))).toBe(true); // one key → every card of the category
+    expect(s.finish.size).toBe(0);
   });
 
-  it("same Finish Group, same distance: the shared finish still applies", () => {
-    const a = cat("Men Level 2", { linkGroup: "1", laps: 4 });
-    const b = cat("Juniors", { linkGroup: "1", laps: 4 });
-    const s = computeGroupSignals([a, b], [rider("Men Level 2", 4, { totalLaps: 4, raceStatus: "finished" })]);
-    expect(s.finish.has(riderGroupKey(b, { totalLaps: 4 }))).toBe(true);
+  it("category laps win over a rider's stale own lap count", () => {
+    const cats = [cat("Man Pro", { laps: 3 })];
+    const s = computeGroupSignals(cats, [rider("Man Pro", 2, { totalLaps: 5 })]);
+    expect(s.bell.has(categoryGroupKey(cats[0]))).toBe(true);
+  });
+
+  it("a Finish Group shares bell and finish across distances and waves", () => {
+    const men = cat("Men Level 2", { linkGroup: "1", laps: 6, heat: 1 });
+    const women = cat("Women Level 2", { linkGroup: "1", laps: 2, heat: 3 });
+    expect(categoryGroupKey(men)).toBe(categoryGroupKey(women));
+    const bell = computeGroupSignals([men, women], [rider("Women Level 2", 1, { totalLaps: 2 }), rider("Men Level 2", 2, { totalLaps: 6 })]);
+    expect(bell.bell.has(categoryGroupKey(men))).toBe(true);
+    const fin = computeGroupSignals([men, women], [rider("Women Level 2", 2, { totalLaps: 2, raceStatus: "finished" }), rider("Men Level 2", 2, { totalLaps: 6 })]);
+    expect(fin.finish.has(categoryGroupKey(men))).toBe(true);
+  });
+
+  it("without a Finish Group, categories in the same wave stay independent", () => {
+    const a = cat("Men Level 2", { laps: 2 });
+    const b = cat("Women Level 2", { laps: 2 });
+    const s = computeGroupSignals([a, b], [rider("Men Level 2", 2, { totalLaps: 2, raceStatus: "finished" })]);
+    expect(s.finish.has(categoryGroupKey(a))).toBe(true);
+    expect(s.finish.has(categoryGroupKey(b))).toBe(false);
   });
 
   it("ignores DNF riders as a trigger", () => {

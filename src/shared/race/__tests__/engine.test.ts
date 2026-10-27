@@ -97,19 +97,29 @@ describe("finish rules across riders", () => {
     expect(state.riders[riders[1].uuid]).toMatchObject({ lapsCounter: 1, raceStatus: "finished" });
   });
 
-  it("a Finish Group mixing distances: the shorter race's leader never finishes riders with laps left", () => {
+  it("a Finish Group across waves and distances: the first finish finishes the others at their next crossing", () => {
     const men = makeCategory({ name: "Men L2", heat: 1, laps: 6, status: "running", startedAt: T0, linkGroup: "1" });
-    const women = makeCategory({ name: "Women L2", heat: 1, laps: 2, status: "running", startedAt: T0, linkGroup: "1" });
-    const w = makeRider({ category: "Women L2", heat: 1, bibNumber: 1 });
+    const women = makeCategory({ name: "Women L2", heat: 3, laps: 2, status: "running", startedAt: T0, linkGroup: "1" });
+    const w = makeRider({ category: "Women L2", heat: 3, bibNumber: 1 });
     const m = makeRider({ category: "Men L2", heat: 1, bibNumber: 2 });
     const state = makeRaceState({ categories: [men, women], riders: [w, m], race: { leaderFinishAll: null } });
+    deriveRider(state, m.uuid, [lap(T0 + 7 * MIN)]);
     deriveRider(state, w.uuid, [lap(T0 + 8 * MIN), lap(T0 + 16 * MIN)]);
     expect(state.riders[w.uuid]).toMatchObject({ lapsCounter: 2, raceStatus: "finished" });
-    // 2 of 6 laps after the women finished: an ordinary lap, never a finish.
+    expect(state.riders[m.uuid]).toMatchObject({ lapsCounter: 1, raceStatus: "running" }); // nothing invented
+    deriveRider(state, m.uuid, [lap(T0 + 7 * MIN), lap(T0 + 17 * MIN)]);
+    expect(state.riders[m.uuid]).toMatchObject({ lapsCounter: 2, raceStatus: "finished" });
+  });
+
+  it("without a Finish Group, another category's finish never finishes a rider", () => {
+    const a = makeCategory({ name: "Men L2", heat: 1, laps: 6, status: "running", startedAt: T0 });
+    const b = makeCategory({ name: "Women L2", heat: 1, laps: 2, status: "running", startedAt: T0 });
+    const w = makeRider({ category: "Women L2", heat: 1, bibNumber: 1 });
+    const m = makeRider({ category: "Men L2", heat: 1, bibNumber: 2 });
+    const state = makeRaceState({ categories: [a, b], riders: [w, m], race: { leaderFinishAll: null } });
+    deriveRider(state, w.uuid, [lap(T0 + 8 * MIN), lap(T0 + 16 * MIN)]);
     deriveRider(state, m.uuid, [lap(T0 + 7 * MIN), lap(T0 + 17 * MIN)]);
     expect(state.riders[m.uuid]).toMatchObject({ lapsCounter: 2, raceStatus: "running" });
-    // The men's own leader still triggers the shared finish for the men.
-    expect(groupFinishAt(state, state.categories[men.uuid], undefined, 6)).toBeNull();
   });
 
   it("… unless the race turned first-finish-all-finish off", () => {

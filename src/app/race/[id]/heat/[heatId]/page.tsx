@@ -18,7 +18,7 @@ import { minLapMsFor } from "@/utils/minLap";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
 import useUIStore from "@/stores/uiStore";
-import { computeGroupSignals, riderGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
+import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -230,14 +230,16 @@ const Heat: React.FC = () => {
   // the rest of the group finishes on their next crossing, however many laps
   // they have left. Derived from rider state, so undoing the leader's finish
   // restores everyone.
-  const groupSignals = useMemo(
-    () => computeGroupSignals(waveCategories, filteredRiders, isLeaderFinishAll(currentRace)),
-    [waveCategories, filteredRiders, currentRace]
-  );
+  // Computed over the WHOLE race (every started category), not just this wave:
+  // an explicit Finish Group shares its bell and finish across waves.
+  const groupSignals = useMemo(() => {
+    const started = categories.filter((c) => c.status === "running" || c.status === "finished");
+    const raceRiders = riders.filter((r) => r.raceUuid === raceUuid && r.raceStatus !== "upcoming");
+    return computeGroupSignals(started, withCategoryLaps(raceRiders, categories), isLeaderFinishAll(currentRace));
+  }, [categories, riders, raceUuid, currentRace]);
   const groupOf = (rider: RiderProps) => {
-    const cat = waveCategories.find((c) => riderInCategory(rider, c));
-    // Group AND the rider's own lap target: a shared finish never ends a longer race early.
-    return cat ? riderGroupKey(cat, withCategoryLaps([rider], waveCategories)[0]) : null;
+    const cat = categories.find((c) => riderInCategory(rider, c));
+    return cat ? categoryGroupKey(cat) : null;
   };
   const isOnTrackAfterEnd = (rider: RiderProps): boolean => {
     if (categories.find((c) => riderInCategory(rider, c))?.status === "finished") return true;

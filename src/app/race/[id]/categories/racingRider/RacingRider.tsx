@@ -140,10 +140,13 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
   );
 
   const lapsRemaining = rider.totalLaps - rider.lapsCounter;
-  // Individual bell at 2 to go is unchanged; a category-wide bell (leader at 1 to
-  // go) joins it; once the leader has finished, the finish flag replaces the bell.
-  const showBell = !forceFinish && (forceBell || lapsRemaining === 2);
-  const showStripes = forceFinish || (lapsRemaining === 1);
+  // Bell = final lap: the rider's own, or the category / Finish Group's once its
+  // first rider started the final lap — and it stays through the finish phase
+  // until this rider's next crossing. The finish flag means only one thing:
+  // THIS rider has finished.
+  const hasFinished = rider.raceStatus === "finished";
+  const showBell = !hasFinished && (forceBell || forceFinish || (rider.totalLaps > 0 && lapsRemaining <= 1));
+  const showStripes = hasFinished;
 
   // Live ticking clock: how long since this rider last crossed (or since race start if never).
   // Only ticks once the race has actually started — before that the card shows a frozen 00:00.
@@ -307,12 +310,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
         </div>
       )}
       {showBell && (
-        <div className={styles.bellBadge} title={`2 laps left! (${rider.lapsCounter}/${rider.totalLaps})`}>
+        <div className={styles.bellBadge} data-testid="bell" title={forceFinish ? "Finishes at the next crossing" : `Final lap (${rider.lapsCounter}/${rider.totalLaps})`}>
           <Bell size={16} color="#ffd60a" fill="#ffd60a" />
         </div>
       )}
       {showStripes && (
-        <div className={styles.flagBadge} title={`Last lap! (${rider.lapsCounter}/${rider.totalLaps})`}>
+        <div className={styles.flagBadge} data-testid="finish-flag" title={`Finished (${rider.lapsCounter}/${rider.totalLaps})`}>
           <div className={styles.flagCloth} />
           <div className={styles.flagPole} />
         </div>
@@ -327,7 +330,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
           {/* Category-wide signals override the rider's own count: once the
               leader is on the last lap everyone is, and once the leader has
               finished everyone finishes on the next crossing. */}
-          {forceFinish ? 'Finish' : forceBell || lapsRemaining === 1 ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
+          {hasFinished ? 'Finished' : forceFinish ? 'Finish' : showBell ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
         </div>
       )}
       {!hasStarted ? (

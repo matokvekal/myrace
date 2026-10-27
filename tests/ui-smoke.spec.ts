@@ -119,11 +119,14 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("redo-finish")).toHaveCount(0);
   });
 
-  test("Live: individual bell at 2 laps, last-lap flag at 1 lap", async ({ page }) => {
+  test("Live: the leader's final lap rings the bell for the whole category; no finish flag before a finish", async ({ page }) => {
     await openLiveDemo(page);
-    // The demo seeds Elite Men mid-race: leader on 6/7 (flag) with others further back.
-    await expect(page.locator('[data-testid^="racing-rider-"] [title^="Last lap"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid^="racing-rider-"] [title^="2 laps left"]').first()).toBeVisible();
+    // The demo seeds Elite Men mid-race: leader on 6/7 with others further back —
+    // every Elite Men card shows the bell, and no racing card shows a finish flag.
+    const bells = page.locator('[data-testid^="racing-rider-"] [data-testid="bell"]');
+    await expect(bells.first()).toBeVisible();
+    expect(await bells.count()).toBeGreaterThan(1);
+    await expect(page.locator('[data-testid^="racing-rider-"] [data-testid="finish-flag"]')).toHaveCount(0);
   });
 
   test("Results: one click from Live, grouped Wave → Category, Back returns to Live", async ({ page }) => {
