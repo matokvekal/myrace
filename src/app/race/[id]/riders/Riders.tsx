@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import { useTranslation } from "react-i18next";
 import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown, Plus, Minus, Search, X } from "lucide-react";
 import styles from "./riders.module.css";
@@ -481,7 +482,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                               <span className={styles.colFlag}>
                                 <RiderFlag flag={rider.flag} className={styles.flagIcon} />
                               </span>
-                              <span className={styles.colBib}><strong>#{rider.bibNumber || "—"}</strong></span>
+                              <span className={styles.colBib}><strong><BibBadge rider={rider} category={cg.category ?? null} /></strong></span>
                               <span className={styles.colName} dir="auto">
                                 {rider.lastName || rider.firstName
                                   ? `${rider.lastName} ${rider.firstName}`.trim()

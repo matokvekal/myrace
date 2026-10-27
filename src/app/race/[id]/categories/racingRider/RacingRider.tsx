@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import styles from "./racingRider.module.css";
 import { RiderProps } from "@/types/types";
 import { formatTime, parseClockTimeMs } from "@/utils/timeUtils";
@@ -314,7 +315,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
           <div className={styles.flagPole} />
         </div>
       )}
-      <div className={styles.bib}>{rider.bibNumber}</div>
+      <div className={styles.bib}><BibBadge rider={rider} prefix="" /></div>
       <div className={styles.laps}>
         <span className={styles.lapsLabel}>finish:</span>
         {rider.lapsCounter}/{rider.totalLaps}

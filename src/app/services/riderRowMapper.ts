@@ -3,6 +3,8 @@ import { isIdColumnHeader } from "@/types/csv.types";
 import type { RiderProps } from "@/types/types";
 import { splitFullName } from "@/services/csvMapper";
 import useClubDictionaryStore from "@/stores/clubDictionaryStore";
+import { normalizeColor } from "@/utils/bibColors";
+import { normalizeUciId } from "@/utils/uciId";
 
 /**
  * Build a rider from one parsed CSV/scan row using the resolved column mappings.
@@ -116,7 +118,13 @@ export function rowToRider(
         data.lastNameEnglish = value || null;
         break;
       case "uciNumber":
-        data.uciNumber = value || null;
+        data.uciNumber = normalizeUciId(value);
+        break;
+      case "bibColor":
+        data.bibColor = normalizeColor(value);
+        break;
+      case "bibTextColor":
+        data.bibTextColor = normalizeColor(value);
         break;
       case "birthDate":
         data.birthDate = value || null;
@@ -202,6 +210,8 @@ export function rowToRider(
     uciPoints: data.uciPoints ?? null,
     federation: data.federation ?? null,
     uciNumber: data.uciNumber ?? null,
+    bibColor: data.bibColor ?? null,
+    bibTextColor: data.bibTextColor ?? null,
     extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined
   };
 }

@@ -181,7 +181,7 @@ export async function exportRaceToXlsx(
   const catHeaders = [
     "id", "raceUuid", "name", "subCategory", "color", "laps", "heat",
     "startTime", "status", "linkedFinish", "finishedAt", "lapsCounter", "riders",
-    "importOrder"
+    "importOrder", "linkGroup", "ignored", "bibColor", "bibTextColor"
   ];
   const catData = [catHeaders, ...categories.map((c) => catHeaders.map((h) => safeStr(c[h as keyof CategoryProps])))];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(catData), "Categories");
@@ -199,7 +199,8 @@ export async function exportRaceToXlsx(
     "distance", "viewOrder", "comment",
     // Start-list data — without these a rider handed to another device loses
     // their seeding and the reference columns shown on the rider card.
-    "standing", "uciPoints", "uciNumber", "extraFields"
+    "standing", "uciPoints", "uciNumber", "extraFields",
+    "bibColor", "bibTextColor"
   ];
   const riderData = [
     riderHeaders,

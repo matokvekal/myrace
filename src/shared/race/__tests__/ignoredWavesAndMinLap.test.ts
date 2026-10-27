@@ -79,3 +79,15 @@ describe("minimum lap interval", () => {
     expect(applyAction(state, makeAction("SettingChanged", { changes: { minLapSeconds: 5000 } }), T0)).toEqual({ applied: false, reason: "invalid" });
   });
 });
+
+describe("UCI ID and bib colours sync as rider / category edits", () => {
+  it("RiderEdited carries uciNumber and bib colours; CategoryEdited carries bib defaults", () => {
+    const cat = makeCategory({ name: "Elite", heat: 1 });
+    const r = makeRider({ category: "Elite", heat: 1, bibNumber: 5 });
+    const state = makeRaceState({ categories: [cat], riders: [r] });
+    expect(applyAction(state, makeAction("RiderEdited", { riderUuid: r.uuid, changes: { uciNumber: "10012345678", bibColor: "#1E88E5", bibTextColor: "#FFFFFF" } }), T0).applied).toBe(true);
+    expect(state.riders[r.uuid]).toMatchObject({ uciNumber: "10012345678", bibColor: "#1E88E5", bibTextColor: "#FFFFFF" });
+    expect(applyAction(state, makeAction("CategoryEdited", { categoryUuid: cat.uuid, changes: { bibColor: "#FDD835", bibTextColor: "#000000" } }), T0).applied).toBe(true);
+    expect(state.categories[cat.uuid]).toMatchObject({ bibColor: "#FDD835", bibTextColor: "#000000" });
+  });
+});

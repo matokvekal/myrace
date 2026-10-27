@@ -54,6 +54,8 @@ export type RiderFieldKey =
    | 'uciPoints'
    | 'federation'
    | 'uciNumber'
+   | 'bibColor'
+   | 'bibTextColor'
    | 'birthDate'
    | 'federationNumber'
    | 'federationChip'
@@ -426,6 +428,24 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
          'friday', 'saturday', 'sunday', 'monday'
       ],
       priority: 8
+   },
+   {
+      field: 'uciNumber',
+      hebrew: ['מספר UCI', 'מזהה UCI', 'UCI ID', 'קוד UCI'],
+      english: ['uci id', 'uci number', 'uci no', 'uci code', 'uciid', 'uci'],
+      priority: 6
+   },
+   {
+      field: 'bibColor',
+      hebrew: ['צבע מספר', 'צבע לוחית', 'צבע רקע מספר', 'רקע מספר'],
+      english: ['bib color', 'bib colour', 'plate color', 'plate colour', 'bib background', 'number background'],
+      priority: 5
+   },
+   {
+      field: 'bibTextColor',
+      hebrew: ['צבע ספרות', 'צבע טקסט מספר', 'צבע כיתוב'],
+      english: ['bib text color', 'bib text colour', 'number color', 'number colour', 'digit color', 'digits color'],
+      priority: 5
    }
 ];
 

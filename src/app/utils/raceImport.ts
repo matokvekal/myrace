@@ -110,6 +110,11 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     riders: parseNum(row.riders),
     isConnected: false,
     importOrder: row.importOrder ? parseNum(row.importOrder) : undefined,
+    // Added with 009; older exports simply lack the columns.
+    linkGroup: parseNullableStr(row.linkGroup) ?? undefined,
+    ignored: parseBool(row.ignored),
+    bibColor: parseNullableStr(row.bibColor),
+    bibTextColor: parseNullableStr(row.bibTextColor),
   }));
 
   // ── Riders ──────────────────────────────────────────────────────
@@ -139,6 +144,8 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
       standing: row.standing !== "" && row.standing !== undefined ? parseNum(row.standing) : null,
       uciPoints: row.uciPoints ? parseNum(row.uciPoints) : null,
       uciNumber: parseNullableStr(row.uciNumber),
+      bibColor: parseNullableStr(row.bibColor),
+      bibTextColor: parseNullableStr(row.bibTextColor),
       extraFields,
       bibNumber: parseNum(row.bibNumber),
       firstName: row.firstName ?? "",

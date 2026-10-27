@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import styles from "./results.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -260,7 +261,7 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
               <span className={`${styles.pos} ${podiumMode && sortBy === "place" && !isOut && idx < 3 ? styles[`pos${idx + 1}`] : ""}`}>
                 {showMedal ? MEDAL[idx] : posLabel}
               </span>
-              {visibleFields.has("bib") && <span className={styles.bib}>#{rider.bibNumber}</span>}
+              {visibleFields.has("bib") && <BibBadge className={styles.bib} rider={rider} />}
               <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
               {visibleFields.has("laps") && <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>}
               {visibleFields.has("time") && (

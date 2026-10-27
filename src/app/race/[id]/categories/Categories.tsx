@@ -11,6 +11,8 @@ import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes, normali
 import { getCategoryStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
 import { finishGroupLabel } from "@/utils/finishGroups";
+import { normalizeColor } from "@/utils/bibColors";
+import BibBadge from "@/components/ui/BibBadge";
 import { formatMinLap, LEGACY_MIN_LAP_SECONDS, MIN_LAP_CHOICES } from "@/utils/minLap";
 import { isLeaderFinishAll } from "@/utils/linkedGroups";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
@@ -214,6 +216,16 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     // their stored value, and laps can't drop below what riders already rode.
     const locks = getCategoryLocks(category, riders.filter((r) => r.raceUuid === raceUuid));
     const updatedCategory = { ...category, ...editForm } as CategoryProps;
+    // Bib colours: stored normalized (#RRGGBB) or empty; an unknown value is refused, not guessed.
+    for (const [field, label] of [["bibColor", "Bib background"], ["bibTextColor", "Bib text"]] as const) {
+      const typed = String(editForm[field] ?? "").trim();
+      const norm = normalizeColor(typed);
+      if (typed && !norm) {
+        setEditError(`${label} color "${typed}" is not recognised — use a colour name or #RRGGBB.`);
+        return;
+      }
+      updatedCategory[field] = norm;
+    }
     if (locks.color) updatedCategory.color = category.color;
     if (locks.wave) updatedCategory.heat = category.heat;
     if (locks.startTime) updatedCategory.startTime = category.startTime;
@@ -636,6 +648,35 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                         onChange={(e) => setEditForm({ ...editForm, linkGroup: e.target.value })}
                       />
                     </label>
+
+                    {/* Bib colours: defaults for this category's riders (a rider can override them) */}
+                    <div className={styles.linkedFinishRow}>
+                      <span className={styles.linkedFinishLabel}>
+                        Bib colors
+                        <span className={styles.linkedFinishHint}>A colour name (e.g. "blue", "צהוב") or a hex value (#1E88E5). Empty = plain bib.</span>
+                      </span>
+                      <input
+                        type="text"
+                        className={styles.input}
+                        dir="auto"
+                        aria-label="Bib Background Color"
+                        data-testid="category-bib-color"
+                        placeholder="Background"
+                        value={editForm.bibColor ?? ""}
+                        onChange={(e) => setEditForm({ ...editForm, bibColor: e.target.value })}
+                      />
+                      <input
+                        type="text"
+                        className={styles.input}
+                        dir="auto"
+                        aria-label="Bib Text Color"
+                        data-testid="category-bib-text-color"
+                        placeholder="Digits"
+                        value={editForm.bibTextColor ?? ""}
+                        onChange={(e) => setEditForm({ ...editForm, bibTextColor: e.target.value })}
+                      />
+                      <BibBadge rider={{ bibNumber: 123, bibColor: null, bibTextColor: null, raceUuid, category: "", subCategory: null }} category={{ bibColor: normalizeColor(editForm.bibColor), bibTextColor: normalizeColor(editForm.bibTextColor) }} />
+                    </div>
 
                     <div className={styles.editActions}>
                       <Button
