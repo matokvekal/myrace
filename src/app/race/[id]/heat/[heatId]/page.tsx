@@ -17,9 +17,8 @@ import { useLapRecording } from "./useLapRecording";
 import { minLapMsFor } from "@/utils/minLap";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
-import BibWarning from "../../../components/bibWarning/BibWarning";
 import useUIStore from "@/stores/uiStore";
-import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
+import { computeGroupSignals, riderGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
@@ -237,13 +236,20 @@ const Heat: React.FC = () => {
   );
   const groupOf = (rider: RiderProps) => {
     const cat = waveCategories.find((c) => riderInCategory(rider, c));
-    return cat ? categoryGroupKey(cat) : null;
+    // Group AND the rider's own lap target: a shared finish never ends a longer race early.
+    return cat ? riderGroupKey(cat, withCategoryLaps([rider], waveCategories)[0]) : null;
   };
   const isOnTrackAfterEnd = (rider: RiderProps): boolean => {
     if (categories.find((c) => riderInCategory(rider, c))?.status === "finished") return true;
     const g = groupOf(rider);
     return g != null && rider.raceStatus !== "finished" && groupSignals.finish.has(g);
   };
+  // The ON TRACK badge / count: only once the rider's category was actually ended
+  // (Finish Wave / Finish Race) and they are still out — never during normal
+  // racing, where the shared finish already shows as the chequered flag.
+  const isLeftOnTrack = (rider: RiderProps): boolean =>
+    rider.raceStatus !== "finished" &&
+    categories.find((c) => riderInCategory(rider, c))?.status === "finished";
 
 
   // Persist the action log (and Joker queue) per wave so a mid-wave reload
@@ -795,23 +801,6 @@ const Heat: React.FC = () => {
         </Suspense>
       )}
 
-      {/* Upcoming categories Start would refuse — tap one to open its wave in Race */}
-      <BibWarning
-        raceUuid={raceUuid}
-        categories={categories}
-        riders={riders}
-        onFix={(cat) => {
-          const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
-          const wave = [...schedule.keys()].find((w) =>
-            [...(schedule.get(w)?.values() ?? [])].flat().some((c) => c.id === cat.id)
-          );
-          const ui = useUIStore.getState();
-          if (wave != null) ui.setSelectedWave(wave);
-          ui.setRaceMode(true);
-          navigate(`/race/${raceUuid}`);
-        }}
-      />
-
       {/* Rider detail modal (double-click) */}
       {contextRider && (
         <RiderLiveModal
@@ -1150,7 +1139,7 @@ const Heat: React.FC = () => {
                 <span className={styles.filterActive}> · {filterCats.size} filtered</span>
               )}
               {(() => {
-                const onTrack = runningRiders.filter(isOnTrackAfterEnd).length;
+                const onTrack = runningRiders.filter(isLeftOnTrack).length;
                 return onTrack > 0 ? (
                   <span
                     className={styles.onTrackTotal}
@@ -1197,7 +1186,7 @@ const Heat: React.FC = () => {
                   forceFinish={(() => { const g = groupOf(rider); return g != null && groupSignals.finish.has(g); })()}
                   isFlashing={flashingRiderId === rider.id}
                   isRecorded={pendingMoveSet.has(rider.id)}
-                  raceEnded={isOnTrackAfterEnd(rider)}
+                  raceEnded={isLeftOnTrack(rider)}
                   onClick={(at) => handleRiderClick(rider, "click", at)}
                   onDoubleClick={() => setContextRider(rider)}
                 />

@@ -74,8 +74,12 @@ export const effectiveTotalLaps = (c: SharedCategory | undefined, r: SharedRider
 
 const leaderFinishAll = (state: RaceState) => state.race.leaderFinishAll !== false;
 
-/** When the first rider of the group completed every lap, or null. */
-export function groupFinishAt(state: RaceState, c: SharedCategory, except?: RiderUuid): number | null {
+/**
+ * When the first rider of the group completed every lap, or null. With
+ * `targetLaps`, only riders racing that same distance count: a shorter
+ * category's finish never ends a longer category's race (Finish Groups).
+ */
+export function groupFinishAt(state: RaceState, c: SharedCategory, except?: RiderUuid, targetLaps?: number): number | null {
   if (!leaderFinishAll(state)) return null;
   const key = groupKey(c);
   let first: number | null = null;
@@ -85,6 +89,7 @@ export function groupFinishAt(state: RaceState, c: SharedCategory, except?: Ride
       if (r.uuid === except || OUT.has(r.status)) continue;
       const laps = effectiveTotalLaps(cat, r);
       if (laps <= 0 || r.lapsCounter < laps || r.raceStatus !== "finished") continue;
+      if (targetLaps !== undefined && targetLaps > 0 && laps !== targetLaps) continue; // another distance
       const end = r.lapsDetails[laps - 1]?.endTime;
       const t = end ? Date.parse(end) : NaN;
       if (Number.isFinite(t) && (first === null || t < first)) first = t;
@@ -122,7 +127,7 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
   const totalLaps = effectiveTotalLaps(cat, r);
   const startMs = cat?.startedAt ?? null;
   const catFinishedAt = cat?.finishedAt ?? null;
-  const groupDoneAt = cat ? groupFinishAt(state, cat, r.uuid) : null;
+  const groupDoneAt = cat ? groupFinishAt(state, cat, r.uuid, totalLaps) : null;
 
   const minLap = raceMinLapMs(state);
   const sorted = marks.filter((m) => !m.undone).slice().sort((a, b) => a.at - b.at || a.seq - b.seq);

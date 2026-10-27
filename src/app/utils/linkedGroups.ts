@@ -18,6 +18,19 @@ export function categoryGroupKey(cat: Pick<CategoryProps, "name" | "subCategory"
 
 const OUT_STATUSES = ["DNF", "DSQ", "DNS"];
 
+/**
+ * The bell / finish key of a rider: their group AND their own lap target. A
+ * shared finish ("first finish – all finish", Finish Groups) only joins riders
+ * racing the same distance: when a shorter category's leader finishes, riders
+ * of a longer category in the same Finish Group keep racing their own laps.
+ */
+export function riderGroupKey(
+  cat: Pick<CategoryProps, "name" | "subCategory" | "linkGroup" | "laps">,
+  rider: Pick<RiderProps, "totalLaps">
+): string {
+  return `${categoryGroupKey(cat)}|laps:${rider.totalLaps || cat.laps || 0}`;
+}
+
 export interface GroupSignals {
   /** Groups whose first rider has exactly ONE lap left — everyone shows the bell. */
   bell: Set<string>;
@@ -39,10 +52,10 @@ export function computeGroupSignals(
   const finish = new Set<string>();
   if (!enabled) return { bell, finish };
   for (const cat of categories) {
-    const key = categoryGroupKey(cat);
     for (const r of riders) {
       if (!riderInCategory(r, cat) || OUT_STATUSES.includes(r.status as string)) continue;
       const laps = r.totalLaps || cat.laps || 0;
+      const key = riderGroupKey(cat, r);
       if (laps <= 0 || r.lapsCounter <= 0) continue;
       // Finish needs the FULL lap count — a rider flagged finished early (manual
       // or by a group flag) with fewer laps must not trigger anything.
