@@ -1,5 +1,5 @@
 .joker {
-  width: 76px;
+  width: 92px;
   min-height: 84px;
   border-radius: 16px;
   display: flex;
@@ -87,4 +87,12 @@
   font-weight: 800;
   color: rgba(255, 214, 232, 0.9);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.unknown {
+  font-size: 11px;
+  font-weight: 900;
+  color: #3a1f6e;
+  text-align: center;
+  line-height: 1.1;
 }

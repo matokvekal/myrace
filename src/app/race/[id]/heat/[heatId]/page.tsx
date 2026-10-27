@@ -13,7 +13,7 @@ import useCategoryStore from "@/stores/categoryStore";
 import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { RiderProps } from "@/types/types";
 import { formatTime, formatTimeWithLeadingZeroes, parseClockTime } from "../../../../utils/timeUtils";
-import { useLapRecording } from "./useLapRecording";
+import { useLapRecording, MIN_LAP_MS } from "./useLapRecording";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
 import BibWarning from "../../../components/bibWarning/BibWarning";
@@ -36,6 +36,7 @@ import { useBoardHold } from "@/stores/boardHoldStore";
 import { useJokerQueue, type JokerEntry } from "./useJokerQueue";
 import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
+import { jokerResolveBlock } from "./jokerResolve";
 import { Bike, List, ChevronDown } from "lucide-react";
 import { canViewScreen, isLiveRace } from "@/services/live/liveBridge";
 // Shared races: the sync state where it matters most (offline / waiting to send).
@@ -460,8 +461,10 @@ const Heat: React.FC = () => {
       toast.error(`No active rider with bib ${bibNumber}`);
       return false;
     }
-    if (candidate.timeArrive && new Date(candidate.timeArrive).getTime() > new Date(joker.capturedAt).getTime()) {
-      toast.error(`Bib ${bibNumber} already has a more recent lap recorded`);
+    // Refused before anything is recorded, so the Joker stays and no duplicate lap is made.
+    const blocked = jokerResolveBlock(candidate, joker.capturedAt, MIN_LAP_MS);
+    if (blocked) {
+      toast.error(blocked);
       return false;
     }
     recordLap(candidate, "click", new Date(joker.capturedAt));
@@ -893,10 +896,13 @@ const Heat: React.FC = () => {
                 <button
                   className={styles.jokerBtn}
                   onClick={addJoker}
-                  aria-label="Add Joker"
-                  title="Stamp an unidentified rider's arrival time now"
+                  aria-label="Unknown Rider"
+                  title="Unknown Rider: stamp the passage time now, assign the bib later"
+                  data-testid="unknown-rider-btn"
                 >
                   <Bike size={20} aria-hidden="true" />
+                  <span className={styles.jokerQ} aria-hidden="true">?</span>
+                  <span className={styles.jokerLabel} aria-hidden="true">Unknown Rider</span>
                   {jokers.length > 0 && (
                     <span className={styles.jokerBadge}>{jokers.length}</span>
                   )}

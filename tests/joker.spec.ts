@@ -34,7 +34,7 @@ test.describe("Joker button", () => {
   test("stays hidden until enabled in the side menu", async ({ page }) => {
     await page.clock.install({ time: new Date("2026-07-21T09:00:00") });
     await openLiveDemo(page);
-    await expect(page.getByRole("button", { name: "Add Joker" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Unknown Rider" })).toHaveCount(0);
   });
 
   test("stamps a Joker and resolves it to a bib using the original captured time, undo works", async ({
@@ -52,7 +52,7 @@ test.describe("Joker button", () => {
     // Let real race time pass before stamping — this is the whole point: the
     // eventual lap must land at THIS moment, not when it's resolved later.
     await page.clock.fastForward(90 * 1000);
-    await page.getByRole("button", { name: "Add Joker" }).click();
+    await page.getByRole("button", { name: "Unknown Rider" }).click();
     await expect(jokerCard(page, 1)).toBeVisible();
     await expect(page.getByText("🃏 Unresolved (1)")).toBeVisible();
 
@@ -95,7 +95,7 @@ test.describe("Joker button", () => {
 
     // Stamp a Joker, then record a REAL lap for the same rider afterward — the
     // Joker is now older than the rider's most recent lap.
-    await page.getByRole("button", { name: "Add Joker" }).click();
+    await page.getByRole("button", { name: "Unknown Rider" }).click();
     await page.clock.fastForward(90 * 1000);
     await tap(page, bib);
 
@@ -122,7 +122,7 @@ test.describe("Joker button", () => {
     const bib = await racingBibWithLapsLeft(page, 2);
     const before = await lapsOf(page, bib);
 
-    await page.getByRole("button", { name: "Add Joker" }).click();
+    await page.getByRole("button", { name: "Unknown Rider" }).click();
     await jokerCard(page, 1).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await page.getByRole("button", { name: /Tap again to delete/ }).click();
