@@ -25,10 +25,11 @@ trap finish EXIT
 
 pass() { echo "ok - $*"; }
 fail() { echo "FAIL - $*" >&2; [[ -f "$BASE/state/deploy.log" ]] && tail -n 20 "$BASE/state/deploy.log" >&2; [[ -f "$T/api.log" ]] && tail -n 20 "$T/api.log" >&2; exit 1; }
-gate() { SSH_ORIGINAL_COMMAND="$*" "$BASE/bin/deploy-gate.sh"; }
-refused() { # <stdin file> <command...>: must fail
-  local input=$1; shift
+gate() { COMMISSAIRE_DEPLOY_BASE="$BASE" SSH_ORIGINAL_COMMAND="$*" "$BASE/bin/deploy-gate.sh"; }
+refused() { # <stdin file> <expected message> <command...>: must fail, for that reason
+  local input=$1 why=$2; shift 2
   if gate "$@" < "$input" > "$T/out" 2>&1; then fail "accepted: $*"; fi
+  grep -qF -- "$why" "$T/out" || { cat "$T/out" >&2; fail "refused for another reason than '$why': $*"; }
 }
 free_port() { node -e 'const s=require("net").createServer().listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})'; }
 db() { # <full|recorded-only> → URL
@@ -109,9 +110,9 @@ tar -C "$T/c" -czf "$T/c.tar.gz" REVISION server
 SUM_C=$(sha256sum "$T/c.tar.gz" | cut -d' ' -f1)
 
 # --- Refused input ------------------------------------------------------------------
-refused /dev/null bash -c id;                                     pass "unknown command refused"
-refused /dev/null "activate ../../etc";                           pass "path in release id refused"
-refused "$T/out-$SHA_A/$ID_A.tar.gz" receive "$ID_A" "$(printf '0%.0s' {1..64})"; pass "checksum mismatch refused"
+refused /dev/null "allowed: receive" bash -c id;                                     pass "unknown command refused"
+refused /dev/null "invalid release id" "activate ../../etc";                           pass "path in release id refused"
+refused "$T/out-$SHA_A/$ID_A.tar.gz" "checksum mismatch" receive "$ID_A" "$(printf '0%.0s' {1..64})"; pass "checksum mismatch refused"
 [[ ! -e "$BASE/releases/$ID_A" ]] || fail "refused archive left a release"
 evil() { # <name> <setup in $T/evil-<name>> → archive path; sha
   tar -C "$T/evil-$1" -czf "$T/evil-$1.tar.gz" "${@:2}"
@@ -120,24 +121,24 @@ evil() { # <name> <setup in $T/evil-<name>> → archive path; sha
 mkdir -p "$T/evil-dots/server" && printf '%s\n' "$SHA_A" > "$T/evil-dots/REVISION" && echo x > "$T/evil-dots/x"
 s=$(evil dots --transform 's,^x$,server/../../x,' REVISION server x)
 tar -tzf "$T/evil-dots.tar.gz" | grep -q '\.\./' || fail "test archive has no '..' member"
-refused "$T/evil-dots.tar.gz" receive "20260101T000000Z-${SHA_A:0:12}" "$s"; pass "'..' path refused"
+refused "$T/evil-dots.tar.gz" "unsafe path" receive "20260101T000000Z-${SHA_A:0:12}" "$s"; pass "'..' path refused"
 mkdir -p "$T/evil-link/server" && printf '%s\n' "$SHA_A" > "$T/evil-link/REVISION" && ln -s /etc/passwd "$T/evil-link/server/passwd"
 s=$(evil link REVISION server)
-refused "$T/evil-link.tar.gz" receive "20260101T000001Z-${SHA_A:0:12}" "$s"; pass "symlink refused"
+refused "$T/evil-link.tar.gz" "links or special files" receive "20260101T000001Z-${SHA_A:0:12}" "$s"; pass "symlink refused"
 mkdir -p "$T/evil-env" && tar -xzf "$T/out-$SHA_A/$ID_A.tar.gz" -C "$T/evil-env" && echo "X=1" > "$T/evil-env/server/.env"
 s=$(evil env REVISION server)
-refused "$T/evil-env.tar.gz" receive "20260101T000002Z-${SHA_A:0:12}" "$s"; pass "server/.env in archive refused"
+refused "$T/evil-env.tar.gz" "must not contain server/.env" receive "20260101T000002Z-${SHA_A:0:12}" "$s"; pass "server/.env in archive refused"
 mkdir -p "$T/evil-other" && printf '%s\n' "$SHA_A" > "$T/evil-other/REVISION" && echo x > "$T/evil-other/run.sh"
 s=$(evil other REVISION run.sh)
-refused "$T/evil-other.tar.gz" receive "20260101T000003Z-${SHA_A:0:12}" "$s"; pass "path outside server/ refused"
-refused "$T/out-$SHA_A/$ID_A.tar.gz" receive "20260101T000004Z-${SHA_B:0:12}" "$SUM_A"; pass "REVISION/id mismatch refused"
+refused "$T/evil-other.tar.gz" "unexpected path" receive "20260101T000003Z-${SHA_A:0:12}" "$s"; pass "path outside server/ refused"
+refused "$T/out-$SHA_A/$ID_A.tar.gz" "REVISION does not match" receive "20260101T000004Z-${SHA_B:0:12}" "$SUM_A"; pass "REVISION/id mismatch refused"
 
 # --- Receive and activate A (first deployment) -------------------------------------
 gate receive "$ID_A" "$SUM_A" < "$T/out-$SHA_A/$ID_A.tar.gz" || fail "receive A"
 [[ -L "$BASE/releases/$ID_A/server/.env" && "$(readlink "$BASE/releases/$ID_A/server/.env")" == "$BASE/shared/.env" ]] || fail ".env link"
 if touch "$BASE/releases/$ID_A/server/x" 2>/dev/null; then fail "release is writable"; fi
 pass "A received: verified, read-only, .env linked to shared/"
-refused "$T/out-$SHA_A/$ID_A.tar.gz" receive "$ID_A" "$SUM_A"; pass "existing release never overwritten"
+refused "$T/out-$SHA_A/$ID_A.tar.gz" "already exists" receive "$ID_A" "$SUM_A"; pass "existing release never overwritten"
 gate activate "$ID_A" || fail "activate A"
 [[ "$(health_release)" == "$SHA_A" && "$(readlink "$BASE/current")" == "releases/$ID_A" ]] || fail "A not serving"
 pass "A active and healthy"
@@ -145,7 +146,7 @@ pass "A active and healthy"
 # --- B, then a schema problem blocks activation ------------------------------------
 gate receive "$ID_B" "$SUM_B" < "$T/out-$SHA_B/$ID_B.tar.gz" || fail "receive B"
 write_env "$BROKEN"
-refused /dev/null activate "$ID_B"
+refused /dev/null "schema check failed" activate "$ID_B"
 grep -q "tables missing" "$T/out" || fail "schema check message"
 [[ "$(readlink "$BASE/current")" == "releases/$ID_A" && "$(health_release)" == "$SHA_A" ]] || fail "current changed after a failed schema check"
 pass "schema check failure: not activated, A keeps running"
@@ -156,7 +157,7 @@ pass "B active, previous = A"
 
 # --- C fails its health check → automatic rollback to B ----------------------------
 gate receive "$ID_C" "$SUM_C" < "$T/c.tar.gz" || fail "receive C"
-refused /dev/null activate "$ID_C"
+refused /dev/null "automatically rolled back to" activate "$ID_C"
 grep -q "automatically rolled back to $ID_B" "$T/out" || fail "rollback message"
 [[ "$(readlink "$BASE/current")" == "releases/$ID_B" && "$(health_release)" == "$SHA_B" ]] || fail "not rolled back to B"
 pass "C unhealthy: automatically rolled back to B"
