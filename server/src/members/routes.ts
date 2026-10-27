@@ -37,12 +37,13 @@ const permissionsSchema = z.unknown().superRefine((v, c) => {
 /** Records a membership change in the race log (audit) without changing race data. */
 async function logMemberChange(d: Db, raceUuid: string, actorId: string, payload: { userId: string; roles: MemberRole[] | null; permissions: MemberPermissions }) {
   const s = await d.one<{ lastSeq: number }>(`UPDATE races SET "lastSeq" = "lastSeq" + 1 WHERE uuid = $1 RETURNING "lastSeq"`, [raceUuid]);
+  if (!s) throw raceNotFound(); // deleted meanwhile: the caller's transaction rolls back
   await d.query(
     `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "eventAt", "deviceId", "protocolVersion", "userId", applied)
      VALUES ($1, $2, $3, 'MemberChanged', $4, NULL, now(), 0, now(), 'server', $5, $6, true)`,
-    [randomUUID(), raceUuid, s!.lastSeq, JSON.stringify(payload), PROTOCOL_VERSION, actorId],
+    [randomUUID(), raceUuid, s.lastSeq, JSON.stringify(payload), PROTOCOL_VERSION, actorId],
   );
-  return s!.lastSeq;
+  return s.lastSeq;
 }
 
 /** Advance every Device's cursor past a membership entry (it carries no race data). */
@@ -157,15 +158,25 @@ membersRouter.post("/invitations", route(async (req, res) => {
   if (targets.size === 0) throw new ApiError(400, "invalid", "Choose who to invite, or create a link");
 
   const expiresAt = new Date(Date.now() + body.expiresInDays * 86_400_000);
+  // All rows in one transaction under the race row lock (no foreign keys: a race
+  // deleted meanwhile must not keep invitations); invited accounts must exist.
+  const rows = await tx(async (d) => {
+    if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR SHARE`, [m.raceUuid]))) throw raceNotFound();
+    const out: { id: string; secret: string; key: string; t: { email: string | null; userId: string | null } }[] = [];
+    for (const [key, t] of targets) {
+      if (t.userId && !(await d.one(`SELECT 1 FROM users WHERE id = $1`, [t.userId]))) continue;
+      const secret = randomToken(24);
+      const row = await d.one<{ id: string }>(
+        `INSERT INTO invitations ("raceUuid", email, "userId", "tokenHash", roles, permissions, "maxUses", "createdBy", "expiresAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [m.raceUuid, t.email, t.userId, sha256(secret), body.roles, JSON.stringify(body.permissions), key === "link" ? body.maxUses : 1, m.userId, expiresAt],
+      );
+      out.push({ id: row!.id, secret, key, t });
+    }
+    return out;
+  });
   const created = [];
-  for (const [key, t] of targets) {
-    if (t.userId && !(await db.one(`SELECT 1 FROM users WHERE id = $1`, [t.userId]))) continue;
-    const secret = randomToken(24);
-    const row = await db.one<{ id: string }>(
-      `INSERT INTO invitations ("raceUuid", email, "userId", "tokenHash", roles, permissions, "maxUses", "createdBy", "expiresAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-      [m.raceUuid, t.email, t.userId, sha256(secret), body.roles, JSON.stringify(body.permissions), key === "link" ? body.maxUses : 1, m.userId, expiresAt],
-    );
+  for (const { id, secret, key, t } of rows) {
     const url = inviteUrl(secret);
     let emailTo = t.email;
     if (!emailTo && t.userId) emailTo = (await db.one<{ email: string | null }>(`SELECT email FROM users WHERE id = $1`, [t.userId]))?.email ?? null;
@@ -175,9 +186,9 @@ membersRouter.post("/invitations", route(async (req, res) => {
         `${me.name} invites you to ${race!.name}`,
         `${me.name} invited you to help run "${race!.name}" (${race!.date}) on Commissaire.${body.message ? `\n\n${body.message}` : ""}\n\nOpen this link, sign in, and accept:\n${url}\n\nThe invitation expires on ${expiresAt.toDateString()}.`,
       );
-      await db.query(`UPDATE invitations SET "sentAt" = now() WHERE id = $1`, [row!.id]);
+      await db.query(`UPDATE invitations SET "sentAt" = now() WHERE id = $1`, [id]);
     }
-    created.push({ id: row!.id, email: t.email, userId: t.userId, link: key === "link", url, qrSvg: await QRCode.toString(url, { type: "svg", margin: 1 }) });
+    created.push({ id, email: t.email, userId: t.userId, link: key === "link", url, qrSvg: await QRCode.toString(url, { type: "svg", margin: 1 }) });
   }
   res.status(201).json({ invitations: created });
 }));
@@ -238,8 +249,10 @@ async function accept(i: InvitationRow, userId: string) {
     if (!(await canAccept(d, locked, userId))) {
       throw new ApiError(403, "wrong_account", locked.email ? `This invitation is for ${locked.email}. Sign in with that email (verified) to accept.` : "This invitation is for another account");
     }
-    const owner = await d.one<{ ownerUserId: string }>(`SELECT "ownerUserId" FROM races WHERE uuid = $1`, [locked.raceUuid]);
-    if (owner?.ownerUserId === userId) return null;
+    // Race row lock: a race deleted meanwhile gets no member row (no foreign keys).
+    const owner = await d.one<{ ownerUserId: string }>(`SELECT "ownerUserId" FROM races WHERE uuid = $1 FOR UPDATE`, [locked.raceUuid]);
+    if (!owner) throw raceNotFound();
+    if (owner.ownerUserId === userId) return null;
     await d.query(
       `INSERT INTO race_members ("raceUuid", "userId", roles, permissions, "invitationId", "addedBy")
        VALUES ($1, $2, $3, $4, $5, $6)

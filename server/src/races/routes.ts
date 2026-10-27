@@ -15,7 +15,7 @@ import { deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 import { accessSummary, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
 import { processActions } from "./actions.js";
-import { insertRace, loadState } from "./repo.js";
+import { deleteRaceRows, insertRace, loadState } from "./repo.js";
 import { newCategory, newRider } from "./schemas.js";
 
 export const racesRouter = Router();
@@ -235,13 +235,17 @@ racesRouter.post("/:raceUuid/sync", route(async (req, res) => {
   const body = z.object({ deviceId: z.string().min(1).max(100), lastSeq: z.number().int().min(0), pendingCount: z.number().int().min(0), appVersion: z.string().max(40).optional() }).parse(req.body);
   const m = await loadMembership(db, raceUuidOf(req), authed(req).userId);
   if (!m) throw raceNotFound();
-  await db.query(
-    `INSERT INTO sync_cursors ("raceUuid", "deviceId", "userId", "lastSeq", "pendingCount", "appVersion", "lastSeenAt")
-     VALUES ($1, $2, $3, $4, $5, $6, now())
-     ON CONFLICT ("raceUuid", "deviceId") DO UPDATE SET "userId" = EXCLUDED."userId", "lastSeq" = EXCLUDED."lastSeq",
-       "pendingCount" = EXCLUDED."pendingCount", "appVersion" = EXCLUDED."appVersion", "lastSeenAt" = now()`,
-    [m.raceUuid, body.deviceId, m.userId, body.lastSeq, body.pendingCount, body.appVersion ?? null],
-  );
+  // Under the race row lock (FOR SHARE), so a race deleted meanwhile leaves no cursor behind.
+  await tx(async (d) => {
+    if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR SHARE`, [m.raceUuid]))) throw raceNotFound();
+    await d.query(
+      `INSERT INTO sync_cursors ("raceUuid", "deviceId", "userId", "lastSeq", "pendingCount", "appVersion", "lastSeenAt")
+       VALUES ($1, $2, $3, $4, $5, $6, now())
+       ON CONFLICT ("raceUuid", "deviceId") DO UPDATE SET "userId" = EXCLUDED."userId", "lastSeq" = EXCLUDED."lastSeq",
+         "pendingCount" = EXCLUDED."pendingCount", "appVersion" = EXCLUDED."appVersion", "lastSeenAt" = now()`,
+      [m.raceUuid, body.deviceId, m.userId, body.lastSeq, body.pendingCount, body.appVersion ?? null],
+    );
+  });
   const last = await db.one<{ lastSeq: number }>(`SELECT "lastSeq" FROM races WHERE uuid = $1`, [m.raceUuid]);
   res.json({ lastSeq: last?.lastSeq ?? 0, serverTime: Date.now() });
 }));
@@ -271,6 +275,8 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
   requireOwner(m);
   await tx(async (d) => {
+    // Race row lock first: a concurrent delete either finishes before (404) or waits.
+    if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]))) throw raceNotFound();
     const ok = await d.one(`SELECT 1 FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`, [m.raceUuid, target]);
     if (!ok) throw new ApiError(400, "invalid", "The new owner must be an active member of the race");
     await d.query(`UPDATE races SET "ownerUserId" = $2 WHERE uuid = $1`, [m.raceUuid, target]);
@@ -285,11 +291,11 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
   res.json({ ownerUserId: target });
 }));
 
-/** DELETE /races/:raceUuid — owner only; removes the race and everything in it. */
+/** DELETE /races/:raceUuid — owner only; removes the race and every row of it, in one transaction. */
 racesRouter.delete("/:raceUuid", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
   requireOwner(m);
-  await db.query(`DELETE FROM races WHERE uuid = $1`, [m.raceUuid]);
+  if (!(await tx((d) => deleteRaceRows(d, m.raceUuid)))) throw raceNotFound();
   await closeRace(m.raceUuid);
   res.status(204).end();
 }));
