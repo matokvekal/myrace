@@ -1283,3 +1283,30 @@
     display: none;
   }
 }
+
+/* Finish Wave (manual, from Live) */
+.finishWaveBtn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  border: 2px solid #b91c1c;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.finishWaveBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.waveFinishedTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: #e5e7eb;
+  color: #111827;
+  font-weight: 800;
+}

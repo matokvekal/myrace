@@ -39,8 +39,11 @@ import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
 import { jokerResolveBlock } from "./jokerResolve";
 import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
+import { planWaveFinish } from "@/utils/waveFinish";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { Bike, List, ChevronDown } from "lucide-react";
-import { canViewScreen, isLiveRace } from "@/services/live/liveBridge";
+import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
+import { AuditLogService } from "@/services/auditLog/auditLogService";
 // Shared races: the sync state where it matters most (offline / waiting to send).
 const SyncBadge = lazy(() => import("../../../../live/SyncBadge"));
 
@@ -434,6 +437,50 @@ const Heat: React.FC = () => {
     [startedWaveCats]
   );
 
+  // ── Finish Wave (manual, from Live) ── one rule with Race → Start (planWaveFinish):
+  // only THIS wave; recorded laps and times kept; riders still racing become
+  // administrative finishers (no invented crossing time). Idempotent.
+  const [showFinishWave, setShowFinishWave] = useState(false);
+  const finishingWaveRef = useRef(false);
+  const waveAllRiders = useMemo(
+    () => riders.filter((r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))),
+    [riders, raceUuid, waveCategories]
+  );
+  const waveStillRacing = waveAllRiders.filter((r) => r.raceStatus === "running" && !["DNF", "DSQ", "DNS"].includes(r.status)).length;
+  const waveAllFinished = waveCategories.length > 0 && waveCategories.every((c) => c.status === "finished");
+  const finishWaveFromLive = async () => {
+    if (finishingWaveRef.current || waveAllFinished || heatId == null) return; // no double execution
+    if (!liveAllows(raceUuid, "WaveFinished", { heat: heatId })) return;
+    finishingWaveRef.current = true;
+    try {
+      const now = new Date();
+      if (isLiveRace(raceUuid)) void liveDispatch(raceUuid, "WaveFinished", { heat: heatId });
+      const plan = planWaveFinish(waveCategories, storeRiders, raceUuid, now);
+      for (const cat of plan.categories) await useCategoryStore.getState().updateCategory(cat);
+      if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
+      if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
+      if (currentRace) {
+        AuditLogService.log({
+          race: currentRace,
+          action: "FINISH_WAVE",
+          screen: "Live",
+          entityType: "wave",
+          entityId: heatId,
+          details: {
+            finishedAt: now.toISOString(),
+            categories: plan.categories.map((c) => c.name),
+            administrativelyFinished: plan.closedOut.map((r) => r.bibNumber),
+            alreadyFinished: plan.finalized.map((r) => r.bibNumber),
+          },
+        });
+      }
+      toast.success(`Wave ${heatId} finished — ${plan.closedOut.length} rider${plan.closedOut.length === 1 ? "" : "s"} still racing marked as finished (administrative).`);
+      setShowFinishWave(false);
+    } finally {
+      finishingWaveRef.current = false;
+    }
+  };
+
   const toggleCatFilter = (key: string) => {
     setFilterCats((prev) => {
       const next = new Set(prev);
@@ -753,6 +800,18 @@ const Heat: React.FC = () => {
         />
       )}
 
+      {showFinishWave && heatId != null && (
+        <DeleteConfirmModal
+          title={`Finish Wave ${heatId}?`}
+          description={`Wave ${heatId}: ${waveAllRiders.length} rider${waveAllRiders.length === 1 ? "" : "s"}, ${waveStillRacing} still racing. All remaining active riders in this wave will be marked as finished (administrative — no finish time is invented; their recorded laps and times are kept). Other waves are not affected.`}
+          confirmWord="FINISH"
+          confirmLabel="Finish Wave"
+          busyLabel="Finishing…"
+          onConfirm={finishWaveFromLive}
+          onCancel={() => setShowFinishWave(false)}
+        />
+      )}
+
       {/* Joker resolve modal — assign a bib to an unidentified stamped tap */}
       {resolvingJoker && (
         <JokerResolveModal
@@ -897,6 +956,22 @@ const Heat: React.FC = () => {
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchWrapperLeft}>
+              {waveCategories.length > 0 && (
+                waveAllFinished ? (
+                  <span className={styles.waveFinishedTag} data-testid="wave-finished-tag">Finished</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.finishWaveBtn}
+                    data-testid="finish-wave-btn"
+                    disabled={startedWaveCats.length === 0}
+                    title={startedWaveCats.length === 0 ? "This wave has not started" : "Finish this wave now"}
+                    onClick={() => setShowFinishWave(true)}
+                  >
+                    Finish Wave
+                  </button>
+                )
+              )}
               {jokerEnabled && (
                 <button
                   className={styles.jokerBtn}

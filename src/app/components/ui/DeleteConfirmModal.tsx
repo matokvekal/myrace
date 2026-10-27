@@ -8,8 +8,12 @@ interface DeleteConfirmModalProps {
   description: string;
   onConfirm: () => Promise<void> | void;
   onCancel: () => void;
-  /** Ask the user to type DELETE (bulk deletes). Off: a plain Delete button, for one item. */
+  /** Ask the user to type the confirm word (bulk deletes). Off: a plain confirm button, for one item. */
   requireTyping?: boolean;
+  /** The word to type (default DELETE), and the button labels. */
+  confirmWord?: string;
+  confirmLabel?: string;
+  busyLabel?: string;
 }
 
 export default function DeleteConfirmModal({
@@ -17,12 +21,15 @@ export default function DeleteConfirmModal({
   description,
   onConfirm,
   onCancel,
-  requireTyping = true
+  requireTyping = true,
+  confirmWord = "DELETE",
+  confirmLabel = "Confirm Delete",
+  busyLabel = "Deleting…"
 }: DeleteConfirmModalProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isValid = !requireTyping || input.toUpperCase() === "DELETE";
+  const isValid = !requireTyping || input.trim().toUpperCase() === confirmWord;
 
   const handleConfirm = async () => {
     if (!isValid || loading) return;
@@ -44,7 +51,7 @@ export default function DeleteConfirmModal({
         {requireTyping && (
         <div className={styles.confirmGroup}>
           <label className={styles.label}>
-            Type <strong>DELETE</strong> to confirm
+            Type <strong>{confirmWord}</strong> to confirm
           </label>
           <input
             className={styles.input}
@@ -52,7 +59,7 @@ export default function DeleteConfirmModal({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
-            placeholder="DELETE"
+            placeholder={confirmWord}
             autoFocus
           />
         </div>
@@ -67,7 +74,7 @@ export default function DeleteConfirmModal({
             onClick={handleConfirm}
             disabled={!isValid || loading}
           >
-            {loading ? "Deleting…" : "Confirm Delete"}
+            {loading ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

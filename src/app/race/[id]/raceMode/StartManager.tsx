@@ -8,6 +8,7 @@ import Icons from "@/constants/Icons";
 import Button from "@/components/ui/Button";
 import { Plus, Edit2, GripVertical, X, Trash2, AlertTriangle, Play, Pause, Flag, ChevronUp, ChevronDown } from "lucide-react";
 import { riderInCategory } from "../schedule/Schedule";
+import { planWaveFinish } from "@/utils/waveFinish";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
 import { isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 
@@ -753,23 +754,13 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
     if (isLiveRace(raceUuid)) void liveDispatch(raceUuid, "WaveFinished", { heat });
     const now = new Date();
     setCountdown(null);
-
-    for (const cat of categories) {
-      if (cat.status === "finished") continue;
-      const wasStarted = cat.status === "running";
-      await updateCategory({ ...cat, status: "finished" as const, finishedAt: now.getTime() });
-      // Categories that never started have no riders on the road to finalize.
-      if (!wasStarted) continue;
-
-      const updatedRiders = closeOutCategoryRiders(cat, now);
-      if (updatedRiders.length > 0) await updateAllRiders(updatedRiders);
-    }
-
-    // The wave is over: nobody is coming back to be clicked in, so every rider
-    // still on the road is closed out as a finisher on the laps they completed.
-    // Unlike finishing a single start, there is no "next crossing" left.
-    const closedOut = ridersStillOnTrack(categories).map(closeOutRiderOnTrack);
-    if (closedOut.length > 0) await updateAllRiders(closedOut);
+    // One wave-finish rule for Race → Start and Live (utils/waveFinish.ts):
+    // categories closed, finished riders finalized, riders still on the road
+    // closed out as (administrative) finishers on the laps they completed.
+    const plan = planWaveFinish(categories, riders, raceUuid, now);
+    for (const cat of plan.categories) await updateCategory(cat);
+    if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
+    if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
   };
 
   const adjustTime = (groupId: string, seconds: number) => {

@@ -4,6 +4,7 @@ import styles from "./results.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
 import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
+import { isAdministrativeFinish } from "@/utils/waveFinish";
 import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
@@ -262,6 +263,11 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
                 {showMedal ? MEDAL[idx] : posLabel}
               </span>
               {visibleFields.has("bib") && <BibBadge className={styles.bib} rider={rider} />}
+              {isAdministrativeFinish(rider) && (
+                <span className={styles.adminFinish} data-testid="admin-finish" title="Finished administratively when the wave was closed: no finish-line time was recorded">
+                  Admin finish
+                </span>
+              )}
               <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
               {visibleFields.has("laps") && <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>}
               {visibleFields.has("time") && (
