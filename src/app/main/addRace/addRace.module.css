@@ -350,3 +350,13 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.previewMapping summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.previewMapping ul {
+  margin: 4px 0 0;
+  padding-inline-start: 18px;
+  font-size: 13px;
+}

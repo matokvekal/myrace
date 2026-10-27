@@ -197,12 +197,16 @@ function findBestFieldMatch(
 
    const isSeedOrderHeader = SEED_ORDER_ALIASES.has(normalized);
    const isAmbiguousHeader = AMBIGUOUS_ALIASES.has(normalized);
+   const isRankingHeader = /דירוג|rank/i.test(columnName);
 
    for (const fieldKeywords of FIELD_KEYWORDS) {
       if (usedFields.has(fieldKeywords.field)) continue;
 
       // A serial/seed-order column is the pre-race standing, never the bib.
       if (isSeedOrderHeader && fieldKeywords.field === 'bibNumber') continue;
+
+      // A ranking column ("דירוג UCI", "UCI ranking") is a ranking, never the rider's UCI ID.
+      if (isRankingHeader && fieldKeywords.field === 'uciNumber') continue;
 
       // For mixed-language columns try all keywords; otherwise restrict to detected language
       const keywords = language === 'mixed'

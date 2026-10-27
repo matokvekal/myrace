@@ -4,6 +4,10 @@ import { autoMapColumns } from "@/services/csvMapper";
 import { buildHeatNameMap, filterImportRows, rowToRider, type ImportSkipReason } from "@/services/riderRowMapper";
 
 export interface StartListPreview {
+  /** How each column was read (header → field, or "—" when not used). */
+  mapping: { header: string; field: string | null }[];
+  /** "column": waves from an explicit wave column; "start times": no wave column — waves follow start times. */
+  waveSource: "column" | "start times";
   riders: number;
   waves: { wave: number; riders: number }[];
   categories: { name: string; wave: number; riders: number }[];
@@ -28,6 +32,12 @@ export async function previewStartListRows(rows: string[][]): Promise<StartListP
   const { rows: dataRows, skipped } = filterImportRows(rows.slice(1), headers, mappings);
   const heatMap = buildHeatNameMap(dataRows, mappings);
   const riders = dataRows.map((r, i) => rowToRider(r, mappings, "preview", i, heatMap));
+  if (!mapped.has("category")) {
+    throw new Error(`No column was recognised as Category, so no categories can be created. Detected headers: ${headers.join(", ") || "(none)"}`);
+  }
+  if (riders.length > 0 && riders.every((r) => !r.category)) {
+    throw new Error("The Category column is empty for every rider, so no categories can be created.");
+  }
 
   const waveCount = new Map<number, number>();
   const catCount = new Map<string, { name: string; wave: number; riders: number }>();
@@ -58,6 +68,8 @@ export async function previewStartListRows(rows: string[][]): Promise<StartListP
   if (headerRows) warnings.push(`${headerRows} repeated header row(s) skipped — they will not become riders or waves`);
 
   return {
+    mapping: headers.map((h, i) => ({ header: h, field: mappings[i]?.targetField ?? null })),
+    waveSource: mapped.has("heat") ? "column" : "start times",
     riders: riders.length,
     waves: [...waveCount.entries()].sort((a, b) => a[0] - b[0]).map(([wave, n]) => ({ wave, riders: n })),
     categories: [...catCount.values()].sort((a, b) => a.wave - b.wave || a.name.localeCompare(b.name)),

@@ -1,4 +1,5 @@
 import useRaceStore from "@/stores/racesStore";
+import useCategoryStore from "@/stores/categoryStore";
 import { DEFAULT_MIN_LAP_SECONDS } from "./minLap";
 import { RaceProps } from "@/types/types";
 import { FormEvent } from "react";
@@ -113,8 +114,24 @@ export const saveRace = async (
         } else {
           await saveRidersFromCsv(await file.text(), newRace.uuid);
         }
+        // Categories first, independent of waves: every imported rider must
+        // belong to a created category. Zero categories = a failed import.
+        await useCategoryStore.getState().createCategoriesFromRiders(newRace.uuid);
+        const created = useCategoryStore.getState().categories.filter((c) => c.raceUuid === newRace.uuid);
+        const imported = useRiderStore.getState().riders.filter((r) => r.raceUuid === newRace.uuid);
+        if (imported.length > 0 && created.length === 0) {
+          throw new Error("No categories could be created from this file — check that a column is recognised as Category. The race was not saved.");
+        }
       } catch (error) {
         console.error("Error saving riders at saveRidersFromCsv", error);
+        // Never keep a half-created race: remove only what THIS save created
+        // (race first, so the lock no longer protects its riders — AGENTS.md).
+        try {
+          await useRaceStore.getState().deleteRace(newRace.uuid);
+          await useRiderStore.getState().deleteRidersByRace(newRace.uuid);
+        } catch (cleanupError) {
+          console.error("Could not roll back the new race", cleanupError);
+        }
         throw error;
       }
     }

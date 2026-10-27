@@ -29,6 +29,13 @@ const RACE_TYPES: { value: RaceType; label: string; soon?: boolean }[] = [
 ];
 
 const today = new Date().toISOString().split("T")[0];
+
+/** Readable names of the import fields shown in the preview's column list. */
+const FIELD_LABEL: Record<string, string> = {
+  bibNumber: "Bib", firstName: "First name", lastName: "Last name", fullName: "Full name", category: "Category",
+  subCategory: "Sub-category", team: "Team", heat: "Wave", startTime: "Start time", totalLaps: "Laps", standing: "Standing",
+  uciNumber: "UCI ID", uciPoints: "UCI points", federation: "Federation", bibColor: "Bib color", bibTextColor: "Bib text color",
+};
 const BASE = import.meta.env.BASE_URL; // "/commissire-race/" in prod, "/" in dev
 
 const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
@@ -126,6 +133,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
   };
 
   const importBlocked = !!ridersFile && (!!previewError || !preview || !previewConfirmed);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -146,6 +154,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
       );
     } catch (error) {
       console.error("Failed to save race:", error);
+      setSaveError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -290,6 +299,11 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
             )}
           </div>
 
+          {saveError && (
+            <div className={styles.previewError} role="alert" data-testid="save-error">
+              {saveError}
+            </div>
+          )}
           {previewError && (
             <div className={styles.previewError} role="alert" data-testid="import-preview-error">
               This file cannot be imported: {previewError}
@@ -298,15 +312,26 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
           {preview && (
             <div className={styles.preview} data-testid="import-preview">
               <strong>Import preview</strong>
+              <details className={styles.previewMapping} data-testid="import-preview-mapping">
+                <summary>Columns detected ({preview.mapping.filter((m) => m.field).length} of {preview.mapping.length} used)</summary>
+                <ul>
+                  {preview.mapping.map((m, i) => (
+                    <li key={`${m.header}-${i}`} dir="auto">
+                      {m.header || "(no header)"} → {m.field ? FIELD_LABEL[m.field] ?? m.field : "not used"}
+                    </li>
+                  ))}
+                </ul>
+              </details>
               <p>
                 {preview.riders} rider{preview.riders === 1 ? "" : "s"} · {preview.categories.length} categor
-                {preview.categories.length === 1 ? "y" : "ies"} · {preview.waves.length} wave{preview.waves.length === 1 ? "" : "s"}
+                {preview.categories.length === 1 ? "y" : "ies"} ·{" "}
+                {preview.waveSource === "column" ? `${preview.waves.length} wave${preview.waves.length === 1 ? "" : "s"} (wave column)` : "waves from start times"}
                 {preview.skipped.length > 0 && ` · ${preview.skipped.length} row(s) skipped`}
               </p>
               <ul className={styles.previewList}>
                 {preview.categories.map((c) => (
                   <li key={`${c.name}::${c.wave}`} dir="auto">
-                    Wave {c.wave || "—"} · {c.name} · {c.riders}
+                    {preview.waveSource === "column" ? `Wave ${c.wave || "—"} · ` : ""}{c.name} · {c.riders}
                   </li>
                 ))}
               </ul>

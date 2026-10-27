@@ -331,26 +331,23 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
    },
    {
       field: 'heat',
+      // Only an explicit start-wave column is a wave. Colour, stage, round or
+      // "מקצה" (the race class — see category) are never waves: absent a wave
+      // column, waves come from start times.
       hebrew: [
-         'גל', 'גל התחלה', 'גל פתיחה', 'גל מס\'',
-         // Some organisers mark the wave by colour ("אדום" / "Red" → one wave)
-         'צבע', 'צבע גל', 'סבב', 'קבוצת התחלה', 'קבוצת פתיחה',
-         'עלייה', 'שלב'
+         'גל', 'גל זינוק', 'גל התחלה', 'גל פתיחה', 'גל מס\'', 'מספר גל', 'קבוצת זינוק'
       ],
       english: [
          'wave', 'wave no', 'wave number', 'wave#', 'wave num',
          'heat', 'heat no', 'heat number', 'heat#',
-         'flight', 'flight no',
-         'color', 'colour', 'wave color', 'wave colour',
-         'start group', 'start wave', 'start heat', 'startgroup',
-         'group no', 'group number'
+         'start group', 'start wave', 'start heat', 'startgroup'
       ],
       priority: 7
    },
    {
       field: 'startTime',
       hebrew: [
-         'שעה', 'שעת התחלה', 'זמן התחלה',
+         'שעה', 'שעת התחלה', 'זמן התחלה', 'שעת זינוק', 'זמן זינוק', 'זינוק',
          'זמן פתיחה', 'שעת פתיחה', 'זמן', 'שעת סטארט'
       ],
       english: [
@@ -432,7 +429,8 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
    {
       field: 'uciNumber',
       hebrew: ['מספר UCI', 'מזהה UCI', 'UCI ID', 'קוד UCI'],
-      english: ['uci id', 'uci number', 'uci no', 'uci code', 'uciid', 'uci'],
+      // Not a bare "uci": "דירוג UCI" / "UCI ranking" is a ranking, not the 11-digit UCI ID.
+      english: ['uci id', 'uci number', 'uci no', 'uci code', 'uciid'],
       priority: 6
    },
    {
@@ -508,7 +506,9 @@ export function withoutIdFields(
  */
 export const AMBIGUOUS_ALIASES = new Set<string>([
    'no', 'no.', 'num', 'number', '#', 'sno', 'sn',
-   'מס', 'מס.', "מס'", 'מספר', 'רוכב'
+   'מס', 'מס.', "מס'", 'מספר', 'רוכב',
+   // "מקצה" alone is the race class; a real "קטגוריה" column must win over it.
+   'מקצה'
 ]);
 
 /**

@@ -17,7 +17,7 @@ describe("Create Race → start-list preview", () => {
     await user.upload(document.getElementById("ridersFileUpload") as HTMLInputElement, new File([csv], "start.csv", { type: "text/csv" }));
 
     const preview = await screen.findByTestId("import-preview");
-    expect(preview).toHaveTextContent("2 riders · 2 categories · 2 waves · 1 row(s) skipped");
+    expect(preview).toHaveTextContent("2 riders · 2 categories · 2 waves (wave column) · 1 row(s) skipped");
     expect(screen.getByTestId("import-preview-warnings")).toHaveTextContent(/repeated header/);
     const done = screen.getByRole("button", { name: "Done" });
     expect(done).toBeDisabled();
