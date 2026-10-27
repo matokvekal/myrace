@@ -158,8 +158,8 @@
   }
 }
 
-/* Very narrow phones only: no room for words — fall back to icon-only */
-@media (max-width: 380px) {
+/* Compact (Live header) under 820px: icon-only, so the clock and settings never overlap */
+@media (max-width: 820px) {
   .compactOnMobile .btn {
     padding: 8px 9px;
     gap: 0;

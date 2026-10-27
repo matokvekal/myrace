@@ -1327,3 +1327,119 @@
   background: #1d4ed8;
   color: #fff;
 }
+
+/* ── LIVE control area (redesign) ─────────────────────────────────────────
+   Entry row: Unknown Rider · bib (prominent, grows) · RECAP.
+   Wave row, separated by a divider: wave switcher · Finish Wave. */
+.entryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border-soft, rgba(20, 40, 80, 0.1));
+  padding-top: 8px;
+  margin-top: 2px;
+}
+.bibEntry {
+  flex: 1 1 auto;
+  min-width: 120px;
+  max-width: 360px;
+  margin: 0 auto;
+}
+.bibEntry .searchInput {
+  height: 52px;
+  font-size: 24px;
+}
+.entryRow .jokerBtn,
+.entryRow .recapBtn {
+  flex: 0 0 auto;
+  min-height: 48px;
+}
+.entryRow .jokerBtn {
+  min-width: 64px;
+}
+.jokerBtn .jokerQ {
+  font-size: 24px;
+}
+.waveRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-soft, rgba(20, 40, 80, 0.15));
+}
+.waveRowStart {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.waveRow .finishWaveBtn {
+  min-height: 44px;
+  margin-inline-start: auto;
+}
+
+/* ── RECAP MODE: unmistakably different from normal Live ── */
+.heatRecap {
+  background: repeating-linear-gradient(135deg, #fef3c7 0 18px, #fde68a 18px 36px) !important;
+}
+.controlPanelRecap {
+  border: 3px solid #b45309;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35);
+}
+.recapBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #78350f;
+  color: #fff;
+}
+.recapBannerTitle {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  font-size: 15px;
+}
+.recapBannerHint {
+  flex: 1 1 200px;
+  font-size: 13px;
+  opacity: 0.95;
+}
+.recapExit {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: 2px solid #fff;
+  background: #fff;
+  color: #78350f;
+  font-weight: 900;
+  cursor: pointer;
+}
+.heatRecap .recapBtn {
+  background: #78350f;
+  border-color: #78350f;
+  color: #fff;
+}
+
+/* Tablet / phone: keep the bib field big; nothing clipped. */
+@media (max-width: 640px) {
+  .entryRow {
+    gap: 6px;
+  }
+  .bibEntry {
+    max-width: none;
+  }
+  .entryRow .recapBtn {
+    padding: 0 10px;
+  }
+}
+@media (max-width: 380px) {
+  .entryRow .jokerBtn {
+    min-width: 52px;
+    padding: 0 6px;
+  }
+}

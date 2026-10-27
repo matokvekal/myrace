@@ -42,6 +42,7 @@ import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { withRecoveredPassage } from "@/utils/passageRecovery";
 import RecapPanel from "./RecapPanel";
+import { useRecapMode } from "./useRecapMode";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { Bike, List, ChevronDown } from "lucide-react";
 import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
@@ -96,6 +97,9 @@ const Heat: React.FC = () => {
   // Always-fresh refs so setTimeout callbacks can see latest store + handler
   const ridersRef = useRef(riders);
   const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice') => void) | null>(null);
+  // RECAP MODE state read by the tap/voice handler (the hook is declared further down).
+  const recapActiveRef = useRef(false);
+  const recapSelectRef = useRef<((rider: RiderProps) => void) | null>(null);
   // Voice buffer: queue of pending bib detections + 30s cooldown map per bib
   const voiceQueueRef = useRef<Array<{ bib: string; detectedAt: number }>>([]);
   const bibCooldownRef = useRef<Map<string, number>>(new Map());
@@ -303,6 +307,11 @@ const Heat: React.FC = () => {
   });
 
   const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
+    // RECAP MODE: a tap (or voice) selects the rider for review — never a lap.
+    if (recapActiveRef.current) {
+      recapSelectRef.current?.(rider);
+      return;
+    }
     recordLap(rider, source);
   };
 
@@ -443,7 +452,33 @@ const Heat: React.FC = () => {
   // only THIS wave; recorded laps and times kept; riders still racing become
   // administrative finishers (no invented crossing time). Idempotent.
   const [showFinishWave, setShowFinishWave] = useState(false);
-  const [showRecap, setShowRecap] = useState(false);
+  // RECAP MODE: a distinct Live mode (useRecapMode) — selecting a rider shows passages and corrections, never records a lap.
+  const recap = useRecapMode();
+  recapActiveRef.current = recap.active;
+  recapSelectRef.current = recap.select;
+  useEffect(() => {
+    if (!recap.active) return;
+    const onActivity = () => recap.touch();
+    document.addEventListener("pointerdown", onActivity);
+    document.addEventListener("keydown", onActivity);
+    return () => {
+      document.removeEventListener("pointerdown", onActivity);
+      document.removeEventListener("keydown", onActivity);
+    };
+  }, [recap.active, recap.touch]); // eslint-disable-line react-hooks/exhaustive-deps
+  // In RECAP MODE an exact bib in the search box selects that rider (no lap).
+  useEffect(() => {
+    if (!recap.active || !searchTerm.trim()) return;
+    const hit = runningRiders.find((r) => String(r.bibNumber) === searchTerm.trim());
+    if (hit) recap.select(hit);
+  }, [recap.active, searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+  const exitRecap = () => recap.exit();
+  // Leaving RECAP MODE (Exit, toggle or 30 s idle) restores normal Live: no review filter left on the board.
+  const wasRecapRef = useRef(false);
+  useEffect(() => {
+    if (wasRecapRef.current && !recap.active) setSearchTerm("");
+    wasRecapRef.current = recap.active;
+  }, [recap.active]);
 
   // RECAP recovery: a missed passage, confirmed in the panel, inserted at its
   // ESTIMATED time (entry time kept separately) and marked recovered. Shared
@@ -787,7 +822,7 @@ const Heat: React.FC = () => {
   };
 
   return (
-    <div className={styles.heat}>
+    <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
       <HeaderHeats raceId={raceUuid} onSettingsClick={() => setShowVoiceSettings(true)} />
       {isLiveRace(raceUuid) && (
         <Suspense fallback={null}>
@@ -825,16 +860,6 @@ const Heat: React.FC = () => {
           onStatusChange={handleStatusChange}
           onFinishRace={finishRider}
           onSaveComment={handleSaveComment}
-        />
-      )}
-
-      {showRecap && (
-        <RecapPanel
-          riders={waveAllRiders}
-          jokers={jokers}
-          minLapMs={minLapMsFor(currentRace)}
-          onRecover={recoverPassage}
-          onClose={() => setShowRecap(false)}
         />
       )}
 
@@ -947,7 +972,18 @@ const Heat: React.FC = () => {
         {/* Control panel: clock, wave info, Joker and bib search, grouped
             into one elevated card so this reads as a single distinct zone
             between the header and the racing grid. */}
-        <div className={styles.controlPanel}>
+        <div className={`${styles.controlPanel} ${recap.active ? styles.controlPanelRecap : ""}`}>
+          {recap.active && (
+            <div className={styles.recapBanner} role="status" data-testid="recap-mode-banner">
+              <span className={styles.recapBannerTitle}>RECAP MODE</span>
+              <span className={styles.recapBannerHint}>
+                {recap.busy ? "Correction in progress" : "Tap a rider or type a bib — no laps are recorded · ends after 30 s idle"}
+              </span>
+              <button type="button" className={styles.recapExit} onClick={exitRecap} data-testid="recap-exit">
+                Exit RECAP
+              </button>
+            </div>
+          )}
           {/* Timer row with wave-info button: which wave is live + its started categories */}
           <div className={styles.timerRow}>
             {/* Rider action log — lives in the timer row's empty left column so it
@@ -992,52 +1028,22 @@ const Heat: React.FC = () => {
             </button>
           </div>
 
-          <div className={styles.searchWrapper}>
-            <div className={styles.searchWrapperLeft}>
+          {/* Entry row: Unknown Rider · bib (prominent) · RECAP MODE */}
+          <div className={styles.entryRow}>
+            {jokerEnabled && (
               <button
-                type="button"
-                className={`${styles.recapBtn} ${showRecap ? styles.recapOn : ""}`}
-                aria-pressed={showRecap}
-                data-testid="recap-btn"
-                onClick={() => setShowRecap((v) => !v)}
-                title="RECAP: recent passages, and recovery of a missed passage"
+                className={styles.jokerBtn}
+                onClick={addJoker}
+                aria-label="Unknown Rider"
+                title="Unknown Rider"
+                data-testid="unknown-rider-btn"
               >
-                RECAP
+                <Bike size={22} aria-hidden="true" />
+                <span className={styles.jokerQ} aria-hidden="true">?</span>
+                {jokers.length > 0 && <span className={styles.jokerBadge}>{jokers.length}</span>}
               </button>
-              {waveCategories.length > 0 && (
-                waveAllFinished ? (
-                  <span className={styles.waveFinishedTag} data-testid="wave-finished-tag">Finished</span>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.finishWaveBtn}
-                    data-testid="finish-wave-btn"
-                    disabled={startedWaveCats.length === 0}
-                    title={startedWaveCats.length === 0 ? "This wave has not started" : "Finish this wave now"}
-                    onClick={() => setShowFinishWave(true)}
-                  >
-                    Finish Wave
-                  </button>
-                )
-              )}
-              {jokerEnabled && (
-                <button
-                  className={styles.jokerBtn}
-                  onClick={addJoker}
-                  aria-label="Unknown Rider"
-                  title="Unknown Rider: stamp the passage time now, assign the bib later"
-                  data-testid="unknown-rider-btn"
-                >
-                  <Bike size={20} aria-hidden="true" />
-                  <span className={styles.jokerQ} aria-hidden="true">?</span>
-                  <span className={styles.jokerLabel} aria-hidden="true">Unknown Rider</span>
-                  {jokers.length > 0 && (
-                    <span className={styles.jokerBadge}>{jokers.length}</span>
-                  )}
-                </button>
-              )}
-            </div>
-            <div className={styles.inputContainer}>
+            )}
+            <div className={`${styles.inputContainer} ${styles.bibEntry}`}>
               <input
                 type="text"
                 inputMode="numeric"
@@ -1045,50 +1051,96 @@ const Heat: React.FC = () => {
                 maxLength={5}
                 className={styles.searchInput}
                 placeholder="#"
+                aria-label={recap.active ? "Bib to review" : "Bib"}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
               {searchTerm ? (
-                <button className={styles.clearSearch} onClick={() => setSearchTerm("")}>✕</button>
+                <button className={styles.clearSearch} onClick={() => setSearchTerm("")} aria-label="Clear bib">✕</button>
               ) : (
-                <img src={Icons.search} alt="search" width={16} height={16} className={styles.inputIcon} />
+                <img src={Icons.search} alt="" width={16} height={16} className={styles.inputIcon} />
               )}
             </div>
-            <div className={styles.searchWrapperRight}>
-              {scheduleWaves.length > 1 && (
-                <label className={styles.waveSwitcher} title="Switch wave">
-                  <span className={styles.waveSwitcherLabel}>Wave</span>
-                  <span
-                    className={[
-                      styles.waveSwitcherDot,
-                      currentWave?.status === "running" ? styles.waveSwitcherDotRunning : "",
-                      currentWave?.status === "finished" ? styles.waveSwitcherDotFinished : "",
-                    ].join(" ")}
-                    aria-hidden="true"
-                  />
-                  <span className={styles.waveSwitcherValue}>
-                    {currentWave ? currentWave.waveNum : heatId}
-                  </span>
-                  <select
-                    className={styles.waveSwitcherSelect}
-                    value={heatId ?? ""}
-                    onChange={(e) => handleWaveChange(Number(e.target.value))}
-                    aria-label="Switch wave"
-                  >
-                    {scheduleWaves.map((w) => (
-                      <option key={w.waveNum} value={w.waveNum}>
-                        Wave {w.waveNum}
-                        {w.startTime ? ` · ${w.startTime}` : ""}
-                        {w.status === "finished" ? " (done)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className={styles.waveSwitcherChevron} aria-hidden="true" />
-                </label>
-              )}
+            <button
+              type="button"
+              className={`${styles.recapBtn} ${recap.active ? styles.recapOn : ""}`}
+              aria-pressed={recap.active}
+              data-testid="recap-btn"
+              onClick={() => (recap.active ? exitRecap() : recap.enter())}
+              title={recap.active ? "Exit RECAP MODE" : "RECAP MODE: review riders' passages and correct missed ones (no laps are recorded)"}
+            >
+              RECAP
+            </button>
+          </div>
+
+          {/* Wave row, apart from timing entry: switch wave · Finish Wave */}
+          <div className={styles.waveRow}>
+            <div className={styles.waveRowStart}>
+                {scheduleWaves.length > 1 && (
+                  <label className={styles.waveSwitcher} title="Switch wave">
+                    <span className={styles.waveSwitcherLabel}>Wave</span>
+                    <span
+                      className={[
+                        styles.waveSwitcherDot,
+                        currentWave?.status === "running" ? styles.waveSwitcherDotRunning : "",
+                        currentWave?.status === "finished" ? styles.waveSwitcherDotFinished : "",
+                      ].join(" ")}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.waveSwitcherValue}>
+                      {currentWave ? currentWave.waveNum : heatId}
+                    </span>
+                    <select
+                      className={styles.waveSwitcherSelect}
+                      value={heatId ?? ""}
+                      onChange={(e) => handleWaveChange(Number(e.target.value))}
+                      aria-label="Switch wave"
+                    >
+                      {scheduleWaves.map((w) => (
+                        <option key={w.waveNum} value={w.waveNum}>
+                          Wave {w.waveNum}
+                          {w.startTime ? ` · ${w.startTime}` : ""}
+                          {w.status === "finished" ? " (done)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className={styles.waveSwitcherChevron} aria-hidden="true" />
+                  </label>
+                )}
             </div>
+            {waveCategories.length > 0 && (
+              waveAllFinished ? (
+                <span className={styles.waveFinishedTag} data-testid="wave-finished-tag">Wave {heatId} · Finished</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.finishWaveBtn}
+                  data-testid="finish-wave-btn"
+                  disabled={startedWaveCats.length === 0}
+                  title={startedWaveCats.length === 0 ? "This wave has not started" : "Finish this wave now"}
+                  onClick={() => setShowFinishWave(true)}
+                >
+                  Finish Wave {heatId}
+                </button>
+              )
+            )}
           </div>
         </div>
+
+        {recap.active && (
+          <RecapPanel
+            riders={waveAllRiders}
+            jokers={jokers}
+            minLapMs={minLapMsFor(currentRace)}
+            onRecover={(rider, at) => {
+              recoverPassage(rider, at);
+              recap.touch();
+            }}
+            selectedRider={recap.selected}
+            onBusyChange={recap.setBusy}
+            onActivity={recap.touch}
+          />
+        )}
 
         {/* Filter panel popup */}
         {showFilterPanel && (

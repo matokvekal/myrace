@@ -237,3 +237,10 @@
     gap: 6px;
   }
 }
+
+/* Under 820px the RACE LIVE chip is redundant with the Live button and crowded the header */
+@media (max-width: 820px) {
+  .liveWaveGroup {
+    display: none;
+  }
+}

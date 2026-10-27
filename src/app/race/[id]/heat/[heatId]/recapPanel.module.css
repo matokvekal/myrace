@@ -1,56 +1,34 @@
+/* RECAP MODE content — inline under the control panel (not an overlay). */
 .panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(340px, 100vw);
-  background: #fff;
-  border-inline-start: 2px solid #1d4ed8;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.18);
-  z-index: 50;
+  margin: 0 0 10px;
+  border: 2px solid #b45309;
+  border-radius: 14px;
+  background: #fffbeb;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
-.head {
+.rider {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  background: #1d4ed8;
-  color: #fff;
+  flex-direction: column;
+  gap: 4px;
 }
-.close {
-  min-width: 40px;
-  min-height: 40px;
-  border: none;
-  background: transparent;
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
+.riderHead {
+  font-size: 16px;
 }
-.list {
-  flex: 1;
-  overflow-y: auto;
+.riderLaps {
   margin: 0;
-  padding: 6px 12px;
-  list-style: decimal inside;
+  padding-inline-start: 0;
+  list-style: none;
   font-variant-numeric: tabular-nums;
 }
-.list li {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 4px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-.bib {
-  min-width: 70px;
-  font-weight: 800;
-}
-.unknown {
-  color: #5b2fa8;
+.muted {
+  color: #64748b;
+  font-size: 13px;
 }
 .recovered {
+  margin-inline-start: 6px;
   padding: 1px 6px;
   border-radius: 8px;
   background: #e0e7ff;
@@ -58,15 +36,12 @@
   font-size: 11px;
   font-weight: 700;
 }
-.empty {
-  color: #64748b;
-}
 .recover {
-  border-top: 1px solid #e2e8f0;
-  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border-top: 1px solid #fcd34d;
+  padding-top: 8px;
 }
 .recoverTitle {
   font-weight: 800;
@@ -74,21 +49,24 @@
 .row {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 .row input {
-  min-height: 40px;
+  min-height: 44px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 110px;
   padding: 4px 8px;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 8px;
+  font-size: 16px;
 }
 .row button,
 .primary,
-.danger {
-  min-height: 40px;
-  padding: 4px 12px;
-  border-radius: 6px;
+.danger,
+.secondary {
+  min-height: 44px;
+  padding: 4px 14px;
+  border-radius: 8px;
   border: 1px solid #1e40af;
   background: #1d4ed8;
   color: #fff;
@@ -98,6 +76,11 @@
 .danger {
   border-color: #b91c1c;
   background: #dc2626;
+}
+.secondary {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #0f172a;
 }
 .review {
   display: flex;
@@ -111,4 +94,33 @@
   padding: 6px 8px;
   border-radius: 6px;
   font-size: 13px;
+}
+.recent summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: decimal inside;
+  font-variant-numeric: tabular-nums;
+}
+.list li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid #fde68a;
+}
+.bib {
+  min-width: 70px;
+  font-weight: 800;
+}
+.unknown {
+  color: #5b2fa8;
 }
