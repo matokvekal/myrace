@@ -8,14 +8,14 @@
  * database is migrated by hand with psql; code only reads schema_migrations
  * and names the files still missing (missingMigrations).
  *
- * CLI: `npm run migrate` — migrates the local PGlite dev database; on any other
- * database it only lists the missing files and exits 1 if there are any.
+ * Command line: src/db/migrate-cli.ts (`npm run migrate`, `npm run check:schema`).
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type pg from "pg";
+import { serverRoot } from "../lib/paths.js";
 
-const SQL_DIR = fileURLToPath(new URL("../../sql/", import.meta.url));
+const SQL_DIR = join(serverRoot(import.meta.url), "sql") + "/";
 
 export const migrationFiles = () =>
   readdirSync(SQL_DIR)
@@ -83,22 +83,4 @@ export async function checkSchema(pool: Queryable): Promise<{ missingMigrations:
     "SELECT count(*)::int AS n FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace",
   )) as Rows<{ n: number }>;
   return { missingMigrations: await missingMigrations(pool), missingTables: tables.rows.map((r) => r.t), foreignKeys: fks.rows[0].n };
-}
-
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const { pool, closePool, autoMigrateAllowed } = await import("./pool.js");
-  try {
-    if (autoMigrateAllowed()) {
-      const ran = await migratePool(pool);
-      console.log(ran.length ? `Applied: ${ran.join(", ")}` : "Database is up to date.");
-    } else {
-      const missing = await missingMigrations(pool);
-      if (missing.length) {
-        console.log(`Not applied (run by hand, in this order, with psql -1 -v ON_ERROR_STOP=1 -f):\n  ${missing.join("\n  ")}`);
-        process.exitCode = 1;
-      } else console.log("All migrations are applied.");
-    }
-  } finally {
-    await closePool();
-  }
 }

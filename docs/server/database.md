@@ -157,8 +157,10 @@ applies them to a cloud/external database.
    - Connecting by IP, or to a host name the certificate does not carry: set
      `DATABASE_TLS_SERVERNAME` to the name the certificate does carry. It is still
      checked.
-6. `npm run migrate` on that database only lists missing files (exit 1 if any).
-   On start the API checks the schema read-only and refuses to start, naming
+6. `npm run migrate` on that database only lists missing files (exit 1 if any);
+   `npm run check:schema` (after a build: `node dist/db/migrate-cli.js --check`)
+   checks files, tables and foreign keys read-only, and never migrates.
+   Deployments run it before switching releases. On start the API checks the schema read-only and refuses to start, naming
    what is missing, while any migration file is not recorded in
    `schema_migrations` or any required table does not exist. It logs a warning
    if any foreign key exists.

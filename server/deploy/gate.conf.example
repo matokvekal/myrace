@@ -1,0 +1,6 @@
+# Optional settings for deploy-gate.sh. Install as /opt/commissaire-api/bin/gate.conf,
+# root:root 0644. Only needed when node/pm2 are not on the commissaire user's PATH
+# or the API does not listen on 127.0.0.1:4000.
+NODE_BIN=/usr/bin/node
+PM2_BIN=/usr/lib/node_modules/pm2/bin/pm2
+HEALTH_URL=http://127.0.0.1:4000/api/v1/health

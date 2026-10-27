@@ -1,24 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { z } from "zod";
+import { serverRoot } from "../lib/paths.js";
 
 /** The database URL in server/.env beats an inherited one: a shell's DATABASE_URL may be El Niño's. */
 const DB_KEYS = ["DATABASE_URL", "COMMISSAIRE_DATABASE_URL"];
 
 /**
- * server/.env: next to the nearest package.json above this module, so the same
- * file is found from src/config/env.ts (tsx) and from the dist/server.js bundle.
+ * server/.env, next to server/package.json: the same file from src/config/env.ts
+ * (tsx) and from the dist/server.js bundle. In a deployed release it is a
+ * symlink to the shared .env outside the release (server/deploy/deploy-gate.sh).
  */
-export function envFilePath(from: string = import.meta.url): string {
-  let dir = dirname(fileURLToPath(from));
-  while (!existsSync(join(dir, "package.json"))) {
-    const up = dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  return join(dir, ".env");
-}
+export const envFilePath = (from: string = import.meta.url): string => join(serverRoot(from), ".env");
 
 /**
  * Loads server/.env into process.env (values already set win, except the

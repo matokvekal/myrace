@@ -1,6 +1,7 @@
 # Production deployment: API next to PostgreSQL
 
-Target layout (not deployed yet):
+Target layout (not deployed yet; CI/CD below is implemented on
+`feature/m2-server`, not active until merged to `main` and configured):
 
 ```
 Browser ── https://commissaire.us ──────────► GitHub Pages (React PWA, unchanged)
@@ -72,11 +73,13 @@ host    commissaire    commissaire_app    127.0.0.1/32    scram-sha-256
   ```
   Until then, keep remote DBeaver access on `hostssl`, limited to your own IP.
 
-## Production `server/.env`
+## Production `.env`: `/opt/commissaire-api/shared/.env`
 
-Keep it outside git, owned by the service user, and readable only by them
-(`chmod 600`). The API finds it next to `server/package.json`, both under
-`npm start` (`dist/server.js`) and under `tsx`.
+It lives only on the server, outside git and outside every release folder.
+Owned by `commissaire`, mode `600`; the deploy gate refuses to activate
+otherwise. Each release's `server/.env` is a symlink to it, created by the gate
+(a release archive containing `server/.env` is refused). The API finds it next
+to `server/package.json`, from `dist/server.js` as from `tsx`.
 
 ```
 NODE_ENV=production
@@ -113,45 +116,106 @@ LOG_LEVEL=info
 
 Never leave `CORS_ORIGINS` empty in production: empty means any origin.
 
-## Running the API
+## Releases, PM2 and the deploy gate
 
-Build and start it as its own system user, separate from El Niño's:
+GitHub Actions builds the API once and ships it as an immutable release; the
+server never runs npm or git for a deployment.
 
 ```
-cd /opt/commissaire/server && npm ci && npm run build
-npm run migrate        # read-only on this database: lists missing files, exit 1 if any
-npm start              # node dist/server.js
+/opt/commissaire-api/           root:commissaire 1775 (sticky: commissaire cannot rename bin/)
+  bin/deploy-gate.sh            root:root 0755  the only command the deploy key can run
+  bin/ecosystem.config.cjs      root:root 0644  PM2 app "commissaire-api-live"
+  bin/gate.conf                 root:root 0644  optional: NODE_BIN, PM2_BIN, HEALTH_URL
+  shared/.env                   commissaire 0600
+  releases/<UTC time>-<commit>/ read-only: REVISION, server/{dist,sql,node_modules,package*.json}, server/.env → shared/.env
+  current  -> releases/...      switched atomically (rename)
+  previous -> releases/...      the release before current (rollback target)
+  incoming/                     upload staging
+  state/deploy.log, deploy.lock
 ```
 
-Before it listens, the API checks the schema read-only. It stops, naming what
-is missing, if a migration file is not recorded or a required table doesn't
+`server/deploy/deploy-gate.sh` (forced command, runs as `commissaire`, no sudo):
+
+| Command | What it does |
+|---|---|
+| `receive <id> <sha256>` | Archive on stdin, at most 200 MB. Checks the SHA-256, that every path is `REVISION` or `server/...` (relative, no `..`, printable), that it holds only regular files and directories (no links or devices), that `REVISION` matches the id, the required files, and no `server/.env`. Extracts to `releases/<id>`, links `.env`, makes it read-only. An existing release is never overwritten. |
+| `activate <id>` | Node ≥ 20 and `shared/.env` (600, owned by `commissaire`) checked; **read-only schema check** (`node dist/db/migrate-cli.js --check`: files recorded, 17 tables, no foreign keys; never migrates) — on failure nothing changes; `current` switched atomically; PM2 restarts only `commissaire-api-live`; health must report `{"ok":true,"release":"<commit>"}` within 30 s. On failure: **automatic rollback** to the previous release (health-checked). On success: `previous` updated, `pm2 save`, keeps the 5 newest releases (never current or previous). |
+| `rollback [id]` | Back to `previous` (or the named release), schema-checked and health-checked; restores the release it left if that fails. |
+| `status` | Current, previous, releases kept, health. |
+
+PM2 runs under the `commissaire` user's own daemon (`~commissaire/.pm2`), so
+El Niño's `pm2 restart all`, `pm2 kill` or `pm2 save` never touch Commissaire,
+and the reverse. The gate only ever names `commissaire-api-live`; never use
+`pm2 ... all`. Don't reuse, stop or delete the old `commissaire-api` process
+until you know what it is. One process only (Socket.IO rooms are in memory).
+
+Before it listens, the API itself also checks the schema read-only and stops,
+naming what is missing, if a migration file is not recorded or a table doesn't
 exist.
 
-### PM2, without affecting El Niño
+## CI/CD (GitHub Actions)
 
-Run Commissaire under its **own Linux user** (`commissaire`), so it has its own
-PM2 daemon (`~commissaire/.pm2`). Then `pm2 restart all`, `pm2 kill` or
-`pm2 save` run as El Niño's user never touch Commissaire, and the reverse.
+| Workflow | When | What |
+|---|---|---|
+| `ci.yml` | Every PR and push (not `main`); called by `deploy.yml` | App: typecheck, lint, tests with coverage, build, build with `VITE_SERVER_URL`, Playwright (local-race regression). Server: typecheck, tests (incl. the real `dist/server.js` and `dist/db/migrate-cli.js`), build, shellcheck, deploy-gate end-to-end test. |
+| `deploy.yml` | Push to `main`; or "Run workflow" (choose frontend/backend) | Decides what changed (`server/`, `src/shared/` → backend; anything else but docs → frontend), runs `ci.yml`, then **backend**: build, `pack-release.sh` (archive + SHA-256), approval in environment `production`, `receive` + `activate` over SSH, then checks through Nginx: health reports this commit, Socket.IO handshake, WebSocket upgrade (warning only). **Frontend**: build with `VITE_SERVER_URL`, `verify:dist`, approval in environment `github-pages`, deploy to Pages — after the backend when both deploy. |
+| `backend-rollback.yml` | "Run workflow" only | `status`, or `rollback [release]`, approved in `production`. |
 
-- Use a new process name, `commissaire-api-live`.
-- Don't reuse, stop or delete the existing `commissaire-api` process until you
-  know what it is.
-- Always name the process in commands (`pm2 restart commissaire-api-live`);
-  never use `all`.
+Nothing deploys without a manual approval, and database migrations never run
+in any workflow: SQL files are applied by hand, before the release that needs
+them (the gate's schema check refuses the release until they are).
 
-As the `commissaire` user:
+GitHub configuration (Settings):
 
+| Name | Kind | Value |
+|---|---|---|
+| `DEPLOY_SSH_KEY` | Secret in environment `production` | Private key of a new ed25519 key pair used only for this |
+| `DEPLOY_KNOWN_HOSTS` | Secret in environment `production` | The server's SSH host key line(s), checked against the server's own fingerprint |
+| `DEPLOY_HOST` | Variable | `api.commissaire.us` (or `191.215.39.19`) |
+| `DEPLOY_USER` | Variable | `commissaire` |
+| `DEPLOY_PORT` | Variable (optional) | SSH port if not 22 |
+| `VITE_SERVER_URL` | Variable | `https://api.commissaire.us` (unset = the app stays local-only) |
+| Environment `production` | Protection | Required reviewer: the owner; deployment branches: `main` only |
+| Environment `github-pages` | Protection | Required reviewer: the owner; deployment branches: `main` only |
+| Branch `main` | Protection | Require a PR and the CI checks |
+
+### One-time server setup (by hand, as root)
+
+```bash
+# User and layout (the old /opt/commissaire/server-OLD is not touched)
+id commissaire || adduser --system --group --home /home/commissaire --shell /bin/bash commissaire
+# The base is root-owned and sticky: commissaire can create and switch its own
+# links (current, previous) but cannot rename or replace the root-owned bin/.
+install -d -o root -g commissaire -m 1775 /opt/commissaire-api
+install -d -o root -g root -m 0755 /opt/commissaire-api/bin
+install -d -o commissaire -g commissaire -m 0755 /opt/commissaire-api/{releases,incoming,state}
+install -d -o commissaire -g commissaire -m 0700 /opt/commissaire-api/shared
+# Gate and PM2 file from a reviewed checkout of the approved commit
+install -o root -g root -m 0755 server/deploy/deploy-gate.sh       /opt/commissaire-api/bin/
+install -o root -g root -m 0644 server/deploy/ecosystem.config.cjs /opt/commissaire-api/bin/
+# Production settings (edit in place; never echo secrets)
+install -o commissaire -g commissaire -m 0600 /dev/null /opt/commissaire-api/shared/.env
+# Deploy key: forced command, no shell, no forwarding
+install -d -o commissaire -g commissaire -m 0700 /home/commissaire/.ssh
+echo 'restrict,command="/opt/commissaire-api/bin/deploy-gate.sh" ssh-ed25519 AAAA... commissaire-deploy' >> /home/commissaire/.ssh/authorized_keys
+chown commissaire:commissaire /home/commissaire/.ssh/authorized_keys && chmod 600 /home/commissaire/.ssh/authorized_keys
+# PM2 at boot for this user only (separate pm2-commissaire.service)
+sudo -iu commissaire pm2 ping
+env PATH="$PATH" pm2 startup systemd -u commissaire --hp /home/commissaire
 ```
-cd /opt/commissaire/server
-pm2 start dist/server.js --name commissaire-api-live --time --max-memory-restart 512M
-pm2 save
-```
 
-Start on boot, for this user only: run `pm2 startup systemd -u commissaire --hp /home/commissaire`,
-then run the `sudo` command it prints. That creates a separate
-`pm2-commissaire.service` and leaves El Niño's PM2 service alone.
+A changed `deploy-gate.sh` or `ecosystem.config.cjs` is installed again by
+hand, after review; deployments never change `bin/`.
 
-Check it: `curl -s http://127.0.0.1:4000/api/v1/health` should return `{"ok":true,...}`.
+### Rollback
+
+- API: run `backend-rollback.yml` (`rollback`, empty = previous), or on the
+  server as `commissaire`: `/opt/commissaire-api/bin/deploy-gate.sh rollback`.
+  A failed activation already rolls back by itself.
+- App: revert the change on `main` (a PR), or "Run workflow" on `deploy.yml`
+  for the frontend after reverting. Unsetting `VITE_SERVER_URL` and deploying
+  the frontend makes the app local-only again.
+- Database: deployments change no schema or data, so nothing to undo.
 
 ## Nginx: `api.commissaire.us`
 
@@ -241,11 +305,6 @@ Order of steps:
 
 The app stays on GitHub Pages. It uses the server only when it was built with
 `VITE_SERVER_URL=https://api.commissaire.us`; without it, the app stays
-local-only, as today. Two changes, both needing your approval because they
-affect production:
-
-- Add a repository variable `VITE_SERVER_URL`.
-- Pass it in the build step of `.github/workflows/deploy.yml`, as the
-  `VITE_FIREBASE_*` variables already are.
-
-A push to `main` deploys.
+local-only, as today. `deploy.yml` passes the repository variable
+`VITE_SERVER_URL` to the build, so the app goes live with the API only once
+that variable is set (and a frontend deploy is approved).
