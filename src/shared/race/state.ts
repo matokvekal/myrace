@@ -36,6 +36,8 @@ export interface LapDetail {
   speed_kph?: number;
   /** The AddLap Action that recorded this lap (multi-user races). */
   actionId?: ActionId;
+  /** A missed passage recovered afterwards (RECAP), at its estimated time. */
+  recovered?: boolean;
 }
 
 export interface TrackMarker {

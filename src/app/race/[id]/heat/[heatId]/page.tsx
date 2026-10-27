@@ -40,6 +40,8 @@ import JokerResolveModal from "./JokerResolveModal";
 import { jokerResolveBlock } from "./jokerResolve";
 import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { planWaveFinish } from "@/utils/waveFinish";
+import { withRecoveredPassage } from "@/utils/passageRecovery";
+import RecapPanel from "./RecapPanel";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { Bike, List, ChevronDown } from "lucide-react";
 import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
@@ -441,6 +443,32 @@ const Heat: React.FC = () => {
   // only THIS wave; recorded laps and times kept; riders still racing become
   // administrative finishers (no invented crossing time). Idempotent.
   const [showFinishWave, setShowFinishWave] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
+
+  // RECAP recovery: a missed passage, confirmed in the panel, inserted at its
+  // ESTIMATED time (entry time kept separately) and marked recovered. Shared
+  // races send AddLap {recovered, enteredAt} at the estimated time; the engine
+  // re-derives in time order and exempts it from the minimum lap time.
+  const recoverPassage = (rider: RiderProps, estimatedAt: Date) => {
+    if (!liveAllows(raceUuid, "AddLap", { riderUuid: rider.uuid ?? "" })) return;
+    const enteredAt = new Date();
+    const updated = withRecoveredPassage(rider, estimatedAt, enteredAt);
+    if (isLiveRace(raceUuid) && rider.uuid) {
+      void liveDispatch(raceUuid, "AddLap", { riderUuid: rider.uuid, recovered: true, enteredAt: enteredAt.toISOString() }, { atMs: estimatedAt.getTime() });
+    }
+    void updateRider(updated);
+    if (currentRace) {
+      AuditLogService.log({
+        race: currentRace,
+        action: "RECOVER_PASSAGE",
+        screen: "Live",
+        entityType: "rider",
+        entityId: rider.bibNumber,
+        details: { recovered: true, estimatedAt: estimatedAt.toISOString(), enteredAt: enteredAt.toISOString(), lapsBefore: rider.lapsCounter, lapsAfter: updated.lapsCounter },
+      });
+    }
+    toast.success(`Bib ${rider.bibNumber}: recovered passage at ${estimatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })} added (laps ${rider.lapsCounter} → ${updated.lapsCounter})`);
+  };
   const finishingWaveRef = useRef(false);
   const waveAllRiders = useMemo(
     () => riders.filter((r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))),
@@ -800,6 +828,16 @@ const Heat: React.FC = () => {
         />
       )}
 
+      {showRecap && (
+        <RecapPanel
+          riders={waveAllRiders}
+          jokers={jokers}
+          minLapMs={minLapMsFor(currentRace)}
+          onRecover={recoverPassage}
+          onClose={() => setShowRecap(false)}
+        />
+      )}
+
       {showFinishWave && heatId != null && (
         <DeleteConfirmModal
           title={`Finish Wave ${heatId}?`}
@@ -956,6 +994,16 @@ const Heat: React.FC = () => {
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchWrapperLeft}>
+              <button
+                type="button"
+                className={`${styles.recapBtn} ${showRecap ? styles.recapOn : ""}`}
+                aria-pressed={showRecap}
+                data-testid="recap-btn"
+                onClick={() => setShowRecap((v) => !v)}
+                title="RECAP: recent passages, and recovery of a missed passage"
+              >
+                RECAP
+              </button>
               {waveCategories.length > 0 && (
                 waveAllFinished ? (
                   <span className={styles.waveFinishedTag} data-testid="wave-finished-tag">Finished</span>

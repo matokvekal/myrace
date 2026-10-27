@@ -91,3 +91,27 @@ describe("UCI ID and bib colours sync as rider / category edits", () => {
     expect(state.categories[cat.uuid]).toMatchObject({ bibColor: "#FDD835", bibTextColor: "#000000" });
   });
 });
+
+describe("recovered passages and duplicate taps", () => {
+  const setupRace = () => {
+    const cat = makeCategory({ name: "Elite", heat: 1, laps: 9, status: "running", startedAt: T0 });
+    const r = makeRider({ category: "Elite", heat: 1, bibNumber: 1 });
+    return { state: makeRaceState({ categories: [cat], riders: [r], race: { minLapSeconds: 180 } }), r };
+  };
+  const mark = (at: number, recovered = false): RiderMark => ({ actionId: `m${++seq}`, seq, type: "AddLap", at, ...(recovered ? { recovered: true } : {}) });
+
+  it("two commissaires tapping the same crossing make one lap; real laps far apart all count", () => {
+    const { state, r } = setupRace();
+    deriveRider(state, r.uuid, [mark(T0 + 10 * MIN), mark(T0 + 10 * MIN + 4_000), mark(T0 + 20 * MIN), mark(T0 + 30 * MIN)]);
+    expect(state.riders[r.uuid].lapsCounter).toBe(3);
+  });
+
+  it("a recovered passage counts even within the minimum, is marked, and does not swallow the next tap", () => {
+    const { state, r } = setupRace();
+    // Tapped 10:00 and 20:00; recovered 18:30 (missed during a busy period) — 1.5 min before the 20:00 tap.
+    deriveRider(state, r.uuid, [mark(T0 + 10 * MIN), mark(T0 + 20 * MIN), mark(T0 + 18.5 * MIN, true)]);
+    const rr = state.riders[r.uuid];
+    expect(rr.lapsCounter).toBe(3);
+    expect(rr.lapsDetails.map((l) => !!l.recovered)).toEqual([false, true, false]);
+  });
+});

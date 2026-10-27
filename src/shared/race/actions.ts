@@ -73,7 +73,8 @@ export type NewRider = Pick<SharedRider, "uuid" | Exclude<RiderIdentityField, "b
 
 
 export interface ActionPayloads {
-  AddLap: { riderUuid: RiderUuid };
+  /** recovered: a missed passage entered afterwards (RECAP), at its estimated time; enteredAt = when it was entered. */
+  AddLap: { riderUuid: RiderUuid; recovered?: true; enteredAt?: string };
   Undo: { targetActionId: ActionId };
   RiderFinished: { riderUuid: RiderUuid };
   LapCountCorrection: { riderUuid: RiderUuid; laps: number };

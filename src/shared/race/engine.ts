@@ -105,6 +105,8 @@ export interface RiderMark {
   at: number;
   /** LapCountCorrection only. */
   laps?: number;
+  /** AddLap only: a recovered missed passage (confirmed by a person; exempt from the minimum lap time). */
+  recovered?: boolean;
   /** Undone by a later Undo. */
   undone?: boolean;
 }
@@ -127,6 +129,9 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
   const laps: LapDetail[] = [];
   let count = 0;
   let lastArrive: number | null = null;
+  // The minimum-lap rule compares two TAPPED passages; a recovered passage was
+  // confirmed by a commissaire, so it neither is filtered nor filters the next tap.
+  let lastTapped: number | null = null;
   let finished = false;
 
   for (const m of sorted) {
@@ -143,7 +148,7 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
       continue;
     }
     if (startMs === null || m.at < startMs) continue; // before the start
-    if (lastArrive !== null && m.at - lastArrive < minLap) continue; // faster than any real lap
+    if (!m.recovered && lastTapped !== null && m.at - lastTapped < minLap) continue; // faster than any real lap
     const from = lastArrive ?? startMs;
     count += 1;
     laps.push({
@@ -152,8 +157,10 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
       endTime: new Date(m.at).toISOString(),
       lapTime: formatTime((m.at - from) / 1000),
       actionId: m.actionId,
+      ...(m.recovered ? { recovered: true } : {}),
     });
     lastArrive = m.at;
+    if (!m.recovered) lastTapped = m.at;
     if ((totalLaps > 0 && count >= totalLaps) || (catFinishedAt !== null && m.at >= catFinishedAt) || (groupDoneAt !== null && m.at > groupDoneAt)) {
       finished = true;
     }

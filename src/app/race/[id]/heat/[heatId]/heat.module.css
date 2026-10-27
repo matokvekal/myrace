@@ -1310,3 +1310,20 @@
   color: #111827;
   font-weight: 800;
 }
+
+/* RECAP toggle */
+.recapBtn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  border: 2px solid #1e40af;
+  background: #fff;
+  color: #1e40af;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.recapOn {
+  background: #1d4ed8;
+  color: #fff;
+}

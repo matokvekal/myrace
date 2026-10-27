@@ -52,7 +52,7 @@ const riderIdentityChanges = newRider.omit({ uuid: true, standing: true, flag: t
 const raceInfoShape = Object.fromEntries(RACE_INFO_FIELDS.map((f) => [f, z.unknown()])) as Record<(typeof RACE_INFO_FIELDS)[number], z.ZodUnknown>;
 
 const payloads = {
-  AddLap: z.strictObject({ riderUuid: uuid }),
+  AddLap: z.strictObject({ riderUuid: uuid, recovered: z.literal(true).optional(), enteredAt: z.string().datetime({ offset: true }).optional() }),
   Undo: z.strictObject({ targetActionId: uuid }),
   RiderFinished: z.strictObject({ riderUuid: uuid }),
   LapCountCorrection: z.strictObject({ riderUuid: uuid, laps: z.number().int().min(0).max(999) }),
