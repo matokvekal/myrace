@@ -233,7 +233,8 @@ describe("Check-In: edit bib", () => {
 
     expect(await screen.findByTestId("checkin-row-777")).toBeInTheDocument();
     expect(screen.queryByTestId("checkin-row-10")).not.toBeInTheDocument();
-    expect(screen.getByText("✓ Saved")).toBeInTheDocument();
+    // The row re-renders from the store before saveBib's await returns and sets "Saved".
+    expect(await screen.findByText("✓ Saved")).toBeInTheDocument();
     expect((await stored()).find((r) => r.id === a.id)!.bibNumber).toBe(777);
     expect(recordRaceEvent).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: "RIDER_EDITED", riderId: a.id, bibNumber: 777 })

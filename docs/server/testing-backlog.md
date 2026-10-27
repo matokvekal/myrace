@@ -19,14 +19,38 @@ with its own error; clock offsets above 1 day refused instead of flagged;
 `env.ts`); the sync badge was missing on the Live screen; the measured clock
 offset was lost on reload.
 
+## Stabilization results (2026-10-27, after the restart)
+
+| Suite | Result |
+|---|---|
+| Server integration (+ races.test.ts: publish, My Races, join code, transfer, delete, signature verify) | 51/51 |
+| App unit tests (+ 2 bridge regression tests) | 356/356 |
+| Playwright, local-only app, against a server-enabled build | 60/60 |
+| Playwright multi-user (2 tests: live laps; setup edits, per-race offline outbox, crash after an offline edit) | 10 of 10 runs green |
+
+Bugs found and fixed:
+- Client: a user's store write made while server changes were being applied was
+  silently NOT sent (the "applying remote" flag was held across awaits). Now each
+  remote write is flagged only during its synchronous start (`applyingRemote`).
+- Client: store writes on a shared race made before the live client's dynamic
+  import resolved were applied locally only. The bridge seam now defers them and
+  replays them when the bridge is installed (new records get their uuid at once).
+- Server: the API applied migrations by itself on any database. Now only the local
+  PGlite dev database (`DEV_PGLITE=true` + loopback) is migrated; any other database
+  is checked and the API refuses to start, naming the missing files.
+- Test-only: CheckIn "saves a new bib" flake (read "✓ Saved" one render early);
+  the bridge test leaked a restricted access between tests.
+
+Harness note: `page.evaluate(import("/src/..."))` in the multi-user spec reads the
+app's stores only on a dev server with no HMR history; restart Vite after editing
+files before running it against a long-running server.
+
 ## Known issues / decisions to confirm
 
 - Role defaults: start, counter and check-in see every screen except Team, so
   they also receive private rider details (comment, chip, points, licence). If
   commissaires should not see those, remove `riders`/`checkin` view from their
   defaults in `src/shared/race/access.ts`.
-- `src/app/race/[id]/raceMode/__tests__/CheckIn.test.tsx` "saves a new bib…"
-  is flaky (about 1 run in 4, on main too): it reads "✓ Saved" synchronously.
 - Pre-existing, local app: `timeStartRace` is an "HH:MM:SS" clock string pinned
   to today's date, so a wave started just before midnight shows "—" as a total
   time after midnight (tests/waves-leaderboard.spec.ts failed once at 00:15).
@@ -39,18 +63,13 @@ offset was lost on reload.
   across riders is re-derived for the group, up to three rounds per Action.
 
 - Client: a store write on a shared race shows locally a few ms before its
-  Action is in the IndexedDB outbox (the bridge enqueues asynchronously); the
-  lap screen writes its AddLap first. Tighten if a crash test shows a loss.
-- Client: screen names in the permission grid fall back to English keys
-  ("checkin") when the language is English; add English labels.
+  Action is in the IndexedDB outbox; a crash test (tab closed right after an
+  offline edit) showed no loss.
 - Client: hidden screens are enforced (tabs, race-mode sub-tabs, Live, and
   store writes refused by the bridge); individual edit buttons are not yet
   hidden one by one — a refused write shows a toast.
 - Client: `liveClient` applies server rows only for the race that is open;
   other shared races catch up when opened.
-- A two-browser smoke (sign-up, share, invite link, accept, wave scope,
-  check-in A→B, lap B→A, start-wave denial, offline lap after reconnect) passed
-  against the local dev server; it is a scratch script, to become a Playwright spec.
 
 ## Deferred test cases
 

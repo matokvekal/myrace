@@ -13,7 +13,7 @@ import useCategoryStore from "@/stores/categoryStore";
 import useRaceStore from "@/stores/racesStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { makeCategory, makeRider } from "@/test/factories";
-import { applyingRemote, LIVE_LINKS_KEY } from "../liveBridge";
+import { applyingRemote, liveBridge, LIVE_LINKS_KEY, setLiveBridge } from "../liveBridge";
 import type { RaceProps } from "@/types/types";
 
 const LOCAL = "local-race-1";
@@ -42,7 +42,9 @@ function access(screens: Record<string, Partial<Record<"view" | "create" | "upda
 beforeEach(async () => {
   vi.stubEnv("VITE_SERVER_URL", "http://server.test");
   localStorage.setItem(LIVE_LINKS_KEY, JSON.stringify({ [LOCAL]: { serverRaceUuid: SERVER, lastSeq: 0, linkedAt: "" } }));
+  localStorage.removeItem(`commissaire.live.access.${LOCAL}`); // one test restricts access; don't leak it
   live = await import("../liveClient");
+  live.useLiveStore.setState({ access: {} });
   live.startLive();
   useRaceStore.setState({ races: [{ id: 1, uuid: LOCAL, name: "Shared" } as RaceProps] });
   useCategoryStore.setState({ categories: [makeCategory({ id: 5, uuid: CAT, raceUuid: LOCAL, name: "Elite", heat: 1 })] });
@@ -101,6 +103,41 @@ describe("store writes on a shared race", () => {
     await settle();
     expect(useRiderStore.getState().riders[0].comment).toBe("from server");
     expect(await outbox()).toEqual([]);
+  });
+
+  it("a user's edit made while server changes are being applied is still sent", async () => {
+    // A server apply spans IndexedDB awaits; a check-in tapped meanwhile must not be taken for a remote write.
+    const r = useRiderStore.getState().riders[0];
+    let release!: () => void;
+    const gate = new Promise<void>((res) => (release = res));
+    // A server write still in flight (its IndexedDB put not done) ...
+    const remote = applyingRemote(async () => {
+      useRiderStore.setState((s) => ({ riders: s.riders.map((x) => (x.id === r.id ? { ...x, team: "server team" } : x)) }));
+      await gate;
+    });
+    await useRiderStore.getState().updateRider({ ...useRiderStore.getState().riders[0], checked: true }); // ... when the user taps
+    release();
+    await remote;
+    await settle();
+    expect((await outbox()).map((e) => e.action.type)).toEqual(["RiderCheckedIn"]);
+    expect(useRiderStore.getState().riders[0]).toMatchObject({ checked: true, team: "server team" });
+  });
+
+  it("edits made before the live client finished loading are sent once it is installed", async () => {
+    const real = liveBridge()!;
+    setLiveBridge(null); // the dynamic import of the live client has not resolved yet
+    const r = useRiderStore.getState().riders[0];
+    await useRiderStore.getState().updateRider({ ...r, checked: true });
+    await useRiderStore.getState().addNewRider(makeRider({ id: 11, raceUuid: LOCAL, category: "Elite", bibNumber: 12 }));
+    expect(useRiderStore.getState().riders[0].checked).toBe(true); // applied locally right away
+    const newUuid = useRiderStore.getState().riders.find((x) => x.id === 11)?.uuid;
+    expect(newUuid).toMatch(/^[0-9a-f-]{36}$/); // shared id assigned before the write
+    expect(await outbox()).toEqual([]);
+    setLiveBridge(real);
+    await settle();
+    const acts = (await outbox()).map((e) => e.action);
+    expect(acts.map((a) => a.type).sort()).toEqual(["RiderAdded", "RiderCheckedIn"]);
+    expect((acts.find((a) => a.type === "RiderAdded")!.payload.rider as { uuid: string }).uuid).toBe(newUuid);
   });
 
   it("a local race produces no Actions", async () => {

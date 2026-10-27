@@ -624,42 +624,42 @@ interface ChangeSet {
 
 async function applyChanges(local: string, ch: ChangeSet) {
   if (ch.access) cacheAccess(local, ch.access);
-  await applyingRemote(async () => {
-    const rs = useRiderStore.getState();
-    if (rs.lastFetchedRaceUuid !== local) await rs.getRiders(local);
-    await useCategoryStore.getState().getCategories(local);
+  // Each write is wrapped on its own (see applyingRemote): a user's edit between them is still sent.
+  const rs = useRiderStore.getState();
+  if (rs.lastFetchedRaceUuid !== local) await rs.getRiders(local);
+  await useCategoryStore.getState().getCategories(local);
 
-    if (ch.race) {
-      const existing = useRaceStore.getState().races.find((r) => r.uuid === local);
-      if (existing) await useRaceStore.getState().updateRace(mergeRace(existing, ch.race));
+  if (ch.race) {
+    const existing = useRaceStore.getState().races.find((r) => r.uuid === local);
+    if (existing) await applyingRemote(() => useRaceStore.getState().updateRace(mergeRace(existing, ch.race!)));
+  }
+  if (ch.categories?.length) {
+    const current = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
+    const cats = ch.categories.map((c) => toLocalCategory(c, local, current.find((x) => x.uuid === c.uuid)));
+    await applyingRemote(() => useCategoryStore.getState().upsertCategories(cats));
+  }
+  for (const uuid of ch.removedCategories ?? []) {
+    const c = useCategoryStore.getState().categories.find((x) => x.raceUuid === local && x.uuid === uuid);
+    if (c) await applyingRemote(() => useCategoryStore.getState().deleteCategory(c.id));
+  }
+  if (ch.riders?.length) {
+    const pending = pendingRiders.get(local) ?? new Set<string>();
+    const current = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
+    const byUuid = new Map(current.filter((r) => r.uuid).map((r) => [r.uuid!, r]));
+    const patches: RiderProps[] = [];
+    const added: RiderProps[] = [];
+    for (const s of ch.riders) {
+      if (!s.uuid || pending.has(s.uuid)) continue; // our queued change wins until the server has it
+      const existing = byUuid.get(s.uuid);
+      (existing ? patches : added).push(toLocalRider(s, local, existing));
     }
-    if (ch.categories?.length) {
-      const current = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
-      await useCategoryStore.getState().upsertCategories(ch.categories.map((c) => toLocalCategory(c, local, current.find((x) => x.uuid === c.uuid))));
-    }
-    for (const uuid of ch.removedCategories ?? []) {
-      const c = useCategoryStore.getState().categories.find((x) => x.raceUuid === local && x.uuid === uuid);
-      if (c) await useCategoryStore.getState().deleteCategory(c.id);
-    }
-    if (ch.riders?.length) {
-      const pending = pendingRiders.get(local) ?? new Set<string>();
-      const current = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
-      const byUuid = new Map(current.filter((r) => r.uuid).map((r) => [r.uuid!, r]));
-      const patches: RiderProps[] = [];
-      const added: RiderProps[] = [];
-      for (const s of ch.riders) {
-        if (!s.uuid || pending.has(s.uuid)) continue; // our queued change wins until the server has it
-        const existing = byUuid.get(s.uuid);
-        (existing ? patches : added).push(toLocalRider(s, local, existing));
-      }
-      if (patches.length) await useRiderStore.getState().patchRiders(patches);
-      if (added.length) await useRiderStore.getState().insertRiders(added);
-    }
-    for (const uuid of ch.removedRiders ?? []) {
-      const r = useRiderStore.getState().riders.find((x) => x.raceUuid === local && x.uuid === uuid);
-      if (r) await useRiderStore.getState().deleteRider(r.id);
-    }
-  });
+    if (patches.length) await applyingRemote(() => useRiderStore.getState().patchRiders(patches));
+    if (added.length) await applyingRemote(() => useRiderStore.getState().insertRiders(added));
+  }
+  for (const uuid of ch.removedRiders ?? []) {
+    const r = useRiderStore.getState().riders.find((x) => x.raceUuid === local && x.uuid === uuid);
+    if (r) await applyingRemote(() => useRiderStore.getState().deleteRider(r.id));
+  }
   const seq = ch.seq ?? ch.lastSeq;
   if (typeof seq === "number") setLink(local, { lastSeq: Math.max(seq, linkOf(local)?.lastSeq ?? 0) });
   setSync(local, { lastSyncAt: Date.now() });
@@ -716,27 +716,25 @@ async function loadSnapshot(local: string): Promise<void> {
   const link = linkOf(local)!;
   const snap = await api<Snapshot>("GET", `/races/${link.serverRaceUuid}/snapshot`);
   cacheAccess(local, snap.access);
-  await applyingRemote(async () => {
-    const races = useRaceStore.getState();
-    const existing = races.races.find((r) => r.uuid === local);
-    if (!existing) {
-      const base = { id: newLocalId(), uuid: local, owner: "", name: "", location: "", time: "", date: "", image: "", heat: "", type: "", level: "",
-        orgenizer: "", manager: "", phone: "", takanon: "", site: "", map: "", distance: 0, isActive: true, createdAt: new Date(), lastUpdateAt: new Date() } as RaceProps;
-      await races.insertRace(mergeRace(base, snap.race));
-    } else {
-      await races.updateRace(mergeRace(existing, snap.race));
-    }
-    // Keep local ids for records we already have; drop anything the server no longer shows us.
-    const rs = useRiderStore.getState();
-    if (rs.lastFetchedRaceUuid !== local) await rs.getRiders(local);
-    const currentRiders = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
-    const keep = new Set(snap.riders.map((r) => r.uuid));
-    for (const r of currentRiders) if (!r.uuid || !keep.has(r.uuid)) await useRiderStore.getState().deleteRider(r.id);
-    await useCategoryStore.getState().getCategories(local);
-    const currentCats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
-    const keepCats = new Set(snap.categories.map((c) => c.uuid));
-    for (const c of currentCats) if (!c.uuid || !keepCats.has(c.uuid)) await useCategoryStore.getState().deleteCategory(c.id);
-  });
+  const races = useRaceStore.getState();
+  const existing = races.races.find((r) => r.uuid === local);
+  if (!existing) {
+    const base = { id: newLocalId(), uuid: local, owner: "", name: "", location: "", time: "", date: "", image: "", heat: "", type: "", level: "",
+      orgenizer: "", manager: "", phone: "", takanon: "", site: "", map: "", distance: 0, isActive: true, createdAt: new Date(), lastUpdateAt: new Date() } as RaceProps;
+    await applyingRemote(() => races.insertRace(mergeRace(base, snap.race)));
+  } else {
+    await applyingRemote(() => races.updateRace(mergeRace(existing, snap.race)));
+  }
+  // Keep local ids for records we already have; drop anything the server no longer shows us.
+  const rs = useRiderStore.getState();
+  if (rs.lastFetchedRaceUuid !== local) await rs.getRiders(local);
+  const currentRiders = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
+  const keep = new Set(snap.riders.map((r) => r.uuid));
+  for (const r of currentRiders) if (!r.uuid || !keep.has(r.uuid)) await applyingRemote(() => useRiderStore.getState().deleteRider(r.id));
+  await useCategoryStore.getState().getCategories(local);
+  const currentCats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
+  const keepCats = new Set(snap.categories.map((c) => c.uuid));
+  for (const c of currentCats) if (!c.uuid || !keepCats.has(c.uuid)) await applyingRemote(() => useCategoryStore.getState().deleteCategory(c.id));
   await applyChanges(local, { ...snap, seq: snap.lastSeq });
   setLink(local, { lastSeq: snap.lastSeq });
 }

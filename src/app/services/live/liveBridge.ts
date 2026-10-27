@@ -46,21 +46,68 @@ export const isLiveRace = (localRaceUuid: string | null | undefined): boolean =>
 let bridge: LiveBridge | null = null;
 let remoteDepth = 0;
 
-export const setLiveBridge = (b: LiveBridge | null) => {
-  bridge = b;
+/**
+ * Writes on a shared race made before the live client finished loading (it is a
+ * dynamic import): kept here and handed to the bridge once installed, so they
+ * are sent instead of staying on this Device only. New records get their shared
+ * uuid now, so what the store saves matches what is sent later.
+ */
+type Deferred = (b: LiveBridge) => void;
+let deferred: Deferred[] = [];
+
+const raceOf = (before: { raceUuid: string }[], after: { raceUuid: string }[]) => (after[0] ?? before[0])?.raceUuid;
+
+const deferringBridge: LiveBridge = {
+  beforeRiders(kind, before, after) {
+    if (!isLiveRace(raceOf(before, after))) return true;
+    if (kind === "add" || kind === "import") for (const r of after) r.uuid ??= crypto.randomUUID();
+    deferred.push((b) => b.beforeRiders(kind, before, after));
+    return true;
+  },
+  beforeCategories(kind, before, after) {
+    if (!isLiveRace(raceOf(before, after))) return true;
+    const prevById = new Map(before.map((c) => [c.id, c]));
+    if (kind === "upsert") for (const c of after) c.uuid ??= prevById.get(c.id)?.uuid ?? crypto.randomUUID();
+    deferred.push((b) => b.beforeCategories(kind, before, after));
+    return true;
+  },
+  beforeRace(before, after) {
+    if (!isLiveRace(after.uuid)) return true;
+    deferred.push((b) => b.beforeRace(before, after));
+    return true;
+  },
+  allows: () => true, // the server still decides; a refusal shows as "Not applied"
 };
 
-/** The bridge, unless remote changes are being applied (those must not echo back as Actions). */
-export const liveBridge = (): LiveBridge | null => (remoteDepth > 0 ? null : bridge);
+export const setLiveBridge = (b: LiveBridge | null) => {
+  bridge = b;
+  if (!b) return;
+  const queued = deferred;
+  deferred = [];
+  for (const replay of queued) replay(b);
+};
+
+/**
+ * The bridge, unless remote changes are being applied (those must not echo back
+ * as Actions). Before the live client has loaded, a stand-in that defers writes.
+ */
+export const liveBridge = (): LiveBridge | null =>
+  remoteDepth > 0 ? null : (bridge ?? (import.meta.env.VITE_SERVER_URL ? deferringBridge : null));
 
 /** True while server changes are applied (the server, not the local lock, decides then). */
 export const isApplyingRemote = () => remoteDepth > 0;
 
-/** Runs store writes that come FROM the server, so they are not sent back. */
-export async function applyingRemote<T>(fn: () => Promise<T>): Promise<T> {
+/**
+ * Runs ONE store write that comes FROM the server, so it is not sent back.
+ * Wrap each write on its own: the flag is up only while `write` starts, which is
+ * where every store write consults the bridge and the finalized lock (before its
+ * first await). Holding it across awaits would swallow a user's edit made while
+ * the server's IndexedDB writes are still in flight.
+ */
+export function applyingRemote<T>(write: () => Promise<T>): Promise<T> {
   remoteDepth += 1;
   try {
-    return await fn();
+    return write();
   } finally {
     remoteDepth -= 1;
   }

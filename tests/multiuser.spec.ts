@@ -39,14 +39,14 @@ async function signUp(page: Page, name: string) {
 }
 
 /** A local race made through the app's own stores (synthetic riders, checked in). */
-async function seedLocalRace(page: Page): Promise<string> {
+async function seedLocalRace(page: Page, raceName = "Shared E2E Race"): Promise<string> {
   await page.goto("/main");
-  return page.evaluate(async ({ w1, w2 }) => {
+  return page.evaluate(async ({ w1, w2, raceName }) => {
     const races = (await import("/src/app/stores/racesStore.ts")).default;
     const cats = (await import("/src/app/stores/categoryStore.ts")).default;
     const riders = (await import("/src/app/stores/ridersStore.ts")).default;
     const uuid = crypto.randomUUID();
-    await races.getState().insertRace({ id: Date.now(), uuid, owner: "Owner", name: "Shared E2E Race", location: "Park", time: "09:00", date: "2026-10-27",
+    await races.getState().insertRace({ id: Date.now(), uuid, owner: "Owner", name: raceName, location: "Park", time: "09:00", date: "2026-10-27",
       image: "", heat: "", type: "", level: "", orgenizer: "", manager: "", phone: "", takanon: "", site: "", map: "", distance: 0, isActive: true,
       createdAt: new Date(), lastUpdateAt: new Date() } as never);
     await cats.getState().upsertCategories([
@@ -60,10 +60,51 @@ async function seedLocalRace(page: Page): Promise<string> {
       status: "standing", team: null, viewOrder: i, totalLaps: 0, heat, color: null, image: null, comment: null });
     await riders.getState().insertRiders([...w1.map((b, i) => mk(b, i, "Elite", 1)), ...w2.map((b, i) => mk(b, i, "Kids", 2))] as never);
     return uuid;
-  }, { w1: WAVE1, w2: WAVE2 });
+  }, { w1: WAVE1, w2: WAVE2, raceName });
 }
 
 const lapsOn = async (page: Page, bib: number) => Number(((await racingCard(page, bib).getAttribute("data-laps")) ?? "0/0").split("/")[0]);
+
+/** Shares the open local race from the Team tab and returns an admin invitation link (path only). */
+async function shareWithAdminLink(page: Page, localUuid: string): Promise<string> {
+  await page.goto(`/race/${localUuid}`);
+  await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByTestId("publish-race").click();
+  await expect(page.getByTestId("sync-badge")).toContainText("Synced");
+  const linkEditor = page.locator("text=Roles (any combination)").locator("..").nth(1);
+  await linkEditor.getByRole("button", { name: "Viewer (read-only)" }).click(); // off
+  await linkEditor.getByRole("button", { name: "Admin", exact: true }).click(); // on
+  await linkEditor.getByRole("button", { name: "Create link + QR" }).click();
+  const urlBox = page.locator('input[readonly][dir="ltr"]');
+  await expect(urlBox).toHaveValue(/\/invite\//);
+  return new URL(await urlBox.inputValue()).pathname;
+}
+
+async function acceptInvite(page: Page, path: string): Promise<string> {
+  await page.goto(path);
+  await page.getByRole("button", { name: "Accept" }).click();
+  await page.waitForURL(/\/race\/[0-9a-f-]{36}$/);
+  return page.url().split("/race/")[1];
+}
+
+/** One rider of a race, read from this page's stores. */
+const riderOn = (page: Page, raceUuid: string, bib: number) =>
+  page.evaluate(async ({ raceUuid, bib }) => {
+    const riders = (await import("/src/app/stores/ridersStore.ts")).default;
+    const r = (await riders.getState().getRiders(raceUuid)).find((x) => x.bibNumber === bib);
+    return r ? { lastName: r.lastName, team: r.team } : null;
+  }, { raceUuid, bib });
+
+/** A rider edit through the store (the same path the Riders screen uses). */
+const editRider = (page: Page, raceUuid: string, bib: number, patch: Record<string, unknown>) =>
+  page.evaluate(async ({ raceUuid, bib, patch }) => {
+    const riders = (await import("/src/app/stores/ridersStore.ts")).default;
+    const r = (await riders.getState().getRiders(raceUuid)).find((x) => x.bibNumber === bib)!;
+    await riders.getState().updateRider({ ...r, ...patch });
+  }, { raceUuid, bib, patch });
+
+const pendingOn = (page: Page, raceUuid: string) =>
+  page.evaluate(async (u) => (await import("/src/app/services/live/liveClient.ts")).pendingCount(u), raceUuid);
 
 test("two commissaires run one shared race live, both ways, within their waves", async ({ browser }) => {
   const A = await newUserPage(browser);
@@ -181,6 +222,94 @@ test("two commissaires run one shared race live, both ways, within their waves",
     await B.page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect.poll(() => lapsOn(A.page, 301), { timeout: 30_000 }).toBe(1);
     await expect(B.page.getByTestId("sync-badge")).toContainText("Synced", { timeout: 15_000 });
+  });
+
+  await A.ctx.close();
+  await B.ctx.close();
+});
+
+test("setup edits propagate both ways; each shared race keeps its own offline outbox", async ({ browser }) => {
+  const A = await newUserPage(browser);
+  const B = await newUserPage(browser);
+  await signUp(A.page, "Organizer");
+  await signUp(B.page, "Deputy");
+
+  // Two shared races, B is admin in both. a* = A's local uuids, b* = B's.
+  const a1 = await seedLocalRace(A.page, "Setup Race One");
+  const b1 = await acceptInvite(B.page, await shareWithAdminLink(A.page, a1));
+  const a2 = await seedLocalRace(A.page, "Setup Race Two");
+  const b2 = await acceptInvite(B.page, await shareWithAdminLink(A.page, a2));
+
+  await test.step("a rider edit on A reaches B", async () => {
+    await A.page.goto(`/race/${a1}`);
+    await editRider(A.page, a1, 302, { lastName: "Renamed", team: "Blue Club" });
+    await B.page.goto(`/race/${b1}`);
+    await expect.poll(() => riderOn(B.page, b1, 302), { timeout: 15_000 }).toEqual({ lastName: "Renamed", team: "Blue Club" });
+  });
+
+  await test.step("category laps and start time changed on B reach A", async () => {
+    await B.page.evaluate(async (u) => {
+      const cats = (await import("/src/app/stores/categoryStore.ts")).default;
+      const elite = (await cats.getState().getCategories(u)).find((c) => c.name === "Elite")!;
+      await cats.getState().upsertCategories([{ ...elite, laps: 6, startTime: "09:30" }]);
+    }, b1);
+    await A.page.goto(`/race/${a1}`);
+    await expect.poll(() => A.page.evaluate(async (u) => {
+      const cats = (await import("/src/app/stores/categoryStore.ts")).default;
+      const c = cats.getState().categories.find((x) => x.raceUuid === u && x.name === "Elite");
+      return c ? `${c.laps}@${c.startTime}` : null;
+    }, a1), { timeout: 15_000 }).toBe("6@09:30");
+  });
+
+  await test.step("race info edited on A reaches B", async () => {
+    await A.page.evaluate(async (u) => {
+      const races = (await import("/src/app/stores/racesStore.ts")).default;
+      const r = (await races.getState().getRaces()).find((x) => x.uuid === u)!;
+      await races.getState().updateRace({ ...r, location: "North Park" });
+    }, a1);
+    await B.page.goto(`/race/${b1}`);
+    await expect.poll(() => B.page.evaluate(async (u) => {
+      const races = (await import("/src/app/stores/racesStore.ts")).default;
+      return races.getState().races.find((x) => x.uuid === u)?.location;
+    }, b1), { timeout: 15_000 }).toBe("North Park");
+  });
+
+  await test.step("offline edits in two races queue separately and each lands in its own race", async () => {
+    await B.ctx.setOffline(true);
+    await B.page.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await editRider(B.page, b1, 303, { lastName: "OfflineOne" });
+    await editRider(B.page, b2, 303, { lastName: "OfflineTwo" });
+    expect(await pendingOn(B.page, b1)).toBe(1);
+    expect(await pendingOn(B.page, b2)).toBe(1);
+    await B.ctx.setOffline(false);
+    await B.page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect.poll(async () => (await pendingOn(B.page, b1)) + (await pendingOn(B.page, b2)), { timeout: 30_000 }).toBe(0);
+
+    await A.page.goto(`/race/${a1}`);
+    await expect.poll(async () => (await riderOn(A.page, a1, 303))?.lastName, { timeout: 15_000 }).toBe("OfflineOne");
+    await A.page.goto(`/race/${a2}`);
+    await expect.poll(async () => (await riderOn(A.page, a2, 303))?.lastName, { timeout: 15_000 }).toBe("OfflineTwo");
+    // Neither edit leaked into the other race.
+    expect((await riderOn(A.page, a1, 302))?.lastName).toBe("Renamed");
+    expect((await riderOn(A.page, a2, 302))?.lastName).toBe("Rider302");
+  });
+
+  await test.step("an offline edit survives the tab closing right after it", async () => {
+    // The API is unreachable (the app itself still loads: no service worker in tests).
+    const api = new URL(process.env.MULTIUSER_API ?? "http://localhost:4000").host;
+    const toApi = (u: URL) => u.host === api;
+    const block = (route: import("@playwright/test").Route) => route.abort("internetdisconnected");
+    await B.ctx.route(toApi, block);
+    await editRider(B.page, b1, 304, { lastName: "Crash" });
+    await B.page.close({ runBeforeUnload: false });
+    B.page = await B.ctx.newPage();
+    await B.page.goto("/main");
+    expect(await pendingOn(B.page, b1)).toBe(1);
+    await B.ctx.unroute(toApi, block);
+    await B.page.goto(`/race/${b1}`);
+    await expect.poll(() => pendingOn(B.page, b1), { timeout: 30_000 }).toBe(0);
+    await A.page.goto(`/race/${a1}`);
+    await expect.poll(async () => (await riderOn(A.page, a1, 304))?.lastName, { timeout: 15_000 }).toBe("Crash");
   });
 
   await A.ctx.close();

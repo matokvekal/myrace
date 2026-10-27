@@ -176,6 +176,13 @@ const ROLE_LABEL = (t: (k: string, d: string) => string): Record<MemberRole, str
   viewer: t("live.roleViewerTitle", "Viewer (read-only)"),
 });
 
+/** English defaults for the permission grid (other languages come from the locale files). */
+const SCREEN_LABEL: Record<Screen, string> = {
+  info: "Info", map: "Map", schedule: "Schedule", categories: "Categories", riders: "Riders", results: "Results",
+  start: "Start", checkin: "Check-In", board: "Board", status: "Status", live: "Live (laps)", team: "Team", settings: "Settings",
+};
+const OP_LABEL: Record<(typeof OPERATIONS)[number], string> = { view: "View", create: "Create", update: "Edit", delete: "Delete" };
+
 /** Roles, waves and per-screen overrides for one member (or an invitation). */
 function AccessEditor({
   raceUuid,
@@ -244,10 +251,10 @@ function AccessEditor({
       {showScreens && (
         <div className={styles.grid}>
           <span />
-          {OPERATIONS.map((op) => <span key={op} className={styles.gridHead}>{t(`live.op.${op}`, op)}</span>)}
+          {OPERATIONS.map((op) => <span key={op} className={styles.gridHead}>{t(`live.op.${op}`, OP_LABEL[op])}</span>)}
           {SCREENS.map((s) => (
             <React.Fragment key={s}>
-              <span>{t(`live.screen.${s}`, s)}</span>
+              <span>{t(`live.screen.${s}`, SCREEN_LABEL[s])}</span>
               {OPERATIONS.map((op) => {
                 const v = screens?.[s]?.[op];
                 // Three states: default (from roles) → allow → deny → default
