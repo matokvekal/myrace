@@ -691,3 +691,40 @@
   border-radius: 14px;
   padding: 16px;
 }
+
+/* Collapse / expand rider groups (display only) */
+.groupBulk {
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-start: 12px;
+  flex-wrap: wrap;
+}
+.groupBulkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.groupBulkBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.groupToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-end: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}

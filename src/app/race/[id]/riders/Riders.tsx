@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown, Plus, Search, X } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown, Plus, Minus, Search, X } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -93,6 +93,16 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [currentTime, setCurrentTime] = useState(new Date());
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
+  // Collapsed rider groups — display state only (never rider data, filters or
+  // sorting). Empty on entry: every group expanded.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -209,6 +219,31 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
     });
     return map;
   }, [filteredAndSorted, groupByCategory]);
+
+  // Every group currently shown: category groups in the table, categories in "group by category".
+  const groupKeys = useMemo((): string[] => {
+    if (viewMode === "table") return waveGroups.flatMap((wg) => wg.categories.map((cg) => `t:${wg.wave ?? "none"}:${cg.key}`));
+    if (grouped) return [...grouped.keys()].map((name) => `g:${name}`);
+    return [];
+  }, [viewMode, waveGroups, grouped]);
+  // Global resets: they override every individual choice.
+  const collapseAll = () => setCollapsedGroups(new Set(groupKeys));
+  const expandAll = () => setCollapsedGroups(new Set());
+
+  const groupToggle = (key: string, label: string) => {
+    const open = !collapsedGroups.has(key);
+    return (
+      <button
+        type="button"
+        className={styles.groupToggle}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+        onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
+      >
+        {open ? <Minus size={14} /> : <Plus size={14} />}
+      </button>
+    );
+  };
 
   const sortOptions = [
     { key: "name" as SortKey, label: "Name A–Z" },
@@ -386,6 +421,14 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
       {filteredAndSorted.length > 0 && (
         <div className={styles.tabCount}>
           Riders ({filteredAndSorted.length})
+          <span className={styles.groupBulk}>
+            <button type="button" className={styles.groupBulkBtn} onClick={collapseAll} disabled={groupKeys.length === 0} data-testid="collapse-all">
+              <Minus size={13} /> Collapse All
+            </button>
+            <button type="button" className={styles.groupBulkBtn} onClick={expandAll} disabled={groupKeys.length === 0} data-testid="expand-all">
+              <Plus size={13} /> Expand All
+            </button>
+          </span>
         </div>
       )}
 
@@ -414,14 +457,16 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                   </div>
                   {wg.categories.map((cg) => {
                     const catColor = cg.category?.color ?? cg.riders[0]?.color ?? "#ddd";
+                    const gKey = `t:${wg.wave ?? "none"}:${cg.key}`;
                     return (
                       <React.Fragment key={cg.key}>
                         <div className={styles.catSeparator} style={{ borderLeftColor: catColor }} data-testid="rider-category-header">
+                          {groupToggle(gKey, cg.name)}
                           <span className={styles.catSepDot} style={{ background: catColor }} />
                           {cg.name}
                           <span className={styles.groupCount}>{cg.riders.length}</span>
                         </div>
-                        {cg.riders.map((rider, idx) => {
+                        {!collapsedGroups.has(gKey) && cg.riders.map((rider, idx) => {
                           const isOut = ["DNS", "DNF", "DSQ"].includes(rider.status);
                           const isRunning = rider.raceStatus === "running" && !isOut;
                           const isFinished = rider.raceStatus === "finished" && !isOut;
@@ -470,8 +515,12 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
           ) : groupByCategory && grouped ? (
             [...grouped.entries()].map(([catName, catRiders]) => (
               <div key={catName} className={styles.catGroup}>
-                <div className={styles.catGroupHeader}>{catName}</div>
-                {catRiders.map((rider) => (
+                <div className={styles.catGroupHeader} data-testid="rider-category-header">
+                  {groupToggle(`g:${catName}`, catName)}
+                  {catName}
+                  <span className={styles.groupCount}>{catRiders.length}</span>
+                </div>
+                {!collapsedGroups.has(`g:${catName}`) && catRiders.map((rider) => (
                   <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
                     <RiderCard {...rider} />
                   </div>
