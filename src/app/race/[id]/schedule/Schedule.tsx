@@ -27,6 +27,7 @@ import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
 import { finishGroupLabel, finishGroupOptions } from "@/utils/finishGroups";
+import ColorSwatchPicker from "@/components/ui/ColorSwatchPicker";
 import { withStatus } from "@/utils/riderStatus";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 
@@ -968,17 +969,13 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
               <span className={styles.colorSwatch} style={{ background: race?.waveColors?.[String(colorWave)] ?? "#ccc" }} />
               <span>Current {race?.waveColors?.[String(colorWave)] ?? "—"}</span>
             </div>
-            <input
-              type="color"
-              className={styles.colorInput}
-              data-testid="wave-color-input"
-              value={colorDraft}
-              onChange={(e) => setColorDraft(e.target.value)}
+            <ColorSwatchPicker
+              value={race?.waveColors?.[String(colorWave)]}
+              onPick={(c) => void saveWaveColor(colorWave, c)}
+              onCancel={() => setColorWave(null)}
+              inputTestId="wave-color-input"
+              saveTestId="wave-color-save"
             />
-            <div className={styles.colorActions}>
-              <Button variant="secondary" size="sm" onClick={() => setColorWave(null)}>Cancel</Button>
-              <Button variant="success" size="sm" onClick={() => void saveWaveColor(colorWave, colorDraft)} data-testid="wave-color-save">Save</Button>
-            </div>
           </div>
         </div>
       )}
@@ -991,17 +988,13 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
               <span className={styles.colorSwatch} style={{ background: colorCat.color ?? "#ccc" }} />
               <span>Current {colorCat.color ?? "—"}</span>
             </div>
-            <input
-              type="color"
-              className={styles.colorInput}
-              data-testid="color-input"
-              value={colorDraft}
-              onChange={(e) => setColorDraft(e.target.value)}
+            <ColorSwatchPicker
+              value={colorCat.color}
+              onPick={(c) => void saveCategoryColor(colorCat, c)}
+              onCancel={() => setColorCat(null)}
+              inputTestId="color-input"
+              saveTestId="color-save"
             />
-            <div className={styles.colorActions}>
-              <Button variant="secondary" size="sm" onClick={() => setColorCat(null)}>Cancel</Button>
-              <Button variant="success" size="sm" onClick={() => void saveCategoryColor(colorCat, colorDraft)} data-testid="color-save">Save</Button>
-            </div>
           </div>
         </div>
       )}

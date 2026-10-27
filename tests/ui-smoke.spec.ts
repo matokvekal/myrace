@@ -55,6 +55,7 @@ test.describe("UI smoke", () => {
 
     // category (upcoming one: the first running categories are editable too, finished are not)
     await page.locator('[data-testid^="edit-color-"]:not([disabled])').first().click();
+    await page.getByTestId("custom-color").click();
     await page.getByTestId("color-input").evaluate((el: HTMLInputElement) => {
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       set.call(el, "#ff8800");
@@ -65,6 +66,7 @@ test.describe("UI smoke", () => {
 
     // wave
     await page.getByTestId("edit-wave-color-2").click();
+    await page.getByTestId("custom-color").click();
     await page.getByTestId("wave-color-input").evaluate((el: HTMLInputElement) => {
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       set.call(el, "#00aa55");
@@ -75,6 +77,11 @@ test.describe("UI smoke", () => {
     // persisted: reopening shows the saved colour
     await page.getByTestId("edit-wave-color-2").click();
     await expect(page.getByText(/Current #00aa55/i)).toBeVisible();
+    // A preset swatch saves at once and closes the dialog
+    await page.getByTestId("swatch-1E88E5").click();
+    await expect(page.getByTestId("swatch-1E88E5")).toHaveCount(0);
+    await page.getByTestId("edit-wave-color-2").click();
+    await expect(page.getByTestId("swatch-1E88E5")).toHaveAttribute("aria-pressed", "true");
   });
 
   test("Board: complete board with expandable results", async ({ page }) => {
