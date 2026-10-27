@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import styles from "./schedule.module.css";
 import Button from "@/components/ui/Button";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +27,8 @@ import { RiderProps } from "@/types/types";
 import { getCategoryStatusInfo, getWaveStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
 import { finishGroupLabel, finishGroupOptions } from "@/utils/finishGroups";
+import { emptyPrefs, learnRace, suggestFinishGroups, type FinishGroupPrefs } from "@/utils/finishGroupLearning";
+import { loadFinishGroupPrefs, saveFinishGroupPrefs } from "@/services/finishGroupPrefs";
 import ColorSwatchPicker from "@/components/ui/ColorSwatchPicker";
 import { withStatus } from "@/utils/riderStatus";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
@@ -316,6 +318,34 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     if ((cat.status ?? "upcoming") !== "upcoming") return;
     if ((cat.linkGroup?.trim() ?? "") === value) return;
     await updateCategory({ ...cat, linkGroup: value });
+    void rememberFinishGroups();
+  };
+
+  // Learned Finish Group suggestions (organizer's own past races; never by wave or name alone).
+  const [fgPrefs, setFgPrefs] = useState<FinishGroupPrefs>(() => emptyPrefs());
+  const [fgSuggestionsDismissed, setFgSuggestionsDismissed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void loadFinishGroupPrefs().then((p) => alive && setFgPrefs(p));
+    return () => { alive = false; };
+  }, []);
+  const fgSuggestions = useMemo(
+    () => (fgSuggestionsDismissed ? new Map<number, string>() : suggestFinishGroups(fgPrefs, raceUuid, categories.filter((c) => c.raceUuid === raceUuid && (c.status ?? "upcoming") === "upcoming"))),
+    [fgPrefs, fgSuggestionsDismissed, raceUuid, categories]
+  );
+  // Learn from deliberate assignments only (never from Reset All).
+  const rememberFinishGroups = async () => {
+    const next = learnRace(fgPrefs, raceUuid, useCategoryStore.getState().categories.filter((c) => c.raceUuid === raceUuid));
+    setFgPrefs(next);
+    await saveFinishGroupPrefs(next);
+  };
+  const acceptFinishGroupSuggestions = async () => {
+    const all = useCategoryStore.getState().categories;
+    for (const [id, value] of fgSuggestions) {
+      const cat = all.find((c) => c.id === id);
+      if (cat && !cat.linkGroup?.trim() && (cat.status ?? "upcoming") === "upcoming") await updateCategory({ ...cat, linkGroup: value });
+    }
+    await rememberFinishGroups();
   };
 
   // Ignore / Restore Wave: every category of the wave gets category.ignored —
@@ -602,6 +632,16 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           <div className={styles.sectionHeader}>
             <span>Category → Wave · Finish Group</span>
             <span className={styles.assignHint}>Choose a wave for each category. Same Finish Group = shared bell and finish, in any wave.</span>
+            {fgSuggestions.size > 0 && (
+              <>
+                <Button variant="success" size="sm" data-testid="finish-group-accept" onClick={() => void acceptFinishGroupSuggestions()}>
+                  Accept suggestions
+                </Button>
+                <Button variant="secondary" size="sm" data-testid="finish-group-dismiss" onClick={() => setFgSuggestionsDismissed(true)}>
+                  Dismiss suggestions
+                </Button>
+              </>
+            )}
             <Button variant="secondary" size="sm" data-testid="finish-group-reset-all" onClick={() => void resetFinishGroups()}>
               Reset All
             </Button>
@@ -611,7 +651,9 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
           ) : (
             allEditCats.map((cat) => {
               const currentWaveId = getCategoryWaveId(cat.id);
-              const fgValue = cat.linkGroup?.trim() ?? "";
+              const fgSaved = cat.linkGroup?.trim() ?? "";
+              const fgSuggested = !fgSaved ? fgSuggestions.get(cat.id) : undefined;
+              const fgValue = fgSaved || fgSuggested || "";
               const fgLocked = (cat.status ?? "upcoming") !== "upcoming";
               return (
                 <div key={cat.id} className={styles.categoryAssignRow}>
@@ -645,6 +687,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                       <option key={v} value={v}>{finishGroupLabel(v)}</option>
                     ))}
                   </select>
+                  {fgSuggested && <span className={styles.fgSuggested} data-testid={`finish-group-suggested-${cat.id}`}>Suggested</span>}
                 </div>
               );
             })

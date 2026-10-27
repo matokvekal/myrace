@@ -9,6 +9,7 @@ import { db } from "./db/pool.js";
 import { directoryRouter } from "./directory/routes.js";
 import { ApiError, logger } from "./lib/core.js";
 import { invitationsRouter, membersRouter, myInvitationsRouter } from "./members/routes.js";
+import { preferencesRouter } from "./preferences/routes.js";
 import { racesRouter } from "./races/routes.js";
 import { resultsRouter } from "./results/routes.js";
 
@@ -32,6 +33,7 @@ export function createApp() {
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/me/invitations", myInvitationsRouter);
   app.use("/api/v1/me", directoryRouter);
+  app.use("/api/v1/me", preferencesRouter);
   app.use("/api/v1/me", meRouter);
   app.use("/api/v1/invitations", invitationsRouter);
   app.use("/api/v1/races/:raceUuid", membersRouter);
