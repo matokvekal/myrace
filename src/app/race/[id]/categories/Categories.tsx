@@ -11,6 +11,7 @@ import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes, normali
 import { getCategoryStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
 import { finishGroupLabel } from "@/utils/finishGroups";
+import { formatMinLap, LEGACY_MIN_LAP_SECONDS, MIN_LAP_CHOICES } from "@/utils/minLap";
 import { isLeaderFinishAll } from "@/utils/linkedGroups";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
@@ -443,6 +444,27 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
             <span><Bell size={14} /> First finish – all finish</span>
             <span className={styles.linkedFinishHint}>
               When a category's first rider starts the last lap, every rider in it gets the bell. When the first rider finishes, everyone finishes on their next crossing, however many laps they did.
+            </span>
+          </span>
+        </label>
+      )}
+
+      {race && (
+        <label className={styles.linkedFinishRow}>
+          <select
+            data-testid="min-lap-seconds"
+            value={race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS}
+            disabled={!!race.finalized}
+            onChange={(e) => void updateRace({ ...race, minLapSeconds: Number(e.target.value) })}
+          >
+            {[...new Set([...MIN_LAP_CHOICES, race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS])].sort((a, b) => a - b).map((sec) => (
+              <option key={sec} value={sec}>{formatMinLap(sec)}</option>
+            ))}
+          </select>
+          <span className={styles.linkedFinishLabel}>
+            <span>Minimum lap time</span>
+            <span className={styles.linkedFinishHint}>
+              A rider's next passage counts only after this long (duplicate taps by several commissaires, or a tap and voice, never make two laps). New races: 3 min.
             </span>
           </span>
         </label>

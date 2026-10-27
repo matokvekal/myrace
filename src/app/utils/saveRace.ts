@@ -1,4 +1,5 @@
 import useRaceStore from "@/stores/racesStore";
+import { DEFAULT_MIN_LAP_SECONDS } from "./minLap";
 import { RaceProps } from "@/types/types";
 import { FormEvent } from "react";
 import { saveRidersFromCsv, saveRidersFromRows } from "./insertRidersCsv";
@@ -83,6 +84,8 @@ export const saveRace = async (
       lastUpdateAt: new Date(),
       isActive: true,
       autoColor,
+      // New races: 3 minutes minimum between two counted passages (configurable in Race Settings).
+      minLapSeconds: DEFAULT_MIN_LAP_SECONDS,
       map: "",
       distance: 0,
     };

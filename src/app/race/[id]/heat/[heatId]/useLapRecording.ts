@@ -7,6 +7,7 @@ import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
 import { logAnalyticsEvent } from "@/services/analytics/analyticsClient";
 import useRaceStore from "@/stores/racesStore";
+import { minLapMsFor } from "@/utils/minLap";
 import useCategoryStore from "@/stores/categoryStore";
 import { isRiderIgnored } from "@/utils/ignoredWaves";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
@@ -23,6 +24,7 @@ import { isLiveRace, liveAllows, liveDispatch, newActionId } from "@/services/li
  */
 
 /** A rider can't record two laps inside a minute. */
+/** Legacy fixed minimum (60 s). The live rule is the race's own: minLapMsFor(race). */
 export const MIN_LAP_MS = 60 * 1000;
 
 /**
@@ -273,8 +275,9 @@ export function useLapRecording({
 
     if (rider.timeArrive) {
       const msSinceLast = clickTime.getTime() - new Date(rider.timeArrive).getTime();
-      if (msSinceLast < MIN_LAP_MS) {
-        const remaining = Math.ceil((MIN_LAP_MS - msSinceLast) / 1000);
+      const minLapMs = minLapMsFor(race);
+      if (msSinceLast < minLapMs) {
+        const remaining = Math.ceil((minLapMs - msSinceLast) / 1000);
         toast.info(`Wait ${remaining}s before next lap`);
         return;
       }

@@ -13,7 +13,8 @@ import useCategoryStore from "@/stores/categoryStore";
 import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { RiderProps } from "@/types/types";
 import { formatTime, formatTimeWithLeadingZeroes, parseClockTime } from "../../../../utils/timeUtils";
-import { useLapRecording, MIN_LAP_MS } from "./useLapRecording";
+import { useLapRecording } from "./useLapRecording";
+import { minLapMsFor } from "@/utils/minLap";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
 import BibWarning from "../../../components/bibWarning/BibWarning";
@@ -466,7 +467,7 @@ const Heat: React.FC = () => {
       return false;
     }
     // Refused before anything is recorded, so the Joker stays and no duplicate lap is made.
-    const blocked = jokerResolveBlock(candidate, joker.capturedAt, MIN_LAP_MS);
+    const blocked = jokerResolveBlock(candidate, joker.capturedAt, minLapMsFor(races.find((r) => r.uuid === raceUuid)));
     if (blocked) {
       toast.error(blocked);
       return false;
