@@ -97,11 +97,16 @@ health() { # 30 s for {"ok":true,"release":<rev>}
   return 1
 }
 
+# pm2 without the lock descriptor: the PM2 daemon (started by the first pm2
+# command) and the app must not inherit fd 9, or the deploy lock would stay
+# held after the gate exits and block every later deployment.
+pm2_() { "$PM2_BIN" "$@" 9>&-; }
+
 # Restarts only this app, from the release `current` points at. delete + start
 # (not reload) so PM2 re-reads cwd, script and env from the new release.
 restart_app() {
-  "$PM2_BIN" delete "$APP" >/dev/null 2>&1 || true
-  "$PM2_BIN" start "$BASE/bin/ecosystem.config.cjs" --only "$APP" >/dev/null
+  pm2_ delete "$APP" >/dev/null 2>&1 || true
+  pm2_ start "$BASE/bin/ecosystem.config.cjs" --only "$APP" >/dev/null
 }
 
 start_and_check() { # <release-id>
@@ -179,7 +184,7 @@ activate() {
   log "current -> $id (was ${prev:-none})"
   if start_and_check "$id"; then
     [[ -n "$prev" && "$prev" != "$id" ]] && set_link previous "$prev"
-    "$PM2_BIN" save >/dev/null 2>&1 || true
+    pm2_ save >/dev/null 2>&1 || true
     prune
     log "activated $id"
     return 0
@@ -188,12 +193,12 @@ activate() {
   if [[ -n "$prev" && "$prev" != "$id" && -d "$BASE/releases/$prev" ]]; then
     set_link current "$prev"
     if start_and_check "$prev"; then
-      "$PM2_BIN" save >/dev/null 2>&1 || true
+      pm2_ save >/dev/null 2>&1 || true
       die "activation of $id failed; automatically rolled back to $prev (healthy)"
     fi
     die "activation of $id failed and the rollback to $prev is unhealthy: check 'pm2 logs $APP'"
   fi
-  "$PM2_BIN" stop "$APP" >/dev/null 2>&1 || true
+  pm2_ stop "$APP" >/dev/null 2>&1 || true
   rm -f -- "$BASE/current"
   die "activation of $id failed and there is no previous release; $APP is stopped"
 }
@@ -215,7 +220,7 @@ rollback() {
   log "rollback: current -> $target (was ${cur:-none})"
   if start_and_check "$target"; then
     [[ -n "$cur" ]] && set_link previous "$cur"
-    "$PM2_BIN" save >/dev/null 2>&1 || true
+    pm2_ save >/dev/null 2>&1 || true
     log "rolled back to $target"
     return 0
   fi
