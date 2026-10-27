@@ -117,6 +117,8 @@ export interface SharedCategory {
   status: RaceProgress | null;
   linkedFinish: boolean | null;
   linkGroup: string | null;
+  /** Epoch ms (race clock) when the category was started. */
+  startedAt: number | null;
   /** Epoch ms when the category was finished. */
   finishedAt: number | null;
   importOrder: number | null;
