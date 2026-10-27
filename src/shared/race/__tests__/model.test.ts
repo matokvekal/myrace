@@ -67,8 +67,8 @@ describe("state fields", () => {
   });
 
   it("settings treat null as on, like the app", () => {
-    expect(raceSettings({ autoColor: null, leaderFinishAll: null })).toEqual({ autoColor: true, leaderFinishAll: true });
-    expect(raceSettings({ autoColor: false, leaderFinishAll: true })).toEqual({ autoColor: false, leaderFinishAll: true });
+    expect(raceSettings({ autoColor: null, leaderFinishAll: null })).toEqual({ autoColor: true, leaderFinishAll: true, minLapSeconds: 60 });
+    expect(raceSettings({ autoColor: false, leaderFinishAll: true })).toEqual({ autoColor: false, leaderFinishAll: true, minLapSeconds: 60 });
   });
 });
 

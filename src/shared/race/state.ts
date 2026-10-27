@@ -85,6 +85,8 @@ export interface SharedRace {
   /** Race settings: null counts as on, as in the app. */
   autoColor: boolean | null;
   leaderFinishAll: boolean | null;
+  /** Minimum seconds between two counted passages of a rider. null = 60 (every race before 009). */
+  minLapSeconds: number | null;
   waveColors: Record<string, string> | null;
   mapCenter: { lat: number; lng: number } | null;
   mapZoom: number | null;
@@ -117,6 +119,11 @@ export interface SharedCategory {
   status: RaceProgress | null;
   linkedFinish: boolean | null;
   linkGroup: string | null;
+  /** Wave ignored by the organizer: kept with its riders, left out of starts, laps, positions and results. */
+  ignored: boolean;
+  /** Default bib background / text colour of the category's riders ("#RRGGBB"; null = not set). */
+  bibColor: string | null;
+  bibTextColor: string | null;
   /** Epoch ms (race clock) when the category was started. */
   startedAt: number | null;
   /** Epoch ms when the category was finished. */
@@ -150,6 +157,9 @@ export interface SharedRider {
   uciPoints: number | null;
   federation: string | null;
   uciNumber: string | null;
+  /** Per-rider bib colour overrides (null = the category's). */
+  bibColor: string | null;
+  bibTextColor: string | null;
   viewOrder: number;
   // Computed by the rules engine from Actions; never sent by a Device (AD-19).
   raceStatus: RaceProgress;
@@ -183,6 +193,9 @@ export const RIDER_IDENTITY_FIELDS = [
   "category",
   "subCategory",
   "heat",
+  "uciNumber",
+  "bibColor",
+  "bibTextColor",
 ] as const satisfies readonly (keyof SharedRider)[];
 export type RiderIdentityField = (typeof RIDER_IDENTITY_FIELDS)[number];
 
@@ -193,15 +206,21 @@ export type RiderIdentityField = (typeof RIDER_IDENTITY_FIELDS)[number];
 export interface RaceSettings {
   leaderFinishAll: boolean;
   autoColor: boolean;
+  /** Approved by the product owner (2026-10-27): configurable minimum lap interval. */
+  minLapSeconds: number;
 }
-export const RACE_SETTING_FIELDS = ["leaderFinishAll", "autoColor"] as const satisfies readonly (keyof RaceSettings)[];
+export const RACE_SETTING_FIELDS = ["leaderFinishAll", "autoColor", "minLapSeconds"] as const satisfies readonly (keyof RaceSettings)[];
+/** Default for new races; existing races (null) keep the 60 s they were recorded with. */
+export const DEFAULT_MIN_LAP_SECONDS = 180;
+export const LEGACY_MIN_LAP_SECONDS = 60;
 /** Settings a Start commissaire may change (race operation, not data collection). */
 export const RACE_OPERATION_SETTINGS = ["leaderFinishAll"] as const satisfies readonly (keyof RaceSettings)[];
 
 /** The one accessor for race settings: null/undefined counts as on, as in the app. */
-export const raceSettings = (race: Pick<SharedRace, "leaderFinishAll" | "autoColor">): RaceSettings => ({
+export const raceSettings = (race: Pick<SharedRace, "leaderFinishAll" | "autoColor"> & { minLapSeconds?: number | null }): RaceSettings => ({
   leaderFinishAll: race.leaderFinishAll !== false,
   autoColor: race.autoColor !== false,
+  minLapSeconds: race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS,
 });
 
 /** Race fields a `RaceEdited` Action may change (info, maps, wave colours). */

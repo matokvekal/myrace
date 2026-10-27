@@ -83,6 +83,8 @@ export interface RaceProps {
    * races keep the behaviour. Off means the organizer picks colours by hand.
    */
   autoColor?: boolean;
+  /** Minimum seconds between two counted passages of a rider. Unset = 60 (races before this setting); new races get 180. */
+  minLapSeconds?: number | null;
   /**
    * Optional colour per wave, keyed by wave number (heat). Independent of the
    * category colours — a wave without an entry simply has no colour of its own.
@@ -177,6 +179,11 @@ export interface CategoryProps {
   linkedFinish?: boolean;
   /** Categories sharing a group ring the bell / finish together. Empty = own category (Masters auto-group). */
   linkGroup?: string;
+  /** Wave ignored by the organizer: kept, but out of starts, laps, positions and results. */
+  ignored?: boolean;
+  /** Default bib background / text colour for this category's riders ("#RRGGBB"). */
+  bibColor?: string | null;
+  bibTextColor?: string | null;
   finishedAt?: number; // epoch ms when race was finished
   /** Position of the category's first rider in the uploaded file (0-based) — the file's schedule order. */
   importOrder?: number;
@@ -233,6 +240,9 @@ export interface RiderProps {
   uciPoints?: number | null;
   federation?: string | null;
   uciNumber?: string | null;
+  /** Bib colour overrides for this rider (unset = the category's). */
+  bibColor?: string | null;
+  bibTextColor?: string | null;
   /**
    * Imported columns kept for reference but NOT used by the app (BUGS.md #A).
    * Shown on the full rider card so a commissaire can see things like UCI

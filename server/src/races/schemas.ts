@@ -7,6 +7,8 @@ const uuid = z.string().uuid();
 const text = (max = 200) => z.string().max(max);
 const heat = z.number().int().min(0).max(999);
 const nullable = <T extends z.ZodTypeAny>(t: T) => t.nullable().optional();
+/** A normalized "#RRGGBB" colour (bib colours). */
+const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
 
 export const newCategory = z.strictObject({
   uuid,
@@ -18,6 +20,8 @@ export const newCategory = z.strictObject({
   color: nullable(text(30)),
   linkGroup: nullable(text(60)),
   importOrder: nullable(z.number().int()),
+  bibColor: nullable(hexColor),
+  bibTextColor: nullable(hexColor),
 });
 
 export const newRider = z.strictObject({
@@ -37,11 +41,13 @@ export const newRider = z.strictObject({
   flag: nullable(text(10)),
   uciPoints: nullable(z.number()),
   uciNumber: nullable(text(30)),
+  bibColor: nullable(hexColor),
+  bibTextColor: nullable(hexColor),
   image: nullable(text(500)),
   comment: nullable(text(1000)),
 });
 
-const riderIdentityChanges = newRider.omit({ uuid: true, standing: true, flag: true, uciPoints: true, uciNumber: true, image: true, comment: true }).partial();
+const riderIdentityChanges = newRider.omit({ uuid: true, standing: true, flag: true, uciPoints: true, image: true, comment: true }).partial();
 
 const raceInfoShape = Object.fromEntries(RACE_INFO_FIELDS.map((f) => [f, z.unknown()])) as Record<(typeof RACE_INFO_FIELDS)[number], z.ZodUnknown>;
 
@@ -67,6 +73,9 @@ const payloads = {
         linkGroup: text(60).nullable(),
         linkedFinish: z.boolean().nullable(),
         isConnected: z.boolean().nullable(),
+        ignored: z.boolean(),
+        bibColor: hexColor.nullable(),
+        bibTextColor: hexColor.nullable(),
       })
       .partial(),
   }),
@@ -78,7 +87,7 @@ const payloads = {
   RiderCheckedIn: z.strictObject({ riderUuid: uuid, checked: z.boolean() }),
   CommentSet: z.strictObject({ riderUuid: uuid, comment: text(1000).nullable() }),
   RaceEdited: z.strictObject({ changes: z.strictObject(raceInfoShape).partial() }),
-  SettingChanged: z.strictObject({ changes: z.strictObject({ leaderFinishAll: z.boolean(), autoColor: z.boolean() }).partial() }),
+  SettingChanged: z.strictObject({ changes: z.strictObject({ leaderFinishAll: z.boolean(), autoColor: z.boolean(), minLapSeconds: z.number().int().min(0).max(3600) }).partial() }),
 } as const;
 
 /** Types a Device may send; MemberChanged/Finalized/Amended are written by the Server only. */

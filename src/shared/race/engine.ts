@@ -24,7 +24,12 @@ import type { RaceAction } from "./actions";
 import { RACE_INFO_FIELDS, RIDER_IDENTITY_FIELDS } from "./state";
 import type { CategoryUuid, LapDetail, RaceState, RiderUuid, SharedCategory, SharedRider } from "./state";
 
+/** The legacy minimum (60 s); a race's own is raceMinLapMs(state). */
 export const MIN_LAP_MS = 60_000;
+/** Minimum time between two counted passages of a rider, for this race. */
+export const raceMinLapMs = (state: RaceState): number => (state.race.minLapSeconds ?? MIN_LAP_MS / 1000) * 1000;
+/** A category whose wave the organizer ignored. */
+const isIgnored = (c: SharedCategory | undefined | null): boolean => !!c?.ignored;
 const OUT = new Set(["DNF", "DSQ", "DNS"]);
 
 /** Race-clock time of an Action: device clock corrected by its measured offset. */
@@ -75,7 +80,7 @@ export function groupFinishAt(state: RaceState, c: SharedCategory, except?: Ride
   const key = groupKey(c);
   let first: number | null = null;
   for (const cat of Object.values(state.categories)) {
-    if (groupKey(cat) !== key) continue;
+    if (groupKey(cat) !== key || isIgnored(cat)) continue;
     for (const r of ridersOfCategory(state, cat)) {
       if (r.uuid === except || OUT.has(r.status)) continue;
       const laps = effectiveTotalLaps(cat, r);
@@ -117,6 +122,7 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
   const catFinishedAt = cat?.finishedAt ?? null;
   const groupDoneAt = cat ? groupFinishAt(state, cat, r.uuid) : null;
 
+  const minLap = raceMinLapMs(state);
   const sorted = marks.filter((m) => !m.undone).slice().sort((a, b) => a.at - b.at || a.seq - b.seq);
   const laps: LapDetail[] = [];
   let count = 0;
@@ -137,7 +143,7 @@ export function deriveRider(state: RaceState, riderUuid: RiderUuid, marks: reado
       continue;
     }
     if (startMs === null || m.at < startMs) continue; // before the start
-    if (lastArrive !== null && m.at - lastArrive < MIN_LAP_MS) continue; // faster than any real lap
+    if (lastArrive !== null && m.at - lastArrive < minLap) continue; // faster than any real lap
     const from = lastArrive ?? startMs;
     count += 1;
     laps.push({
@@ -194,7 +200,8 @@ export function rankRiders(state: RaceState): RiderUuid[] {
     if (!at || !bt) return (at ? 0 : 1) - (bt ? 0 : 1);
     return at - bt;
   };
-  const active = Object.values(state.riders).filter((r) => !OUT.has(r.status));
+  // Riders of an ignored wave keep their data but take no position.
+  const active = Object.values(state.riders).filter((r) => !OUT.has(r.status) && !isIgnored(categoryOfRider(state, r)));
   const pos = new Map<RiderUuid, [number, number]>();
   const groups = new Map<string, SharedRider[]>();
   for (const r of active) {
@@ -271,6 +278,7 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
     case "LapCountCorrection": {
       const r = rider(p.riderUuid);
       if (!r) return notApplied("invalid");
+      if (isIgnored(categoryOfRider(state, r))) return notApplied("locked"); // ignored wave: no timing
       if (action.type === "LapCountCorrection" && (!Number.isInteger(action.payload.laps) || action.payload.laps < 0)) return notApplied("invalid");
       ch.rederive.add(r.uuid);
       return { applied: true, changes: ch };
@@ -296,7 +304,7 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       if (running) return notApplied("locked"); // one wave at a time
       const wanted = action.payload.categoryUuids;
       const cats = Object.values(state.categories).filter(
-        (c) => c.heat === heat && c.status !== "running" && c.status !== "finished" && (!wanted || wanted.includes(c.uuid)),
+        (c) => c.heat === heat && !c.ignored && c.status !== "running" && c.status !== "finished" && (!wanted || wanted.includes(c.uuid)),
       );
       if (cats.length === 0) return { applied: true, changes: ch }; // first start wins; nothing left to start
       // Close out riders of already-finished categories still on track (prior-wave sweep).
@@ -366,7 +374,8 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       state.categories[n.uuid] = {
         uuid: n.uuid, raceUuid: state.race.uuid, name: n.name, subCategory: n.subCategory ?? null, laps: n.laps ?? null,
         startTime: n.startTime ?? null, isConnected: false, color: n.color ?? null, heat: n.heat ?? null, status: "upcoming",
-        linkedFinish: null, linkGroup: n.linkGroup ?? null, startedAt: null, finishedAt: null, importOrder: n.importOrder ?? null,
+        linkedFinish: null, linkGroup: n.linkGroup ?? null, ignored: false, bibColor: n.bibColor ?? null, bibTextColor: n.bibTextColor ?? null,
+        startedAt: null, finishedAt: null, importOrder: n.importOrder ?? null,
       };
       ch.categories.add(n.uuid);
       return { applied: true, changes: ch };
@@ -398,7 +407,7 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
           r.heat = c.heat;
           touch(r);
         }
-        if ("laps" in changes || "linkGroup" in changes) ch.rederive.add(r.uuid);
+        if ("laps" in changes || "linkGroup" in changes || "ignored" in changes) ch.rederive.add(r.uuid);
       }
       return { applied: true, changes: ch };
     }
@@ -431,7 +440,8 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
         state.categories[n.uuid] = {
           uuid: n.uuid, raceUuid: state.race.uuid, name: n.name, subCategory: n.subCategory ?? null, laps: n.laps ?? null,
           startTime: n.startTime ?? null, isConnected: false, color: n.color ?? null, heat: n.heat ?? null, status: "upcoming",
-          linkedFinish: null, linkGroup: n.linkGroup ?? null, startedAt: null, finishedAt: null, importOrder: n.importOrder ?? null,
+          linkedFinish: null, linkGroup: n.linkGroup ?? null, ignored: false, bibColor: n.bibColor ?? null, bibTextColor: n.bibTextColor ?? null,
+          startedAt: null, finishedAt: null, importOrder: n.importOrder ?? null,
         };
         ch.categories.add(n.uuid);
       }
@@ -501,11 +511,13 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
 
     case "SettingChanged": {
       const c = action.payload.changes;
-      for (const k of Object.keys(c)) if (k !== "leaderFinishAll" && k !== "autoColor") return notApplied("invalid");
+      for (const k of Object.keys(c)) if (k !== "leaderFinishAll" && k !== "autoColor" && k !== "minLapSeconds") return notApplied("invalid");
+      if (c.minLapSeconds !== undefined && !(Number.isInteger(c.minLapSeconds) && c.minLapSeconds >= 0 && c.minLapSeconds <= 3600)) return notApplied("invalid");
       if (c.leaderFinishAll !== undefined) state.race.leaderFinishAll = c.leaderFinishAll;
       if (c.autoColor !== undefined) state.race.autoColor = c.autoColor;
+      if (c.minLapSeconds !== undefined) state.race.minLapSeconds = c.minLapSeconds;
       ch.race = true;
-      if (c.leaderFinishAll !== undefined) {
+      if (c.leaderFinishAll !== undefined || c.minLapSeconds !== undefined) {
         for (const r of Object.values(state.riders)) if (r.raceStatus !== "upcoming") ch.rederive.add(r.uuid);
       }
       return { applied: true, changes: ch };
@@ -526,7 +538,7 @@ function newRider(state: RaceState, n: import("./actions").NewRider, atMs: numbe
     checked: false, firstName: n.firstName ?? "", middleName: n.middleName ?? null, lastName: n.lastName ?? "", flag: n.flag ?? null,
     team: n.team ?? null, standing: n.standing ?? null, heat: n.heat ?? null, status: "standing", comment: n.comment ?? null,
     image: n.image ?? null, chipNumber: n.chipNumber ?? null, points: n.points ?? null, uciPoints: n.uciPoints ?? null,
-    federation: n.federation ?? null, uciNumber: n.uciNumber ?? null, viewOrder: 0, raceStatus: "upcoming", timeStartRace: null,
+    federation: n.federation ?? null, uciNumber: n.uciNumber ?? null, bibColor: n.bibColor ?? null, bibTextColor: n.bibTextColor ?? null, viewOrder: 0, raceStatus: "upcoming", timeStartRace: null,
     timeArrive: null, lapsCounter: 0, lapsDetails: [], totalLaps: 0, elapsedLastLap: null, elapsedTimeFromStart: null,
     distance: null, position_start: null, position_category: 0, position_race: 0, color: null, createdAt: iso, updatedAt: iso,
   };

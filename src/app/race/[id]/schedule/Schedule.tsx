@@ -318,6 +318,18 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     await updateCategory({ ...cat, linkGroup: value });
   };
 
+  // Ignore / Restore Wave: every category of the wave gets category.ignored —
+  // same category write (and sync) as colour or laps. Nothing is deleted.
+  const setWaveIgnored = async (waveNum: number, cats: CategoryProps[], riderCount: number, ignored: boolean) => {
+    const n = cats.length;
+    const what = `${n} categor${n === 1 ? "y" : "ies"} and ${riderCount} rider${riderCount === 1 ? "" : "s"}`;
+    const msg = ignored
+      ? `Ignore Wave ${waveNum}? Its ${what} are kept, but left out of starts, lap recording, positions and results. You can restore it later.`
+      : `Restore Wave ${waveNum}? Its ${what} take part in the race again.`;
+    if (!window.confirm(msg)) return;
+    for (const c of cats) if (!!c.ignored !== ignored) await updateCategory({ ...c, ignored });
+  };
+
   const resetFinishGroups = async () => {
     // From the store, not the prop: the latest assignments, including ones made a moment ago.
     const assigned = useCategoryStore
@@ -680,9 +692,10 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
         const waveFinished = waveRiders.filter((r) => r.status === "finished").length;
         const waveStatusInfo = getWaveStatusInfo(allWaveCats.map((c) => c.status));
         const waveLock = getWaveLock(allWaveCats.map((c) => c.status));
+        const waveIgnored = allWaveCats.length > 0 && allWaveCats.every((c) => c.ignored);
 
         return (
-          <div key={waveNum} className={styles.wave}>
+          <div key={waveNum} className={`${styles.wave} ${waveIgnored ? styles.waveIgnored : ""}`} data-testid={`schedule-wave-${waveNum}`}>
             <div
               className={styles.waveHeader}
               data-wave-lock={waveLock ?? undefined}
@@ -700,6 +713,30 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
               >
                 {waveLock === "finished" ? <Lock size={12} /> : <Palette size={12} />}
               </button>
+              {waveIgnored ? (
+                <>
+                  <span className={styles.ignoredBadge} data-testid={`wave-ignored-${waveNum}`}>Ignored</span>
+                  <button
+                    type="button"
+                    className={styles.waveActionBtn}
+                    data-testid={`restore-wave-${waveNum}`}
+                    onClick={() => void setWaveIgnored(waveNum, allWaveCats, waveRiders.length, false)}
+                  >
+                    Restore Wave
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.waveActionBtn}
+                  data-testid={`ignore-wave-${waveNum}`}
+                  disabled={waveLock === "running"}
+                  title={waveLock === "running" ? "A running wave can't be ignored" : "Set this wave aside: kept, but out of starts, laps, positions and results"}
+                  onClick={() => void setWaveIgnored(waveNum, allWaveCats, waveRiders.length, true)}
+                >
+                  Ignore Wave
+                </button>
+              )}
               <span
                 className={styles.statusBadge}
                 style={{ background: `${waveStatusInfo.color}1f`, color: waveStatusInfo.color }}

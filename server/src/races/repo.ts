@@ -10,19 +10,19 @@ import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../.
 export const RACE_COLUMNS = [
   "uuid", "ownerUserId", "raceId", "owner", "name", "location", "time", "date", "image", "heat", "status", "type",
   "raceType", "level", "orgenizer", "manager", "phone", "takanon", "site", "map", "distance", "isActive",
-  "autoColor", "leaderFinishAll", "waveColors", "mapCenter", "mapZoom", "trackPoints", "mapMarkers", "tracks",
+  "autoColor", "leaderFinishAll", "minLapSeconds", "waveColors", "mapCenter", "mapZoom", "trackPoints", "mapMarkers", "tracks",
   "joinCode", "lastSeq", "createdAt", "lastUpdateAt",
 ] as const;
 
 export const CATEGORY_COLUMNS = [
   "uuid", "raceUuid", "name", "subCategory", "laps", "startTime", "isConnected", "color", "heat", "status",
-  "linkedFinish", "linkGroup", "startedAt", "finishedAt", "importOrder",
+  "linkedFinish", "linkGroup", "ignored", "bibColor", "bibTextColor", "startedAt", "finishedAt", "importOrder",
 ] as const;
 
 export const RIDER_COLUMNS = [
   "uuid", "raceUuid", "bibNumber", "category", "subCategory", "checked", "firstName", "middleName", "lastName",
   "flag", "team", "standing", "heat", "status", "comment", "image", "chipNumber", "points", "uciPoints",
-  "federation", "uciNumber", "viewOrder", "raceStatus", "timeStartRace", "timeArrive", "lapsCounter", "lapsDetails",
+  "federation", "uciNumber", "bibColor", "bibTextColor", "viewOrder", "raceStatus", "timeStartRace", "timeArrive", "lapsCounter", "lapsDetails",
   "totalLaps", "elapsedLastLap", "elapsedTimeFromStart", "distance", "position_start", "position_category",
   "position_race", "color", "createdAt", "updatedAt",
 ] as const;

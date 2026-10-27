@@ -244,7 +244,7 @@ export const projectCategory = (access: EffectiveAccess, category: SharedCategor
 
 const RACE_BASIC_FIELDS = [
   "uuid", "raceId", "name", "date", "location", "raceType", "status", "isActive", "lastSeq", "createdAt", "lastUpdateAt",
-  "autoColor", "leaderFinishAll",
+  "autoColor", "leaderFinishAll", "minLapSeconds",
 ] as const satisfies readonly (keyof SharedRace)[];
 const RACE_INFO_DETAIL_FIELDS = [
   "owner", "time", "image", "heat", "type", "level", "orgenizer", "manager", "phone", "takanon", "site", "distance",

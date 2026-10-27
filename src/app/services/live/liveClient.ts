@@ -455,11 +455,12 @@ function toLocalCategory(s: SharedCategory, local: string, existing?: CategoryPr
     lapsCounter: 0, riders: null, isConnected: false, ...(existing ?? {}),
     uuid: s.uuid, raceUuid: local, name: s.name, subCategory: s.subCategory, laps: s.laps, startTime: s.startTime, color: s.color,
     heat: s.heat, status: s.status ?? "upcoming", linkedFinish: s.linkedFinish ?? undefined, linkGroup: s.linkGroup ?? undefined,
+    ignored: s.ignored ?? false, bibColor: s.bibColor ?? null, bibTextColor: s.bibTextColor ?? null,
     finishedAt: s.finishedAt ?? undefined, importOrder: s.importOrder ?? undefined, id: existing?.id ?? newLocalId(),
   } as CategoryProps;
 }
 
-const RACE_FROM_SERVER = [...RACE_INFO_FIELDS, "status", "autoColor", "leaderFinishAll"] as const;
+const RACE_FROM_SERVER = [...RACE_INFO_FIELDS, "status", "autoColor", "leaderFinishAll", "minLapSeconds"] as const;
 
 function mergeRace(existing: RaceProps, s: Partial<SharedRace>): RaceProps {
   const out = { ...existing } as unknown as Record<string, unknown>;
@@ -474,12 +475,14 @@ function toNewRider(r: RiderProps) {
     chipNumber: r.chipNumber ?? null, federation: r.federation ?? null, points: r.points ?? null, category: r.category,
     subCategory: r.subCategory ?? null, heat: r.heat ?? null, standing: r.standing ?? null, flag: r.flag ?? null,
     uciPoints: r.uciPoints ?? null, uciNumber: r.uciNumber ?? null, image: r.image ?? null, comment: r.comment ?? null,
+    bibColor: r.bibColor ?? null, bibTextColor: r.bibTextColor ?? null,
   };
 }
 
 const toNewCategory = (c: CategoryProps) => ({
   uuid: c.uuid!, name: c.name, subCategory: c.subCategory ?? null, laps: c.laps ?? null, heat: c.heat ?? null,
   startTime: c.startTime ?? null, color: c.color ?? null, linkGroup: c.linkGroup ?? null, importOrder: c.importOrder ?? null,
+  bibColor: c.bibColor ?? null, bibTextColor: c.bibTextColor ?? null,
 });
 
 /** Shared-shape state of a local race, for checking permissions on the Device. */
@@ -571,9 +574,10 @@ const bridge: LiveBridge = {
         }
         next.uuid ??= prev.uuid;
         const changes: Record<string, unknown> = {};
-        for (const f of ["name", "laps", "heat", "startTime", "color", "linkGroup", "linkedFinish", "isConnected"] as const) {
+        for (const f of ["name", "laps", "heat", "startTime", "color", "linkGroup", "linkedFinish", "isConnected", "bibColor", "bibTextColor"] as const) {
           if (!sameValue(prev[f], next[f])) changes[f] = next[f] ?? null;
         }
+        if (!!prev.ignored !== !!next.ignored) changes.ignored = !!next.ignored;
         if (Object.keys(changes).length) actions.push(draft(local, "CategoryEdited", { categoryUuid: prev.uuid, changes }));
       }
     }
@@ -593,6 +597,7 @@ const bridge: LiveBridge = {
     }
     const settings: Record<string, unknown> = {};
     for (const f of ["leaderFinishAll", "autoColor"] as const) if (!sameValue(before[f], after[f])) settings[f] = after[f] !== false;
+    if (after.minLapSeconds != null && !sameValue(before.minLapSeconds, after.minLapSeconds)) settings.minLapSeconds = after.minLapSeconds;
     const actions: RaceAction[] = [];
     if (Object.keys(info).length) actions.push(draft(local, "RaceEdited", { changes: info }));
     if (Object.keys(settings).length) actions.push(draft(local, "SettingChanged", { changes: settings }));
@@ -845,6 +850,7 @@ export async function publishRace(local: string): Promise<string> {
   }
   info.autoColor = race.autoColor ?? null;
   info.leaderFinishAll = race.leaderFinishAll ?? null;
+  info.minLapSeconds = race.minLapSeconds ?? null;
   const res = await api<{ race: SharedRace }>("POST", "/races/publish", {
     race: { ...info, name: race.name || "Race" },
     categories: catsWithUuid.map(toNewCategory),

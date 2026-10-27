@@ -56,7 +56,7 @@ const RacePhaseSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false })
   // pick on the heat page isn't clobbered by re-clicking the Live tab.
   const goLive = () => {
     if (onLiveRoute) return;
-    const raceCats = categories.filter((c) => c.raceUuid === raceUuid);
+    const raceCats = categories.filter((c) => c.raceUuid === raceUuid && !c.ignored);
     const wave = getDefaultLiveWave(raceCats) ?? selectedWave;
     navigate(`/race/${raceUuid}/heat/${wave}`);
   };

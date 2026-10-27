@@ -37,6 +37,7 @@ import { useJokerQueue, type JokerEntry } from "./useJokerQueue";
 import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
 import { jokerResolveBlock } from "./jokerResolve";
+import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { Bike, List, ChevronDown } from "lucide-react";
 import { canViewScreen, isLiveRace } from "@/services/live/liveBridge";
 // Shared races: the sync state where it matters most (offline / waiting to send).
@@ -56,8 +57,11 @@ const Heat: React.FC = () => {
   const heatId = params?.heatId ? parseInt(params.heatId as string, 10) : null;
 
   const { races, getRaces } = useRaceStore();
-  const { riders, getRiders, updateRider, updateAllRiders } = useRiderStore();
-  const { categories, getCategories } = useCategoryStore();
+  const { riders: storeRiders, getRiders, updateRider, updateAllRiders } = useRiderStore();
+  const { categories: storeCategories, getCategories } = useCategoryStore();
+  // Ignored waves take no part in Live: no cards, no laps, no positions (data kept).
+  const categories = useMemo(() => activeCategories(storeCategories), [storeCategories]);
+  const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const { settings: voiceSettings } = useVoiceSettingsStore();
 
   // live cloud sync for this race (no-op when race is local-only)

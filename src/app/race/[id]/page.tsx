@@ -172,7 +172,7 @@ const Race: React.FC = () => {
 
       <div className={styles.bottom}>
         {isRaceMode && !finalized ? (
-          <RaceMode raceUuid={raceUuid} categories={filteredCategories} />
+          <RaceMode raceUuid={raceUuid} categories={filteredCategories.filter((c) => !c.ignored)} />
         ) : (
           <>
             {finalized && (

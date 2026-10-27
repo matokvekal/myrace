@@ -7,6 +7,8 @@ import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
 import { logAnalyticsEvent } from "@/services/analytics/analyticsClient";
 import useRaceStore from "@/stores/racesStore";
+import useCategoryStore from "@/stores/categoryStore";
+import { isRiderIgnored } from "@/utils/ignoredWaves";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 import { maxBoardHoldMs, normalizeBoardHoldMs } from "@/stores/boardHoldStore";
 import { isLiveRace, liveAllows, liveDispatch, newActionId } from "@/services/live/liveBridge";
@@ -246,6 +248,12 @@ export function useLapRecording({
    */
   const recordLap = (rider: RiderProps, source: "click" | "voice" = "click", atTime?: Date): void => {
     if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
+
+    // An ignored wave records nothing (its riders are hidden from Live anyway).
+    if (isRiderIgnored(rider, useCategoryStore.getState().categories)) {
+      toast.warn("This wave is ignored — restore it in Schedule to record laps");
+      return;
+    }
 
     if (!canForRace(raceUuid, "MARK_LAP")) {
       toast.warn("No permission to mark laps");

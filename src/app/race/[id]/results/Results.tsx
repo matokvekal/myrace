@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import styles from "./results.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
+import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
@@ -122,14 +123,15 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
       return next;
     });
 
+  // Ignored waves are left out of results (their data is kept).
   const raceCategories = useMemo(
-    () => categories.filter((c) => c.raceUuid === raceUuid),
+    () => categories.filter((c) => c.raceUuid === raceUuid && !c.ignored),
     [categories, raceUuid]
   );
   // Laps resolved from the category so results read 0/5, not 0/0 (BUGS.md #7)
   const raceRiders = useMemo(
-    () => withCategoryLaps(riders.filter((r) => r.raceUuid === raceUuid), raceCategories),
-    [riders, raceUuid, raceCategories]
+    () => withCategoryLaps(withoutIgnoredRiders(riders.filter((r) => r.raceUuid === raceUuid), categories), raceCategories),
+    [riders, raceUuid, raceCategories, categories]
   );
 
   const { waveNums, catWaveMap } = useMemo(() => {

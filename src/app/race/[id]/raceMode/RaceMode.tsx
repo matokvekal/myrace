@@ -8,6 +8,8 @@ import WaveStatus from "./WaveStatus";
 import BibWarning from "../../components/bibWarning/BibWarning";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, getDefaultLiveWave } from "../schedule/Schedule";
 import useRiderStore from "@/stores/ridersStore";
+import useCategoryStore from "@/stores/categoryStore";
+import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import useUIStore from "@/stores/uiStore";
 import { Flag, Circle } from "lucide-react";
 import { canViewScreen } from "@/services/live/liveBridge";
@@ -75,7 +77,10 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   }, [schedule, selectedWave]);
 
   // Nudge the commissaire toward Check-In when nobody in this wave has checked in yet
-  const riders = useRiderStore((state) => state.riders);
+  // Riders of ignored waves take no part in race operations (data kept).
+  const storeRiders = useRiderStore((state) => state.riders);
+  const storeCategories = useCategoryStore((state) => state.categories);
+  const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const needsCheckIn = useMemo(() => {
     if (waveStatusMap.get(selectedWave) !== "upcoming") return false;
     const waveRiders = riders.filter(
