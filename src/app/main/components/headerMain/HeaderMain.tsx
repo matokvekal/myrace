@@ -3,12 +3,12 @@ import styles from "./headerMain.module.css";
 import Images from "@/constants/Images";
 import Button from "@/components/ui/Button";
 import Version from "@/components/Version/Version";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
 import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
 import {
-  Bike, ChevronDown, Download, FileSpreadsheet, Globe, Info, LifeBuoy, LogIn, LogOut,
+  Bike, ChevronDown, Download, FileSpreadsheet, Globe, House, Info, LifeBuoy, LogIn, LogOut,
   Mail, Menu, MessageCircle, Palette, Smartphone, Timer, X,
 } from "lucide-react";
 // Relative: tsconfig only aliases specific "@/…" prefixes, and config isn't one.
@@ -74,6 +74,7 @@ function HeaderMain() {
   const [openSection, setOpenSection] = useState<PrefSection | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user, getUser } = useDataStore();
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
@@ -279,6 +280,20 @@ function HeaderMain() {
             <button
               type="button"
               className={styles.navItem}
+              aria-current={pathname === "/" ? "page" : undefined}
+              onClick={() => {
+                setDrawerOpen(false);
+                navigate("/");
+              }}
+              data-testid="nav-home"
+            >
+              <House className={styles.navItemIcon} aria-hidden="true" />
+              <span>{t("nav.home", "Home")}</span>
+            </button>
+            <button
+              type="button"
+              className={styles.navItem}
+              aria-current={pathname.replace(/\/+$/, "") === "/main" ? "page" : undefined}
               onClick={() => {
                 setDrawerOpen(false);
                 navigate("/main");

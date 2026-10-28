@@ -389,6 +389,28 @@
   background: var(--bg-surface);
 }
 
+/* Current route: tinted row + accent bar on the leading edge (same as the race sidebar) */
+.navItem[aria-current="page"] {
+  position: relative;
+  background: var(--bg-surface);
+  font-weight: 600;
+}
+
+.navItem[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+.navItem[aria-current="page"] .navItemIcon {
+  color: var(--brand-strong);
+}
+
 .navItemIcon {
   width: var(--icon);
   height: var(--icon);
@@ -804,6 +826,7 @@
   border-radius: 50% !important;
 }
 
+:root[data-skin="gaming"] .drawer .navItem[aria-current="page"],
 :root[data-skin="gaming"] .drawer .segment[aria-pressed="true"] {
   font-weight: 600;
 }
