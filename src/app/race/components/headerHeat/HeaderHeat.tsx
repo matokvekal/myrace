@@ -33,6 +33,10 @@ function HeaderHeat({
   const anyCategoryRunning = useCategoryStore((s) =>
     s.categories.some((c) => c.raceUuid === raceId && c.status === "running")
   );
+  // "RACE PAST" only once the race has really happened; nothing before the start.
+  const hasRun = useCategoryStore((s) =>
+    s.categories.some((c) => c.raceUuid === raceId && c.status === "finished")
+  ) || !!race?.finalized;
   const isLive =
     !race?.viewOnly &&
     !race?.finalized &&
@@ -60,9 +64,9 @@ function HeaderHeat({
           <span className={styles.liveDot}>●</span>
           {t("heat.raceLive", "RACE LIVE")}
         </div>
-      ) : (
+      ) : hasRun ? (
         <div className={styles.racePastLabel}>{t("heat.racePast", "RACE PAST")}</div>
-      )}
+      ) : null}
       <div className={styles.timeDisplay} aria-label={t("heat.clock", "Clock")}>
         {currentTime}
       </div>
