@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './riderActionLog.module.css';
 import { RiderProps } from '@/types/types';
 import { Bell, History, Search, X } from 'lucide-react';
@@ -37,6 +38,32 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<Record<string, number>>({});
   const [sortBy, setSortBy] = useState<'arrival' | 'bib'>('arrival');
+  // Desktop: the panel opens next to the Log button, clamped inside the viewport.
+  // Phones (≤640px): CSS turns it into a full-width bottom sheet instead.
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [anchorStyle, setAnchorStyle] = useState<CSSProperties | undefined>();
+  useEffect(() => {
+    if (!isOpen) return;
+    const place = () => {
+      const btn = btnRef.current;
+      if (!btn || window.matchMedia('(max-width: 640px)').matches) {
+        setAnchorStyle(undefined);
+        return;
+      }
+      const rect = btn.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const width = Math.min(420, vw - 16);
+      const rtl = document.documentElement.dir === 'rtl';
+      const left = Math.max(8, Math.min(rtl ? rect.right - width : rect.left, vw - width - 8));
+      const below = rect.bottom + 6;
+      const top = vh - below < 260 ? 8 : below;
+      setAnchorStyle({ position: 'fixed', top, left, width, maxHeight: vh - top - 8 });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [isOpen]);
   const [now, setNow] = useState(() => Date.now());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,6 +160,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
     <>
       {/* Toggle button */}
       <button
+        ref={btnRef}
         className={`${styles.toggleBtn} ${isOpen ? styles.open : ''}`}
         onClick={onToggle}
         // Without this the ⏱️ glyph IS the accessible name — `title` is only a
@@ -146,9 +174,11 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
       </button>
 
       {/* Log panel */}
-      {isOpen && (
-        <div className={styles.overlay} onClick={onToggle}>
-          <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
+      {/* Portal to <body>: a transformed ancestor on the Live page would otherwise
+          make `position: fixed` relative to it and clip the panel. */}
+      {isOpen && createPortal(
+        <div className={`${styles.overlay} ${anchorStyle ? styles.overlayAnchored : ''}`} onClick={onToggle}>
+          <div className={styles.panel} style={anchorStyle} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Rider log">
             <div className={styles.header}>
               <h3>Rider Log</h3>
               <div className={styles.sortControls}>
@@ -468,7 +498,8 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
