@@ -1206,3 +1206,171 @@
     width: 36px;
   }
 }
+
+/* ═══ Categories v2: actions bar, Add/Edit form, 5-column table ═══ */
+.catActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.secondaryMini {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.secondaryMiniActive {
+  border-color: var(--brand, #63a6fc);
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.catActions .libraryCount {
+  margin-inline-start: 2px;
+}
+
+.library {
+  margin: 0 0 8px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+button.libRow {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+button.libRow:hover {
+  background: var(--bg-surface, #f5f8ff);
+  color: var(--text-primary, #14243c);
+}
+
+.libPlus {
+  color: #16a34a;
+}
+
+.catForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--brand, #63a6fc);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+}
+
+.catFormInline {
+  margin: 0;
+  border: none;
+  border-top: 1px dashed var(--border-card, #d9e7fb);
+  border-radius: 0;
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.formLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+}
+
+.formLine .nameInput {
+  flex: 1;
+}
+
+.fieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+  flex-shrink: 0;
+  color: var(--text-muted, #8498ba);
+}
+
+.allNote {
+  font-size: 11px;
+  color: var(--text-muted, #8498ba);
+}
+
+.smallInput {
+  height: 30px;
+  min-width: 0;
+  max-width: 140px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.moreToggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--brand-strong, #3f86e7);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.moreFields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* 5 columns: colour | name | laps | edit | remove */
+.table .row {
+  grid-template-columns: 28px minmax(0, 1fr) 104px 28px 28px;
+}
+
+@media (max-width: 480px) {
+  .table .row {
+    grid-template-columns: 24px minmax(0, 1fr) 96px 28px 28px;
+  }
+
+  .fieldLabel {
+    width: 84px;
+  }
+}
+
+:root[data-skin="gaming"] .catActions button:not(:disabled),
+:root[data-skin="gaming"] .catForm button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+:root[data-skin="gaming"] .catForm .cpSwatch:not(:disabled),
+:root[data-skin="gaming"] .catForm .cpOption:not(:disabled) {
+  border-radius: 50% !important;
+}

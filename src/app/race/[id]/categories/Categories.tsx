@@ -61,7 +61,8 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
   const [editError, setEditError] = useState("");
   const [showRidersFor, setShowRidersFor] = useState<CategoryProps | null>(null);
   // New Category needs only a name and a colour; laps 5 and wave 1 are the existing defaults.
-  const [newCategoryForm, setNewCategoryForm] = useState({ name: "", color: "#63A6FC" });
+  const [newCategoryForm, setNewCategoryForm] = useState({ name: "", color: "#63A6FC", laps: 5 });
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const { categories, updateCategory, getCategories } = useCategoryStore();
   const { riders, updateRider } = useRiderStore();
@@ -295,7 +296,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
       name: newCategoryForm.name.trim(),
       // Sub-categories are no longer authored — one category per age band (BUGS.md #2)
       subCategory: null,
-      laps: 5,
+      laps: newCategoryForm.laps,
       lapsCounter: 0,
       riders: 0,
       startTime: null,
@@ -337,7 +338,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     }
     setCreating(false);
     setColorFor(null);
-    setNewCategoryForm({ name: "", color: "#63A6FC" });
+    setNewCategoryForm({ name: "", color: "#63A6FC", laps: 5 });
     getCategories(raceUuid);
   };
 
@@ -398,36 +399,81 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     </div>
   );
 
+  /** − [n] + stepper used by the table rows and the Add/Edit form. */
+  const lapsStepper = (value: number, locked: boolean, onChange: (n: number) => void, label: string) => (
+    <div className={styles.lapsCell}>
+      <button type="button" className={styles.stepMini} disabled={locked} aria-label={`Fewer laps for ${label}`} onClick={() => onChange(Math.max(0, value - 1))}>−</button>
+      <input
+        type="number"
+        min="0"
+        className={styles.lapsInput}
+        aria-label={`Laps for ${label}`}
+        data-testid="category-laps"
+        disabled={locked}
+        value={value}
+        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+      />
+      <button type="button" className={styles.stepMini} disabled={locked} aria-label={`More laps for ${label}`} onClick={() => onChange(value + 1)}>+</button>
+    </div>
+  );
+
+  /** First finish – all finish and Min lap time are stored once per race and
+   *  apply to every category; shown (and edited) in the Add/Edit form. */
+  const raceRuleFields = race ? (
+    <>
+      <label className={styles.formLine} title="When a category's first rider starts the last lap, every rider in it gets the bell. When the first rider finishes, everyone finishes on their next crossing. Applies to all categories.">
+        <span className={styles.fieldLabel}>First finish</span>
+        <input
+          type="checkbox"
+          className={styles.switch}
+          data-testid="leader-finish-all"
+          checked={isLeaderFinishAll(race)}
+          disabled={!!race.finalized}
+          onChange={(e) => void updateRace({ ...race, leaderFinishAll: e.target.checked })}
+        />
+        <span className={styles.allNote}>all categories</span>
+      </label>
+      <label className={styles.formLine} title="A rider's next passage counts only after this long. New races: 3 min. Applies to all categories.">
+        <span className={styles.fieldLabel}>Min lap time</span>
+        <select
+          className={styles.ruleSelect}
+          data-testid="min-lap-seconds"
+          value={race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS}
+          disabled={!!race.finalized}
+          onChange={(e) => void updateRace({ ...race, minLapSeconds: Number(e.target.value) })}
+        >
+          {[...new Set([...MIN_LAP_CHOICES, race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS])].sort((a, b) => a - b).map((sec) => (
+            <option key={sec} value={sec}>{formatMinLap(sec)}</option>
+          ))}
+        </select>
+        <span className={styles.allNote}>all categories</span>
+      </label>
+    </>
+  ) : null;
+
   return (
     <div className={styles.container}>
-      {/* Race-wide timing rules: one value per race, used by every category */}
-      {race && (
-        <div className={styles.raceRules}>
-          <label className={styles.ruleItem} title="When a category's first rider starts the last lap, every rider in it gets the bell. When the first rider finishes, everyone finishes on their next crossing, however many laps they did.">
-            <input
-              type="checkbox"
-              className={styles.switch}
-              data-testid="leader-finish-all"
-              checked={isLeaderFinishAll(race)}
-              disabled={!!race.finalized}
-              onChange={(e) => void updateRace({ ...race, leaderFinishAll: e.target.checked })}
-            />
-            <span><Bell size={13} aria-hidden="true" /> First finish – all finish</span>
-          </label>
-          <label className={styles.ruleItem} title="A rider's next passage counts only after this long (duplicate taps by several commissaires, or a tap and voice, never make two laps). New races: 3 min.">
-            <span>Min lap time</span>
-            <select
-              className={styles.ruleSelect}
-              data-testid="min-lap-seconds"
-              value={race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS}
-              disabled={!!race.finalized}
-              onChange={(e) => void updateRace({ ...race, minLapSeconds: Number(e.target.value) })}
-            >
-              {[...new Set([...MIN_LAP_CHOICES, race.minLapSeconds ?? LEGACY_MIN_LAP_SECONDS])].sort((a, b) => a - b).map((sec) => (
-                <option key={sec} value={sec}>{formatMinLap(sec)}</option>
-              ))}
-            </select>
-          </label>
+      {/* Actions: New Category · Add From (· order, once there is a table) */}
+      <div className={styles.catActions}>
+        <button
+          type="button"
+          className={styles.primaryMini}
+          onClick={() => { cancelEdit(); setLibraryOpen(false); setCreating(true); }}
+          data-testid="new-category-btn"
+        >
+          <Plus size={14} /> New Category
+        </button>
+        <button
+          type="button"
+          className={`${styles.secondaryMini} ${libraryOpen ? styles.secondaryMiniActive : ""}`}
+          aria-expanded={libraryOpen}
+          onClick={() => { setCreating(false); setLibraryOpen((o) => !o); }}
+          data-testid="add-from-btn"
+        >
+          <Plus size={14} /> Add From
+          <span className={styles.libraryCount}>{available.length}</span>
+        </button>
+        {raceCategories.length > 1 && (
           <select
             className={`${styles.ruleSelect} ${styles.orderSelect}`}
             value={sortMode}
@@ -438,283 +484,44 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
             <option value="now">Order: now</option>
             <option value="upload">Order: upload</option>
           </select>
+        )}
+      </div>
+
+      {/* Library: hidden until "Add From"; closes after a pick */}
+      {libraryOpen && (
+        <div className={styles.library}>
+          {available.length === 0 && <div className={styles.emptyRow}>Every library category is already in this race.</div>}
+          {available.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              className={styles.libRow}
+              onClick={() => { handleAddFromBank(template); setLibraryOpen(false); }}
+              data-testid="library-add"
+            >
+              <span className={styles.libDot} style={{ background: template.color }} />
+              <span className={styles.libName} dir="auto">
+                {template.name}
+                {template.subCategories.length > 0 && ` (${template.subCategories.length})`}
+              </span>
+              <Plus size={14} className={styles.libPlus} aria-hidden="true" />
+            </button>
+          ))}
         </div>
       )}
 
-      <div className={styles.table} role="table" aria-label="Categories in this race">
-        <div className={`${styles.row} ${styles.headRow}`} role="row">
-          <span role="columnheader" />
-          <span role="columnheader">Category</span>
-          <span role="columnheader" className={styles.center}>Laps</span>
-          <span role="columnheader" className={`${styles.center} ${styles.hideSm}`}>Wave</span>
-          <span role="columnheader" className={styles.center}>Riders</span>
-          <span role="columnheader" />
-        </div>
-
-        {orderedCategories.length === 0 && (
-          <div className={styles.emptyRow}>No categories in this race yet. Add them from the library below, or create a new one.</div>
-        )}
-
-        {orderedCategories.map((cat) => {
-          const isEditing = editingId === cat.id;
-          const riderCount = riderCounts.find((rc) => rc.id === cat.id)?.count || 0;
-          const locks = getCategoryLocks(cat, raceRiders);
-          const isDone = cat.status === "finished";
-          const info = getCategoryStatusInfo(cat.status);
-          return (
-            <React.Fragment key={cat.id}>
-              <div className={`${styles.row} ${isDone ? styles.rowDone : ""}`} role="row">
-                {colorCell(cat.id, cat.color, locks.color, (code) => void updateCategoryAndSyncRiders({ ...cat, color: code }))}
-                <div className={styles.nameCell} dir="auto">
-                  {isDone && <Flag size={12} className={styles.doneFlag} aria-hidden="true" />}
-                  <span className={styles.catName}>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
-                  {cat.status && cat.status !== "upcoming" && (
-                    <span className={styles.statusChip} style={{ background: `${info.color}1f`, color: info.color }}>{info.label}</span>
-                  )}
-                  {cat.linkGroup?.trim() && <span className={styles.groupChip}><Bell size={10} /> {finishGroupLabel(cat.linkGroup)}</span>}
-                </div>
-                <div className={styles.lapsCell}>
-                  <button
-                    type="button"
-                    className={styles.stepMini}
-                    disabled={locks.laps}
-                    aria-label={`Fewer laps for ${cat.name}`}
-                    onClick={() => void updateCategoryAndSyncRiders({ ...cat, laps: Math.max(0, (cat.laps ?? 0) - 1) })}
-                  >−</button>
-                  <input
-                    type="number"
-                    min="0"
-                    className={styles.lapsInput}
-                    aria-label={`Laps for ${cat.name}`}
-                    data-testid="category-laps"
-                    disabled={locks.laps}
-                    value={cat.laps ?? 0}
-                    onChange={(e) => void updateCategoryAndSyncRiders({ ...cat, laps: Math.max(0, parseInt(e.target.value) || 0) })}
-                  />
-                  <button
-                    type="button"
-                    className={styles.stepMini}
-                    disabled={locks.laps}
-                    aria-label={`More laps for ${cat.name}`}
-                    onClick={() => void updateCategoryAndSyncRiders({ ...cat, laps: (cat.laps ?? 0) + 1 })}
-                  >+</button>
-                </div>
-                <span className={`${styles.center} ${styles.hideSm}`}>
-                  {catWaveMap.get(catWaveKey(cat.name, cat.subCategory)) ?? cat.heat ?? 1}
-                </span>
-                <button
-                  type="button"
-                  className={styles.ridersBtn}
-                  title={`Show riders in ${cat.name}`}
-                  onClick={() => setShowRidersFor(cat)}
-                >
-                  <Users size={12} aria-hidden="true" /> {riderCount}
-                </button>
-                <div className={styles.rowActions}>
-                  <button
-                    type="button"
-                    className={`${styles.iconMini} ${isEditing ? styles.iconMiniActive : ""}`}
-                    title={`More settings for ${cat.name} (wave, start time, bell group, bib colors)`}
-                    aria-label={`Edit ${cat.name}`}
-                    aria-expanded={isEditing}
-                    onClick={() => (isEditing ? cancelEdit() : startEdit(cat))}
-                  >
-                    <Edit2 size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.iconMini} ${styles.removeBtn}`}
-                    title={riderCount > 0 ? `${riderCount} riders are in ${cat.name}; move them first` : `Remove ${cat.name} from this race (it stays in the library)`}
-                    aria-label={`Remove ${cat.name} from this race`}
-                    data-testid="category-remove"
-                    onClick={() => handleDelete(cat)}
-                  >
-                    <Minus size={14} />
-                  </button>
-                </div>
-              </div>
-              {isEditing && (
-                <div className={styles.editRowWrap}>
-                <div className={styles.editForm} style={{ padding: 16 }}>
-                  {(() => {
-                    const locks = getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid));
-                    return locks.reason ? (
-                      <div className={styles.lockNote} data-testid="category-lock-note">{locks.reason}</div>
-                    ) : null;
-                  })()}
-                  <div className={styles.editRow}>
-                    <div className={styles.formGroup}>
-                      <label>Color</label>
-                      <button
-                        type="button"
-                        className={styles.colorTrigger}
-                        data-testid="category-color-trigger"
-                        disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).color}
-                        aria-expanded={colorOpen}
-                        onClick={() => setColorOpen((o) => !o)}
-                      >
-                        <span className={styles.colorTriggerDot} style={{ background: editForm.color ?? "#ccc" }} />
-                        {COLORS.find((c) => c.code === editForm.color)?.name ?? editForm.color}
-                      </button>
-                      {colorOpen && (
-                        <div className={styles.colorPicker} data-testid="category-color-palette">
-                          {COLORS.map((color) => (
-                            <button
-                              key={color.code}
-                              className={`${styles.colorBtn} ${editForm.color === color.code ? styles.colorActive : ""}`}
-                              style={{ background: color.code }}
-                              onClick={() => {
-                                setEditForm({ ...editForm, color: color.code });
-                                setColorOpen(false);
-                              }}
-                              title={color.name}
-                            >
-                              {editForm.color === color.code && <Check size={10} />}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.editRow}>
-                    <div className={styles.formGroup}>
-                      <label>Laps</label>
-                      <div className={styles.stepperWrap}>
-                        <button
-                          type="button"
-                          className={styles.stepBtn}
-                          disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).laps}
-                          onClick={() => setEditForm({ ...editForm, laps: Math.max(0, (editForm.laps || 0) - 1) })}
-                        >−</button>
-                        <input
-                          type="number"
-                          className={`${styles.input} ${styles.stepInput}`}
-                          value={editForm.laps || 0}
-                          disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).laps}
-                          onChange={(e) => { setEditError(""); setEditForm({ ...editForm, laps: parseInt(e.target.value) || 0 }); }}
-                          min="0"
-                        />
-                        <button
-                          type="button"
-                          className={styles.stepBtn}
-                          disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).laps}
-                          onClick={() => setEditForm({ ...editForm, laps: (editForm.laps || 0) + 1 })}
-                        >+</button>
-                      </div>
-                    </div>
-
-                    <div className={styles.formGroup}>
-                      <label>Wave</label>
-                      <input
-                        type="number"
-                        className={styles.input}
-                        disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).wave}
-                        value={editForm.heat || 1}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            heat: parseInt(e.target.value) || 1
-                          })
-                        }
-                        min="1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles.editRow}>
-                    <div className={styles.formGroup}>
-                      <label>Start time</label>
-                      <input
-                        type="time"
-                        className={styles.input}
-                        data-testid="category-start-time"
-                        disabled={getCategoryLocks(cat, riders.filter((r) => r.raceUuid === raceUuid)).startTime}
-                        value={normalizeTime(editForm.startTime)?.slice(0, 5) ?? ""}
-                        onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value || null })}
-                      />
-                    </div>
-                  </div>
-                  {editError && <div className={styles.lockNote} role="alert" data-testid="category-edit-error">{editError}</div>}
-
-                  <label className={styles.linkedFinishRow}>
-                    <span className={styles.linkedFinishLabel}>
-                      <Bell size={14} /> Bell / finish group
-                      <span className={styles.linkedFinishHint}>
-                        When anyone in the group reaches the bell or finishes, every rider in it gets the bell / finishes on their next lap. Categories with the same group name share it. Leave empty for the category alone.
-                      </span>
-                    </span>
-                    <input
-                      type="text"
-                      className={styles.input}
-                      dir="auto"
-                      value={editForm.linkGroup ?? ""}
-                      placeholder="e.g. Masters"
-                      onChange={(e) => setEditForm({ ...editForm, linkGroup: e.target.value })}
-                    />
-                  </label>
-
-                  {/* Bib colours: defaults for this category's riders (a rider can override them) */}
-                  <div className={styles.linkedFinishRow}>
-                    <span className={styles.linkedFinishLabel}>
-                      Bib colors
-                      <span className={styles.linkedFinishHint}>A colour name (e.g. "blue", "צהוב") or a hex value (#1E88E5). Empty = plain bib.</span>
-                    </span>
-                    <input
-                      type="text"
-                      className={styles.input}
-                      dir="auto"
-                      aria-label="Bib Background Color"
-                      data-testid="category-bib-color"
-                      placeholder="Background"
-                      value={editForm.bibColor ?? ""}
-                      onChange={(e) => setEditForm({ ...editForm, bibColor: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      className={styles.input}
-                      dir="auto"
-                      aria-label="Bib Text Color"
-                      data-testid="category-bib-text-color"
-                      placeholder="Digits"
-                      value={editForm.bibTextColor ?? ""}
-                      onChange={(e) => setEditForm({ ...editForm, bibTextColor: e.target.value })}
-                    />
-                    <BibBadge rider={{ bibNumber: 123, bibColor: null, bibTextColor: null, raceUuid, category: "", subCategory: null }} category={{ bibColor: normalizeColor(editForm.bibColor), bibTextColor: normalizeColor(editForm.bibTextColor) }} />
-                  </div>
-
-                  <div className={styles.editActions}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={cancelEdit}
-                    >
-                      <X size={14} />
-                      Cancel
-                    </Button>
-                    <Button variant="success" size="sm" onClick={saveEdit}>
-                      <Check size={14} />
-                      Save
-                    </Button>
-                  </div>
-                </div>
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })}
-
-        {/* New Category: name + colour only */}
-        {creating ? (
-          <div className={`${styles.row} ${styles.newRow}`}>
+      {/* New Category: the same compact form as Edit */}
+      {creating && (
+        <div className={styles.catForm} data-testid="new-category-form">
+          <div className={styles.formLine}>
             {colorCell("new", newCategoryForm.color, false, (code) => setNewCategoryForm({ ...newCategoryForm, color: code }))}
             <input
               type="text"
               dir="auto"
               autoFocus
               className={styles.nameInput}
-              placeholder="Category name, e.g. Man Elite"
-              aria-label="New category name"
+              placeholder="Category name"
+              aria-label="Category name"
               data-testid="new-category-name"
               value={newCategoryForm.name}
               onChange={(e) => setNewCategoryForm({ ...newCategoryForm, name: e.target.value })}
@@ -723,59 +530,180 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                 if (e.key === "Escape") setCreating(false);
               }}
             />
-            <div className={styles.newActions}>
-              <button type="button" className={styles.iconMini} aria-label="Cancel" onClick={() => setCreating(false)}>
-                <X size={14} />
-              </button>
-              <button type="button" className={styles.primaryMini} onClick={() => void handleCreateNew()} data-testid="new-category-save">
-                <Check size={14} /> Add
-              </button>
-            </div>
           </div>
-        ) : (
-          <button type="button" className={styles.newBtn} onClick={() => setCreating(true)} data-testid="new-category-btn">
-            <Plus size={14} /> New Category
-          </button>
-        )}
-      </div>
+          <div className={styles.formLine}>
+            <span className={styles.fieldLabel}>Laps</span>
+            {lapsStepper(newCategoryForm.laps, false, (n) => setNewCategoryForm({ ...newCategoryForm, laps: n }), "new category")}
+          </div>
+          {raceRuleFields}
+          <div className={styles.formButtons}>
+            <button type="button" className={styles.secondaryMini} onClick={() => setCreating(false)}>Cancel</button>
+            <button type="button" className={styles.primaryMini} onClick={() => void handleCreateNew()} data-testid="new-category-save">
+              <Check size={14} /> Add
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Category library: reuse instead of recreating. + adds a copy to this race. */}
-      <div className={styles.library}>
-        <button
-          type="button"
-          className={styles.libraryHead}
-          aria-expanded={libraryOpen || raceCategories.length === 0}
-          onClick={() => setLibraryOpen((o) => !o)}
-        >
-          <Plus size={14} aria-hidden="true" />
-          <span>Add from library</span>
-          <span className={styles.libraryCount}>{available.length}</span>
-        </button>
-        {(libraryOpen || raceCategories.length === 0) && (
-          <div className={styles.libraryList}>
-            {available.length === 0 && <div className={styles.emptyRow}>Every library category is already in this race.</div>}
-            {available.map((template) => (
-              <div key={template.id} className={styles.libRow}>
-                <span className={styles.libDot} style={{ background: template.color }} />
-                <span className={styles.libName} dir="auto">
-                  {template.name}
-                  {template.subCategories.length > 0 && ` (${template.subCategories.length})`}
-                </span>
-                <button
-                  type="button"
-                  className={`${styles.iconMini} ${styles.addBtn}`}
-                  aria-label={`Add ${template.name} to this race`}
-                  title={`Add ${template.name} to this race`}
-                  onClick={() => handleAddFromBank(template)}
-                  data-testid="library-add"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-            ))}
+      {/* Table only when the race has categories: colour | name | laps | edit | remove */}
+      {orderedCategories.length > 0 && (
+        <div className={styles.table} role="table" aria-label="Categories in this race">
+          <div className={`${styles.row} ${styles.headRow}`} role="row">
+            <span role="columnheader" />
+            <span role="columnheader">Category</span>
+            <span role="columnheader" className={styles.center}>Laps</span>
+            <span role="columnheader" />
+            <span role="columnheader" />
           </div>
-        )}
-      </div>
+
+          {orderedCategories.map((cat) => {
+            const isEditing = editingId === cat.id;
+            const riderCount = riderCounts.find((rc) => rc.id === cat.id)?.count || 0;
+            const locks = getCategoryLocks(cat, raceRiders);
+            const isDone = cat.status === "finished";
+            const info = getCategoryStatusInfo(cat.status);
+            return (
+              <React.Fragment key={cat.id}>
+                <div className={`${styles.row} ${isDone ? styles.rowDone : ""}`} role="row">
+                  {colorCell(cat.id, cat.color, locks.color, (code) => void updateCategoryAndSyncRiders({ ...cat, color: code }))}
+                  <div className={styles.nameCell} dir="auto">
+                    {isDone && <Flag size={12} className={styles.doneFlag} aria-hidden="true" />}
+                    <span className={styles.catName}>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
+                    {cat.status && cat.status !== "upcoming" && (
+                      <span className={styles.statusChip} style={{ background: `${info.color}1f`, color: info.color }}>{info.label}</span>
+                    )}
+                  </div>
+                  {lapsStepper(cat.laps ?? 0, locks.laps, (n) => void updateCategoryAndSyncRiders({ ...cat, laps: n }), cat.name)}
+                  <button
+                    type="button"
+                    className={`${styles.iconMini} ${isEditing ? styles.iconMiniActive : ""}`}
+                    aria-label={`Edit ${cat.name}`}
+                    aria-expanded={isEditing}
+                    onClick={() => { setCreating(false); if (isEditing) cancelEdit(); else { startEdit(cat); setMoreOpen(false); } }}
+                  >
+                    <Edit2 size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.iconMini} ${styles.removeBtn}`}
+                    title={riderCount > 0 ? `${riderCount} riders are in ${cat.name}; move them first` : `Remove ${cat.name} from this race`}
+                    aria-label={`Remove ${cat.name} from this race`}
+                    data-testid="category-remove"
+                    onClick={() => handleDelete(cat)}
+                  >
+                    <Minus size={14} />
+                  </button>
+                </div>
+
+                {isEditing && (
+                  <div className={`${styles.catForm} ${styles.catFormInline}`} data-testid="category-edit-form">
+                    {locks.reason && <div className={styles.lockNote} data-testid="category-lock-note">{locks.reason}</div>}
+                    <div className={styles.formLine}>
+                      {colorCell(-cat.id, editForm.color ?? null, locks.color, (code) => setEditForm({ ...editForm, color: code }))}
+                      <input
+                        type="text"
+                        dir="auto"
+                        className={styles.nameInput}
+                        aria-label="Category name"
+                        title={riderCount > 0 ? "Riders are linked to this name; move them before renaming" : undefined}
+                        disabled={riderCount > 0}
+                        value={editForm.name ?? ""}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.formLine}>
+                      <span className={styles.fieldLabel}>Laps</span>
+                      {lapsStepper(editForm.laps ?? 0, locks.laps, (n) => { setEditError(""); setEditForm({ ...editForm, laps: n }); }, cat.name)}
+                      <button type="button" className={styles.ridersBtn} onClick={() => setShowRidersFor(cat)} title={`Show riders in ${cat.name}`}>
+                        <Users size={12} aria-hidden="true" /> {riderCount}
+                      </button>
+                    </div>
+                    {raceRuleFields}
+
+                    <button
+                      type="button"
+                      className={styles.moreToggle}
+                      aria-expanded={moreOpen}
+                      onClick={() => setMoreOpen((o) => !o)}
+                    >
+                      More {moreOpen ? "▴" : "▾"}
+                    </button>
+                    {moreOpen && (
+                      <div className={styles.moreFields}>
+                        <label className={styles.formLine}>
+                          <span className={styles.fieldLabel}>Wave</span>
+                          <input
+                            type="number"
+                            min="1"
+                            className={styles.smallInput}
+                            disabled={locks.wave}
+                            value={editForm.heat || 1}
+                            onChange={(e) => setEditForm({ ...editForm, heat: parseInt(e.target.value) || 1 })}
+                          />
+                        </label>
+                        <label className={styles.formLine}>
+                          <span className={styles.fieldLabel}>Start time</span>
+                          <input
+                            type="time"
+                            className={styles.smallInput}
+                            data-testid="category-start-time"
+                            disabled={locks.startTime}
+                            value={normalizeTime(editForm.startTime)?.slice(0, 5) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value || null })}
+                          />
+                        </label>
+                        <label className={styles.formLine} title="Categories with the same group name ring the bell / finish together. Empty = this category alone.">
+                          <span className={styles.fieldLabel}><Bell size={12} aria-hidden="true" /> Bell group</span>
+                          <input
+                            type="text"
+                            dir="auto"
+                            className={styles.smallInput}
+                            placeholder="e.g. Masters"
+                            value={editForm.linkGroup ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, linkGroup: e.target.value })}
+                          />
+                        </label>
+                        <div className={styles.formLine} title='A colour name (e.g. "blue", "צהוב") or #RRGGBB. Empty = plain bib.'>
+                          <span className={styles.fieldLabel}>Bib colors</span>
+                          <input
+                            type="text"
+                            dir="auto"
+                            className={styles.smallInput}
+                            aria-label="Bib Background Color"
+                            data-testid="category-bib-color"
+                            placeholder="Background"
+                            value={editForm.bibColor ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, bibColor: e.target.value })}
+                          />
+                          <input
+                            type="text"
+                            dir="auto"
+                            className={styles.smallInput}
+                            aria-label="Bib Text Color"
+                            data-testid="category-bib-text-color"
+                            placeholder="Digits"
+                            value={editForm.bibTextColor ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, bibTextColor: e.target.value })}
+                          />
+                          <BibBadge rider={{ bibNumber: 123, bibColor: null, bibTextColor: null, raceUuid, category: "", subCategory: null }} category={{ bibColor: normalizeColor(editForm.bibColor), bibTextColor: normalizeColor(editForm.bibTextColor) }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {editError && <div className={styles.lockNote} role="alert" data-testid="category-edit-error">{editError}</div>}
+                    <div className={styles.formButtons}>
+                      <button type="button" className={styles.secondaryMini} onClick={cancelEdit}>Cancel</button>
+                      <button type="button" className={styles.primaryMini} onClick={() => void saveEdit()}>
+                        <Check size={14} /> Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      )}
 
       {showRidersFor && (
         <CategoryRidersModal
