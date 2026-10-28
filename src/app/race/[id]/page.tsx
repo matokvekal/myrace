@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
-import { CalendarClock, Info, Map as MapIcon, Tags, Users, type LucideIcon } from "lucide-react";
+import { CalendarClock, Info as InfoIcon, Map as MapIcon, Tags, Users, type LucideIcon } from "lucide-react";
 import styles from "./race.module.css";
 import HeaderRace from "../components/headerRace/HeaderRace";
 import Loader from "@/components/Loader";
@@ -45,7 +45,7 @@ const TAB_ICONS: Record<Tab, LucideIcon> = {
   categories: Tags,
   riders: Users,
   map: MapIcon,
-  info: Info,
+  info: InfoIcon,
 };
 
 /**
