@@ -80,25 +80,26 @@ const Map: React.FC<MapProps> = ({ raceUuid }) => {
   return (
     <div className={styles.wrap}>
       <div className={styles.pageBar}>
-        <h3 className={styles.pageTitle}>Maps</h3>
+        <span className={styles.pageTitle}>Maps{tracks.length > 0 ? ` · ${tracks.length}` : ""}</span>
         <div className={styles.spacer} />
+        <button className={tracks.length === 0 ? styles.btnPrimary : styles.btn} onClick={addMap}>
+          <Plus size={14} /> Add map
+        </button>
         {dirty && (
-          <button className={styles.btnGhost} onClick={handleReset}>
+          <button className={styles.btnGhost} onClick={handleReset} title="Discard unsaved map changes">
             <RotateCcw size={14} /> Reset
           </button>
         )}
-        <button className={styles.btnPrimary} onClick={handleSave} disabled={!dirty}>
-          <Save size={14} /> Save
-        </button>
-        <button className={styles.btn} onClick={addMap}>
-          <Plus size={14} /> Add map
-        </button>
+        {(dirty || tracks.length > 0) && (
+          <button className={styles.btnPrimary} onClick={handleSave} disabled={!dirty} title={dirty ? "Save map changes" : "No unsaved changes"}>
+            <Save size={14} /> Save
+          </button>
+        )}
       </div>
 
       {tracks.length === 0 ? (
         <div className={styles.hint}>
-          No maps yet. Press <b>Add map</b>, then upload a track file or draw one — add a map for each
-          course (e.g. Elite, Kids, Katkatim).
+          No maps yet. <b>Add map</b>, then upload a track or draw one, one map per course.
         </div>
       ) : (
         tracks.map((t) => (

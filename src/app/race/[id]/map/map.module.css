@@ -316,3 +316,155 @@
 .catCheck:hover {
   background: var(--bg-card-2);
 }
+
+/* ═══ Map-first layout + grouped toolbar ═══ */
+.wrap {
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.pageTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn,
+.btnGhost,
+.btnPrimary,
+.btnDanger {
+  height: 32px;
+  padding: 0 10px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.btnPrimary {
+  background: var(--brand-strong, #3f86e7);
+  border-color: var(--brand-strong, #3f86e7);
+}
+
+.card {
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+/* Segmented group, same look as the Riders view control */
+.toolGroup {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.tool {
+  height: 30px;
+  min-width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolbar > .tool,
+.toolbarEnd .tool {
+  border-color: var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--surface-1, #fff);
+  border-color: var(--border-card, #d9e7fb);
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolActive,
+.toolActive:hover:not(:disabled) {
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+  font-weight: 600;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.menuDanger {
+  color: #ef4444;
+}
+
+/* The map takes most of the screen */
+.mapBox {
+  height: min(70vh, 640px);
+  min-height: 320px;
+  border-radius: 8px;
+}
+
+:root[dir="rtl"] .menuRight,
+:global(html[dir="rtl"]) .menuRight {
+  right: auto;
+  left: 0;
+}
+
+@media (max-width: 480px) {
+  .tool span {
+    display: none;
+  }
+
+  .mapBox {
+    height: 62vh;
+  }
+}
+
+:root[data-skin="gaming"] .card button:not(:disabled),
+:root[data-skin="gaming"] .pageBar button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
+}

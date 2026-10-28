@@ -15,8 +15,14 @@ import {
   LocateFixed,
   Crosshair,
   Check,
+  MoreHorizontal,
 } from "lucide-react";
 import styles from "./map.module.css";
+
+/** View-only fallback for a map with nothing saved yet (no centre, route or points).
+ *  Never written to the race — only "Set area" saves a view. */
+const FALLBACK_CENTER = { lat: 40.7829, lng: -73.9654 }; // Central Park, New York
+const FALLBACK_ZOOM = 15;
 
 interface WaveGroup {
   waveNum: number;
@@ -56,6 +62,7 @@ const MapCard: React.FC<MapCardProps> = ({
   const [editing, setEditing] = useState(startEditing);
   const [mode, setMode] = useState<Mode>("none");
   const [catMenu, setCatMenu] = useState(false);
+  const [moreMenu, setMoreMenu] = useState(false);
   const [myLoc, setMyLoc] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   // Pan target for "My location" — not saved with the map
   const [focus, setFocus] = useState<{ lat: number; lng: number } | undefined>();
@@ -161,6 +168,9 @@ const MapCard: React.FC<MapCardProps> = ({
     toast.info("Map area set to current view");
   };
 
+  // Anything the race already has for this map wins over the Central Park fallback.
+  const hasSavedView = !!track.center || track.points.length > 0 || track.markers.length > 0;
+
   const done = () => {
     setEditing(false);
     setMode("none");
@@ -237,58 +247,95 @@ const MapCard: React.FC<MapCardProps> = ({
         </div>
       )}
 
-      {/* ── Edit tools (only while editing) ── */}
-      {editing && (
-        <div className={styles.editTools}>
-          <button className={styles.btn} onClick={() => fileRef.current?.click()}>
-            <Upload size={14} /> {track.points.length > 0 ? "Replace track" : "Upload track"}
-          </button>
-          <button
-            className={`${styles.btn} ${mode === "draw" ? styles.btnActive : ""}`}
-            onClick={() => setMode(mode === "draw" ? "none" : "draw")}
-            title="Click the map to add route points in order"
-          >
-            <Route size={14} /> Draw
-          </button>
-          <button
-            className={`${styles.btn} ${mode === "point" ? styles.btnActive : ""}`}
-            onClick={() => setMode(mode === "point" ? "none" : "point")}
-          >
-            <MapPin size={14} /> Point
-          </button>
-          <button className={styles.btn} onClick={addPointHere} disabled={locating}>
-            <LocateFixed size={14} /> Point here
-          </button>
-          <button className={styles.btn} onClick={goToMyLocation} disabled={locating}>
-            <LocateFixed size={14} /> {locating ? "Locating…" : "My location"}
-          </button>
-          {track.points.length > 0 && (
-            <>
-              <button className={styles.btn} onClick={() => onChange({ points: track.points.slice(0, -1) })}>
-                <Undo2 size={14} /> Undo
+      {/* ── Toolbar: route · points · view · More, then Done / Edit ── */}
+      <div className={styles.toolbar}>
+        {editing ? (
+          <>
+            <div className={styles.toolGroup} role="group" aria-label="Route">
+              <button className={styles.tool} onClick={() => fileRef.current?.click()} title={track.points.length > 0 ? "Replace track file (GPX, TCX, GeoJSON)" : "Upload a track file (GPX, TCX, GeoJSON)"}>
+                <Upload size={15} /> <span>{track.points.length > 0 ? "Replace" : "Upload"}</span>
               </button>
               <button
-                className={styles.btn}
-                onClick={() => onChange({ points: [...track.points].reverse() })}
-                title="Swap start and finish — arrows flip"
+                className={`${styles.tool} ${mode === "draw" ? styles.toolActive : ""}`}
+                aria-pressed={mode === "draw"}
+                onClick={() => setMode(mode === "draw" ? "none" : "draw")}
+                title="Draw: click the map to add route points in order"
               >
-                <ArrowLeftRight size={14} /> Reverse
+                <Route size={15} /> <span>Draw</span>
               </button>
-              <button className={styles.btn} onClick={() => onChange({ points: [] })}>
-                <Trash2 size={14} /> Clear route
+              <button className={styles.tool} onClick={() => onChange({ points: track.points.slice(0, -1) })} disabled={track.points.length === 0} title="Undo last route point" aria-label="Undo last route point">
+                <Undo2 size={15} />
               </button>
-            </>
-          )}
-          {track.markers.length > 0 && (
-            <button className={styles.btn} onClick={() => onChange({ markers: [] })}>
-              <Trash2 size={14} /> Clear points
+              <button className={styles.tool} onClick={() => onChange({ points: [...track.points].reverse() })} disabled={track.points.length === 0} title="Reverse: swap start and finish" aria-label="Reverse route">
+                <ArrowLeftRight size={15} />
+              </button>
+            </div>
+            <div className={styles.toolGroup} role="group" aria-label="Points">
+              <button
+                className={`${styles.tool} ${mode === "point" ? styles.toolActive : ""}`}
+                aria-pressed={mode === "point"}
+                onClick={() => setMode(mode === "point" ? "none" : "point")}
+                title="Point: click the map to drop a labelled point"
+              >
+                <MapPin size={15} /> <span>Point</span>
+              </button>
+              <button className={styles.tool} onClick={addPointHere} disabled={locating} title="Add a point at my current location" aria-label="Point here">
+                <MapPin size={15} /> <LocateFixed size={12} />
+              </button>
+            </div>
+            <div className={styles.toolGroup} role="group" aria-label="View">
+              <button className={styles.tool} onClick={goToMyLocation} disabled={locating} title={locating ? "Locating…" : "Go to my location"} aria-label="My location">
+                <LocateFixed size={15} />
+              </button>
+              <button className={styles.tool} onClick={setAreaToView} title="Set area: save the current view as this map's area" aria-label="Set area">
+                <Crosshair size={15} />
+              </button>
+            </div>
+          </>
+        ) : (
+          <button className={styles.tool} onClick={() => setEditing(true)} title="Edit this map">
+            <Pencil size={15} /> <span>Edit</span>
+          </button>
+        )}
+
+        <div className={styles.toolbarEnd}>
+          <div className={styles.menuWrap}>
+            <button className={styles.tool} onClick={() => setMoreMenu((v) => !v)} aria-expanded={moreMenu} title="More" aria-label="More map actions">
+              <MoreHorizontal size={16} />
+            </button>
+            {moreMenu && (
+              <>
+                <div className={styles.backdrop} onClick={() => setMoreMenu(false)} />
+                <div className={`${styles.menu} ${styles.menuRight}`} role="menu">
+                  {!editing && (
+                    <button className={styles.menuItem} role="menuitem" onClick={() => { setMoreMenu(false); fileRef.current?.click(); }}>
+                      <Upload size={14} /> Update track file
+                    </button>
+                  )}
+                  {editing && track.points.length > 0 && (
+                    <button className={styles.menuItem} role="menuitem" onClick={() => { setMoreMenu(false); onChange({ points: [] }); }}>
+                      <Trash2 size={14} /> Clear route
+                    </button>
+                  )}
+                  {editing && track.markers.length > 0 && (
+                    <button className={styles.menuItem} role="menuitem" onClick={() => { setMoreMenu(false); onChange({ markers: [] }); }}>
+                      <Trash2 size={14} /> Clear points
+                    </button>
+                  )}
+                  <button className={`${styles.menuItem} ${styles.menuDanger}`} role="menuitem" onClick={() => { setMoreMenu(false); confirmDelete(); }}>
+                    <Trash2 size={14} /> Delete map
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          {editing && (
+            <button className={styles.btnPrimary} onClick={done}>
+              <Check size={14} /> Done
             </button>
           )}
-          <button className={styles.btn} onClick={setAreaToView}>
-            <Crosshair size={14} /> Set area
-          </button>
         </div>
-      )}
+      </div>
 
       {/* ── Map ── */}
       <div className={styles.mapBox}>
@@ -296,13 +343,13 @@ const MapCard: React.FC<MapCardProps> = ({
           key={track.id}
           bare
           editable={editing && mode !== "none"}
-          center={focus ?? track.center}
-          zoom={focus ? 17 : track.zoom}
+          center={focus ?? track.center ?? (hasSavedView ? undefined : FALLBACK_CENTER)}
+          zoom={focus ? 17 : track.zoom ?? (hasSavedView ? undefined : FALLBACK_ZOOM)}
           trackPoints={track.points}
           markers={track.markers}
           trackColor={track.color}
           myLocation={myLoc}
-          location={location}
+          location={hasSavedView ? location : undefined}
           onMapClick={handleMapClick}
           onViewChange={(c, z) => {
             viewRef.current = { center: c, zoom: z };
@@ -329,27 +376,6 @@ const MapCard: React.FC<MapCardProps> = ({
           ))}
         </div>
       )}
-
-      {/* ── Under the map: Edit · Update · Delete ── */}
-      <div className={styles.cardActions}>
-        {editing ? (
-          <button className={styles.btnPrimary} onClick={done}>
-            <Check size={14} /> Done
-          </button>
-        ) : (
-          <>
-            <button className={styles.btn} onClick={() => setEditing(true)}>
-              <Pencil size={14} /> Edit
-            </button>
-            <button className={styles.btn} onClick={() => fileRef.current?.click()}>
-              <Upload size={14} /> Update
-            </button>
-          </>
-        )}
-        <button className={styles.btnDanger} onClick={confirmDelete}>
-          <Trash2 size={14} /> Delete
-        </button>
-      </div>
 
       <input
         ref={fileRef}
