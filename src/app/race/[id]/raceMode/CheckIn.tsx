@@ -18,7 +18,18 @@ interface Props {
   slots?: Map<string, CategoryProps[]>;
 }
 
-type SortKey = "standing" | "bib" | "name";
+type SortKey = "standing" | "bib" | "name" | "first";
+
+/** Sort choice survives tab switches for this working session. */
+const SORT_SESSION_KEY = "commissaire.checkinSort";
+const loadSort = (): SortKey => {
+  try {
+    const v = sessionStorage.getItem(SORT_SESSION_KEY);
+    return v === "bib" || v === "name" || v === "first" ? v : "standing";
+  } catch {
+    return "standing";
+  }
+};
 
 const catKey = (c: CategoryProps) => `${c.name}::${c.subCategory ?? ""}`;
 const standingOf = (r: RiderProps): number | null => r.standing ?? r.position_start ?? null;
@@ -31,7 +42,12 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "cards">("list");
-  const [sortKey, setSortKey] = useState<SortKey>("standing");
+  const [sortKey, setSortKeyState] = useState<SortKey>(loadSort);
+  const setSortKey = (k: SortKey) => {
+    setSortKeyState(k);
+    try { sessionStorage.setItem(SORT_SESSION_KEY, k); } catch { /* preference only */ }
+  };
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [sortScope, setSortScope] = useState<"category" | "wave">("category");
   const [editingBibId, setEditingBibId] = useState<number | null>(null);
@@ -62,6 +78,10 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
 
   const compare = (a: RiderProps, b: RiderProps) => {
     const dir = sortDir === "asc" ? 1 : -1;
+    if (sortKey === "first") {
+      const n = a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
+      return n * dir;
+    }
     if (sortKey === "name") {
       const n = a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
       return n * dir;
@@ -100,8 +120,13 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
 
   const toggleCheck = (rider: RiderProps) => {
     if (!canForRace(raceUuid, "CHECKIN_RIDER")) return;
-    updateRider({ ...rider, checked: !rider.checked });
-    void recordCheckin(rider, !rider.checked);
+    const checking = !rider.checked;
+    updateRider({
+      ...rider,
+      checked: checking,
+      ...(checking && rider.status === "DNS" ? { status: "standing" as const } : {}),
+    });
+    void recordCheckin(rider, checking);
   };
 
   /**
@@ -223,7 +248,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
     }
     return (
       <span className={styles.bibWrap}>
-        {!card && <span className={styles.bib}>#{rider.bibNumber}</span>}
+        {!card && <span className={styles.bib}>{rider.bibNumber}</span>}
         {savedBibId === rider.id && <span className={styles.bibSaved}>✓ Saved</span>}
         {!isRaceActive && (
           <button
@@ -232,7 +257,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
             title="Edit bib number"
             aria-label={`Edit bib ${rider.bibNumber}`}
             data-testid={`checkin-editbib-${rider.bibNumber}`}
-          >✎ Bib</button>
+          >✎</button>
         )}
       </span>
     );
@@ -257,50 +282,50 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
         className={`${styles.row} ${rider.checked ? styles.checked : ""} ${hasStatus ? styles.out : ""}`}
       >
         <span className={styles.rowColorBar} style={{ background: catColorOfRider(rider) }} title={rider.category} />
-        <div className={styles.leftArea}>
-          {hasStatus ? (
+        {renderBib(rider)}
+        <span className={styles.who}>
+          <span className={styles.name} dir="auto">{rider.lastName} {rider.firstName}</span>
+          {showCat && <span className={styles.cat} dir="auto">{rider.category}</span>}
+        </span>
+        <div className={styles.rowActions}>
+          {hasStatus && rider.status !== "DNS" ? (
             <button
               className={`${styles.statusInlineBadge} ${statusClass}`}
               onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}
-              title="Tap to change status"
+              title="Change status"
             >
               {rider.status}
             </button>
-          ) : isRaceActive ? (
-            <>
-              <span className={`${styles.checkBtn} ${rider.checked ? styles.checkedBtn : styles.lockedBtn}`} title="Check-in locked" />
-              <button className={styles.statusTrigger} onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}>Status</button>
-            </>
           ) : (
             <>
               <button
-                className={`${styles.checkBtn} ${rider.checked ? styles.checkedBtn : ""}`}
+                className={`${styles.actBtn} ${rider.checked ? styles.actIn : ""}`}
                 onClick={() => toggleCheck(rider)}
-                title={rider.checked ? "Uncheck" : "Check in"}
-              />
+                disabled={isRaceActive}
+                aria-pressed={!!rider.checked}
+                data-testid={`checkin-check-${rider.bibNumber}`}
+                title={isRaceActive ? "Check-in locked: race in progress" : rider.checked ? "Undo check-in" : "Check in"}
+              >
+                {rider.checked ? "✓ In" : "Check In"}
+              </button>
               <button
-                className={styles.dnsTrigger}
+                className={`${styles.actBtn} ${rider.status === "DNS" ? styles.actDns : ""}`}
                 onClick={() => toggleDns(rider)}
-                title="Mark as DNS (did not start)"
+                aria-pressed={rider.status === "DNS"}
                 aria-label={`Mark #${rider.bibNumber} DNS`}
+                title={rider.status === "DNS" ? "Undo DNS" : "Did not start"}
               >
                 DNS
               </button>
-              <button className={styles.statusTrigger} onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}>Status</button>
             </>
           )}
+          <button
+            className={styles.moreBtn}
+            onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}
+            aria-label={`Status for #${rider.bibNumber}`}
+            title="Other status (DNF, DSQ…)"
+          >⋯</button>
         </div>
-        <span className={styles.standingNum} title="Standing (rank)">
-          {st != null ? `S${st}` : "S–"}
-        </span>
-        {renderBib(rider)}
-        <span className={styles.name} dir="auto">{rider.lastName} {rider.firstName}</span>
-        {showCat && (
-          <span className={styles.cat}>
-            <span className={styles.catDot} style={{ background: catColorOfRider(rider) }} />
-            {rider.category}
-          </span>
-        )}
       </div>
     );
   };
@@ -429,9 +454,10 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   };
 
   const sortOptions: { key: SortKey; label: string }[] = [
-    { key: "standing", label: "Standing" },
+    { key: "standing", label: "Start pos." },
     { key: "bib", label: "Bib" },
-    { key: "name", label: "Name" },
+    { key: "name", label: "Last name" },
+    { key: "first", label: "First name" },
   ];
 
   return (
@@ -441,77 +467,101 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           🏁 Race in progress — check-in locked. You can still change rider status.
         </div>
       )}
-      <div className={styles.stickyBar}>
-        <div className={styles.toolbar}>
-          <div className={styles.searchWrap}>
-            <img src={Icons.search} alt="" width={14} height={14} />
-            <input
-              className={styles.search}
-              placeholder="Search name or bib…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <select className={styles.catSelect} value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
-            <option value="all">All categories</option>
-            {catNames.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <div className={styles.viewToggle}>
+      {waveRiders.length > 0 && (
+        <div className={styles.stickyBar}>
+          <div className={styles.topLine}>
+            <div className={styles.counts}>
+              <span className={styles.countItem}><b>{waveRiders.length}</b> total</span>
+              <span className={`${styles.countItem} ${styles.countIn}`}><b>{waveRiders.filter((r) => r.checked).length}</b> in</span>
+              <span className={styles.countItem}>
+                <b>{waveRiders.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status)).length}</b> left
+              </span>
+              {waveRiders.some((r) => r.status === "DNS") && (
+                <span className={`${styles.countItem} ${styles.countDns}`}><b>{waveRiders.filter((r) => r.status === "DNS").length}</b> DNS</span>
+              )}
+            </div>
             <button
-              className={`${styles.viewBtn} ${viewMode === "list" ? styles.viewBtnActive : ""}`}
-              onClick={() => setViewMode("list")}
-              title="List view"
-            >☰</button>
-            <button
-              className={`${styles.viewBtn} ${viewMode === "cards" ? styles.viewBtnActive : ""}`}
-              onClick={() => setViewMode("cards")}
-              title="Card view"
-            >⊞</button>
+              className={`${styles.toolsBtn} ${toolsOpen || search ? styles.toolsBtnActive : ""}`}
+              onClick={() => setToolsOpen((o) => !o)}
+              aria-expanded={toolsOpen}
+              data-testid="checkin-tools"
+            >
+              <img src={Icons.search} alt="" width={14} height={14} />
+              {search ? `“${search}”` : sortOptions.find((o) => o.key === sortKey)?.label}
+            </button>
+            {!allAccountedFor && !isRaceActive && (
+              <button className={styles.checkAllBtn} onClick={checkAll}>✓ All</button>
+            )}
           </div>
-        </div>
 
-        <div className={styles.sortBar}>
-          <span className={styles.sortLabel}>Sort</span>
-          <div className={styles.scopeToggle}>
-            {sortOptions.map((o) => (
-              <button
-                key={o.key}
-                className={`${styles.scopeBtn} ${sortKey === o.key ? styles.scopeBtnActive : ""}`}
-                onClick={() => setSortKey(o.key)}
-              >{o.label}</button>
+          {toolsOpen && (
+            <div className={styles.toolsPanel}>
+              <div className={styles.searchWrap}>
+                <input
+                  className={styles.search}
+                  dir="auto"
+                  autoFocus
+                  placeholder="Search name or bib"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setToolsOpen(false); }}
+                />
+                {search && <button className={styles.clearBtn} onClick={() => setSearch("")} aria-label="Clear search">✕</button>}
+              </div>
+              <div className={styles.panelRow}>
+                <span className={styles.sortLabel}>Sort</span>
+                <div className={styles.scopeToggle}>
+                  {sortOptions.map((o) => (
+                    <button
+                      key={o.key}
+                      className={`${styles.scopeBtn} ${sortKey === o.key ? styles.scopeBtnActive : ""}`}
+                      aria-pressed={sortKey === o.key}
+                      onClick={() => setSortKey(o.key)}
+                    >{o.label}</button>
+                  ))}
+                </div>
+                <button
+                  className={styles.dirBtn}
+                  onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                  title={sortDir === "asc" ? "Ascending" : "Descending"}
+                  aria-label={sortDir === "asc" ? "Ascending" : "Descending"}
+                >{sortDir === "asc" ? "▲" : "▼"}</button>
+              </div>
+              <div className={styles.panelRow}>
+                <select className={styles.catSelect} value={filterCat} onChange={(e) => setFilterCat(e.target.value)} aria-label="Category filter">
+                  <option value="all">All categories</option>
+                  {catNames.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <div className={styles.scopeToggle}>
+                  <button className={`${styles.scopeBtn} ${sortScope === "category" ? styles.scopeBtnActive : ""}`} onClick={() => setSortScope("category")}>By category</button>
+                  <button className={`${styles.scopeBtn} ${sortScope === "wave" ? styles.scopeBtnActive : ""}`} onClick={() => setSortScope("wave")}>Whole wave</button>
+                </div>
+                <div className={styles.viewToggle}>
+                  <button className={`${styles.viewBtn} ${viewMode === "list" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("list")} title="List" aria-label="List view">☰</button>
+                  <button className={`${styles.viewBtn} ${viewMode === "cards" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("cards")} title="Cards" aria-label="Card view">⊞</button>
+                </div>
+                <button className={styles.doneBtn} onClick={() => setToolsOpen(false)}>Done</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {waveRiders.length === 0 && (
+        <div className={styles.emptyWave}>
+          <span>No riders in Wave {waveNum}.</span>
+          <div className={styles.addChips}>
+            {categories.map((c) => (
+              <React.Fragment key={catKey(c)}>{renderAddBtn(catKey(c), c, `+ ${c.name}`)}</React.Fragment>
             ))}
           </div>
-          <button
-            className={styles.dirBtn}
-            onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-            title={sortDir === "asc" ? "Ascending" : "Descending"}
-          >{sortDir === "asc" ? "▲ 1→9" : "▼ 9→1"}</button>
-          <span className={styles.sortLabel}>Within</span>
-          <div className={styles.scopeToggle}>
-            <button
-              className={`${styles.scopeBtn} ${sortScope === "category" ? styles.scopeBtnActive : ""}`}
-              onClick={() => setSortScope("category")}
-            >Category</button>
-            <button
-              className={`${styles.scopeBtn} ${sortScope === "wave" ? styles.scopeBtnActive : ""}`}
-              onClick={() => setSortScope("wave")}
-            >Whole wave</button>
-          </div>
+          {categories.map((c) => (
+            <React.Fragment key={catKey(c)}>{renderAddForm(catKey(c), c)}</React.Fragment>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className={styles.counts}>
-        <span className={styles.countItem}>✓ {waveRiders.filter((r) => r.checked).length} checked</span>
-        <span className={styles.countItem}>✗ {waveRiders.filter((r) => r.status === "DNS").length} DNS</span>
-        <span className={styles.countItem}>Total {waveRiders.length}</span>
-        {!allAccountedFor && !isRaceActive && (
-          <button className={styles.checkAllBtn} onClick={checkAll}>
-            ✓ Check All
-          </button>
-        )}
-      </div>
-
-      <div className={styles.groupWrap}>{slotList.map(renderSlot)}</div>
+      {waveRiders.length > 0 && <div className={styles.groupWrap}>{slotList.map(renderSlot)}</div>}
 
       {selectedRider && <StatusModal rider={selectedRider} onStatusChange={handleStatusChange} />}
     </div>
