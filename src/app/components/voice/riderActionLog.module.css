@@ -693,3 +693,26 @@
     font-size: 11px;
   }
 }
+
+/* Log toggle: compact labelled pill (was a round ⏱️ emoji button) */
+.toggleBtn {
+  width: auto;
+  height: 36px;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  box-shadow: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.toggleBtn.open {
+  color: #fff;
+  box-shadow: none;
+}
+
+.toggleLabel {
+  line-height: 1;
+}

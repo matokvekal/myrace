@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styles from './riderActionLog.module.css';
 import { RiderProps } from '@/types/types';
-import { Bell, Search, X } from 'lucide-react';
+import { Bell, History, Search, X } from 'lucide-react';
 import { parseClockTimeMs } from '@/utils/timeUtils';
 
 interface RiderAction {
@@ -140,7 +140,8 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
         aria-label="View rider action history"
         title="View rider action history"
       >
-        <span className={styles.icon}>⏱️</span>
+        <History size={16} aria-hidden="true" />
+        <span className={styles.toggleLabel}>Log</span>
         {actions.length > 0 && <span className={styles.badge}>{actions.length}</span>}
       </button>
 

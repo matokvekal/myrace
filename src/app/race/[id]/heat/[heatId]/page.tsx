@@ -140,11 +140,7 @@ const Heat: React.FC = () => {
     if (heatId == null || categories.length === 0) return categories;
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const slotMap = schedule.get(heatId);
-    if (slotMap) {
-      const cats = [...slotMap.values()].flat();
-      if (cats.length > 0) return cats;
-    }
-    return categories;
+    return slotMap ? [...slotMap.values()].flat() : [];
   }, [categories, heatId]);
 
   // Every wave in this race's schedule, for the wave-switch dropdown next to
@@ -784,6 +780,21 @@ const Heat: React.FC = () => {
     setShowMicPrompt(true);
   };
 
+  // One short message instead of an empty board, matched to the actual state.
+  const waveRiderTotal = riders.filter(
+    (r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))
+  ).length;
+  const liveEmpty =
+    scheduleWaves.length === 0
+      ? "No waves configured"
+      : waveCategories.length === 0
+        ? "No categories assigned to this wave"
+        : waveRiderTotal === 0
+          ? "No riders in this wave"
+          : startedWaveCats.length === 0
+            ? "Race has not started"
+            : null;
+
   return (
     <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
       <HeaderHeats
@@ -998,22 +1009,15 @@ const Heat: React.FC = () => {
                 <img src={Icons.search} alt="" width={16} height={16} className={styles.inputIcon} />
               )}
             </div>
-            <button
-              type="button"
-              className={`${styles.recapBtn} ${recap.active ? styles.recapOn : ""}`}
-              aria-pressed={recap.active}
-              data-testid="recap-btn"
-              onClick={() => (recap.active ? exitRecap() : recap.enter())}
-              title={recap.active ? "Exit RECAP" : "RECAP: record with a 6-minute duplicate check (ends after 30 s idle)"}
-            >
-              RECAP
-            </button>
           </div>
 
           {/* Wave row, apart from timing entry: switch wave · Finish Wave */}
           <div className={styles.waveRow}>
             <div className={styles.waveRowStart}>
-                {scheduleWaves.length > 1 && (
+                {scheduleWaves.length === 0 && (
+                  <span className={styles.noWaves} data-testid="no-waves">No waves configured</span>
+                )}
+                {scheduleWaves.length > 0 && (
                   <label className={styles.waveSwitcher} title="Switch wave">
                     <span className={styles.waveSwitcherLabel}>Wave</span>
                     <span
@@ -1105,11 +1109,26 @@ const Heat: React.FC = () => {
                   </label>
                 );
               })}
+              <div className={styles.filterDivider} />
+              {/* RECAP: off the main screen, still available here */}
+              <label className={styles.filterPanelRow}>
+                <input
+                  type="checkbox"
+                  data-testid="recap-btn"
+                  checked={recap.active}
+                  onChange={() => (recap.active ? exitRecap() : recap.enter())}
+                />
+                <span>Recap mode <span className={styles.filterStatusTag}>6-min duplicate check, ends after 30 s idle</span></span>
+              </label>
             </div>
           </div>
         )}
 
-        <div className={styles.gridWrapper}>
+        {liveEmpty && (
+          <div className={styles.liveEmpty} data-testid="live-empty">{liveEmpty}</div>
+        )}
+
+        <div className={styles.gridWrapper} style={liveEmpty ? { display: "none" } : undefined}>
           <div className={styles.info}>
             <div className={styles.active}>
               Racing ({activeRiders.length})

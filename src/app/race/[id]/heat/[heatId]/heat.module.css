@@ -1445,3 +1445,77 @@
     padding: 0 6px;
   }
 }
+
+/* ═══ LIVE cleanup: outdoor-readable controls ═══ */
+.info {
+  gap: 8px;
+}
+
+.active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #15803d;
+  border-radius: 8px;
+  background: rgba(21, 128, 61, 0.08);
+  color: #14532d;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: none;
+  transform: none;
+}
+
+:global([data-theme="dark"]) .active {
+  color: #4ade80;
+}
+
+.filterIconBtn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-card, #c7d4e8);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1220);
+  font-size: 13px;
+  font-weight: 600;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: none;
+  transform: none;
+}
+
+.filterIconBtn.filterIconActive {
+  border-color: var(--brand-strong, #3f86e7);
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+:root[data-skin="gaming"] .filterIconBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  text-transform: none;
+}
+
+.noWaves {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #0b1220);
+}
+
+.liveEmpty {
+  margin: 12px 0;
+  padding: 16px 12px;
+  border: 1px solid var(--border-card, #c7d4e8);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1220);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
