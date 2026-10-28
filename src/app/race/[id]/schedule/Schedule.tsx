@@ -18,8 +18,11 @@ import {
   ChevronsDown,
   ChevronsUp,
   Palette,
-  Lock
+  Lock,
+  Users
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useDataStore } from "@/stores/appStore";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
@@ -255,6 +258,8 @@ function sortRidersForStanding(riderList: RiderProps[]): RiderProps[] {
 
 const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const setActiveTab = useDataStore((s) => s.setActiveTab);
   const { updateCategory } = useCategoryStore();
   const { riders, getRiders, updateRider } = useRiderStore((s) => ({
     riders: s.riders,
@@ -394,9 +399,16 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     setExpandedCats(allExpanded ? new Set() : new Set(allCatIds));
   };
 
+  // Whether this race's riders have been loaded at least once, so the
+  // "No riders" hint never flashes before IndexedDB answers.
+  const [ridersLoaded, setRidersLoaded] = useState(false);
   useEffect(() => {
-    getRiders(raceUuid);
+    let alive = true;
+    setRidersLoaded(false);
+    void getRiders(raceUuid).finally(() => alive && setRidersLoaded(true));
+    return () => { alive = false; };
   }, [raceUuid, getRiders]);
+  const noRiders = ridersLoaded && !riders.some((r) => r.raceUuid === raceUuid);
 
   const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
 
@@ -538,8 +550,22 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     setUnassignedCategories([]);
   };
 
+  {/* New race: point to Riders, where riders are added or imported. Schedule stays usable below. */}
+  const noRidersHint = noRiders ? (
+    <div className={styles.emptyRiders} data-testid="schedule-no-riders" dir="auto">
+      <Users className={styles.emptyRidersIcon} size={18} aria-hidden="true" />
+      <div className={styles.emptyRidersText}>
+        <div className={styles.emptyRidersTitle}>{t("schedule.noRidersTitle", "No riders added yet")}</div>
+        <div className={styles.emptyRidersSub}>{t("schedule.noRidersSub", "Add riders to your race to get started.")}</div>
+      </div>
+      <Button variant="primary" size="sm" onClick={() => setActiveTab("riders")} data-testid="schedule-add-riders">
+        {t("schedule.addRiders", "Add Riders")}
+      </Button>
+    </div>
+  ) : null;
+
   if (!categories.length) {
-    return <div className={styles.empty}>No categories yet. Import riders to generate them.</div>;
+    return noRidersHint ?? <div className={styles.empty}>No categories yet. Import riders to generate them.</div>;
   }
 
   // ── EDIT MODE ──
@@ -709,6 +735,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   // ── VIEW MODE ──
   return (
     <div className={styles.container}>
+      {noRidersHint}
       <div className={styles.headerControls}>
         <button
           className={styles.expandAllBtn}

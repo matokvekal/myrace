@@ -1389,3 +1389,40 @@ button.standingName {
     min-width: 140px;
   }
 }
+
+/* "No riders added yet" hint (new race) — one compact row, Schedule stays usable below */
+.emptyRiders {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary);
+}
+
+.emptyRidersIcon {
+  flex-shrink: 0;
+  color: var(--brand-strong);
+}
+
+.emptyRidersText {
+  flex: 1;
+  min-width: 0;
+}
+
+.emptyRidersTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.emptyRidersSub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.emptyRiders > button {
+  flex-shrink: 0;
+}
