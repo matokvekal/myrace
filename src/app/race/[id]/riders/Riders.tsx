@@ -88,6 +88,8 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
+  // Search / view / sort stay folded behind one search icon until needed.
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [importMode, setImportMode] = useState<"file" | "scan">("file");
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
@@ -243,70 +245,86 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
     <div className={styles.riders}>
       {/* Toolbar: Search | View | Sort | Import · Edit | Add Rider — wraps on phones */}
       <div className={styles.topBar}>
-        <div className={styles.searchBox}>
-          <Search size={15} aria-hidden="true" />
-          <input
-            type="search"
-            dir="auto"
-            className={styles.searchInput}
-            data-testid="rider-search"
-            placeholder="Search name or bib"
-            aria-label="Search riders"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
-        <div className={styles.viewModeGroup} role="group" aria-label="Riders view">
-          <button
-            type="button"
-            className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
-            aria-pressed={viewMode === "table"}
-            onClick={() => setViewMode("table")}
-            title="Table view"
-            aria-label="Table view"
-          >
-            <LayoutList size={16} />
-          </button>
-          <button
-            type="button"
-            className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
-            aria-pressed={viewMode === "cards" && !groupByCategory}
-            onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
-            title="Cards view"
-            aria-label="Cards view"
-          >
-            <LayoutGrid size={16} />
-          </button>
-          <button
-            type="button"
-            className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
-            aria-pressed={groupByCategory && viewMode === "cards"}
-            onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
-            title="Group by category"
-            aria-label="Group by category"
-          >
-            <Layers size={16} />
-          </button>
-        </div>
-
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortKey)}
-          className={styles.sortDropdown}
-          aria-label="Sort riders"
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${toolsOpen || searchTerm ? styles.iconBtnActive : ""}`}
+          aria-label="Search, sort and view"
+          aria-expanded={toolsOpen || !!searchTerm}
+          title="Search, sort and view"
+          onClick={() => setToolsOpen((o) => !o)}
+          data-testid="rider-tools-toggle"
         >
-          {sortOptions.map((opt) => (
-            <option key={opt.key} value={opt.key}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <Search size={16} />
+        </button>
+
+        {(toolsOpen || !!searchTerm) && (
+          <>
+            <div className={styles.searchBox}>
+              <Search size={15} aria-hidden="true" />
+              <input
+                type="search"
+                dir="auto"
+                className={styles.searchInput}
+                data-testid="rider-search"
+                placeholder="Search name or bib"
+                aria-label="Search riders"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className={styles.viewModeGroup} role="group" aria-label="Riders view">
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
+                aria-pressed={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+                title="Table view"
+                aria-label="Table view"
+              >
+                <LayoutList size={16} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
+                aria-pressed={viewMode === "cards" && !groupByCategory}
+                onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
+                title="Cards view"
+                aria-label="Cards view"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
+                aria-pressed={groupByCategory && viewMode === "cards"}
+                onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
+                title="Group by category"
+                aria-label="Group by category"
+              >
+                <Layers size={16} />
+              </button>
+            </div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className={styles.sortDropdown}
+              aria-label="Sort riders"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
 
         {/* Former Actions menu: Import and Edit as icon buttons. Scan (coming
             soon) stays on the empty state. None of it on a finalized race. */}
@@ -553,6 +571,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
               waveNum={waves[0] ?? 1}
               waveOf={(c) => catWaveMap.get(catWaveKey(c.name, c.subCategory)) ?? waves[0] ?? 1}
               categories={categories}
+              essential
               onDone={() => setShowAddRider(false)}
             />
           </div>

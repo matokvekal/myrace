@@ -90,6 +90,12 @@
   background: var(--bg-surface, #f5f8ff);
 }
 
+.iconBtnActive {
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+  background: var(--bg-surface, #f5f8ff);
+}
+
 .addRiderBtn {
   height: 36px;
   display: inline-flex;
@@ -553,7 +559,7 @@
 }
 
 .searchBox {
-  flex: 1 1 200px; /* takes the free width; first to wrap onto its own row on phones */
+  flex: 1 1 200px; /* takes the free width; wraps onto its own row on phones */
   min-width: 0;
   display: flex;
   align-items: center;
