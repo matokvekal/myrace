@@ -107,6 +107,12 @@
   height: 7px;
   border-radius: 50%;
   background: currentColor;
+  opacity: 0.45;
+}
+
+/* Pulses only while the race is running */
+.liveDotOn {
+  opacity: 1;
   animation: livePulse 1.5s ease-in-out infinite;
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./headerHeat.module.css";
 import useRaceStore from "@/stores/racesStore";
+import useCategoryStore from "@/stores/categoryStore";
 import { Eraser } from "lucide-react";
 import RaceTopBar from "../raceSidebar/RaceTopBar";
 import { effectiveRaceStatus } from "@/utils/raceStatus";
@@ -26,8 +27,17 @@ function HeaderHeat({
   // Whether the RACE ITSELF is live — not whether the currently viewed wave
   // happens to be running. A finished/upcoming-but-past race, or a read-only
   // downloaded copy, is never "live" even while looking at its heat screen.
+  // ...and only once it has actually been started: a category of this race is
+  // running (the existing lifecycle). The date-based status alone made a new,
+  // unstarted race dated today read "RACE LIVE".
+  const anyCategoryRunning = useCategoryStore((s) =>
+    s.categories.some((c) => c.raceUuid === raceId && c.status === "running")
+  );
   const isLive =
-    !race?.viewOnly && effectiveRaceStatus(race?.status, race?.date) === "running";
+    !race?.viewOnly &&
+    !race?.finalized &&
+    anyCategoryRunning &&
+    effectiveRaceStatus(race?.status, race?.date) === "running";
 
   useEffect(() => {
     const updateClock = () => {

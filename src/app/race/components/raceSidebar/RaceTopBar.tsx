@@ -8,6 +8,7 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Menu } from "lucide-react";
 import useRaceStore from "@/stores/racesStore";
+import useCategoryStore from "@/stores/categoryStore";
 import RaceSidebar, { useModeItems } from "./RaceSidebar";
 import { useRaceModeNav } from "./useRaceModeNav";
 import styles from "./raceSidebar.module.css";
@@ -21,6 +22,12 @@ const RaceTopBar: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === nav.raceUuid));
   const items = useModeItems();
   const current = items.find((i) => i.key === nav.mode);
+  // Blink only while this race is actually running: a category of it has been
+  // started and not finished (the existing category lifecycle), never just
+  // because the Live screen is open.
+  const raceRunning = useCategoryStore((s) =>
+    s.categories.some((c) => c.raceUuid === nav.raceUuid && c.status === "running")
+  ) && !race?.finalized;
 
   const close = () => {
     setOpen(false);
@@ -57,7 +64,9 @@ const RaceTopBar: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 data-testid="race-mode-indicator"
                 data-mode={nav.mode}
               >
-                {nav.mode === "live" ? <span className={styles.liveDot} aria-hidden="true" /> : current.icon}
+                {nav.mode === "live" ? (
+                  <span className={`${styles.liveDot} ${raceRunning ? styles.liveDotOn : ""}`} aria-hidden="true" />
+                ) : current.icon}
                 {current.label}
               </span>
             )
