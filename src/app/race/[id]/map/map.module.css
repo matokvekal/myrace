@@ -468,3 +468,80 @@
   text-transform: none;
   letter-spacing: normal;
 }
+
+/* ═══ Fixed map names, help and active-tool strip ═══ */
+.fixedName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-primary, #14243c);
+}
+
+.helpPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 32px 8px 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+  font-size: 12px;
+  color: var(--text-primary, #14243c);
+}
+
+.helpPanel span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.helpClose {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  cursor: pointer;
+}
+
+.modeStrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--brand, #63a6fc);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+  color: var(--brand-strong, #3f86e7);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.modeCancel {
+  margin-inline-start: auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--brand-strong, #3f86e7);
+  border-radius: 6px;
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .tool span.keepLabel {
+    display: inline;
+  }
+}

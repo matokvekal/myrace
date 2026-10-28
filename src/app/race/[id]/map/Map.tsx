@@ -102,9 +102,10 @@ const Map: React.FC<MapProps> = ({ raceUuid }) => {
           No maps yet. <b>Add map</b>, then upload a track or draw one, one map per course.
         </div>
       ) : (
-        tracks.map((t) => (
+        tracks.map((t, i) => (
           <MapCard
             key={t.id}
+            index={i}
             track={t}
             categories={categories}
             waveGroups={waveGroups}

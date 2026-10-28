@@ -16,6 +16,8 @@ import {
   Crosshair,
   Check,
   MoreHorizontal,
+  Info,
+  X,
 } from "lucide-react";
 import styles from "./map.module.css";
 
@@ -30,6 +32,8 @@ interface WaveGroup {
 }
 
 interface MapCardProps {
+  /** Position in the race's map list: the card is shown as \"Map {index + 1}\". */
+  index: number;
   track: RaceTrack;
   categories: CategoryProps[];
   waveGroups: WaveGroup[];
@@ -48,6 +52,7 @@ type Mode = "none" | "point" | "draw";
  * so the page stays calm when several maps are stacked on it.
  */
 const MapCard: React.FC<MapCardProps> = ({
+  index,
   track,
   categories,
   waveGroups,
@@ -63,6 +68,9 @@ const MapCard: React.FC<MapCardProps> = ({
   const [mode, setMode] = useState<Mode>("none");
   const [catMenu, setCatMenu] = useState(false);
   const [moreMenu, setMoreMenu] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  /** Fixed display name; the stored title is left as it is. */
+  const mapName = `Map ${index + 1}`;
   const [myLoc, setMyLoc] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   // Pan target for "My location" — not saved with the map
   const [focus, setFocus] = useState<{ lat: number; lng: number } | undefined>();
@@ -178,7 +186,7 @@ const MapCard: React.FC<MapCardProps> = ({
   };
 
   const confirmDelete = () => {
-    if (window.confirm(`Delete map "${track.title || "Untitled"}"?`)) onDelete();
+    if (window.confirm(`Delete ${mapName}${track.header ? ` (${track.header})` : ""}?`)) onDelete();
   };
 
   return (
@@ -186,56 +194,24 @@ const MapCard: React.FC<MapCardProps> = ({
       {/* ── Top: name ── */}
       {editing ? (
         <div className={styles.cardEditHead}>
-          <input
-            className={styles.titleInput}
-            dir="auto"
-            placeholder="Map name (e.g. Elite)"
-            value={track.title}
-            onChange={(e) => onChange({ title: e.target.value })}
-          />
+          <span className={styles.fixedName}>
+            <span className={styles.dot} style={{ background: track.color }} />
+            {mapName}
+          </span>
           <input
             className={styles.headerInput}
             dir="auto"
-            placeholder="Header / description (e.g. 3 laps · 4.2 km)"
+            aria-label={`${mapName} description`}
+            placeholder="Description (e.g. Elite · 3 laps · 4.2 km)"
             value={track.header ?? ""}
             onChange={(e) => onChange({ header: e.target.value })}
           />
-          <div className={styles.menuWrap}>
-            <button className={styles.btn} onClick={() => setCatMenu((v) => !v)}>
-              Categories ({keys.length})
-            </button>
-            {catMenu && (
-              <>
-                <div className={styles.backdrop} onClick={() => setCatMenu(false)} />
-                <div className={`${styles.menu} ${styles.menuRight} ${styles.catMenu}`}>
-                  {waveGroups.length === 0 && (
-                    <div className={styles.menuEmpty}>No categories yet — import riders first.</div>
-                  )}
-                  {waveGroups.map((g) => (
-                    <div key={g.waveNum}>
-                      <div className={styles.menuGroup}>Wave {g.waveNum}</div>
-                      {g.cats.map((cat) => {
-                        const key = catWaveKey(cat.name, cat.subCategory);
-                        return (
-                          <label key={cat.id} className={styles.catCheck}>
-                            <input type="checkbox" checked={keys.includes(key)} onChange={() => toggleCategory(key)} />
-                            <span className={styles.dot} style={{ background: cat.color ?? "#ccc" }} />
-                            <span dir="auto">{cat.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
         </div>
       ) : (
         <div className={styles.cardHead}>
           <span className={styles.dot} style={{ background: track.color }} />
           <div className={styles.cardTitleBlock}>
-            <div className={styles.cardTitle} dir="auto">{track.title || "Untitled"}</div>
+            <div className={styles.cardTitle}>{mapName}</div>
             {(track.header || ridingNames.length > 0) && (
               <div className={styles.cardSub} dir="auto">
                 {track.header}
@@ -253,7 +229,7 @@ const MapCard: React.FC<MapCardProps> = ({
           <>
             <div className={styles.toolGroup} role="group" aria-label="Route">
               <button className={styles.tool} onClick={() => fileRef.current?.click()} title={track.points.length > 0 ? "Replace track file (GPX, TCX, GeoJSON)" : "Upload a track file (GPX, TCX, GeoJSON)"}>
-                <Upload size={15} /> <span>{track.points.length > 0 ? "Replace" : "Upload"}</span>
+                <Upload size={15} /> <span className={styles.keepLabel}>{track.points.length > 0 ? "Replace" : "Upload"}</span>
               </button>
               <button
                 className={`${styles.tool} ${mode === "draw" ? styles.toolActive : ""}`}
@@ -261,7 +237,7 @@ const MapCard: React.FC<MapCardProps> = ({
                 onClick={() => setMode(mode === "draw" ? "none" : "draw")}
                 title="Draw: click the map to add route points in order"
               >
-                <Route size={15} /> <span>Draw</span>
+                <Route size={15} /> <span className={styles.keepLabel}>Draw</span>
               </button>
               <button className={styles.tool} onClick={() => onChange({ points: track.points.slice(0, -1) })} disabled={track.points.length === 0} title="Undo last route point" aria-label="Undo last route point">
                 <Undo2 size={15} />
@@ -277,7 +253,7 @@ const MapCard: React.FC<MapCardProps> = ({
                 onClick={() => setMode(mode === "point" ? "none" : "point")}
                 title="Point: click the map to drop a labelled point"
               >
-                <MapPin size={15} /> <span>Point</span>
+                <MapPin size={15} /> <span className={styles.keepLabel}>Point</span>
               </button>
               <button className={styles.tool} onClick={addPointHere} disabled={locating} title="Add a point at my current location" aria-label="Point here">
                 <MapPin size={15} /> <LocateFixed size={12} />
@@ -294,11 +270,21 @@ const MapCard: React.FC<MapCardProps> = ({
           </>
         ) : (
           <button className={styles.tool} onClick={() => setEditing(true)} title="Edit this map">
-            <Pencil size={15} /> <span>Edit</span>
+            <Pencil size={15} /> <span className={styles.keepLabel}>Edit</span>
           </button>
         )}
 
         <div className={styles.toolbarEnd}>
+          {editing && (
+            <button
+              className={`${styles.tool} ${showHelp ? styles.toolActive : ""}`}
+              onClick={() => setShowHelp((v) => !v)}
+              aria-expanded={showHelp}
+              aria-label="What do these tools do?"
+            >
+              <Info size={15} />
+            </button>
+          )}
           <div className={styles.menuWrap}>
             <button className={styles.tool} onClick={() => setMoreMenu((v) => !v)} aria-expanded={moreMenu} title="More" aria-label="More map actions">
               <MoreHorizontal size={16} />
@@ -336,6 +322,28 @@ const MapCard: React.FC<MapCardProps> = ({
           )}
         </div>
       </div>
+
+      {editing && showHelp && (
+        <div className={styles.helpPanel} role="note">
+          <span><Upload size={13} /> Upload a GPX/TCX/GeoJSON track</span>
+          <span><Route size={13} /> Draw: tap the map to add route points</span>
+          <span><Undo2 size={13} /> Undo last point · <ArrowLeftRight size={13} /> Reverse direction</span>
+          <span><MapPin size={13} /> Point: tap the map to drop a labelled point</span>
+          <span><MapPin size={13} /><LocateFixed size={11} /> Point at my location</span>
+          <span><LocateFixed size={13} /> Go to my location · <Crosshair size={13} /> Save this view as the map area</span>
+          <button className={styles.helpClose} onClick={() => setShowHelp(false)} aria-label="Close help"><X size={14} /></button>
+        </div>
+      )}
+
+      {editing && mode !== "none" && (
+        <div className={styles.modeStrip} role="status">
+          {mode === "draw" ? <Route size={14} /> : <MapPin size={14} />}
+          <span>{mode === "draw" ? "Tap the map to add route points" : "Tap the map to add a point"}</span>
+          <button className={styles.modeCancel} onClick={() => setMode("none")}>
+            {mode === "draw" ? "Done drawing" : "Cancel"}
+          </button>
+        </div>
+      )}
 
       {/* ── Map ── */}
       <div className={styles.mapBox}>

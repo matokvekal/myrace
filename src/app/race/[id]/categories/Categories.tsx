@@ -17,6 +17,7 @@ import { formatMinLap, LEGACY_MIN_LAP_SECONDS, MIN_LAP_CHOICES } from "@/utils/m
 import { isLeaderFinishAll } from "@/utils/linkedGroups";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
+import { getRaceTracks } from "@/utils/raceTracks";
 
 interface CategoriesProps {
   raceUuid: string;
@@ -61,7 +62,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
   const [editError, setEditError] = useState("");
   const [showRidersFor, setShowRidersFor] = useState<CategoryProps | null>(null);
   // New Category needs only a name and a colour; laps 5 and wave 1 are the existing defaults.
-  const [newCategoryForm, setNewCategoryForm] = useState({ name: "", color: "#63A6FC", laps: 5 });
+  const [newCategoryForm, setNewCategoryForm] = useState({ name: "", color: "#63A6FC", laps: 5, mapId: "" });
   const [moreOpen, setMoreOpen] = useState(false);
 
   const { categories, updateCategory, getCategories } = useCategoryStore();
@@ -307,6 +308,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     };
 
     await updateCategory(newCat);
+    if (newCategoryForm.mapId) await assignMap(catWaveKey(newCat.name, newCat.subCategory), newCategoryForm.mapId);
     // Remember it in the category library so later races can reuse it.
     if (!templates.some((t) => t.name.toLowerCase() === newCat.name.toLowerCase())) {
       const tpl: CategoryTemplate = {
@@ -338,7 +340,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     }
     setCreating(false);
     setColorFor(null);
-    setNewCategoryForm({ name: "", color: "#63A6FC", laps: 5 });
+    setNewCategoryForm({ name: "", color: "#63A6FC", laps: 5, mapId: "" });
     getCategories(raceUuid);
   };
 
@@ -398,6 +400,37 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
       )}
     </div>
   );
+
+  // Maps a category rides: the existing race.tracks[].categoryKeys relationship.
+  const raceTracks = getRaceTracks(race);
+  const mapOfKey = (key: string) => raceTracks.find((t) => (t.categoryKeys ?? []).includes(key))?.id ?? "";
+  const assignMap = async (key: string, trackId: string) => {
+    if (!race) return;
+    const tracks = raceTracks.map((t) => {
+      const keys = (t.categoryKeys ?? []).filter((k) => k !== key);
+      return { ...t, categoryKeys: t.id === trackId ? [...keys, key] : keys };
+    });
+    await updateRace({ ...race, tracks });
+  };
+  /** Map dropdown — only when the race has maps. "Map n — description". */
+  const mapField = (value: string, onPick: (trackId: string) => void) =>
+    raceTracks.length > 0 ? (
+      <label className={styles.formLine}>
+        <span className={styles.fieldLabel}>Map</span>
+        <select
+          className={styles.ruleSelect}
+          value={value}
+          disabled={!!race?.finalized}
+          onChange={(e) => onPick(e.target.value)}
+          data-testid="category-map"
+        >
+          <option value="">No map</option>
+          {raceTracks.map((t, i) => (
+            <option key={t.id} value={t.id}>{`Map ${i + 1}${t.header ? ` — ${t.header}` : ""}`}</option>
+          ))}
+        </select>
+      </label>
+    ) : null;
 
   /** − [n] + stepper used by the table rows and the Add/Edit form. */
   const lapsStepper = (value: number, locked: boolean, onChange: (n: number) => void, label: string) => (
@@ -535,6 +568,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
             <span className={styles.fieldLabel}>Laps</span>
             {lapsStepper(newCategoryForm.laps, false, (n) => setNewCategoryForm({ ...newCategoryForm, laps: n }), "new category")}
           </div>
+          {mapField(newCategoryForm.mapId, (id) => setNewCategoryForm({ ...newCategoryForm, mapId: id }))}
           {raceRuleFields}
           <div className={styles.formButtons}>
             <button type="button" className={styles.secondaryMini} onClick={() => setCreating(false)}>Cancel</button>
@@ -618,6 +652,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
                         <Users size={12} aria-hidden="true" /> {riderCount}
                       </button>
                     </div>
+                    {mapField(mapOfKey(catWaveKey(cat.name, cat.subCategory)), (id) => void assignMap(catWaveKey(cat.name, cat.subCategory), id))}
                     {raceRuleFields}
 
                     <button
