@@ -43,7 +43,8 @@ test.describe("i18n", () => {
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByText("Register / Login")).toBeVisible();
 
-    await page.getByRole("button", { name: "Español" }).click();
+    await page.getByTestId("prefs-language").click();
+    await page.getByTestId("language-select").selectOption("es");
 
     // No remount required — react-i18next re-renders on the language-change
     // event, same requirement that drove boardHoldStore to be a zustand store

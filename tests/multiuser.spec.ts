@@ -188,6 +188,7 @@ test("two commissaires run one shared race live, both ways, within their waves",
   await test.step("a Joker resolved on the counter's phone lands on the owner's", async () => {
     await B.page.goto("/main");
     await B.page.getByRole("button", { name: "Open menu" }).click();
+    await B.page.getByTestId("prefs-timing").click();
     await B.page.getByRole("checkbox", { name: /Show Joker button/i }).check();
     await B.page.getByRole("button", { name: "Close menu" }).click();
     await B.page.goto(`/race/${sharedUuid}/heat/1`);

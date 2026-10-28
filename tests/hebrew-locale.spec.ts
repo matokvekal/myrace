@@ -15,21 +15,23 @@ test.describe("Hebrew locale", () => {
     await page.reload();
 
     await page.getByRole("button", { name: "Open menu" }).click();
-    await page.getByRole("button", { name: "עברית" }).click();
+    await page.getByTestId("prefs-language").click();
+    await page.getByTestId("language-select").selectOption("he");
 
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.locator("html")).toHaveAttribute("lang", "he");
-    await expect(page.getByText("המרוצים שלי").first()).toBeVisible();
+    await expect(page.getByText("המרוצים שלי").locator("visible=true").first()).toBeVisible();
 
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByText("המרוצים שלי").first()).toBeVisible();
+    await expect(page.getByText("המרוצים שלי").locator("visible=true").first()).toBeVisible();
 
     // Back to English restores today's markup (no dir attribute).
     await page.getByRole("button", { name: "Open menu" }).click();
-    await page.getByRole("button", { name: "English" }).click();
+    await page.getByTestId("prefs-language").click();
+    await page.getByTestId("language-select").selectOption("en");
     await expect(page.locator("html")).not.toHaveAttribute("dir", "rtl");
-    await expect(page.getByText("My Races").first()).toBeVisible();
+    await expect(page.getByText("My Races").locator("visible=true").first()).toBeVisible();
   });
 });
 
@@ -40,7 +42,7 @@ test.describe("Hebrew browser without a choice", () => {
     await page.goto("/main");
     await acceptTerms(page);
     await page.reload();
-    await expect(page.getByText("My Races").first()).toBeVisible();
+    await expect(page.getByText("My Races").locator("visible=true").first()).toBeVisible();
     await expect(page.locator("html")).not.toHaveAttribute("dir", "rtl");
   });
 });

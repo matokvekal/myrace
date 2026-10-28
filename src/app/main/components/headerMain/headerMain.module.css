@@ -128,499 +128,696 @@
   box-sizing: border-box;
 }
 
-/* Overlay */
+/* ═══════════════════════════════════════════════════════════════════════
+   Side menu (drawer). Flat rows, hairline borders, one 14px icon size and
+   one 44px touch-target height throughout. Logical properties so the whole
+   drawer mirrors for Hebrew (RTL).
+   ═══════════════════════════════════════════════════════════════════════ */
+
 .overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 29, 55, 0.38);
-  backdrop-filter: blur(2px);
   z-index: 40;
 }
 
-/* Drawer */
 .drawer {
+  --row-h: 44px;
+  --gutter: 16px;
+  --icon: 18px;
+  --radius: 8px;
+
   position: fixed;
   top: 0;
-  left: 0;
-  width: 72vw;
-  max-width: 280px;
+  inset-inline-start: 0;
+  width: min(86vw, 320px);
   height: 100vh;
   height: 100dvh;
-  background: linear-gradient(180deg, var(--drawer-bg), var(--drawer-bg-2));
+  background: var(--drawer-bg);
+  color: var(--text-primary);
   z-index: 50;
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);
-  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), background 0.25s ease;
-  box-shadow: 8px 0 34px rgba(0, 0, 0, 0.22);
-  border-radius: 0 21px 21px 0;
-  border-right: 1px solid var(--drawer-border);
+  /* visibility drops the closed drawer out of the tab order and the a11y tree;
+     delayed on close so the slide-out still plays. */
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
+  border-inline-end: 1px solid var(--drawer-border);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.12);
   overflow: hidden;
+  font-size: 14px;
 }
 
 .drawerOpen {
   transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
 }
 
-/* Everything below the header scrolls on its own — the drawer itself is a
-   fixed 100vh box with overflow:hidden (for the rounded-corner clip), so
-   without this the bottom of a tall drawer (Joker checkbox, feedback email,
-   version) just gets clipped off with no way to reach it on short viewports. */
+:global(html[dir="rtl"]) .drawer {
+  transform: translateX(100%);
+}
+
+:global(html[dir="rtl"]) .drawerOpen {
+  transform: translateX(0);
+}
+
+/* Everything below the header scrolls on its own. Plain BLOCK scroller, not a
+   flex column: a nested flex column that is also the overflow container
+   compresses its children on iOS Safari/Chrome instead of scrolling. */
 .drawerScroll {
   flex: 1;
   min-height: 0;
-  /* Plain BLOCK scroller — not a flex column. A nested flex column that is also
-     the overflow container compresses its children to fit on iOS Safari/Chrome
-     instead of overflowing, so it never scrolls and the bottom (feedback +
-     version) is unreachable. Block flow + overflow-y scrolls reliably. */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
+.drawer button,
+.drawer a,
+.drawer select,
+.drawer input {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drawer button:focus-visible,
+.drawer a:focus-visible,
+.drawer select:focus-visible,
+.drawer input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* ─── 1 · Header ───────────────────────────────────────────────────────── */
 .drawerHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 21px 16px 13px;
+  gap: 12px;
+  padding: 14px 12px 14px var(--gutter);
+  padding-inline: var(--gutter) 12px;
   border-bottom: 1px solid var(--drawer-border);
+  flex-shrink: 0;
 }
 
 .drawerTitleContainer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .drawerTitle {
-  font-size: 16px;
-  font-weight: 900;
-  font-style: italic;
-  color: #4f90ea;
-  letter-spacing: 0.04em;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--brand-strong);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  line-height: 1.2;
 }
 
 .drawerSlogan {
   font-size: 11px;
-  font-weight: 600;
   color: var(--text-muted);
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
+  line-height: 1.3;
 }
 
 .closeBtn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border-card);
-  border-radius: 11px;
-  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
-.closeBtn:active {
-  transform: translateY(1px);
+.closeBtn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .closeIcon {
-  width: 16px;
-  height: 16px;
-  color: var(--brand-strong);
+  width: 20px;
+  height: 20px;
 }
 
-.drawerAvatar {
+/* ─── 2 · Account ──────────────────────────────────────────────────────── */
+.account {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 21px 16px 16px;
-  border-bottom: 1px solid var(--drawer-border);
-  gap: 3px;
-  background:
-    radial-gradient(200px 100px at 50% 0%, rgba(99, 166, 252, 0.1), transparent 70%);
+  gap: 12px;
+  padding: 14px var(--gutter) 10px;
 }
 
 .avatarImg {
-  width: 64px;
-  height: 64px;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
   border-radius: 50%;
-  border: 2px solid var(--brand);
-  padding: 3px;
-  box-sizing: border-box;
+  border: 1px solid var(--drawer-border);
   object-fit: cover;
-  margin-bottom: 6px;
-  box-shadow: 0 0 0 5px rgba(99, 166, 252, 0.14), 0 5px 13px var(--shadow-sm);
+  background: var(--bg-surface);
+}
+
+.accountText {
+  min-width: 0;
 }
 
 .avatarName {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .avatarSub {
   font-size: 12px;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Nav items */
+.accountActions {
+  padding: 0 var(--gutter) 14px;
+  border-bottom: 1px solid var(--drawer-border);
+}
+
+.accountAction {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.accountAction:hover {
+  background: var(--bg-surface);
+  border-color: var(--brand);
+}
+
+.accountAction svg {
+  width: var(--icon);
+  height: var(--icon);
+  flex-shrink: 0;
+  color: var(--brand-strong);
+}
+
+/* "Not live yet" flag (Register/Login has no backend yet). */
+.soonBadge {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── 3 · Main navigation ──────────────────────────────────────────────── */
 .drawerNav {
   display: flex;
   flex-direction: column;
-  padding: 13px 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--drawer-border);
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 13px 16px;
-  background: transparent;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 0 8px;
   border: none;
-  border-radius: 13px;
-  margin: 0 10px 5px;
-  font-size: 15px;
-  font-weight: 600;
+  border-radius: var(--radius);
+  background: transparent;
   color: var(--text-primary);
-  cursor: pointer;
-  text-align: left;
-  width: calc(100% - 20px);
-  transition:
-    background 0.15s,
-    color 0.15s,
-    transform 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.navItem:hover {
-  background: var(--bg-surface);
-  transform: translateX(3px);
-}
-
-/* Classic skin only — a flat list of transparent-border rows read as one
-   messy block once there were enough of them (Login, Contact, My Races,
-   template download…). A hairline border per row gives each its own edge.
-   Gaming skin's bold/gold treatment already reads as distinct rows, so it's
-   deliberately excluded here. */
-:root:not([data-skin="gaming"]) .navItem {
-  border: 1px solid var(--drawer-border);
-}
-
-/* Reusable "not live yet" flag for nav items whose backend isn't ready
-   (e.g. Register/Login — LOGIN_ENABLED is false until sign-up has a
-   backend). Pushed to the row's end via margin-left:auto on the flex row. */
-.soonBadge {
-  margin-left: auto;
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #e0384c;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* The template-download row is an <a>, not a <button> — kill link styling so it
-   matches the other nav items. */
-.navItemLink {
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
   text-decoration: none;
   box-sizing: border-box;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
+.navItem:hover,
 .navItem:active {
   background: var(--bg-surface);
 }
 
-/* Menu items cascade in each time the drawer opens (89ms Fibonacci beat) */
-.drawerOpen .navItem {
-  animation: navItemIn var(--beat-3) ease-out backwards;
-}
-
-.drawerOpen .navItem:nth-child(1) { animation-delay: calc(var(--stagger) * 1); }
-.drawerOpen .navItem:nth-child(2) { animation-delay: calc(var(--stagger) * 2); }
-.drawerOpen .navItem:nth-child(3) { animation-delay: calc(var(--stagger) * 3); }
-.drawerOpen .navItem:nth-child(4) { animation-delay: calc(var(--stagger) * 4); }
-.drawerOpen .navItem:nth-child(5) { animation-delay: calc(var(--stagger) * 5); }
-.drawerOpen .navItem:nth-child(6) { animation-delay: calc(var(--stagger) * 6); }
-
-@keyframes navItemIn {
-  from {
-    opacity: 0;
-    transform: translateX(-13px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Icon sits in a small brand-tinted tile — scannable, modern */
 .navItemIcon {
-  width: 34px;
-  height: 34px;
-  padding: 8px;
-  border-radius: 10px;
-  background: rgba(99, 166, 252, 0.12);
-  color: var(--brand-strong);
+  width: var(--icon);
+  height: var(--icon);
   flex-shrink: 0;
-  box-sizing: border-box;
+  color: var(--text-muted);
 }
 
-/* ═══ PRO skin: gold arcade drawer accents ═══ */
-:root[data-skin="gaming"] .drawerTitle {
-  color: #c9930f;
+.navItem:hover .navItemIcon {
+  color: var(--brand-strong);
 }
 
-:root[data-skin="gaming"] .navItemIcon {
-  background: rgba(224, 169, 44, 0.14);
-  color: #c9930f;
+/* ─── 4 · Preferences ──────────────────────────────────────────────────── */
+.groupLabel {
+  padding: 14px var(--gutter) 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
 }
 
-:root[data-skin="gaming"] .navItem {
-  font-weight: 800;
+.prefs {
+  margin: 0 var(--gutter);
+  border: 1px solid var(--drawer-border);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
-/* ─── Theme picker (bottom of drawer) ──────────────────────────────────────── */
-.themeSection {
-  padding: 14px 16px 20px;
+.prefSection + .prefSection {
   border-top: 1px solid var(--drawer-border);
 }
 
-.drawerFooter {
-  display: flex;
-  justify-content: center;
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--drawer-border);
-}
-
-/* Feedback block — same rhythm as .themeSection so the drawer reads as one list */
-.feedbackSection {
-  padding: 14px 16px 18px;
-  border-top: 1px solid var(--drawer-border);
-}
-
-.feedbackTitle {
+.prefHeader {
+  width: 100%;
+  min-height: var(--row-h);
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  gap: 10px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
 }
 
-.feedbackIcon {
+.prefHeader:hover {
+  background: var(--bg-surface);
+}
+
+.prefSectionOpen .prefHeader {
+  background: var(--bg-surface);
+}
+
+.prefIcon {
+  display: inline-flex;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.prefIcon svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.prefTitle {
+  flex-shrink: 0;
+}
+
+.prefSummary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: end;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.prefChevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.prefSummary + .prefChevron {
+  margin-inline-start: 0;
+}
+
+.prefSectionOpen .prefChevron {
+  transform: rotate(180deg);
+}
+
+.prefBody {
+  padding: 4px 12px 12px;
+  background: var(--bg-surface);
+}
+
+.fieldLabel {
+  margin: 8px 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Segmented control — Theme and Button style */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  background: var(--drawer-bg);
+}
+
+.segment {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.segment:hover {
+  color: var(--text-primary);
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--bg-surface);
+  border-color: var(--brand);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.swatch {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
-.feedbackText {
-  margin: 0 0 8px;
+/* Selects — Language and Board hold */
+.selectRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.selectFlag {
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--drawer-border);
+}
+
+.select {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: var(--drawer-bg);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.selectSmall {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 36px;
   font-size: 13px;
-  line-height: 1.45;
+}
+
+/* Setting row: label · ⓘ · control, explanation drops below when opened */
+.settingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--row-h);
+}
+
+.settingRow + .settingRow {
+  border-top: 1px solid var(--drawer-border);
+}
+
+.settingLabel {
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.settingRow > :last-child:not(.infoText),
+.settingRow > .switch,
+.settingRow > .select {
+  margin-inline-start: auto;
+}
+
+.infoBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
   color: var(--text-muted);
+  cursor: pointer;
+}
+
+.infoBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.infoBtn:hover,
+.infoBtnActive {
+  color: var(--brand-strong);
+}
+
+.infoText {
+  order: 10;
+  flex-basis: 100%;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary, var(--text-muted));
+  background: var(--drawer-bg);
+  border: 1px solid var(--drawer-border);
+  border-radius: var(--radius);
+}
+
+/* Toggle switch — a real checkbox, so it keeps its checkbox role */
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-card);
+  background: var(--drawer-bg);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: inset-inline-start 0.15s, background 0.15s;
+}
+
+.switch:checked {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.switch:checked::before {
+  inset-inline-start: 18px;
+  background: #fff;
+}
+
+/* ─── 5 · Footer ───────────────────────────────────────────────────────── */
+.drawerFooter {
+  padding: 14px var(--gutter) calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footerBtn {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+
+.footerBtn:hover {
+  background: var(--bg-surface);
+  border-color: var(--brand);
+}
+
+.footerBtn svg {
+  width: var(--icon);
+  height: var(--icon);
+  flex-shrink: 0;
+  color: var(--brand-strong);
+}
+
+.footerBtn .footerBtnTrail {
+  margin-inline-start: auto;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.footerMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
 .feedbackLink {
-  display: inline-block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent, #63a6fc);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 32px;
+  font-size: 12px;
+  color: var(--text-muted);
   text-decoration: none;
-  word-break: break-all;
+}
+
+.feedbackLink span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedbackLink svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .feedbackLink:hover,
 .feedbackLink:focus-visible {
+  color: var(--brand-strong);
   text-decoration: underline;
 }
 
-.themeSectionLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  margin-bottom: 12px;
-}
-
-.themeSectionIcon {
-  width: 13px;
-  height: 13px;
-}
-
-.jokerToggleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text, #14243c);
-  cursor: pointer;
-}
-
-.jokerToggleRow input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  cursor: pointer;
-}
-
-.jokerToggleDesc {
-  margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-
-.boardHoldSelect {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text, #14243c);
-  background: var(--bg-surface, #f5f8fc);
-  border: 1px solid var(--border-card, #d6dfeb);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.themeOptions {
-  display: flex;
-  gap: 6px;
-  justify-content: space-between;
-}
-
-.themeOption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 2px;
-  border-radius: 8px;
-  -webkit-tap-highlight-color: transparent;
-  flex: 1;
-  transition: background 0.15s;
-}
-
-.themeOption:active {
-  background: var(--bg-surface);
-}
-
-.themeSwatch {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 2px solid transparent;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-  display: block;
+.footerVersion {
   flex-shrink: 0;
 }
 
-.themeSwatchActive {
-  border-color: var(--brand);
-  transform: scale(1.1);
-  box-shadow: 0 0 0 2px var(--brand), 0 2px 8px rgba(0, 0, 0, 0.22);
-}
-
-/* Accent stripe across the bottom */
-.themeSwatchStripe {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 38%;
-  display: block;
-}
-
-/* Small text-color dot in upper half */
-.themeSwatchDot {
-  position: absolute;
-  top: 7px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  opacity: 0.55;
-  display: block;
-}
-
-.themeLabel {
-  font-size: 10px;
-  font-weight: 600;
+/* Version badge styles itself for a light background; follow the theme here. */
+.footerVersion > div {
+  padding: 0;
+  font-size: 11px;
   color: var(--text-muted);
-  text-align: center;
-  white-space: nowrap;
-  transition: color 0.15s;
+  text-transform: none;
 }
 
-.themeLabelActive {
-  color: var(--brand);
+/* ═══ PRO skin ═══
+   The global gaming skin gives every <button> arcade depth (uppercase, 3D
+   shadow). The side menu stays flat in both skins — only a gold accent marks
+   PRO here. Higher specificity than the global rule, so it wins its !important. */
+:root[data-skin="gaming"] .drawer button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: var(--radius) !important;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  filter: none;
 }
 
-/* Language picker — same swatch/label rhythm as the theme picker, but wraps
-   to a grid instead of one space-between row since there are 8 options, not 3. */
-.languageGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+:root[data-skin="gaming"] .drawer button:not(:disabled):active {
+  transform: none;
+  box-shadow: none !important;
 }
 
-.languageOption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  width: 56px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 2px;
-  border-radius: 8px;
-  -webkit-tap-highlight-color: transparent;
+:root[data-skin="gaming"] .drawer .prefHeader:not(:disabled) {
+  border-radius: 0 !important;
 }
 
-.languageOption:active {
-  background: var(--bg-surface);
+:root[data-skin="gaming"] .drawer .infoBtn:not(:disabled) {
+  border-radius: 50% !important;
 }
 
-.languageFlag {
-  width: 38px;
-  height: 27px;
-  border-radius: 5px;
-  border: 2px solid transparent;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+:root[data-skin="gaming"] .drawer .segment[aria-pressed="true"] {
+  font-weight: 600;
 }
 
-.languageFlag img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+:root[data-skin="gaming"] .drawerTitle {
+  color: #c9930f;
 }
 
-.languageFlagActive {
-  border-color: var(--brand);
-  transform: scale(1.1);
-  box-shadow: 0 0 0 2px var(--brand), 0 2px 8px rgba(0, 0, 0, 0.22);
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawerOpen,
+  .prefChevron,
+  .switch,
+  .switch::before {
+    transition: none;
+  }
 }

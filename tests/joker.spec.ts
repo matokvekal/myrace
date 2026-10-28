@@ -26,6 +26,7 @@ async function lapsOf(page: Page, bib: number): Promise<number> {
 /** Flip the side-menu "Joker button" checkbox on, from /main. */
 async function enableJokerMode(page: Page) {
   await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByTestId("prefs-timing").click();
   await page.getByRole("checkbox", { name: /Show Joker button/i }).check();
   await page.getByRole("button", { name: "Close menu" }).click();
 }
