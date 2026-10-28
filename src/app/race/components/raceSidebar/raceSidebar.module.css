@@ -310,12 +310,15 @@
   height: 18px;
 }
 
-:global(html[dir="rtl"]) .flipRtl svg {
-  transform: scaleX(-1);
+.navDivider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--drawer-border);
 }
 
 .drawerScroll {
   flex: 1;
+  padding-bottom: env(safe-area-inset-bottom);
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -387,11 +390,6 @@
 .setupBody {
   padding: 4px 12px 12px;
   background: var(--bg-surface);
-}
-
-.navFooter {
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--drawer-border);
 }
 
 /* PRO skin: the global gaming skin gives every <button> arcade depth. The

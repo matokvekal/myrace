@@ -11,11 +11,12 @@ import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard, gotoRace
  */
 
 test.describe("UI smoke", () => {
-  test("race sidebar lists Create / Race / Live / Results / All Races", async ({ page }) => {
+  test("race sidebar lists All Races, then Create / Race / Live / Results", async ({ page }) => {
     await loadDemoRace(page);
     await page.getByTestId("race-menu-btn").click();
-    const labels = await page.locator('[data-testid^="race-nav-"]').allInnerTexts();
-    expect(labels.map((l) => l.trim())).toEqual(["Create", "Race", "Live", "Results", "All Races"]);
+    const ids = ["all", "setup", "race", "live", "results"];
+    const labels = await Promise.all(ids.map((id) => page.getByTestId(`race-nav-${id}`).innerText()));
+    expect(labels.map((l) => l.trim())).toEqual(["All Races", "Create", "Race", "Live", "Results"]);
     await expect(page.getByTestId("race-nav-setup")).toHaveAttribute("aria-current", "page");
   });
 

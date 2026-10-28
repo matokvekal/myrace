@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ChevronDown, Flag, Radio, Sliders, Timer, Trophy, X } from "lucide-react";
+import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X } from "lucide-react";
 import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
 import styles from "./raceSidebar.module.css";
@@ -75,6 +75,20 @@ const RaceSidebar: React.FC<{
 
         <div className={styles.drawerScroll}>
         <nav className={styles.nav} aria-label={t("raceNav.modes", "Race modes")}>
+          {/* Home: back to the main race list. Always first, on every race screen. */}
+          <button
+            type="button"
+            className={styles.navItem}
+            data-testid="race-nav-all"
+            onClick={() => {
+              onClose();
+              goAllRaces();
+            }}
+          >
+            <span className={styles.navIcon}><House aria-hidden="true" /></span>
+            <span>{t("raceNav.allRaces", "All Races")}</span>
+          </button>
+          <div className={styles.navDivider} role="separator" />
           {items.map((it) => {
             const active = mode === it.key;
             return (
@@ -118,21 +132,6 @@ const RaceSidebar: React.FC<{
             </div>
           )}
         </div>
-        </div>
-
-        <div className={styles.navFooter}>
-          <button
-            type="button"
-            className={styles.navItem}
-            data-testid="race-nav-all"
-            onClick={() => {
-              onClose();
-              goAllRaces();
-            }}
-          >
-            <span className={`${styles.navIcon} ${styles.flipRtl}`}><ArrowLeft aria-hidden="true" /></span>
-            <span>{t("raceNav.allRaces", "All Races")}</span>
-          </button>
         </div>
       </aside>
     </>

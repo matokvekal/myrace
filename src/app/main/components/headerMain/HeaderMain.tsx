@@ -210,7 +210,7 @@ function HeaderMain() {
 
         <div className={styles.drawerScroll}>
           {/* 2 · Account — exactly one action: sign in for guests, sign out otherwise */}
-          <div className={styles.account}>
+          <div className={`${styles.account} ${user ? "" : styles.accountGuest}`}>
             <img src={Images.user} alt="" className={styles.avatarImg} />
             <div className={styles.accountText}>
               <div className={styles.avatarName} dir="auto">
@@ -221,27 +221,15 @@ function HeaderMain() {
               </div>
             </div>
           </div>
-          <div className={styles.accountActions}>
-            {user ? (
+          {/* Signed in: Logout stays with the account. Guests sign in from the footer. */}
+          {user && (
+            <div className={styles.accountActions}>
               <button type="button" className={styles.accountAction} onClick={handleLogout}>
                 <LogOut aria-hidden="true" />
                 <span>{t("nav.logout", "Logout")}</span>
               </button>
-            ) : (
-              <button
-                type="button"
-                className={styles.accountAction}
-                onClick={() => {
-                  setDrawerOpen(false);
-                  navigate("/login");
-                }}
-              >
-                <LogIn aria-hidden="true" />
-                <span>{t("nav.registerLogin", "Register / Login")}</span>
-                <span className={styles.soonBadge}>{t("login.soon", "Soon")}</span>
-              </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* 3 · Main navigation */}
           <nav className={styles.drawerNav} aria-label={t("nav.mainNav", "Main")}>
@@ -373,6 +361,20 @@ function HeaderMain() {
                 <Smartphone aria-hidden="true" />
                 <span>{t("nav.installApp", "Install app")}</span>
                 <Download className={styles.footerBtnTrail} aria-hidden="true" />
+              </button>
+            )}
+            {!user && (
+              <button
+                type="button"
+                className={styles.footerBtn}
+                onClick={() => {
+                  setDrawerOpen(false);
+                  navigate("/login");
+                }}
+              >
+                <LogIn aria-hidden="true" />
+                <span>{t("nav.registerLogin", "Register / Login")}</span>
+                <span className={styles.soonBadge}>{t("login.soon", "Soon")}</span>
               </button>
             )}
             <div className={styles.footerMeta}>
