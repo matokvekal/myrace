@@ -72,6 +72,7 @@ test.describe("Commissaire race flow", () => {
     // ── 6. Check-in all riders in the selected wave ──────────────────────────
     await test.step("check in wave riders", async () => {
       await page.getByRole("button", { name: "Check-In", exact: true }).click();
+      await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
       const checkAll = page.getByRole("button", { name: /Check All/i });
       await expect(checkAll).toBeVisible();
       await checkAll.click();
@@ -96,13 +97,12 @@ test.describe("Commissaire race flow", () => {
       await expect(page.getByText(/FINISHED/).first()).toBeVisible();
     });
 
-    // ── 9. Results tab renders ───────────────────────────────────────────────
+    // ── 9. Results screen renders ────────────────────────────────────────────
     await test.step("view results", async () => {
-      // Return to setup (the "Create" phase) to reach the Results tab.
-      await gotoRaceMode(page, "Create");
-      await page.getByRole("button", { name: "Results", exact: true }).click();
-      // Results tab mounts without crashing (page still shows the tab bar).
-      await expect(page.getByRole("button", { name: "Results", exact: true })).toBeVisible();
+      // Results is its own race mode (race sidebar), no longer a Create tab.
+      await gotoRaceMode(page, "Results");
+      await expect(page.getByTestId("race-mode-indicator")).toHaveAttribute("data-mode", "results");
+      await expect(page.getByTestId("results-category").first()).toBeVisible();
     });
   });
 });

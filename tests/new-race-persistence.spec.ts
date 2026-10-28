@@ -112,6 +112,7 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
     await gotoRaceMode(page, "Race");
     await page.locator('button[class*="wavePill"]', { hasText: /^1\b/ }).first().click();
     await page.getByRole("button", { name: "Check-In", exact: true }).click();
+    await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
     const checkAll = page.getByRole("button", { name: /Check All/ });
     await checkAll.click();
     await expect(checkAll).toHaveCount(0);

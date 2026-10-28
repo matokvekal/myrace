@@ -31,6 +31,10 @@ async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / …). */
 async function openSetupTab(page: Page, name: string): Promise<void> {
   if (name === "Results") return gotoRaceMode(page, "Results"); // its own screen now
+  // The Create tabs only exist in Create mode (not on Results / Race / Live).
+  if ((await page.getByTestId("race-mode-indicator").getAttribute("data-mode")) !== "setup") {
+    await gotoRaceMode(page, "Create");
+  }
   await page.getByRole("button", { name, exact: true }).click();
 }
 

@@ -122,6 +122,10 @@ async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / Map / Info). */
 async function openSetupTab(page: Page, name: string): Promise<void> {
   if (name === "Results") return gotoRaceMode(page, "Results"); // its own screen now
+  // The Create tabs only exist in Create mode (not on Results / Race / Live).
+  if ((await page.getByTestId("race-mode-indicator").getAttribute("data-mode")) !== "setup") {
+    await gotoRaceMode(page, "Create");
+  }
   await page.getByRole("button", { name, exact: true }).click();
 }
 
@@ -484,6 +488,7 @@ async function runWave(
     await selectWave(page, plan.wave);
     await openRaceModeTab(page, "Check-In");
 
+    await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
     const checkAll = page.getByRole("button", { name: /Check All/ });
     await expect(checkAll).toBeVisible();
     await checkAll.click();
@@ -492,20 +497,18 @@ async function runWave(
     // One rider signs off before the start — DNS, so they never take the line.
     // Uses the one-tap row action (BUGS.md #25) rather than the Status menu.
     await page.getByRole("button", { name: `Mark #${plan.dnsBib} DNS` }).click();
-    await expect(page.getByText(/✗ 1 DNS/)).toBeVisible();
+    await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
 
-    // Both controls drive the same field. Once out, the row collapses to an
-    // inline DNS badge; tapping it opens the Status menu, and clearing there
-    // clears the row too.
-    const dnsRow = checkInRow(page, plan.dnsBib);
-    await expect(dnsRow.getByRole("button", { name: "DNS" })).toBeVisible();
-    await dnsRow.getByRole("button", { name: "DNS" }).click();
-    await page.locator('[class*="modalbottom"]').first().getByText("STANDING", { exact: true }).click();
-    await expect(page.getByText(/✗ 0 DNS/)).toBeVisible();
+    // Both controls drive the same field. The row's DNS button stays, pressed;
+    // tapping it again clears DNS (undo).
+    const dnsBtn = page.getByRole("button", { name: `Mark #${plan.dnsBib} DNS` });
+    await expect(dnsBtn).toHaveAttribute("aria-pressed", "true");
+    await dnsBtn.click();
+    await expect(page.getByTestId("checkin-dns-count")).toHaveCount(0); // no DNS → no DNS count shown
 
     // Put them back out — this time through the Status menu, to prove both paths.
     await setStatusAtCheckIn(page, plan.dnsBib, "DNS");
-    await expect(page.getByText(/✗ 1 DNS/)).toBeVisible();
+    await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
 
     for (const entry of opts.lateEntries) {
       // Add-rider now lives in each category block (category is fixed there).
@@ -515,7 +518,7 @@ async function runWave(
       await page.getByPlaceholder("Bib # *").fill(String(entry.bib));
       await page.getByPlaceholder("Club / team").fill(entry.team);
       await page.getByRole("button", { name: "Add Rider", exact: true }).click();
-      await expect(page.getByText(`#${entry.bib}`)).toBeVisible();
+      await expect(checkInRow(page, entry.bib)).toBeVisible(); // Check-In shows the bib large, without "#"
     }
   });
 
