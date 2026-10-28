@@ -63,7 +63,13 @@ const Heat: React.FC = () => {
   const { riders: storeRiders, getRiders, updateRider, updateAllRiders } = useRiderStore();
   const { categories: storeCategories, getCategories } = useCategoryStore();
   // Ignored waves take no part in Live: no cards, no laps, no positions (data kept).
-  const categories = useMemo(() => activeCategories(storeCategories), [storeCategories]);
+  // This race only: the store is a shared cache and can still hold another
+  // race's categories (e.g. the demo) when this race has none of its own —
+  // that is where a phantom "Wave 1" with foreign categories came from.
+  const categories = useMemo(
+    () => activeCategories(storeCategories.filter((c) => c.raceUuid === raceUuid)),
+    [storeCategories, raceUuid]
+  );
   const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const { settings: voiceSettings } = useVoiceSettingsStore();
 
@@ -961,6 +967,7 @@ const Heat: React.FC = () => {
               </button>
             )}
             <p className={styles.timerText}>{elapsedTime}</p>
+            {currentWave && (
             <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
               {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
               {waveCategories
@@ -970,6 +977,7 @@ const Heat: React.FC = () => {
                   <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
                 ))}
             </button>
+            )}
           </div>
 
           {/* Entry row: Unknown Rider · bib (prominent) · RECAP MODE */}
