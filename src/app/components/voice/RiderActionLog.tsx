@@ -162,6 +162,8 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
       <button
         ref={btnRef}
         className={`${styles.toggleBtn} ${isOpen ? styles.open : ''}`}
+        // No entries yet → nothing to open (never an empty panel).
+        disabled={actions.length === 0 && !isOpen}
         onClick={onToggle}
         // Without this the ⏱️ glyph IS the accessible name — `title` is only a
         // fallback, so the button announced as "⏱️" and was unaddressable.

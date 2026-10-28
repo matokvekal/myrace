@@ -778,3 +778,9 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+.toggleBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

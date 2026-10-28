@@ -794,6 +794,9 @@ const Heat: React.FC = () => {
           : startedWaveCats.length === 0
             ? "Race has not started"
             : null;
+  // Joker needs real riders on track in this wave (no waves, categories,
+  // riders or start yet → disabled, never an empty stamp).
+  const jokerReady = !liveEmpty && activeRiders.length > 0;
 
   return (
     <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
@@ -974,9 +977,10 @@ const Heat: React.FC = () => {
             {jokerEnabled && (
               <button
                 className={styles.jokerBtn}
-                onClick={addJoker}
+                onClick={jokerReady ? addJoker : undefined}
+                disabled={!jokerReady}
                 aria-label="Unknown Rider"
-                title="Unknown Rider"
+                title={jokerReady ? "Unknown Rider" : "Unknown Rider: available once riders are racing in this wave"}
                 data-testid="unknown-rider-btn"
               >
                 <Bike size={22} aria-hidden="true" />
