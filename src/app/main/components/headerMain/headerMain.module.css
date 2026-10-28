@@ -607,6 +607,38 @@
   font-size: 13px;
 }
 
+/* Small group heading inside an expanded preference section */
+.subLabel {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.subLabel + .settingRow {
+  border-top: none;
+}
+
+/* One-line caution (e.g. voice unavailable in the iOS installed app) */
+.warnLine {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.segmentedInline {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.segmentedInline .segment {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
 /* Setting row: label · ⓘ · control, explanation drops below when opened */
 .settingRow {
   display: flex;

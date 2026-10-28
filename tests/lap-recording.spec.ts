@@ -63,13 +63,16 @@ async function boardOrder(page: Page): Promise<number[]> {
     );
 }
 
-/** Set the board hold from the live screen's settings gear, without leaving Live. */
+/** Set the board hold in the main side menu (Timing & Live Controls). Call before
+ *  openLiveDemo: the persisted value is what Live then uses. */
 async function setBoardHold(page: Page, seconds: number) {
-  await page.getByRole("button", { name: "Live settings" }).click();
-  await expect(page.getByRole("heading", { name: "Live Settings" })).toBeVisible();
-  await page.getByLabel("Board hold").selectOption(String(seconds * 1000));
-  await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByRole("heading", { name: "Live Settings" })).toHaveCount(0);
+  await page.goto("/main");
+  await acceptTerms(page);
+  await page.reload();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByTestId("prefs-timing").click();
+  await page.getByRole("combobox", { name: "Board hold delay" }).selectOption(String(seconds * 1000));
+  await page.getByRole("button", { name: "Close menu" }).click();
 }
 
 test.describe("Lap recording core", () => {
@@ -185,9 +188,9 @@ test.describe("Lap recording core", () => {
     expect(await boardOrder(page)).toEqual(orderBefore);
   });
 
-  test("the live-screen gear changes the hold, and the new value applies straight away", async ({ page }) => {
-    await openLiveDemo(page);
+  test("the board hold set in the main side menu applies on Live", async ({ page }) => {
     await setBoardHold(page, 10);
+    await openLiveDemo(page);
 
     const bib = await racingBibWithLapsLeft(page, 2);
     const orderBefore = await boardOrder(page);
@@ -205,9 +208,9 @@ test.describe("Lap recording core", () => {
   });
 
   test("max board hold flushes anyway, so a nonstop trickle can't freeze the board forever", async ({ page }) => {
-    await openLiveDemo(page);
     // 10s hold ⇒ max hold = 3 × 10s = 30s, measured from the FIRST pending card.
     await setBoardHold(page, 10);
+    await openLiveDemo(page);
 
     const bibs = await racingBibsWithLapsLeft(page, 2, 4);
     const orderBefore = await boardOrder(page);

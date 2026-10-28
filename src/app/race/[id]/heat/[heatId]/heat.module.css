@@ -662,8 +662,8 @@
   }
 }
 
-/* ── Clear board (BUGS.md #14) — trigger lives in VoiceSettingsModal
-   (Live Settings); this confirm dialog stays on the Heat page. ── */
+/* ── Clear board (BUGS.md #14) — trigger is the race top bar's Clear board
+   button (HeaderHeat); this confirm dialog stays on the Heat page. ── */
 .clearConfirmText {
   margin: 0;
   font-size: 13px;

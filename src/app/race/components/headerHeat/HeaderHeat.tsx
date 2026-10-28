@@ -2,16 +2,17 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./headerHeat.module.css";
 import useRaceStore from "@/stores/racesStore";
-import { Settings } from "lucide-react";
+import { Eraser } from "lucide-react";
 import RaceTopBar from "../raceSidebar/RaceTopBar";
 import { effectiveRaceStatus } from "@/utils/raceStatus";
 
 function HeaderHeat({
   raceId,
-  onSettingsClick,
+  onClearBoard,
 }: {
   raceId: string;
-  onSettingsClick?: () => void;
+  /** Set only once the wave has stopped and the board isn't cleared yet. */
+  onClearBoard?: () => void;
 }) {
   const { t } = useTranslation();
   const [currentTime, setCurrentTime] = useState<string>("");
@@ -55,9 +56,20 @@ function HeaderHeat({
       <div className={styles.timeDisplay} aria-label={t("heat.clock", "Clock")}>
         {currentTime}
       </div>
-      <button className={styles.settingsBtn} onClick={onSettingsClick} title={t("heat.liveSettingsTitle", "Live settings")}>
-        <Settings size={18} />
-      </button>
+      {/* Clear board (BUGS.md #14) appears only when it can be used; every Live
+          setting lives in the main side menu → Timing & Live Controls. */}
+      {onClearBoard && (
+        <button
+          type="button"
+          className={styles.clearBoardBtn}
+          onClick={onClearBoard}
+          title={t("heat.clearBoardTitle", "Reset the clock and clear the rider cards; results stay in Results")}
+          data-testid="clear-board-btn"
+        >
+          <Eraser size={16} aria-hidden="true" />
+          <span>{t("heat.clearBoard", "Clear board")}</span>
+        </button>
+      )}
     </RaceTopBar>
   );
 }

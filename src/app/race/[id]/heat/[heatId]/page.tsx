@@ -22,7 +22,6 @@ import { computeGroupPhases, phaseOfRider, isLeaderFinishAll } from "@/utils/lin
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
-import { VoiceSettingsModal } from "./VoiceSettingsModal";
 import { MicPermissionModal } from "@/components/voice/MicPermissionModal";
 import { VoiceRadarIcon } from "@/components/voice/VoiceRadarIcon";
 import { DetectedNumbers } from "@/components/voice/DetectedNumbers";
@@ -79,7 +78,6 @@ const Heat: React.FC = () => {
   const [displayOrder, setDisplayOrder] = useState<number[]>([]);
   const [voiceActive, setVoiceActive] = useState(false);
   const [showMicPrompt, setShowMicPrompt] = useState(false);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [voiceAudioLevel, setVoiceAudioLevel] = useState(0);
   const [voiceIsListening, setVoiceIsListening] = useState(false);
   const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
@@ -788,7 +786,10 @@ const Heat: React.FC = () => {
 
   return (
     <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
-      <HeaderHeats raceId={raceUuid} onSettingsClick={() => setShowVoiceSettings(true)} />
+      <HeaderHeats
+        raceId={raceUuid}
+        onClearBoard={waveStopped && !clearedWave ? () => setConfirmClear(true) : undefined}
+      />
       {isLiveRace(raceUuid) && (
         <Suspense fallback={null}>
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 0" }}>
@@ -831,25 +832,6 @@ const Heat: React.FC = () => {
           onSave={(bib) => resolveJoker(resolvingJoker, bib)}
           onDelete={() => removeJoker(resolvingJoker.id)}
           onClose={() => setResolvingJoker(null)}
-        />
-      )}
-
-      {/* Voice settings modal */}
-      {showVoiceSettings && (
-        <VoiceSettingsModal
-          onClose={() => setShowVoiceSettings(false)}
-          voiceOnDevice={voiceActive && voiceSettings.enabled ? voiceOnDevice : null}
-          leaderFinishAll={isLeaderFinishAll(currentRace)}
-          onLeaderFinishAllChange={
-            currentRace && !currentRace.finalized
-              ? (on) => void useRaceStore.getState().updateRace({ ...currentRace, leaderFinishAll: on })
-              : undefined
-          }
-          canClearBoard={waveStopped && !clearedWave}
-          onClearBoard={() => {
-            setShowVoiceSettings(false);
-            setConfirmClear(true);
-          }}
         />
       )}
 
@@ -1286,7 +1268,11 @@ const Heat: React.FC = () => {
             <button
               className={styles.micButtonRadar}
               onClick={handleToggleVoice}
-              title={voiceActive ? "Disable voice input" : "Enable voice input"}
+              title={
+                voiceActive
+                  ? `Disable voice input${voiceSettings.enabled && voiceOnDevice != null ? (voiceOnDevice ? " · on device — works offline" : " · cloud — needs internet") : ""}`
+                  : "Enable voice input"
+              }
             >
               <VoiceRadarIcon
                 isActive={voiceActive}

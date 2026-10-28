@@ -58,31 +58,33 @@
   white-space: nowrap;
 }
 
-.settingsBtn {
-  width: 40px;
-  height: 40px;
-  display: flex;
+.clearBoardBtn {
+  height: 32px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid transparent;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--danger);
   border-radius: 8px;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.settingsBtn:hover {
+.clearBoardBtn:hover {
   background: var(--bg-surface);
 }
 
-:root[data-skin="gaming"] .settingsBtn:not(:disabled) {
+:root[data-skin="gaming"] .clearBoardBtn:not(:disabled) {
   box-shadow: none !important;
   border-radius: 8px !important;
 }
 
-/* Phones: the mode chip already says LIVE; keep the clock and the gear. */
+/* Phones: the mode chip already says LIVE; keep the clock. */
 @media (max-width: 600px) {
   .raceLiveLabel,
   .racePastLabel {
@@ -95,8 +97,8 @@
     letter-spacing: 0;
   }
 
-  .settingsBtn {
-    width: 36px;
-    height: 36px;
+  /* Icon-only on phones */
+  .clearBoardBtn span {
+    display: none;
   }
 }

@@ -19,7 +19,8 @@ import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useSkin, type Skin } from "@/hooks/useSkin";
 import { useJokerMode } from "@/hooks/useJokerMode";
 import { BOARD_HOLD_OPTIONS, useBoardHold } from "@/stores/boardHoldStore";
-import { usePwaInstall, isIos } from "@/components/pwa/usePwaInstall";
+import { usePwaInstall, isIos, isStandalone } from "@/components/pwa/usePwaInstall";
+import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { toast } from "react-toastify";
 
 const THEME_OPTIONS: { value: Theme; labelKey: string; label: string; bg: string; accent: string }[] = [
@@ -81,6 +82,7 @@ function HeaderMain() {
   const { skin, setSkin } = useSkin();
   const { jokerEnabled, toggleJokerEnabled } = useJokerMode();
   const { holdMs, setHoldMs } = useBoardHold();
+  const { settings: voiceSettings, setLanguage: setVoiceLanguage, setAutoConfirm } = useVoiceSettingsStore();
   const { hasNativePrompt, installed, promptInstall } = usePwaInstall();
 
   useEffect(() => {
@@ -395,6 +397,7 @@ function HeaderMain() {
 
             {section('timing', <Timer />, t("prefs.timing", "Timing & Live Controls"), (
               <>
+                <div className={styles.subLabel}>{t("prefs.groupBoard", "Live board")}</div>
                 {/* Joker — instant time+arrival stamp for riders the commissaire
                     can't identify fast enough, resolved to a bib later */}
                 <div className={styles.settingRow}>
@@ -414,8 +417,7 @@ function HeaderMain() {
                   />
                 </div>
                 {/* Board hold — stops the live board reshuffling under the
-                    commissaire while a whole bunch is being called out. Also on
-                    the live screen's settings gear, so it can be retuned mid-wave. */}
+                    commissaire while a whole bunch is being called out. */}
                 <div className={styles.settingRow}>
                   <label className={styles.settingLabel} htmlFor="prefs-board-hold">
                     {t("prefs.boardHold", "Board hold")}
@@ -436,6 +438,54 @@ function HeaderMain() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Voice input on Live — voiceSettingsStore, read live by the heat page */}
+                <div className={styles.subLabel}>{t("prefs.groupVoice", "Voice input")}</div>
+                {isIos() && isStandalone() && (
+                  <p className={styles.warnLine} dir="auto">
+                    {t("prefs.voiceIosPwa", "Voice doesn't work in the installed app on iPhone/iPad — open Commissaire in Safari.")}
+                  </p>
+                )}
+                <div className={styles.settingRow}>
+                  <span className={styles.settingLabel} id="prefs-voice-lang">
+                    {t("prefs.voiceLanguage", "Language")}
+                  </span>
+                  <InfoTip label={t("prefs.aboutVoice", "About voice input")}>
+                    {t("prefs.voiceInfo", "Speech engine: Web Speech API. Whether it runs on the device (works offline) or in the cloud (needs internet) is shown on the Live mic button while voice is on.")}
+                  </InfoTip>
+                  <div className={`${styles.segmented} ${styles.segmentedInline}`} role="group" aria-labelledby="prefs-voice-lang">
+                    {([['en', 'English'], ['he', 'עברית']] as const).map(([code, label]) => (
+                      <button
+                        key={code}
+                        type="button"
+                        className={styles.segment}
+                        aria-pressed={voiceSettings.language === code}
+                        onClick={() => setVoiceLanguage(code)}
+                        data-testid={`voice-lang-${code}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.settingRow}>
+                  <label className={styles.settingLabel} htmlFor="prefs-auto-confirm">
+                    {t("prefs.autoConfirm", "Auto-record spoken bibs")}
+                  </label>
+                  <InfoTip label={t("prefs.aboutAutoConfirm", "About auto-record")}>
+                    {voiceSettings.autoConfirm
+                      ? t("prefs.autoConfirmOnInfo", "Experimental — speaking a bib number records the lap immediately, same as tapping the rider. Not 100% reliable yet, so double-check the board. Every spoken bib is also saved to the voice buffer (the list icon next to the mic on Live).")
+                      : t("prefs.autoConfirmOffInfo", "Assist mode: speaking a bib number records nothing by itself — it only goes to the voice buffer (the list icon next to the mic on Live shows the last 30 bibs heard, with the time).")}
+                  </InfoTip>
+                  <input
+                    id="prefs-auto-confirm"
+                    type="checkbox"
+                    className={styles.switch}
+                    checked={voiceSettings.autoConfirm}
+                    onChange={(e) => setAutoConfirm(e.target.checked)}
+                    data-testid="voice-auto-confirm"
+                  />
                 </div>
               </>
             ))}
