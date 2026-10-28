@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import BibBadge from "@/components/ui/BibBadge";
 import { useTranslation } from "react-i18next";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown, Plus, Minus, Search, X } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Minus, Search, X } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -92,8 +92,6 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const actionsRef = useRef<HTMLDivElement>(null);
   // Collapsed rider groups — display state only (never rider data, filters or
   // sorting). Empty on entry: every group expanded.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
@@ -109,18 +107,6 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  // Close the actions dropdown on outside click
-  useEffect(() => {
-    if (!actionsOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
-        setActionsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [actionsOpen]);
 
   const { getRiders, riders, deleteRidersByRace } = useRiderStore(
     (state) => ({
@@ -255,127 +241,106 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
 
   return (
     <div className={styles.riders}>
+      {/* Toolbar: Search | View | Sort | Import · Edit | Add Rider — wraps on phones */}
       <div className={styles.topBar}>
-        <div className={styles.leftControls}>
-          {/* Sort dropdown */}
-          <div className={styles.sortDropdownWrapper}>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className={styles.sortDropdown}
-              aria-label="Sort riders"
-            >
-              {sortOptions.map((opt) => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* View mode buttons */}
-          <div className={styles.viewModeGroup}>
-            <button
-              className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
-              onClick={() => setViewMode("table")}
-              title="Table view"
-            >
-              <LayoutList size={16} />
+        <div className={styles.searchBox}>
+          <Search size={15} aria-hidden="true" />
+          <input
+            type="search"
+            dir="auto"
+            className={styles.searchInput}
+            data-testid="rider-search"
+            placeholder="Search name or bib"
+            aria-label="Search riders"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
+              <X size={14} />
             </button>
-            <button
-              className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
-              onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
-              title="Cards view"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
-              onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
-              title="Group by category"
-            >
-              <Layers size={16} />
-            </button>
-          </div>
+          )}
         </div>
 
-        {!readOnly && (
+        <div className={styles.viewModeGroup} role="group" aria-label="Riders view">
           <button
             type="button"
-            className={styles.actionsTrigger}
-            data-testid="add-rider-btn"
-            onClick={() => setShowAddRider(true)}
+            className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
+            aria-pressed={viewMode === "table"}
+            onClick={() => setViewMode("table")}
+            title="Table view"
+            aria-label="Table view"
           >
-            <Plus size={14} /> Add Rider
+            <LayoutList size={16} />
           </button>
-        )}
+          <button
+            type="button"
+            className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
+            aria-pressed={viewMode === "cards" && !groupByCategory}
+            onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
+            title="Cards view"
+            aria-label="Cards view"
+          >
+            <LayoutGrid size={16} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
+            aria-pressed={groupByCategory && viewMode === "cards"}
+            onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
+            title="Group by category"
+            aria-label="Group by category"
+          >
+            <Layers size={16} />
+          </button>
+        </div>
 
-        {/* Actions dropdown — Import / Scan / Edit (right end of the bar).
-            Gone entirely on a finalized race: nothing in it would work. */}
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortKey)}
+          className={styles.sortDropdown}
+          aria-label="Sort riders"
+        >
+          {sortOptions.map((opt) => (
+            <option key={opt.key} value={opt.key}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Former Actions menu: Import and Edit as icon buttons. Scan (coming
+            soon) stays on the empty state. None of it on a finalized race. */}
         {!readOnly && (
-        <div className={styles.actionsMenu} ref={actionsRef}>
+          <div className={styles.toolActions}>
             <button
               type="button"
-              className={styles.actionsTrigger}
-              onClick={() => setActionsOpen((o) => !o)}
-              aria-haspopup="menu"
-              aria-expanded={actionsOpen}
+              className={styles.iconBtn}
+              onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+              title="Import CSV"
+              aria-label="Import CSV"
             >
-              <Pencil size={13} /> Actions
-              <ChevronDown size={14} className={styles.actionsChevron} />
+              <Upload size={16} />
             </button>
-            {actionsOpen && (
-              <div className={styles.actionsList} role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.actionItem}
-                  onClick={() => { setActionsOpen(false); setImportMode("file"); setShowImportWizard(true); }}
-                >
-                  <Upload size={15} /> Import CSV
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.actionItem}
-                  disabled
-                  title={t("scan.tooltip", "Scan Start List — coming soon")}
-                >
-                  <Camera size={15} /> {t("scan.list", "Scan Start List")}
-                  <span className={styles.comingSoonBadge}>{t("scan.soon", "Soon")}</span>
-                </button>
-                {onEditMode && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={styles.actionItem}
-                    onClick={() => { setActionsOpen(false); onEditMode(); }}
-                  >
-                    <Pencil size={15} /> Edit Riders
-                  </button>
-                )}
-              </div>
+            {onEditMode && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                onClick={onEditMode}
+                title="Edit Riders"
+                aria-label="Edit Riders"
+              >
+                <Pencil size={16} />
+              </button>
             )}
-        </div>
-        )}
-      </div>
-
-      <div className={styles.searchBox}>
-        <Search size={15} aria-hidden="true" />
-        <input
-          type="search"
-          dir="auto"
-          className={styles.searchInput}
-          data-testid="rider-search"
-          placeholder="Search name or bib"
-          aria-label="Search riders"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        {searchTerm && (
-          <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
-            <X size={14} />
-          </button>
+            <button
+              type="button"
+              className={styles.addRiderBtn}
+              data-testid="add-rider-btn"
+              onClick={() => setShowAddRider(true)}
+            >
+              <Plus size={14} /> Add Rider
+            </button>
+          </div>
         )}
       </div>
 

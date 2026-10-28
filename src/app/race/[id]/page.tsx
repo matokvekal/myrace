@@ -14,7 +14,6 @@ import Riders from "./riders/Riders";
 const Map = lazy(() => import("./map/Map"));
 import Schedule from "./schedule/Schedule";
 import Categories from "./categories/Categories";
-import Results from "./results/Results";
 import Info from "./info/Info";
 import RaceMode from "./raceMode/RaceMode";
 import EditRiders from "./editRiders/EditRiders";
@@ -27,7 +26,6 @@ import { canForRace } from "@/services/cloud/permissions";
 import { isRaceFinalized } from "@/utils/raceLock";
 import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
 // Multi-user (only with a configured server): sharing, members, sync state.
-const TeamPanel = lazy(() => import("../../live/TeamPanel"));
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
 const LocalOnlyBadge = lazy(() => import("../../live/LocalOnlyBadge"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
@@ -36,20 +34,18 @@ const TABS = [
   "schedule",
   "categories",
   "riders",
-  "results",
   "map",
   // "cloud", // hidden for now
-  "info",
-  "team"
+  "info"
 ] as const;
 type Tab = (typeof TABS)[number];
 
 /**
  * Tabs a FINALIZED race still shows. Schedule and Categories are setup tools
  * for a race that hasn't happened yet — on a closed race they'd offer edits
- * that silently do nothing, so they're dropped and Results leads instead.
+ * that silently do nothing, so they're dropped. Results lives in the race sidebar.
  */
-const FINALIZED_TABS: Tab[] = ["results", "riders", "map", "info"];
+const FINALIZED_TABS: Tab[] = ["riders", "map", "info"];
 
 const Race: React.FC = () => {
   const params = useParams();
@@ -137,9 +133,9 @@ const Race: React.FC = () => {
   if (loading) return <div className={styles.loading}>Loading race...</div>;
   if (!race) return <div className={styles.loading}>Race not found.</div>;
 
-  // Shared race: only the screens this member may view (team is always there to show your own access).
-  const visibleTabs: readonly Tab[] = (finalized ? [...FINALIZED_TABS, "team" as Tab] : TABS).filter(
-    (tab) => (tab === "team" ? serverConfigured : canViewScreen(raceUuid, tab))
+  // Shared race: only the screens this member may view.
+  const visibleTabs: readonly Tab[] = (finalized ? FINALIZED_TABS : TABS).filter(
+    (tab) => canViewScreen(raceUuid, tab)
   );
   const activeTabSafe = (
     visibleTabs.includes(activeTab as Tab) ? activeTab : visibleTabs[0]
@@ -233,15 +229,9 @@ const Race: React.FC = () => {
                     readOnly={finalized}
                   />
                 ))}
-              {activeTabSafe === "results" && <Results raceUuid={raceUuid} />}
               {activeTabSafe === "map" && (
                 <Suspense fallback={<Loader />}>
                   <Map raceUuid={raceUuid} />
-                </Suspense>
-              )}
-              {activeTabSafe === "team" && (
-                <Suspense fallback={<Loader />}>
-                  <TeamPanel raceUuid={raceUuid} />
                 </Suspense>
               )}
               {/* Cloud tab hidden for now */}

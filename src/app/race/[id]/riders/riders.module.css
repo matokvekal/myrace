@@ -5,210 +5,117 @@
   padding-bottom: 32px;
 }
 
-/* ── Top control bar ── */
+/* ── Toolbar: Search | View | Sort | Import · Edit | Add Rider ── */
 .topBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap; /* sort/view left, Actions right; wraps instead of overflowing on phones */
-  gap: 12px;
-  background: linear-gradient(180deg, #ffffff, #f2f7ff);
-  border: 1px solid #c9defc;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 10px 18px rgba(99, 166, 252, 0.14);
-}
-
-.leftControls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* Sort dropdown */
-.sortDropdownWrapper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sortLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: #3a5080;
-  margin: 0;
+  flex-wrap: wrap; /* wraps instead of overflowing on phones */
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 10px;
 }
 
 .sortDropdown {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
-  background: white;
-  color: #1a304f;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.sortDropdown:hover {
-  border-color: #a8c5f8;
-  background: #f8fbff;
-}
-
-.sortDropdown:focus {
-  outline: none;
-  border-color: #63a6fc;
-  box-shadow: 0 0 0 2px rgba(99, 166, 252, 0.2);
-}
-
-/* Actions dropdown (Import / Scan / Edit) — matches the sort control */
-.actionsMenu {
-  position: relative;
-  /* Stay right-aligned even when the bar wraps on a phone. Without this a
-     wrapped Actions button falls to the LEFT of its row, and its right-anchored
-     menu then opens off the left edge and gets clipped (BUGS.md #4). */
-  margin-left: auto;
-}
-
-.actionsTrigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
-  background: white;
-  color: #1a304f;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.actionsTrigger:hover {
-  border-color: #a8c5f8;
-  background: #f8fbff;
-}
-
-.actionsChevron {
-  opacity: 0.55;
-  margin-left: 2px;
-}
-
-.actionsList {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0; /* trigger sits at the bar's right end — anchor the menu right so it stays on-screen */
-  z-index: 20;
-  min-width: 190px;
-  /* Never wider than the viewport, so it can't be clipped on small phones. */
-  max-width: calc(100vw - 24px);
-  display: flex;
-  flex-direction: column;
-  padding: 6px;
-  background: white;
-  border: 1px solid #d5e4fb;
-  border-radius: 10px;
-  box-shadow: 0 12px 28px rgba(20, 31, 50, 0.18);
-}
-
-.actionItem {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  height: 36px;
+  padding: 0 10px;
   font-size: 13px;
-  font-weight: 500;
-  color: #1a304f;
-  background: transparent;
-  border: none;
+  color: var(--text-primary, #14243c);
+  background-color: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
   border-radius: 8px;
   cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
 }
 
-.actionItem:hover {
-  background: #eef5ff;
-}
-
-.actionItem svg {
-  color: #63a6fc;
-  flex-shrink: 0;
-}
-
-.actionItem:disabled {
-  cursor: not-allowed;
-  color: #9fb1c9;
-  opacity: 0.75;
-}
-
-.actionItem:disabled:hover {
-  background: transparent;
-}
-
-.actionItem:disabled svg {
-  color: #b7c6dd;
-}
-
-.comingSoonBadge {
-  margin-left: auto;
-  padding: 2px 7px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #7a5b0e;
-  background: #ffe9b3;
-  border-radius: 999px;
-}
-
-/* ── View mode buttons — casino/game style (matches the race tab bars) ── */
+/* View modes: classic segmented control */
 .viewModeGroup {
-  display: flex;
-  gap: 4px;
-  border: 1px solid rgba(224, 169, 44, 0.35);
-  border-radius: 12px;
-  padding: 4px;
-  background: linear-gradient(180deg, #262e40, #171d2b);
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
 }
 
 .viewModeBtn {
-  width: 36px;
-  height: 34px;
-  border: 2px solid rgba(224, 169, 44, 0.5);
-  background: linear-gradient(180deg, #34a1ff 0%, #0b5ecc 100%);
-  filter: saturate(0.8) brightness(0.85);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
+  width: 34px;
+  height: 30px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: filter 0.15s, box-shadow 0.15s;
-  color: #fff;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -5px 8px rgba(0, 0, 0, 0.25);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-/* Each view button its own colour */
-.viewModeGroup .viewModeBtn:nth-child(2) { background: linear-gradient(180deg, #7ce83c 0%, #3fa60d 100%); }
-.viewModeGroup .viewModeBtn:nth-child(3) { background: linear-gradient(180deg, #ffa63d 0%, #cc6a0b 100%); }
-
 .viewModeBtn:hover {
-  filter: saturate(1) brightness(1);
+  color: var(--text-primary, #14243c);
 }
 
 .viewModeBtn.active {
-  filter: none;
-  border-color: #e0a92c;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -5px 8px rgba(0, 0, 0, 0.25),
-    0 0 10px rgba(255, 200, 80, 0.45);
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+}
+
+/* Import · Edit · Add Rider — pushed to the inline end */
+.toolActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.addRiderBtn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--brand-strong, #3f86e7);
+  border-radius: 8px;
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.addRiderBtn:hover {
+  filter: brightness(1.06);
+}
+
+/* PRO skin: keep the toolbar flat */
+:root[data-skin="gaming"] .topBar button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* Import button */
@@ -646,14 +553,16 @@
 }
 
 .searchBox {
+  flex: 1 1 200px; /* takes the free width; first to wrap onto its own row on phones */
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 8px 0;
-  padding: 0 12px;
-  min-height: 40px;
-  border-radius: 10px;
-  border: 1px solid rgba(120, 130, 150, 0.35);
+  padding: 0 10px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  color: var(--text-muted, #8498ba);
 }
 .searchInput {
   flex: 1;
@@ -661,7 +570,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: inherit;
+  color: var(--text-primary, #14243c);
   font: inherit;
   font-size: 16px;
 }
