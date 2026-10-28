@@ -26,11 +26,10 @@ test.describe("Commissaire race flow", () => {
       await expect(page.getByText(`Riders (${EXPECTED_RIDERS})`)).toBeVisible();
     });
 
-    // ── 3. Actions dropdown → Edit Riders enters and exits edit mode ──────────
-    await test.step("Actions → Edit Riders enters and exits edit mode", async () => {
-      // Edit now lives inside the "Actions" dropdown (with Import CSV / Scan).
-      await page.getByRole("button", { name: "Actions" }).click();
-      await page.getByRole("menuitem", { name: /Edit Riders/i }).click();
+    // ── 3. Edit Riders enters and exits edit mode ─────────────────────────────
+    await test.step("Edit Riders enters and exits edit mode", async () => {
+      // Edit Riders is an icon button in the Riders toolbar.
+      await page.getByRole("button", { name: "Edit Riders" }).click();
       // EditRiders toolbar shows the "← Back" button (distinct from the
       // header's "Back to main") + the search placeholder.
       const backBtn = page.getByRole("button", { name: /← Back/ });

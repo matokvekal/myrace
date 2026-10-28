@@ -279,6 +279,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
         data-testid={`checkin-row-${rider.bibNumber}`}
         data-checked={rider.checked ? "yes" : "no"}
         data-status={rider.status}
+        data-standing={st ?? ""}
         className={`${styles.row} ${rider.checked ? styles.checked : ""} ${hasStatus ? styles.out : ""}`}
       >
         <span className={styles.rowColorBar} style={{ background: catColorOfRider(rider) }} title={rider.category} />
@@ -288,7 +289,11 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           {showCat && <span className={styles.cat} dir="auto">{rider.category}</span>}
         </span>
         <div className={styles.rowActions}>
-          {hasStatus && rider.status !== "DNS" ? (
+          {isRaceActive && !hasStatus ? (
+            <span className={`${styles.actState} ${rider.checked ? styles.actIn : ""}`} title="Check-in locked">
+              {rider.checked ? "✓ In" : "—"}
+            </span>
+          ) : hasStatus && (rider.status !== "DNS" || isRaceActive) ? (
             <button
               className={`${styles.statusInlineBadge} ${statusClass}`}
               onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}
@@ -301,10 +306,9 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
               <button
                 className={`${styles.actBtn} ${rider.checked ? styles.actIn : ""}`}
                 onClick={() => toggleCheck(rider)}
-                disabled={isRaceActive}
                 aria-pressed={!!rider.checked}
                 data-testid={`checkin-check-${rider.bibNumber}`}
-                title={isRaceActive ? "Check-in locked: race in progress" : rider.checked ? "Undo check-in" : "Check in"}
+                title={rider.checked ? "Undo check-in" : "Check in"}
               >
                 {rider.checked ? "✓ In" : "Check In"}
               </button>
@@ -477,7 +481,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
                 <b>{waveRiders.filter((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status)).length}</b> left
               </span>
               {waveRiders.some((r) => r.status === "DNS") && (
-                <span className={`${styles.countItem} ${styles.countDns}`}><b>{waveRiders.filter((r) => r.status === "DNS").length}</b> DNS</span>
+                <span className={`${styles.countItem} ${styles.countDns}`} data-testid="checkin-dns-count"><b>{waveRiders.filter((r) => r.status === "DNS").length}</b> DNS</span>
               )}
             </div>
             <button
@@ -489,9 +493,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
               <img src={Icons.search} alt="" width={14} height={14} />
               {search ? `“${search}”` : sortOptions.find((o) => o.key === sortKey)?.label}
             </button>
-            {!allAccountedFor && !isRaceActive && (
-              <button className={styles.checkAllBtn} onClick={checkAll}>✓ All</button>
-            )}
           </div>
 
           {toolsOpen && (
@@ -537,9 +538,12 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
                   <button className={`${styles.scopeBtn} ${sortScope === "wave" ? styles.scopeBtnActive : ""}`} onClick={() => setSortScope("wave")}>Whole wave</button>
                 </div>
                 <div className={styles.viewToggle}>
-                  <button className={`${styles.viewBtn} ${viewMode === "list" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("list")} title="List" aria-label="List view">☰</button>
-                  <button className={`${styles.viewBtn} ${viewMode === "cards" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("cards")} title="Cards" aria-label="Card view">⊞</button>
+                  <button className={`${styles.viewBtn} ${viewMode === "list" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("list")} title="List view">☰</button>
+                  <button className={`${styles.viewBtn} ${viewMode === "cards" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("cards")} title="Card view">⊞</button>
                 </div>
+                {!allAccountedFor && !isRaceActive && (
+                  <button className={styles.scopeBtn} onClick={checkAll}>Check All</button>
+                )}
                 <button className={styles.doneBtn} onClick={() => setToolsOpen(false)}>Done</button>
               </div>
             </div>
@@ -547,21 +551,8 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
         </div>
       )}
 
-      {waveRiders.length === 0 && (
-        <div className={styles.emptyWave}>
-          <span>No riders in Wave {waveNum}.</span>
-          <div className={styles.addChips}>
-            {categories.map((c) => (
-              <React.Fragment key={catKey(c)}>{renderAddBtn(catKey(c), c, `+ ${c.name}`)}</React.Fragment>
-            ))}
-          </div>
-          {categories.map((c) => (
-            <React.Fragment key={catKey(c)}>{renderAddForm(catKey(c), c)}</React.Fragment>
-          ))}
-        </div>
-      )}
-
-      {waveRiders.length > 0 && <div className={styles.groupWrap}>{slotList.map(renderSlot)}</div>}
+      {/* No riders yet: no toolbar or counts, just each category with its Add button */}
+      <div className={styles.groupWrap}>{slotList.map(renderSlot)}</div>
 
       {selectedRider && <StatusModal rider={selectedRider} onStatusChange={handleStatusChange} />}
     </div>

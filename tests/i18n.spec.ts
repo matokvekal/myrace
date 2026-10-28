@@ -25,12 +25,19 @@ test.describe("i18n", () => {
     expect(resolved).toBe("Escanear inicio");
   });
 
-  test("Scan Start List is disabled with a Soon badge (Riders actions menu)", async ({ page }) => {
-    await loadDemoRace(page);
+  test("Scan Start List is disabled with a Soon badge (empty Riders screen)", async ({ page }) => {
+    // A race with no riders: Riders shows the import actions, Scan among them.
+    await page.goto("/main");
+    await acceptTerms(page);
+    await page.reload();
+    await page.getByRole("button", { name: /Create new race|^Add$/ }).first().click();
+    await page.getByPlaceholder("Race Name").fill("Scan Check Race");
+    await page.getByPlaceholder("Location").fill("Nowhere");
+    await page.getByRole("button", { name: /Done|Saving/ }).click();
+    await page.getByText("Scan Check Race").first().click();
     await openTab(page, "Riders");
 
-    await page.getByRole("button", { name: "Actions" }).click();
-    const scanItem = page.getByRole("menuitem", { name: /Scan Start List/ });
+    const scanItem = page.getByRole("button", { name: /Scan Start List/ });
     await expect(scanItem).toBeVisible();
     await expect(scanItem).toBeDisabled();
     await expect(scanItem.getByText("Soon")).toBeVisible();

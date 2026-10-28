@@ -40,6 +40,7 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("rider-category-header").first()).toBeVisible();
     const before = await page.getByTestId("rider-category-header").count();
 
+    await page.getByTestId("rider-tools-toggle").click(); // search sits behind the search icon
     const box = page.getByTestId("rider-search");
     await box.fill("1");
     const afterBib = await page.getByTestId("rider-category-header").count();

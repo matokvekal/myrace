@@ -52,6 +52,7 @@ describe("Riders: search", () => {
   it("finds across all waves by first/last/full name or bib, case-insensitive and partial", async () => {
     const user = userEvent.setup();
     setup();
+    await user.click(screen.getByTestId("rider-tools-toggle")); // search sits behind the search icon
     const box = screen.getByTestId("rider-search");
 
     await user.type(box, "dan");

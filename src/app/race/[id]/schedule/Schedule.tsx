@@ -961,7 +961,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                       <option key={v} value={v}>{finishGroupLabel(v)}</option>
                                     ))}
                                   </select>
-                                  {suggested && <span className={styles.fgSuggested}>Suggested</span>}
+                                  {suggested && <span className={styles.fgSuggested} data-testid={`finish-group-row-suggested-${cat.id}`}>Suggested</span>}
                                 </label>
                               );
                             })()}

@@ -32,19 +32,19 @@ describe("Schedule → Finish Group", () => {
     const a = makeCategory({ id: 1, raceUuid: RACE, name: "Men Masters", heat: 1, startTime: "09:00", status: "upcoming" });
     const b = makeCategory({ id: 2, raceUuid: RACE, name: "Women Masters", heat: 2, startTime: "10:00", status: "upcoming" });
     setup([a, b]);
-    await user.click(screen.getByRole("button", { name: /Edit Schedule/ }));
-
-    const selA = screen.getByTestId("finish-group-1") as HTMLSelectElement;
+    // Finish Group is set on each schedule row; Reset All lives in Edit Schedule.
+    const selA = screen.getByTestId("finish-group-row-1") as HTMLSelectElement;
     expect(selA.value).toBe(""); // None by default
     expect([...selA.options].map((o) => o.text)).toEqual(["None", "Finish Group 1", "Finish Group 2", "Finish Group 3"]);
 
     await user.selectOptions(selA, "1");
-    await user.selectOptions(screen.getByTestId("finish-group-2"), "1");
+    await user.selectOptions(screen.getByTestId("finish-group-row-2"), "1");
     await waitFor(() => expect([groupOf(1), groupOf(2)]).toEqual(["1", "1"]));
     // The wave is untouched.
     expect(useCategoryStore.getState().categories.map((c) => c.heat)).toEqual([1, 2]);
 
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: /Edit Schedule/ }));
     await user.click(screen.getByTestId("finish-group-reset-all"));
     await waitFor(() => expect([groupOf(1), groupOf(2)]).toEqual(["", ""]));
   });
@@ -53,8 +53,7 @@ describe("Schedule → Finish Group", () => {
     const user = userEvent.setup();
     const cat = makeCategory({ id: 3, raceUuid: RACE, name: "Elite", heat: 1, startTime: "09:00", status: "running", linkGroup: "2" });
     setup([cat]);
-    await user.click(screen.getByRole("button", { name: /Edit Schedule/ }));
-    const sel = screen.getByTestId("finish-group-3") as HTMLSelectElement;
+    const sel = screen.getByTestId("finish-group-row-3") as HTMLSelectElement;
     expect(sel.disabled).toBe(true);
     expect(sel.value).toBe("2");
   });

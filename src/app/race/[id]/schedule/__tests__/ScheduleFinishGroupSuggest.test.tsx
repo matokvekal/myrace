@@ -36,11 +36,12 @@ describe("Schedule → suggested Finish Groups", () => {
     useRiderStore.setState({ riders: [], lastFetchedRaceUuid: RACE });
     const Live = () => <Schedule raceUuid={RACE} categories={useCategoryStore((s) => s.categories)} />;
     render(<MemoryRouter><Live /></MemoryRouter>);
-    await user.click(screen.getByRole("button", { name: /Edit Schedule/ }));
-
-    expect(await screen.findByTestId("finish-group-suggested-11")).toHaveTextContent("Suggested");
-    expect((screen.getByTestId("finish-group-12") as HTMLSelectElement).value).toBe("1");
+    // Suggestions show on the schedule rows; Accept / Reset All live in Edit Schedule.
+    expect(await screen.findByTestId("finish-group-row-suggested-11")).toHaveTextContent("Suggested");
+    expect((screen.getByTestId("finish-group-row-12") as HTMLSelectElement).value).toBe("1");
     expect([groupOf(11), groupOf(12)]).toEqual(["", ""]); // not saved until accepted
+
+    await user.click(screen.getByRole("button", { name: /Edit Schedule/ }));
 
     await user.click(screen.getByTestId("finish-group-accept"));
     await waitFor(() => expect([groupOf(11), groupOf(12)]).toEqual(["1", "1"]));

@@ -1014,3 +1014,18 @@
   text-transform: none;
   letter-spacing: normal;
 }
+
+/* Race running: check-in state shown, not editable */
+.actState {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 56px;
+  padding: 0 10px;
+  border: 1.5px solid #94a3b8;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0b1220;
+}

@@ -121,6 +121,7 @@ async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / Map / Info). */
 async function openSetupTab(page: Page, name: string): Promise<void> {
+  if (name === "Results") return gotoRaceMode(page, "Results"); // its own screen now
   await page.getByRole("button", { name, exact: true }).click();
 }
 
@@ -169,7 +170,7 @@ async function openRiderModal(page: Page, bib: number, finished = false): Promis
 
 async function closeRiderModal(page: Page): Promise<void> {
   // Scoped to the modal's own close button — the live screen has other ✕ controls.
-  await page.locator('[class*="closeBtn"]').first().click();
+  await page.locator('[class*="closeBtn"]').locator("visible=true").first().click();
   await expect(page.getByText("Note / Comment")).toHaveCount(0);
 }
 
@@ -239,7 +240,7 @@ test.describe("Full race day", () => {
       await openSetupTab(page, "Categories");
       for (const cat of [...WAVE_1.categories, ...WAVE_2.categories]) {
         await expect(
-          page.getByRole("button", { name: `Show riders in ${cat.name}` })
+          page.getByRole("table", { name: "Categories in this race" }).getByText(cat.name, { exact: true })
         ).toBeVisible();
       }
 

@@ -30,6 +30,7 @@ async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / …). */
 async function openSetupTab(page: Page, name: string): Promise<void> {
+  if (name === "Results") return gotoRaceMode(page, "Results"); // its own screen now
   await page.getByRole("button", { name, exact: true }).click();
 }
 
