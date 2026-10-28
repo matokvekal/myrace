@@ -1,0 +1,224 @@
+/* Race Setup panel (RaceSetupSettings). Rendered inside both the main side
+   menu and the race sidebar, so it carries its own styles and sizes rather
+   than relying on either drawer's custom properties. */
+
+/* The host drawer supplies padding and background around the panel. */
+.root {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* Segmented control — Theme and Button style */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--drawer-bg);
+}
+
+.segment {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.segment:hover {
+  color: var(--text-primary);
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--bg-surface);
+  border-color: var(--brand);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.select {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: var(--drawer-bg);
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.selectSmall {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 36px;
+  font-size: 13px;
+}
+
+/* Small group heading inside an expanded preference section */
+.subLabel {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.subLabel + .settingRow {
+  border-top: none;
+}
+
+/* One-line caution (e.g. voice unavailable in the iOS installed app) */
+.warnLine {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.segmentedInline {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.segmentedInline .segment {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+/* Setting row: label · ⓘ · control, explanation drops below when opened */
+.settingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.settingRow + .settingRow {
+  border-top: 1px solid var(--drawer-border);
+}
+
+.settingLabel {
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.settingRow > :last-child:not(.infoText),
+.settingRow > .switch,
+.settingRow > .select {
+  margin-inline-start: auto;
+}
+
+.infoBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.infoBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.infoBtn:hover,
+.infoBtnActive {
+  color: var(--brand-strong);
+}
+
+.infoText {
+  order: 10;
+  flex-basis: 100%;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary, var(--text-muted));
+  background: var(--drawer-bg);
+  border: 1px solid var(--drawer-border);
+  border-radius: 8px;
+}
+
+/* Toggle switch — a real checkbox, so it keeps its checkbox role */
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-card);
+  background: var(--drawer-bg);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: inset-inline-start 0.15s, background 0.15s;
+}
+
+.switch:checked {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.switch:checked::before {
+  inset-inline-start: 18px;
+  background: #fff;
+}
+
+
+/* PRO skin: both drawers flatten every <button> (8px radius); keep the info
+   button round and the selected segment bold. Extra .root specificity wins. */
+:root[data-skin="gaming"] .root button.infoBtn:not(:disabled) {
+  border-radius: 50% !important;
+}
+
+:root[data-skin="gaming"] .root button.segment:not(:disabled) {
+  border-radius: 6px !important;
+}
+
+:root[data-skin="gaming"] .root .segment[aria-pressed="true"] {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::before {
+    transition: none;
+  }
+}

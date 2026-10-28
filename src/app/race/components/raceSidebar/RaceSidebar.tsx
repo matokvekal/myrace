@@ -3,9 +3,10 @@
  * Results, then All Races. Same visual language as the main-page side menu.
  * A finished race has no Race or Live left, so those rows drop out.
  */
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Flag, Radio, Sliders, Trophy, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Flag, Radio, Sliders, Timer, Trophy, X } from "lucide-react";
+import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
 import styles from "./raceSidebar.module.css";
 
@@ -31,6 +32,8 @@ const RaceSidebar: React.FC<{
   const { mode, go, goAllRaces } = useRaceModeNav();
   const items = useModeItems();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupSummary = useRaceSetupSummary();
 
   // Keyboard: focus moves into the drawer on open, Escape closes it.
   useEffect(() => {
@@ -70,6 +73,7 @@ const RaceSidebar: React.FC<{
           </button>
         </div>
 
+        <div className={styles.drawerScroll}>
         <nav className={styles.nav} aria-label={t("raceNav.modes", "Race modes")}>
           {items.map((it) => {
             const active = mode === it.key;
@@ -91,6 +95,30 @@ const RaceSidebar: React.FC<{
             );
           })}
         </nav>
+
+        {/* Race Setup — the same panel as the main side menu's, so Live and
+            every other race screen can retune it without leaving the race. */}
+        <div className={styles.setup}>
+          <button
+            type="button"
+            className={styles.setupHeader}
+            aria-expanded={setupOpen}
+            aria-controls="race-setup-body"
+            onClick={() => setSetupOpen((o) => !o)}
+            data-testid="race-nav-setup-settings"
+          >
+            <span className={styles.navIcon}><Timer aria-hidden="true" /></span>
+            <span className={styles.setupTitle}>{t("prefs.timing", "Race Setup")}</span>
+            {!setupOpen && <span className={styles.setupSummary}>{setupSummary}</span>}
+            <ChevronDown className={`${styles.setupChevron} ${setupOpen ? styles.setupChevronOpen : ""}`} aria-hidden="true" />
+          </button>
+          {setupOpen && (
+            <div id="race-setup-body" className={styles.setupBody} role="group" aria-label={t("prefs.timing", "Race Setup")}>
+              <RaceSetupSettings />
+            </div>
+          )}
+        </div>
+        </div>
 
         <div className={styles.navFooter}>
           <button

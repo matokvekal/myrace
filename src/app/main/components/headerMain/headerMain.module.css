@@ -600,145 +600,6 @@
   cursor: pointer;
 }
 
-.selectSmall {
-  flex: 0 0 auto;
-  width: auto;
-  min-height: 36px;
-  font-size: 13px;
-}
-
-/* Small group heading inside an expanded preference section */
-.subLabel {
-  margin: 10px 0 0;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-.subLabel + .settingRow {
-  border-top: none;
-}
-
-/* One-line caution (e.g. voice unavailable in the iOS installed app) */
-.warnLine {
-  margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--danger);
-}
-
-.segmentedInline {
-  flex: 0 0 auto;
-  margin-inline-start: auto;
-}
-
-.segmentedInline .segment {
-  min-height: 30px;
-  padding: 0 10px;
-}
-
-/* Setting row: label · ⓘ · control, explanation drops below when opened */
-.settingRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--row-h);
-}
-
-.settingRow + .settingRow {
-  border-top: 1px solid var(--drawer-border);
-}
-
-.settingLabel {
-  font-size: 14px;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.settingRow > :last-child:not(.infoText),
-.settingRow > .switch,
-.settingRow > .select {
-  margin-inline-start: auto;
-}
-
-.infoBtn {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.infoBtn svg {
-  width: 15px;
-  height: 15px;
-}
-
-.infoBtn:hover,
-.infoBtnActive {
-  color: var(--brand-strong);
-}
-
-.infoText {
-  order: 10;
-  flex-basis: 100%;
-  margin: 0 0 10px;
-  padding: 8px 10px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-secondary, var(--text-muted));
-  background: var(--drawer-bg);
-  border: 1px solid var(--drawer-border);
-  border-radius: var(--radius);
-}
-
-/* Toggle switch — a real checkbox, so it keeps its checkbox role */
-.switch {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  width: 40px;
-  height: 24px;
-  margin: 0;
-  flex-shrink: 0;
-  border-radius: 999px;
-  border: 1px solid var(--border-card);
-  background: var(--drawer-bg);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.switch::before {
-  content: "";
-  position: absolute;
-  top: 2px;
-  inset-inline-start: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: inset-inline-start 0.15s, background 0.15s;
-}
-
-.switch:checked {
-  background: var(--brand);
-  border-color: var(--brand);
-}
-
-.switch:checked::before {
-  inset-inline-start: 18px;
-  background: #fff;
-}
-
 /* ─── 5 · Footer ───────────────────────────────────────────────────────── */
 .drawerFooter {
   padding: 14px var(--gutter) calc(14px + env(safe-area-inset-bottom));
@@ -854,10 +715,6 @@
   border-radius: 0 !important;
 }
 
-:root[data-skin="gaming"] .drawer .infoBtn:not(:disabled) {
-  border-radius: 50% !important;
-}
-
 :root[data-skin="gaming"] .drawer .navItem[aria-current="page"],
 :root[data-skin="gaming"] .drawer .segment[aria-pressed="true"] {
   font-weight: 600;
@@ -870,9 +727,7 @@
 @media (prefers-reduced-motion: reduce) {
   .drawer,
   .drawerOpen,
-  .prefChevron,
-  .switch,
-  .switch::before {
+  .prefChevron {
     transition: none;
   }
 }
