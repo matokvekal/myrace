@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard } from "./helpers";
+import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard, gotoRaceMode } from "./helpers";
 
 /**
  * Browser smoke test of the post-race features, on the built-in demo race.
@@ -11,12 +11,12 @@ import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard } from ".
  */
 
 test.describe("UI smoke", () => {
-  test("phase tabs read Create / Race / Live", async ({ page }) => {
+  test("race sidebar lists Create / Race / Live / Results / All Races", async ({ page }) => {
     await loadDemoRace(page);
-    for (const name of ["Create", "Race", "Live"]) {
-      await expect(page.getByRole("tab", { name, exact: true })).toBeVisible();
-    }
-    await expect(page.getByRole("tab", { name: "Start", exact: true })).toHaveCount(0);
+    await page.getByTestId("race-menu-btn").click();
+    const labels = await page.locator('[data-testid^="race-nav-"]').allInnerTexts();
+    expect(labels.map((l) => l.trim())).toEqual(["Create", "Race", "Live", "Results", "All Races"]);
+    await expect(page.getByTestId("race-nav-setup")).toHaveAttribute("aria-current", "page");
   });
 
   test("Schedule: open a rider, edit the name, see it update", async ({ page }) => {
@@ -86,7 +86,7 @@ test.describe("UI smoke", () => {
 
   test("Board: complete board with expandable results", async ({ page }) => {
     await loadDemoRace(page);
-    await page.getByRole("tab", { name: "Race", exact: true }).click();
+    await gotoRaceMode(page, "Race");
     await page.getByRole("button", { name: "Board", exact: true }).click();
     await expect(page.getByTestId("board-wave-1")).toBeVisible();
     await expect(page.getByTestId("board-wave-2")).toBeVisible();
@@ -134,7 +134,7 @@ test.describe("UI smoke", () => {
   test("Results: one click from Live, grouped Wave → Category, Back returns to Live", async ({ page }) => {
     await openLiveDemo(page);
     const liveUrl = page.url();
-    await page.getByTestId("results-btn").click();
+    await gotoRaceMode(page, "Results");
     await expect(page).toHaveURL(/\/results$/);
     await expect(page.getByText(/^Wave 1$/).first()).toBeVisible();
     await expect(page.getByTestId("results-category").first()).toBeVisible();
@@ -148,17 +148,17 @@ test.describe("UI smoke", () => {
     if ((await chips.count()) > 1) await chips.nth(1).click();
     await expect(page).toHaveURL(/\/results$/);
 
-    await page.getByTestId("results-back").click();
+    await gotoRaceMode(page, "Live");
     await expect(page).toHaveURL(liveUrl);
     await expect(page.locator('[data-testid^="racing-rider-"]').first()).toBeVisible();
   });
 
   test("Results: also reachable from the Race screen and Back returns there", async ({ page }) => {
     await loadDemoRace(page);
-    await page.getByRole("tab", { name: "Race", exact: true }).click();
-    await page.getByTestId("results-btn").click();
+    await gotoRaceMode(page, "Race");
+    await gotoRaceMode(page, "Results");
     await expect(page.getByTestId("results-category").first()).toBeVisible();
-    await page.getByTestId("results-back").click();
-    await expect(page.getByRole("tab", { name: "Race", exact: true })).toHaveAttribute("aria-selected", "true");
+    await gotoRaceMode(page, "Race");
+    await expect(page.getByTestId("race-mode-indicator")).toHaveAttribute("data-mode", "race");
   });
 });

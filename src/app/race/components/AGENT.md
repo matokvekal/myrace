@@ -25,7 +25,7 @@ Immediate Children Summary
   - heatCard (HeatCard.tsx — one heat's summary card, used by `[id]/heats/Heats.tsx`)
   - modals (CategoryModal, CategorySettingsModal, StatusModal — shared modal set)
   - raceInfo (RaceInfo.tsx — compact race metadata display block)
-  - racePhaseSwitcher (RacePhaseSwitcher.tsx — switches setup/race-mode phase)
+  - raceSidebar (RaceTopBar.tsx + RaceSidebar.tsx — the one race header and the Create/Race/Live/Results/All Races menu, shared by every race screen)
   - riderCard (RiderCard.tsx — rider summary card)
   - riderDetailModal (RiderDetailModal.tsx — full rider detail popup)
   - riderFlag (RiderFlag.tsx — country-flag `<img>`, BASE_URL-safe, fails silent)

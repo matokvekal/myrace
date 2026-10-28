@@ -1,5 +1,5 @@
 import { test, expect, Page, Locator } from "@playwright/test";
-import { loadDemoRace, selectWave } from "./helpers";
+import { loadDemoRace, selectWave, gotoRaceMode } from "./helpers";
 
 /**
  * Focused coverage for the areas the big end-to-end run doesn't isolate:
@@ -25,7 +25,7 @@ const WAVE2_BIB = 31; // a Masters 50+ rider — scheduled, never on wave 1's bo
 
 /** Phase switcher. Call-site names are the old ids (Race=setup, Start=race mode); the tabs now read Create / Race / Live. */
 async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<void> {
-  await page.getByRole("tab", { name: ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase], exact: true }).click();
+  await gotoRaceMode(page, ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase]);
 }
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / …). */

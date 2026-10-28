@@ -11,6 +11,7 @@ import {
   tapWithSettle,
   checkInRow,
   setStatusAtCheckIn,
+  gotoRaceMode,
 } from "./helpers";
 
 /**
@@ -115,7 +116,7 @@ async function advanceLap(page: Page): Promise<void> {
 
 /** Phase switcher. Call-site names are the old ids (Race=setup, Start=race mode); the tabs now read Create / Race / Live. */
 async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<void> {
-  await page.getByRole("tab", { name: ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase], exact: true }).click();
+  await gotoRaceMode(page, ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase]);
 }
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / Map / Info). */

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import styles from "./headerHeat.module.css";
 import useRaceStore from "@/stores/racesStore";
 import { Settings } from "lucide-react";
-import RacePhaseSwitcher from "../racePhaseSwitcher/RacePhaseSwitcher";
+import RaceTopBar from "../raceSidebar/RaceTopBar";
 import { effectiveRaceStatus } from "@/utils/raceStatus";
 
 function HeaderHeat({
@@ -41,35 +41,24 @@ function HeaderHeat({
     return () => clearInterval(interval);
   }, []);
 
+  // Live keeps its own controls in the shared race top bar's right-hand slot.
   return (
-    <div className={styles.headerRace}>
-      <div className={styles.leftSection}>
-        <div className={styles.raceName}>{race?.name || t("heat.defaultRaceName", "Race")}</div>
-      </div>
-
-      {/* Always-visible Setup / Race / Live switcher (icon-only on phones) */}
-      <RacePhaseSwitcher compact />
-
-      <div className={styles.rightSection}>
-        <div className={styles.liveWaveGroup}>
-          {isLive ? (
-            <div className={styles.raceLiveLabel}>
-              <span className={styles.liveDot}>●</span>
-              {t("heat.raceLive", "RACE LIVE")}
-            </div>
-          ) : (
-            <div className={styles.racePastLabel}>{t("heat.racePast", "RACE PAST")}</div>
-          )}
+    <RaceTopBar>
+      {isLive ? (
+        <div className={styles.raceLiveLabel}>
+          <span className={styles.liveDot}>●</span>
+          {t("heat.raceLive", "RACE LIVE")}
         </div>
-        <div className={styles.timeDisplay}>
-          <div className={styles.timeLabel}>{t("heat.clock", "Clock")}</div>
-          <div className={styles.time}>{currentTime}</div>
-        </div>
-        <button className={styles.settingsBtn} onClick={onSettingsClick} title={t("heat.liveSettingsTitle", "Live settings")}>
-          <Settings size={18} />
-        </button>
+      ) : (
+        <div className={styles.racePastLabel}>{t("heat.racePast", "RACE PAST")}</div>
+      )}
+      <div className={styles.timeDisplay} aria-label={t("heat.clock", "Clock")}>
+        {currentTime}
       </div>
-    </div>
+      <button className={styles.settingsBtn} onClick={onSettingsClick} title={t("heat.liveSettingsTitle", "Live settings")}>
+        <Settings size={18} />
+      </button>
+    </RaceTopBar>
   );
 }
 

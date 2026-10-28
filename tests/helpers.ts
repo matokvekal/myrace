@@ -38,13 +38,20 @@ export async function loadDemoRace(page: Page): Promise<void> {
   // be either side of our first look.
   await expect(async () => {
     if (/\/heat\//.test(page.url())) {
-      await page.getByRole("tab", { name: "Create", exact: true }).click();
+      await gotoRaceMode(page, "Create");
     }
     // The race tab bar is up once the Riders tab button is present.
     await expect(page.getByRole("button", { name: "Riders", exact: true })).toBeVisible({
       timeout: 2_000,
     });
   }).toPass({ timeout: 20_000 });
+}
+
+/** Switch race mode through the race sidebar (hamburger → Create / Race / Live / Results). */
+export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" | "Results"): Promise<void> {
+  const key = ({ Create: "setup", Race: "race", Live: "live", Results: "results" } as const)[mode];
+  await page.getByTestId("race-menu-btn").click();
+  await page.getByTestId(`race-nav-${key}`).click();
 }
 
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */
@@ -96,7 +103,7 @@ export async function openLiveDemo(page: Page): Promise<void> {
   // The demo's one-shot onboarding lands us on Live; make sure we're there.
   await expect(async () => {
     if (!/\/heat\//.test(page.url())) {
-      await page.getByRole("tab", { name: "Live", exact: true }).click();
+      await gotoRaceMode(page, "Live");
     }
     await expect(page.locator('[data-testid^="racing-rider-"]').first()).toBeVisible({
       timeout: 2_000,

@@ -4,6 +4,7 @@ import {
   racingCard as card,
   tapWithSettle as tap,
   racingBibWithLapsLeft,
+  gotoRaceMode,
 } from "./helpers";
 
 /**
@@ -72,7 +73,7 @@ test.describe("Local-race regression gate", () => {
     const external = trackExternalRequests(page);
     await openLiveDemo(page);
 
-    await page.getByTestId("results-btn").click();
+    await gotoRaceMode(page, "Results");
     await expect(page).toHaveURL(/\/results/);
     // The demo race's categories are listed, with a known demo rider.
     await expect(page.getByTestId("results-category").first()).toBeVisible();

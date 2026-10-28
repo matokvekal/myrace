@@ -147,10 +147,10 @@ const Race: React.FC = () => {
 
   return (
     <div className={styles.race}>
-      <div className={`${styles.top} ${isRaceMode ? styles.topCompact : ""}`}>
-        <div className={styles.headerRaceWrapper}>
-          <HeaderRace />
-        </div>
+      <HeaderRace />
+      {/* Hero (image + race card) belongs to Create only; Race mode goes straight to work. */}
+      {!isRaceMode && (
+      <div className={styles.top}>
         <div className={styles.imageWrapper}>
           <img
             src={resolvedImage}
@@ -164,12 +164,11 @@ const Race: React.FC = () => {
             }}
           />
         </div>
-        {!isRaceMode && (
-          <div className={styles.raceInfo}>
-            <RaceInfo {...race} />
-          </div>
-        )}
+        <div className={styles.raceInfo}>
+          <RaceInfo {...race} />
+        </div>
       </div>
+      )}
 
       <div className={styles.bottom}>
         {isRaceMode && !finalized ? (

@@ -1,0 +1,351 @@
+/* Race top bar + race sidebar. Same tokens, row height and hairline style as
+   the main-page side menu (main/components/headerMain). Logical properties so
+   both mirror for Hebrew (RTL). */
+
+/* ─── Top bar ──────────────────────────────────────────────────────────── */
+.topBar {
+  position: relative;
+  z-index: 20;
+  flex-shrink: 0;
+  width: 100%;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  padding-inline: 8px 12px;
+  background: var(--surface-1, #fff);
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.menuBtn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.menuBtn:hover {
+  background: var(--bg-surface);
+}
+
+.menuBtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.raceName {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modeChip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.modeChip svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* One accent per mode, used by the chip and the sidebar icon tile. */
+.mode_setup,
+.icon_setup { color: #3f86e7; }
+.mode_race,
+.icon_race { color: #16a34a; }
+.mode_live,
+.icon_live { color: #dc2626; }
+.mode_results,
+.icon_results { color: #6d28d9; }
+.modeFinal { color: var(--text-muted); }
+
+:global([data-theme="dark"]) .mode_setup,
+:global([data-theme="dark"]) .icon_setup { color: #63a6fc; }
+:global([data-theme="dark"]) .mode_race,
+:global([data-theme="dark"]) .icon_race { color: #3edda4; }
+:global([data-theme="dark"]) .mode_live,
+:global([data-theme="dark"]) .icon_live { color: #ff6b6b; }
+:global([data-theme="dark"]) .mode_results,
+:global([data-theme="dark"]) .icon_results { color: #a78bfa; }
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  50% { opacity: 0.35; }
+}
+
+/* Screen-specific controls (Live: status, clock, settings) */
+.slot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .topBar {
+    gap: 6px;
+  }
+
+  .titleBlock {
+    gap: 6px;
+  }
+
+  .raceName {
+    font-size: 14px;
+  }
+}
+
+/* ─── Sidebar ──────────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 29, 55, 0.38);
+  z-index: 1200; /* above Live's floating stopwatch / mic buttons */
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  inset-inline-start: 0;
+  width: min(86vw, 300px);
+  height: 100vh;
+  height: 100dvh;
+  z-index: 1201;
+  display: flex;
+  flex-direction: column;
+  background: var(--drawer-bg, #fff);
+  color: var(--text-primary);
+  border-inline-end: 1px solid var(--drawer-border);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  transform: translateX(-100%);
+  /* hidden drops the closed drawer out of the tab order; delayed on close so
+     the slide-out still plays. */
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
+}
+
+.drawerOpen {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+}
+
+:global(html[dir="rtl"]) .drawer {
+  transform: translateX(100%);
+}
+
+:global(html[dir="rtl"]) .drawerOpen {
+  transform: translateX(0);
+}
+
+.drawer button {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drawer button:focus-visible,
+.menuBtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 12px 14px 16px;
+  padding-inline: 16px 12px;
+  border-bottom: 1px solid var(--drawer-border);
+}
+
+.drawerTitleBlock {
+  min-width: 0;
+}
+
+.drawerKicker {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.drawerTitle {
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.drawerSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.closeBtn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.closeBtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+.navItem {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.navItem:hover {
+  background: var(--bg-surface);
+}
+
+.navItemActive {
+  background: var(--bg-surface);
+  font-weight: 600;
+}
+
+/* Active marker: a short accent bar on the leading edge */
+.navItemActive::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+.navIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.navIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+:global(html[dir="rtl"]) .flipRtl svg {
+  transform: scaleX(-1);
+}
+
+.navFooter {
+  margin-top: auto;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--drawer-border);
+}
+
+/* PRO skin: the global gaming skin gives every <button> arcade depth. The
+   race bar and sidebar stay flat in both skins. */
+:root[data-skin="gaming"] .drawer button:not(:disabled),
+:root[data-skin="gaming"] .topBar .menuBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  filter: none;
+}
+
+:root[data-skin="gaming"] .drawer button:not(:disabled):active,
+:root[data-skin="gaming"] .topBar .menuBtn:not(:disabled):active {
+  transform: none;
+}
+
+:root[data-skin="gaming"] .drawer .navItemActive:not(:disabled) {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawerOpen,
+  .liveDot {
+    transition: none;
+    animation: none;
+  }
+}

@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { TERMS_VERSION } from "../src/app/legal/terms";
-import { racingCard } from "./helpers";
+import { racingCard, gotoRaceMode } from "./helpers";
 
 /**
  * A NEW race is persisted to PostgreSQL by itself, end to end through the app UI:
@@ -109,7 +109,7 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
   });
 
   await test.step("check in wave 1 and start it on the Grid", async () => {
-    await page.getByRole("tab", { name: "Race", exact: true }).click();
+    await gotoRaceMode(page, "Race");
     await page.locator('button[class*="wavePill"]', { hasText: /^1\b/ }).first().click();
     await page.getByRole("button", { name: "Check-In", exact: true }).click();
     const checkAll = page.getByRole("button", { name: /Check All/ });
