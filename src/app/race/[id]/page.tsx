@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
+import { CalendarClock, Info, Map as MapIcon, Tags, Users, type LucideIcon } from "lucide-react";
 import styles from "./race.module.css";
 import HeaderRace from "../components/headerRace/HeaderRace";
-import Button from "@/components/ui/Button";
 import Loader from "@/components/Loader";
 import { resolveRaceImage } from "@/utils/resolveRaceImage";
 import RaceInfo from "../components/raceInfo/RaceInfo";
@@ -39,6 +39,14 @@ const TABS = [
   "info"
 ] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_ICONS: Record<Tab, LucideIcon> = {
+  schedule: CalendarClock,
+  categories: Tags,
+  riders: Users,
+  map: MapIcon,
+  info: Info,
+};
 
 /**
  * Tabs a FINALIZED race still shows. Schedule and Categories are setup tools
@@ -191,18 +199,22 @@ const Race: React.FC = () => {
                 <LocalOnlyBadge raceUuid={raceUuid} />
               </Suspense>
             )}
-            <div className={styles.tabs}>
-              {visibleTabs.map((tab) => (
-                <Button
-                  key={tab}
-                  variant={activeTabSafe === tab ? "primary" : "secondary"}
-                  size="sm"
-                  className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </Button>
-              ))}
+            <div className={styles.tabs} role="group" aria-label="Create sections">
+              {visibleTabs.map((tab) => {
+                const Icon = TAB_ICONS[tab];
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
+                    aria-pressed={activeTabSafe === tab}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    <Icon size={15} aria-hidden="true" />
+                    <span>{tab.charAt(0).toUpperCase() + tab.slice(1)}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className={styles.tabContent}>
