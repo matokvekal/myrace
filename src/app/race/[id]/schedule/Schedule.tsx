@@ -41,18 +41,22 @@ interface Props {
   categories: CategoryProps[];
 }
 
-interface StartSlot {
-  id: string;
-  time: string;
-  categoryIds: number[];
+/** Schedule editor: a category in a wave, starting `gap` seconds after the previous one. */
+interface WaveRow {
+  catId: number;
+  gap: number;
 }
 
 interface Wave {
   id: number;
   number: number;
-  startTime: string;
-  startSlots: StartSlot[];
+  /** Wave base start time ("HH:MM" or "HH:MM:SS"): the first category's start. */
+  base: string;
+  rows: WaveRow[];
 }
+
+/** Default interval between consecutive category starts in a wave. */
+const DEFAULT_START_GAP_SEC = 30;
 
 export const DEFAULT_WAVE_GAP_MINUTES = 30;
 
@@ -412,27 +416,54 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
 
   const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
 
+  // ── Wave editor state ──
+  // A wave is an ordered list of categories. The first starts at the wave's
+  // base time; each next one starts `gap` seconds after the previous one.
+  // Saved through the existing fields only: category.heat + category.startTime.
+  const secOf = (t: string | null | undefined): number => {
+    const n = normalizeTime(t);
+    if (!n) return NaN;
+    const [h, m, s = 0] = n.split(":").map(Number);
+    return h * 3600 + m * 60 + s;
+  };
+  const fmtSec = (sec: number): string => {
+    const c = ((Math.round(sec) % 86400) + 86400) % 86400;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return normalizeTime(`${pad(Math.floor(c / 3600))}:${pad(Math.floor((c % 3600) / 60))}:${pad(c % 60)}`)!;
+  };
+  /** Always HH:MM:SS, for <input type="time" step=1>. */
+  const fullHms = (sec: number): string => {
+    const c = Number.isFinite(sec) ? ((Math.round(sec) % 86400) + 86400) % 86400 : 8 * 3600;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(Math.floor(c / 3600))}:${pad(Math.floor((c % 3600) / 60))}:${pad(c % 60)}`;
+  };
+  const rowTimes = (w: Wave): number[] => {
+    let t = secOf(w.base);
+    return w.rows.map((r, i) => {
+      if (i > 0) t += r.gap;
+      return t;
+    });
+  };
+
   const enterEditMode = () => {
     const waveData: Wave[] = [];
     const assigned = new Set<number>();
-
     schedule.forEach((startMap, waveNum) => {
-      const slots: StartSlot[] = [];
+      const rows: WaveRow[] = [];
+      let prev = NaN;
+      let base = "";
       startMap.forEach((cats, startTime) => {
-        slots.push({
-          id: `slot-${waveNum}-${startTime}`,
-          time: startTime === "TBD" ? "08:00" : startTime,
-          categoryIds: cats.map((c) => { assigned.add(c.id); return c.id; })
+        const sec = startTime === "TBD" ? NaN : secOf(startTime);
+        if (!base && Number.isFinite(sec)) base = startTime;
+        cats.forEach((c, i) => {
+          assigned.add(c.id);
+          const gap = rows.length === 0 || i > 0 ? 0 : Number.isFinite(sec) && Number.isFinite(prev) ? sec - prev : DEFAULT_START_GAP_SEC;
+          rows.push({ catId: c.id, gap });
         });
+        if (Number.isFinite(sec)) prev = sec;
       });
-      waveData.push({
-        id: waveNum,
-        number: waveNum,
-        startTime: slots[0]?.time || "08:00",
-        startSlots: slots
-      });
+      waveData.push({ id: waveNum, number: waveNum, base: base || "08:00", rows });
     });
-
     setWaves(waveData);
     setUnassignedCategories(categories.filter((c) => !assigned.has(c.id)));
     setEditMode(true);
@@ -441,99 +472,58 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
   const addWave = () => {
     const maxWave = waves.length > 0 ? Math.max(...waves.map((w) => w.number)) : 0;
     // New wave starts 1.5 hours after the latest existing wave (default 08:00 if none)
-    const times = waves.map((w) => toMinutes(w.startTime)).filter((n) => Number.isFinite(n));
-    const startTime = times.length ? minutesToTime(Math.max(...times) + 90) : "08:00";
-    setWaves([...waves, { id: Date.now(), number: maxWave + 1, startTime, startSlots: [] }]);
+    const times = waves.map((w) => toMinutes(w.base)).filter((n) => Number.isFinite(n));
+    const base = times.length ? minutesToTime(Math.max(...times) + 90) : "08:00";
+    setWaves((prev) => [...prev, { id: Date.now(), number: maxWave + 1, base, rows: [] }]);
   };
 
-  // Nudge a wave's start time by ±minutes (used by the −5 / +5 buttons)
-  const nudgeWaveTime = (waveId: number, delta: number) => {
-    const wave = waves.find((w) => w.id === waveId);
-    if (!wave) return;
-    const base = toMinutes(wave.startTime);
-    const mins = Number.isFinite(base) ? base : toMinutes("08:00");
-    updateWaveTime(waveId, minutesToTime(mins + delta));
-  };
+  const patchWave = (waveId: number, fn: (w: Wave) => Wave) =>
+    setWaves((prev) => prev.map((w) => (w.id === waveId ? fn(w) : w)));
 
-  const updateWaveTime = (waveId: number, time: string) => {
-    setWaves(waves.map((w) => {
-      if (w.id !== waveId) return w;
-      return {
-        ...w,
-        startTime: time,
-        startSlots: w.startSlots.map((s, i) => i === 0 ? { ...s, time } : s)
-      };
-    }));
-  };
+  const setGap = (waveId: number, idx: number, gap: number) =>
+    patchWave(waveId, (w) => ({ ...w, rows: w.rows.map((r, i) => (i === idx ? { ...r, gap: Math.max(0, gap) } : r)) }));
+
+  // Reorder keeps each position's interval; only the categories swap.
+  const moveRow = (waveId: number, idx: number, dir: -1 | 1) =>
+    patchWave(waveId, (w) => {
+      const j = idx + dir;
+      if (j < 0 || j >= w.rows.length) return w;
+      const rows = w.rows.map((r) => ({ ...r }));
+      [rows[idx].catId, rows[j].catId] = [rows[j].catId, rows[idx].catId];
+      return { ...w, rows };
+    });
 
   const deleteWave = (waveId: number) => {
     const wave = waves.find((w) => w.id === waveId);
     if (!wave) return;
-    const freed = wave.startSlots
-      .flatMap((s) => s.categoryIds.map((id) => categories.find((c) => c.id === id)!))
-      .filter(Boolean);
+    const freed = wave.rows.map((r) => categories.find((c) => c.id === r.catId)).filter(Boolean) as CategoryProps[];
     setUnassignedCategories((prev) => [...prev, ...freed]);
-    setWaves(waves.filter((w) => w.id !== waveId));
+    setWaves((prev) => prev.filter((w) => w.id !== waveId));
   };
 
-  const moveWave = (waveId: number, direction: "up" | "down") => {
-    const idx = waves.findIndex((w) => w.id === waveId);
-    if (idx === -1) return;
-    if (direction === "up" && idx === 0) return;
-    if (direction === "down" && idx === waves.length - 1) return;
-    const next = [...waves];
-    const ti = direction === "up" ? idx - 1 : idx + 1;
-    [next[idx], next[ti]] = [next[ti], next[idx]];
-    setWaves(next);
-  };
-
-  const moveCategoryToWave = useCallback((cat: CategoryProps, targetWaveId: number | null) => {
-    setUnassignedCategories((prev) => prev.filter((c) => c.id !== cat.id));
-    setWaves((prev) => prev.map((w) => ({
-      ...w,
-      startSlots: w.startSlots.map((s) => ({
-        ...s,
-        categoryIds: s.categoryIds.filter((id) => id !== cat.id)
-      }))
-    })));
-
-    if (targetWaveId === null) {
-      setUnassignedCategories((prev) => [...prev, cat]);
-    } else {
-      setWaves((prev) => prev.map((w) => {
-        if (w.id !== targetWaveId) return w;
-        if (w.startSlots.length === 0) {
-          return {
-            ...w,
-            startSlots: [{ id: `slot-${w.id}-${Date.now()}`, time: w.startTime, categoryIds: [cat.id] }]
-          };
-        }
-        return {
-          ...w,
-          startSlots: w.startSlots.map((s, i) =>
-            i === 0 ? { ...s, categoryIds: [...s.categoryIds, cat.id] } : s
-          )
-        };
-      }));
-    }
-  }, []);
-
-  const getCategoryWaveId = (catId: number): number | null => {
-    for (const w of waves) {
-      for (const s of w.startSlots) {
-        if (s.categoryIds.includes(catId)) return w.id;
-      }
-    }
-    return null;
+  /** Move a category to a wave (appended, 30 s after the previous start) or back to unassigned. */
+  const moveCategoryToWave = (catId: number, targetWaveId: number | null) => {
+    const cat = categories.find((c) => c.id === catId);
+    if (!cat) return;
+    setUnassignedCategories((prev) => prev.filter((c) => c.id !== catId));
+    setWaves((prev) =>
+      prev
+        .map((w) => ({ ...w, rows: w.rows.filter((r) => r.catId !== catId) }))
+        .map((w) =>
+          w.id === targetWaveId
+            ? { ...w, rows: [...w.rows, { catId, gap: w.rows.length ? DEFAULT_START_GAP_SEC : 0 }] }
+            : w
+        )
+    );
+    if (targetWaveId === null) setUnassignedCategories((prev) => [...prev, cat]);
   };
 
   const saveSchedule = async () => {
     for (const wave of waves) {
-      for (const slot of wave.startSlots) {
-        for (const catId of slot.categoryIds) {
-          const category = categories.find((c) => c.id === catId);
-          if (category) await updateCategory({ ...category, heat: wave.number, startTime: slot.time });
-        }
+      const times = rowTimes(wave);
+      for (let i = 0; i < wave.rows.length; i++) {
+        const category = categories.find((c) => c.id === wave.rows[i].catId);
+        if (category) await updateCategory({ ...category, heat: wave.number, startTime: fmtSec(times[i]) });
       }
     }
     for (const cat of unassignedCategories) {
@@ -564,169 +554,172 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
     </div>
   ) : null;
 
-  if (!categories.length) {
-    return noRidersHint ?? <div className={styles.empty}>No categories yet. Import riders to generate them.</div>;
-  }
-
-  // ── EDIT MODE ──
-  if (editMode) {
-    const allEditCats: CategoryProps[] = [];
-    waves.forEach((w) =>
-      w.startSlots.forEach((s) =>
-        s.categoryIds.forEach((id) => {
-          const cat = categories.find((c) => c.id === id);
-          if (cat && !allEditCats.find((c) => c.id === id)) allEditCats.push(cat);
-        })
-      )
-    );
-    unassignedCategories.forEach((cat) => {
-      if (!allEditCats.find((c) => c.id === cat.id)) allEditCats.push(cat);
-    });
-
+  // Nothing scheduled yet: just the Add Wave action (plus the riders hint for an empty race).
+  if (!categories.length && !editMode) {
     return (
       <div className={styles.container}>
-        <div className={styles.editHeader}>
-          <h3>Schedule Editor</h3>
-          <div className={styles.editActions}>
-            <Button variant="secondary" size="sm" onClick={cancelEdit}>
-              <X size={14} /> Cancel
-            </Button>
-            <Button variant="success" size="sm" onClick={saveSchedule}>
-              <Save size={14} /> Save Schedule
-            </Button>
+        {noRidersHint}
+        <div className={styles.wvEmpty}>
+          <button type="button" className={styles.wvPrimary} onClick={() => { enterEditMode(); addWave(); }} data-testid="schedule-add-wave">
+            <Plus size={14} /> Add Wave
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EDIT MODE: one compact section per wave ──
+  if (editMode) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.wvHeader}>
+          <span className={styles.wvTitle}>Schedule</span>
+          <button type="button" className={styles.wvSecondary} onClick={addWave} data-testid="schedule-add-wave">
+            <Plus size={14} /> Add Wave
+          </button>
+          <div className={styles.wvHeaderEnd}>
+            <button type="button" className={styles.wvSecondary} onClick={cancelEdit}>Cancel</button>
+            <button type="button" className={styles.wvPrimary} onClick={() => void saveSchedule()} data-testid="schedule-save">
+              <Save size={14} /> Save
+            </button>
           </div>
         </div>
 
-        {/* Waves */}
-        <div className={styles.waveTimeSection}>
-          <div className={styles.sectionHeader}>
-            <span>Waves & Start Times</span>
-            <Button variant="primary" size="sm" startIcon={<Plus size={12} />} onClick={addWave}>
-              Add Wave
-            </Button>
-          </div>
-          {waves.length === 0 ? (
-            <div className={styles.emptyMessage}>No waves yet — click "Add Wave" to create one.</div>
-          ) : (
-            waves.map((wave, waveIdx) => {
-              const waveLock = getWaveLock(
-                wave.startSlots
-                  .flatMap((s) => s.categoryIds)
-                  .map((id) => categories.find((c) => c.id === id)?.status)
-              );
-              const locked = waveLock !== null;
-              return (
-                <div key={wave.id} className={styles.waveTimeRow} data-wave-lock={waveLock ?? undefined}>
-                  <div className={styles.dragButtons}>
-                    <button className={styles.iconBtn} onClick={() => moveWave(wave.id, "up")} disabled={waveIdx === 0} title="Move up">↑</button>
-                    <button className={styles.iconBtn} onClick={() => moveWave(wave.id, "down")} disabled={waveIdx === waves.length - 1} title="Move down">↓</button>
-                  </div>
-                  <span className={styles.waveLabel}>Wave {wave.number}</span>
-                  <button
-                    className={styles.nudgeBtn}
-                    onClick={() => nudgeWaveTime(wave.id, -5)}
-                    disabled={locked}
-                    title={locked ? "Time locked — wave already started" : "5 minutes earlier"}
-                  >
-                    −5
-                  </button>
+        {waves.length === 0 && <div className={styles.emptyMessage}>No waves. Add one to start scheduling.</div>}
+
+        {waves.map((wave) => {
+          const waveLock = getWaveLock(wave.rows.map((r) => categories.find((c) => c.id === r.catId)?.status));
+          const locked = waveLock !== null;
+          const times = rowTimes(wave);
+          return (
+            <section key={wave.id} className={styles.wv} data-wave-lock={waveLock ?? undefined}>
+              <div className={styles.wvHead}>
+                <span className={styles.wvName}>Wave {wave.number}</span>
+                <label className={styles.wvBase}>
+                  <span>Start</span>
                   <input
                     type="time"
-                    className={styles.timeInput}
-                    value={wave.startTime}
-                    onChange={(e) => updateWaveTime(wave.id, e.target.value)}
+                    step={1}
+                    className={styles.wvTime}
+                    value={fullHms(secOf(wave.base))}
                     disabled={locked}
-                    title={locked ? "Time locked — wave already started" : undefined}
+                    onChange={(e) => e.target.value && patchWave(wave.id, (w) => ({ ...w, base: e.target.value }))}
+                    aria-label={`Wave ${wave.number} start time`}
                   />
-                  <button
-                    className={styles.nudgeBtn}
-                    onClick={() => nudgeWaveTime(wave.id, 5)}
-                    disabled={locked}
-                    title={locked ? "Time locked — wave already started" : "5 minutes later"}
-                  >
-                    +5
-                  </button>
-                  {locked && (
-                    <span className={styles.lockTag} data-wave-lock={waveLock}>
-                      🔒 {waveLock === "finished" ? "Finished" : "Started"}
-                    </span>
-                  )}
-                  <div style={{ marginLeft: "auto" }}>
-                    <Button variant="icon" size="sm" iconOnly onClick={() => deleteWave(wave.id)}>
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                </label>
+                {locked && <span className={styles.lockTag} data-wave-lock={waveLock}>🔒 {waveLock === "finished" ? "Finished" : "Started"}</span>}
+                <button
+                  type="button"
+                  className={`${styles.wvIcon} ${styles.wvDanger}`}
+                  onClick={() => deleteWave(wave.id)}
+                  disabled={locked}
+                  aria-label={`Remove wave ${wave.number}`}
+                  title="Remove wave (its categories become unassigned)"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
 
-        {/* Category assignments */}
-        <div className={styles.categoryAssignSection}>
-          <div className={styles.sectionHeader}>
-            <span>Category → Wave · Finish Group</span>
-            <span className={styles.assignHint}>Choose a wave for each category. Same Finish Group = shared bell and finish, in any wave.</span>
-            {fgSuggestions.size > 0 && (
-              <>
-                <Button variant="success" size="sm" data-testid="finish-group-accept" onClick={() => void acceptFinishGroupSuggestions()}>
-                  Accept suggestions
-                </Button>
-                <Button variant="secondary" size="sm" data-testid="finish-group-dismiss" onClick={() => setFgSuggestionsDismissed(true)}>
-                  Dismiss suggestions
-                </Button>
-              </>
-            )}
-            <Button variant="secondary" size="sm" data-testid="finish-group-reset-all" onClick={() => void resetFinishGroups()}>
-              Reset All
-            </Button>
-          </div>
-          {allEditCats.length === 0 ? (
-            <div className={styles.emptyMessage}>No categories found. Import riders first.</div>
-          ) : (
-            allEditCats.map((cat) => {
-              const currentWaveId = getCategoryWaveId(cat.id);
-              const fgSaved = cat.linkGroup?.trim() ?? "";
-              const fgSuggested = !fgSaved ? fgSuggestions.get(cat.id) : undefined;
-              const fgValue = fgSaved || fgSuggested || "";
-              const fgLocked = (cat.status ?? "upcoming") !== "upcoming";
-              return (
-                <div key={cat.id} className={styles.categoryAssignRow}>
-                  <div className={styles.colorDot} style={{ background: cat.color ?? "#ccc" }} />
-                  <div className={styles.catAssignInfo}>
-                    <span className={styles.catName}>{cat.name}</span>
-                    {cat.subCategory && <span className={styles.subCategory}> · {cat.subCategory}</span>}
+              {wave.rows.length === 0 ? (
+                <div className={styles.wvNote}>Add categories to keep this wave.</div>
+              ) : (
+                <div className={styles.wvTable} role="table">
+                  <div className={`${styles.wvRow} ${styles.wvRowHead}`} role="row">
+                    <span>Category</span>
+                    <span>Interval</span>
+                    <span>Start</span>
+                    <span />
                   </div>
-                  <select
-                    className={styles.waveSelect}
-                    value={currentWaveId ?? ""}
-                    onChange={(e) =>
-                      moveCategoryToWave(cat, e.target.value !== "" ? Number(e.target.value) : null)
-                    }
-                  >
-                    <option value="">— Unassigned —</option>
-                    {waves.map((w) => (
-                      <option key={w.id} value={w.id}>Wave {w.number}  ·  {w.startTime}</option>
-                    ))}
-                  </select>
-                  <select
-                    className={styles.waveSelect}
-                    aria-label={`Finish Group for ${cat.name}`}
-                    data-testid={`finish-group-${cat.id}`}
-                    title={fgLocked ? "Fixed once the category has started" : "Categories in the same Finish Group share the bell and the finish"}
-                    value={fgValue}
-                    disabled={fgLocked}
-                    onChange={(e) => void setFinishGroup(cat, e.target.value)}
-                  >
-                    {finishGroupOptions(categories.filter((c) => c.raceUuid === raceUuid)).map((v) => (
-                      <option key={v} value={v}>{finishGroupLabel(v)}</option>
-                    ))}
-                  </select>
-                  {fgSuggested && <span className={styles.fgSuggested} data-testid={`finish-group-suggested-${cat.id}`}>Suggested</span>}
+                  {wave.rows.map((row, i) => {
+                    const cat = categories.find((c) => c.id === row.catId);
+                    if (!cat) return null;
+                    return (
+                      <div key={row.catId} className={styles.wvRow} role="row">
+                        <span className={styles.wvCat} dir="auto">
+                          <span className={styles.colorDot} style={{ background: cat.color ?? "#ccc" }} />
+                          <span className={styles.wvCatName}>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
+                        </span>
+                        <span className={styles.wvGap}>
+                          {i === 0 ? (
+                            "—"
+                          ) : (
+                            <>
+                              <input
+                                type="number"
+                                min={0}
+                                step={5}
+                                className={styles.wvGapInput}
+                                value={row.gap}
+                                disabled={locked}
+                                onChange={(e) => setGap(wave.id, i, parseInt(e.target.value) || 0)}
+                                aria-label={`Seconds after the previous start for ${cat.name}`}
+                              />
+                              <span className={styles.wvUnit}>s</span>
+                            </>
+                          )}
+                        </span>
+                        <span className={styles.wvStart}>{Number.isFinite(times[i]) ? fmtSec(times[i]) : "—"}</span>
+                        <span className={styles.wvRowActions}>
+                          <button type="button" className={styles.wvIcon} disabled={locked || i === 0} onClick={() => moveRow(wave.id, i, -1)} aria-label={`Move ${cat.name} up`}>↑</button>
+                          <button type="button" className={styles.wvIcon} disabled={locked || i === wave.rows.length - 1} onClick={() => moveRow(wave.id, i, 1)} aria-label={`Move ${cat.name} down`}>↓</button>
+                          <select
+                            className={styles.wvMove}
+                            value={wave.id}
+                            disabled={locked}
+                            onChange={(e) => moveCategoryToWave(cat.id, e.target.value === "" ? null : Number(e.target.value))}
+                            aria-label={`Wave for ${cat.name}`}
+                          >
+                            {waves.map((w) => <option key={w.id} value={w.id}>W{w.number}</option>)}
+                            <option value="">Remove</option>
+                          </select>
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              )}
+
+              {!locked && (
+                <select
+                  className={styles.wvAddCat}
+                  value=""
+                  disabled={unassignedCategories.length === 0}
+                  onChange={(e) => e.target.value && moveCategoryToWave(Number(e.target.value), wave.id)}
+                  aria-label={`Add a category to wave ${wave.number}`}
+                  data-testid={`wave-add-category-${wave.number}`}
+                >
+                  <option value="">{unassignedCategories.length ? "+ Add Category" : "All categories are scheduled"}</option>
+                  {unassignedCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}{c.subCategory ? ` · ${c.subCategory}` : ""}</option>
+                  ))}
+                </select>
+              )}
+            </section>
+          );
+        })}
+
+        {unassignedCategories.length > 0 && waves.length > 0 && (
+          <div className={styles.wvNote}>
+            Not scheduled: {unassignedCategories.map((c) => c.name).join(", ")}
+          </div>
+        )}
+
+        {/* Finish Group helpers (the per-category Finish Group is on the schedule view) */}
+        <div className={styles.wvFg}>
+          <span>Finish groups</span>
+          {fgSuggestions.size > 0 && (
+            <>
+              <button type="button" className={styles.wvSecondary} data-testid="finish-group-accept" onClick={() => void acceptFinishGroupSuggestions()}>
+                Accept suggestions
+              </button>
+              <button type="button" className={styles.wvSecondary} data-testid="finish-group-dismiss" onClick={() => setFgSuggestionsDismissed(true)}>
+                Dismiss
+              </button>
+            </>
           )}
+          <button type="button" className={styles.wvSecondary} data-testid="finish-group-reset-all" onClick={() => void resetFinishGroups()}>
+            Reset all
+          </button>
         </div>
       </div>
     );
