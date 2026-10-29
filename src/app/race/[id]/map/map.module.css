@@ -633,3 +633,18 @@
   font-size: 13px;
   color: var(--text-muted, #8498ba);
 }
+
+/* Card preview: wrap the 300px preview map (drawing has its own full screen),
+   so stacked maps have no empty gap between them. */
+.mapBox,
+.card .mapBox {
+  height: auto;
+  min-height: 0;
+}
+
+@media (max-width: 480px) {
+  .mapBox,
+  .card .mapBox {
+    height: auto;
+  }
+}
