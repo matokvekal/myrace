@@ -118,7 +118,7 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
     await expect(checkAll).toHaveCount(0);
     await openRaceView(page, "Grid");
     await page.getByTestId("start-all").first().click();
-    await expect(page.getByText(/RUNNING/).first()).toBeVisible();
+    await expect(page.getByText(/Started/).first()).toBeVisible();
   });
 
   await test.step("record laps until riders finish", async () => {

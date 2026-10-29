@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadDemoRace, selectWave, gotoRaceMode, openRaceView } from "./helpers";
+import { loadDemoRace, selectWave, gotoRaceMode, openRaceView, finishWave } from "./helpers";
 
 /**
  * End-to-end smoke of the core Commissaire flow:
@@ -61,11 +61,8 @@ test.describe("Commissaire race flow", () => {
     // the app allows only one wave running at a time — so wave 1 has to be
     // signed off before wave 2 can take the line.
     await test.step("finish the wave already on course", async () => {
-      await selectWave(page, 1);
-      await openRaceView(page, "Grid");
-      await page.getByRole("button", { name: /Finish Wave/i }).click();
-      await page.getByRole("button", { name: /^Yes/i }).click();
-      await expect(page.getByText(/Wave 1 finished/)).toBeVisible();
+      await finishWave(page, 1); // card Finish → Live's FINISH confirmation
+      await gotoRaceMode(page, "Race");
       await selectWave(page, 2);
     });
 
@@ -83,18 +80,18 @@ test.describe("Commissaire race flow", () => {
     // ── 7. Start the first start group ───────────────────────────────────────
     await test.step("start a wave", async () => {
       await openRaceView(page, "Grid");
-      const startBtn = page.getByRole("button", { name: /Start All/i }).first();
+      const startBtn = page.getByTestId("start-all").first();
       await expect(startBtn).toBeVisible();
       await startBtn.click();
       // A started group flips to the RUNNING state.
-      await expect(page.getByText(/RUNNING/).first()).toBeVisible();
+      await expect(page.getByText(/Started/).first()).toBeVisible();
     });
 
     // ── 8. Finish the running group ──────────────────────────────────────────
     await test.step("finish the running group", async () => {
       await page.getByTestId("wave-sheet").getByRole("button", { name: /Finish/i }).first().click();
       await page.getByRole("button", { name: /^Yes/i }).click();
-      await expect(page.getByText(/FINISHED/).first()).toBeVisible();
+      await expect(page.getByText(/Finished/).first()).toBeVisible();
     });
 
     // ── 9. Results screen renders ────────────────────────────────────────────

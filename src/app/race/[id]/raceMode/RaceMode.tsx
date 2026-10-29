@@ -37,7 +37,21 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   const navigate = useNavigate();
   const openWave = (w: number) => {
     setSelectedWave(w);
-    setSheetView("summary");
+    // The card tap follows the wave's lifecycle (persisted state only):
+    // completed → never the start sheet (its card offers Results | Board);
+    // Check-In incomplete → Check-In; otherwise (ready or racing) the start sheet,
+    // which holds per-group start / finish. Live is the card's Live action.
+    const state = waveStatusMap.get(w);
+    const cats = [...(schedule.get(w)?.values() ?? [])].flat();
+    if (state === "finished") {
+      setSheet(null);
+      return;
+    }
+    const waveRiders = raceRiders.filter((r) => cats.some((c) => riderInCategory(r, c)));
+    const ciIncomplete =
+      state === "upcoming" &&
+      waveRiders.some((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status));
+    setSheetView(ciIncomplete ? "checkin" : "summary");
     setSheet((s) => s ?? "half");
   };
   // Card actions: Check-In / Start open the sheet; Live / Finish go to the Live screen
@@ -140,7 +154,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           onView={setSheetView}
           renderStart={() =>
             canViewScreen(raceUuid, "start")
-              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />
+              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} simple onFixCheckIn={() => setSheetView("checkin")} />
               : deny
           }
           renderCheckIn={() =>

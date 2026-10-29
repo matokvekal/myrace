@@ -685,3 +685,15 @@
   padding: 0 6px;
   font-size: 11px;
 }
+
+/* Incomplete Check-In close to the start: a light-red accent, not a red block */
+.cardWarn {
+  border-color: #fca5a5;
+  border-inline-start-color: #dc2626;
+  background: #fef2f2;
+}
+
+.ciWarn {
+  background: #fee2e2;
+  color: #b91c1c;
+}

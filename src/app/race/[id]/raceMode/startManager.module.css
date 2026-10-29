@@ -1340,3 +1340,144 @@
   border-radius: 8px !important;
   text-transform: none;
 }
+
+/* ═══ Simple race-day layout (bottom sheet) ═══ */
+.simple {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.simpleGroup {
+  padding: 10px 12px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  background: var(--surface-1, #fff);
+}
+
+.simpleHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.simpleTime {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary, #0b1f3f);
+}
+
+.simpleCount {
+  margin-inline-start: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+}
+
+.simpleCats {
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.simpleCats li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #0b1f3f);
+}
+
+.simpleDot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.simpleWarn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.simpleFix {
+  margin-inline-start: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #b91c1c;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.simpleActions {
+  display: flex;
+  gap: 8px;
+}
+
+.simpleBtn {
+  flex: 1;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0b1f3f;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.simpleStart {
+  border-color: #15803d;
+  color: #15803d;
+}
+
+.simpleBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.simpleStarted {
+  font-size: 14px;
+  font-weight: 700;
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+}
+
+:global([data-theme="dark"]) .simpleBtn {
+  background: transparent;
+  color: #e2e8f0;
+}
+
+:root[data-skin="gaming"] .simpleBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 10px !important;
+  text-transform: none;
+}
+
+.simpleRunning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.simpleRunning .simpleBtn {
+  flex: 0 0 auto;
+  padding: 0 16px;
+}

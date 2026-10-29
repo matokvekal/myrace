@@ -13,6 +13,7 @@ import {
   setStatusAtCheckIn,
   gotoRaceMode,
   openRaceView,
+  finishWave,
 } from "./helpers";
 
 /**
@@ -140,7 +141,7 @@ async function openRaceModeTab(page: Page, name: "Grid" | "Check-In" | "Board"):
  * hidden behind an expander, but the time stays on the header throughout.
  */
 function startBlockFor(page: Page, startTime: string): Locator {
-  return page.locator('[class*="startBlock"]').filter({ hasText: startTime }).first();
+  return page.getByTestId("simple-start-group").filter({ hasText: startTime }).first();
 }
 
 /** A rider's row on the Results tab. */
@@ -537,7 +538,7 @@ async function runWave(
     for (const cat of plan.categories) {
       const block = startBlockFor(page, cat.startTime);
       await block.getByTestId("start-all").click();
-      await expect(block.getByText(/RUNNING/)).toBeVisible();
+      await expect(block.getByText(/Started/)).toBeVisible();
       // Stagger the starts the way a real grid does.
       await page.clock.fastForward(60 * 1000);
     }
@@ -625,15 +626,14 @@ async function runWave(
   });
 
   await test.step(`${label}: finish the wave`, async () => {
+    // Race day: the wave card's Finish → Live's typed FINISH confirmation.
+    // A wave whose every start group was already flagged off is finished as is.
     await gotoPhase(page, "Start");
-    await selectWave(page, plan.wave);
-    await openRaceModeTab(page, "Grid");
-    const finishWave = page.getByTestId("finish-wave");
-    if (await finishWave.count()) {
-      await finishWave.click();
-      await page.getByTestId("confirm-yes-wave").click();
+    if (await page.getByTestId(`wave-act-finish-${plan.wave}`).isVisible().catch(() => false)) {
+      await finishWave(page, plan.wave);
+    } else {
+      await expect(page.getByTestId(`wave-act-results-${plan.wave}`)).toBeVisible();
     }
-    await expect(page.getByText(`Wave ${plan.wave} finished`)).toBeVisible();
   });
 }
 
@@ -662,7 +662,7 @@ async function flagOffEarly(page: Page, plan: WavePlan): Promise<void> {
   // The confirm button must stay reachable, never pushed out of the viewport.
   await expect(block.getByTestId("confirm-yes")).toBeInViewport();
   await block.getByTestId("confirm-yes").click();
-  await expect(block.getByText(/FINISHED/)).toBeVisible();
+  await expect(block.getByText(/Finished/)).toBeVisible();
 
   await gotoPhase(page, "Live");
   await page.waitForURL(new RegExp(`/heat/${plan.wave}$`));

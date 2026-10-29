@@ -159,7 +159,7 @@ test("two commissaires run one shared race live, both ways, within their waves",
     await selectWave(A.page, 1);
     await openRaceView(A.page, "Grid");
     await A.page.getByTestId("start-all").first().click();
-    await expect(A.page.getByText(/RUNNING/).first()).toBeVisible();
+    await expect(A.page.getByText(/Started/).first()).toBeVisible();
     await expect.poll(() => B.page.evaluate(async (u) => {
       const cats = (await import("/src/app/stores/categoryStore.ts")).default;
       return cats.getState().categories.find((c) => c.raceUuid === u && c.heat === 1)?.status;

@@ -215,6 +215,9 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
               {laid.map(({ it, top, bottom, lane, lanes }) => {
                 const s = waveStats(it.cats, riders);
                 const isSel = it.wave === selected;
+                // Check-In matters once the start is near (≤ 60 min) or due.
+                const missing = s.registered - s.accounted;
+                const ciWarn = it.state === "upcoming" && missing > 0 && it.start - now <= 60;
                 return (
                   <div
                     key={it.wave}
@@ -226,7 +229,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         onSelect(it.wave);
                       }
                     }}
-                    className={`${styles.card} ${styles[`card_${it.state}`]} ${isSel ? styles.cardSel : ""}`}
+                    className={`${styles.card} ${styles[`card_${it.state}`]} ${ciWarn ? styles.cardWarn : ""} ${isSel ? styles.cardSel : ""}`}
                     style={{
                       top,
                       height: bottom - top - 3,
@@ -238,6 +241,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                     data-testid={`timeline-wave-${it.wave}`}
                     title={`Wave ${it.wave} · ${it.startLabel} · ${it.cats.map((c) => c.name).join(", ")}`}
                     data-current={it.wave === current ? "true" : undefined}
+                    data-opens={it.state === "finished" ? "none" : "sheet"}
                   >
                     <span className={styles.cardTop}>
                       <span className={styles.cardName}>{compact ? `W${it.wave}` : `Wave ${it.wave}`}</span>
@@ -256,12 +260,12 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                       )}
                       {it.state === "upcoming" && s.registered > 0 && (
                         <span
-                          className={`${styles.ciTag} ${s.accounted === s.registered ? styles.ciDone : s.accounted > 0 ? styles.ciPart : ""}`}
+                          className={`${styles.ciTag} ${s.accounted === s.registered ? styles.ciDone : ciWarn ? styles.ciWarn : s.accounted > 0 ? styles.ciPart : ""}`}
                           title={`Check-In ${s.accounted} / ${s.registered}`}
                           aria-label={`Check-In ${s.accounted} of ${s.registered}`}
                         >
                           {s.accounted === s.registered ? <CheckCircle2 size={12} /> : <ClipboardCheck size={12} />}
-                          {s.accounted}/{s.registered}
+                          {ciWarn ? `${missing} missing` : `${s.accounted}/${s.registered}`}
                         </span>
                       )}
                     </span>
@@ -279,10 +283,14 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                           </>
                         ) : (
                         <>
-                        <button type="button" className={styles.act} onClick={() => onAction(it.wave, "checkin")} aria-label={`Check-In, wave ${it.wave}`} data-testid={`wave-act-checkin-${it.wave}`}>
-                          <ClipboardCheck size={13} /> Check-In
-                        </button>
-                        {it.cats.some((c) => c.status === "upcoming") && (
+                        {/* Before the start: Check-In; once everyone is accounted for, Start too.
+                            After the start: Live / Finish (+ Start while a later group still waits). */}
+                        {it.state === "upcoming" && (
+                          <button type="button" className={styles.act} onClick={() => onAction(it.wave, "checkin")} aria-label={`Check-In, wave ${it.wave}`} data-testid={`wave-act-checkin-${it.wave}`}>
+                            <ClipboardCheck size={13} /> Check-In
+                          </button>
+                        )}
+                        {it.cats.some((c) => c.status === "upcoming") && (it.state === "running" || (s.registered > 0 && missing === 0)) && (
                           <button type="button" className={styles.act} onClick={() => onAction(it.wave, "start")} aria-label={`Start, wave ${it.wave}`} data-testid={`wave-act-start-${it.wave}`}>
                             <Flag size={13} /> Start
                           </button>

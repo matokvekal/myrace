@@ -58,13 +58,18 @@ export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" 
   }
   await page.getByTestId("race-menu-btn").click();
   await page.getByTestId(`race-nav-${key}`).click();
-  // Race opens on the full timeline; open the current wave's bottom sheet.
+  // Race opens on the full timeline; open the current wave's bottom sheet
+  // (a completed wave opens none, a fully running one goes to Live).
   if (key === "race") {
     const panel = page.getByTestId("wave-sheet");
     if (!(await panel.isVisible().catch(() => false))) {
       const current = page.locator('[data-testid^="timeline-wave-"][data-current="true"]');
-      await ((await current.count()) ? current.first() : page.locator('[data-testid^="timeline-wave-"]').first()).click();
-      await panel.waitFor();
+      const card = (await current.count()) ? current.first() : page.locator('[data-testid^="timeline-wave-"]').first();
+      // Only tap when the card opens a sheet (a racing wave with nothing left to start goes to Live).
+      if ((await card.getAttribute("data-opens")) === "sheet") {
+        await card.click();
+        await panel.waitFor({ timeout: 3000 }).catch(() => {});
+      }
     }
   }
 }
@@ -81,6 +86,27 @@ export async function openRaceView(page: Page, view: "Grid" | "Check-In" | "Boar
   if (await back.isVisible().catch(() => false)) await back.click();
   if (view === "Check-In") await page.getByTestId("sheet-checkin").click();
   else await page.getByTestId("sheet-start").waitFor();
+}
+
+/**
+ * Finish a racing wave the race-day way: the wave card's Finish → Live's typed
+ * FINISH confirmation. Ends on the Live screen.
+ */
+export async function finishWave(page: Page, wave: number): Promise<void> {
+  const backdrop = page.getByTestId("sheet-backdrop");
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ position: { x: 5, y: 5 } });
+  }
+  if (!(await page.getByTestId(`wave-act-finish-${wave}`).isVisible().catch(() => false))) {
+    await gotoRaceMode(page, "Race");
+    const b = page.getByTestId("sheet-backdrop");
+    if (await b.isVisible().catch(() => false)) await b.click({ position: { x: 5, y: 5 } });
+  }
+  await page.getByTestId(`wave-act-finish-${wave}`).click();
+  await page.waitForURL(new RegExp(`/heat/${wave}`));
+  await page.getByPlaceholder("FINISH").fill("FINISH");
+  await page.getByRole("button", { name: "Finish Wave", exact: true }).click();
+  await expect(page.getByText(new RegExp(`Wave ${wave} finished`)).first()).toBeVisible();
 }
 
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */
