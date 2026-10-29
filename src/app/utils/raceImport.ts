@@ -3,6 +3,7 @@ import type { CategoryProps, RiderProps, RaceFinalization, RaceTrack, TrackMarke
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { riderInCategory, catWaveKey } from "../race/[id]/schedule/Schedule";
 import { verifyExportToken } from "./raceSignature";
+import { withoutIdFields } from "@/types/csv.types";
 
 export interface ImportResult {
   raceUuid: string;
@@ -109,6 +110,11 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     riders: parseNum(row.riders),
     isConnected: false,
     importOrder: row.importOrder ? parseNum(row.importOrder) : undefined,
+    // Added with 009; older exports simply lack the columns.
+    linkGroup: parseNullableStr(row.linkGroup) ?? undefined,
+    ignored: parseBool(row.ignored),
+    bibColor: parseNullableStr(row.bibColor),
+    bibTextColor: parseNullableStr(row.bibTextColor),
   }));
 
   // ── Riders ──────────────────────────────────────────────────────
@@ -128,7 +134,7 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
     try {
       if (row.extraFields) {
         const parsed = JSON.parse(row.extraFields);
-        if (parsed && typeof parsed === "object") extraFields = parsed;
+        if (parsed && typeof parsed === "object") extraFields = withoutIdFields(parsed);
       }
     } catch { extraFields = undefined; }
 
@@ -138,6 +144,8 @@ export async function importRaceFromXlsx(file: File): Promise<ImportResult> {
       standing: row.standing !== "" && row.standing !== undefined ? parseNum(row.standing) : null,
       uciPoints: row.uciPoints ? parseNum(row.uciPoints) : null,
       uciNumber: parseNullableStr(row.uciNumber),
+      bibColor: parseNullableStr(row.bibColor),
+      bibTextColor: parseNullableStr(row.bibTextColor),
       extraFields,
       bibNumber: parseNum(row.bibNumber),
       firstName: row.firstName ?? "",

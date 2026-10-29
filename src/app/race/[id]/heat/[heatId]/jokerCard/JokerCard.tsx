@@ -19,16 +19,21 @@ const JokerCard: React.FC<Props> = ({ joker, onClick }) => {
   }, []);
 
   const sinceCaptured = formatTime((now - capturedAtMs) / 1000);
+  // The passage time as recorded (HH:mm); the full timestamp stays in capturedAt.
+  const passedAt = new Date(capturedAtMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
   return (
     <div
       data-testid={`joker-card-${joker.sequence}`}
       className={styles.joker}
       onClick={onClick}
-      title="Tap to assign a bib number"
+      title="Unknown Rider: tap to assign the bib (the original passage time is kept)"
     >
       <Bike className={styles.bikeIcon} aria-hidden="true" />
-      <div className={styles.sequence}>#{joker.sequence}</div>
+      <div className={styles.unknown}>? Unknown Rider</div>
+      <div className={styles.sequence}>
+        #{joker.sequence} · <time dateTime={joker.capturedAt}>{passedAt}</time>
+      </div>
       <div className={styles.since}>{sinceCaptured}</div>
     </div>
   );

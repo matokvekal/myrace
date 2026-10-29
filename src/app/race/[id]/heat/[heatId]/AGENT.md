@@ -12,7 +12,7 @@ Read Order
 2. ../AGENT.md
 3. page.tsx (largest file — tap-to-lap, board layout, joker strip, live timer)
 4. useLapRecording.ts, useJokerQueue.ts
-5. jokerCard/AGENT.md, RiderLiveModal.tsx, JokerResolveModal.tsx, VoiceSettingsModal.tsx
+5. jokerCard/AGENT.md, RiderLiveModal.tsx, JokerResolveModal.tsx
 
 Immediate Children Summary
 
@@ -27,8 +27,9 @@ Immediate Children Summary
     status, history)
   - JokerResolveModal.tsx + jokerResolveModal.module.css (resolve a joker by
     typing a bib, backdates `recordLap` to the joker's `capturedAt`)
-  - VoiceSettingsModal.tsx + voiceSettingsModal.module.css (voice-assist config
-    for this heat)
+  - (no settings panel here: every Live setting — Joker, board hold, voice
+    language, auto-record — is in the main side menu → Timing & Live Controls;
+    first finish – all finish is per race, in Create → Categories)
   - heat.module.css (page-level layout, incl. >=600px/>=900px responsive rules)
 
 Conventions — all from root CLAUDE.md "Live tap / undo" and "Joker button", read those first:

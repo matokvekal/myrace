@@ -1,4 +1,6 @@
 import useRaceStore from "@/stores/racesStore";
+import useCategoryStore from "@/stores/categoryStore";
+import { DEFAULT_MIN_LAP_SECONDS } from "./minLap";
 import { RaceProps } from "@/types/types";
 import { FormEvent } from "react";
 import { saveRidersFromCsv, saveRidersFromRows } from "./insertRidersCsv";
@@ -83,6 +85,8 @@ export const saveRace = async (
       lastUpdateAt: new Date(),
       isActive: true,
       autoColor,
+      // New races: 3 minutes minimum between two counted passages (configurable in Race Settings).
+      minLapSeconds: DEFAULT_MIN_LAP_SECONDS,
       map: "",
       distance: 0,
     };
@@ -110,8 +114,24 @@ export const saveRace = async (
         } else {
           await saveRidersFromCsv(await file.text(), newRace.uuid);
         }
+        // Categories first, independent of waves: every imported rider must
+        // belong to a created category. Zero categories = a failed import.
+        await useCategoryStore.getState().createCategoriesFromRiders(newRace.uuid);
+        const created = useCategoryStore.getState().categories.filter((c) => c.raceUuid === newRace.uuid);
+        const imported = useRiderStore.getState().riders.filter((r) => r.raceUuid === newRace.uuid);
+        if (imported.length > 0 && created.length === 0) {
+          throw new Error("No categories could be created from this file — check that a column is recognised as Category. The race was not saved.");
+        }
       } catch (error) {
         console.error("Error saving riders at saveRidersFromCsv", error);
+        // Never keep a half-created race: remove only what THIS save created
+        // (race first, so the lock no longer protects its riders — AGENTS.md).
+        try {
+          await useRaceStore.getState().deleteRace(newRace.uuid);
+          await useRiderStore.getState().deleteRidersByRace(newRace.uuid);
+        } catch (cleanupError) {
+          console.error("Could not roll back the new race", cleanupError);
+        }
         throw error;
       }
     }
@@ -127,6 +147,13 @@ export const saveRace = async (
       entityId: newRace.uuid,
       details: { name: newRace.name, date: newRace.date, riderCount: useRiderStore.getState().riders.length },
     });
+
+    // With a server: the new race is saved there too (PostgreSQL), now or on sign-in.
+    if (import.meta.env.VITE_SERVER_URL) {
+      void import("@/services/live/liveClient")
+        .then((m) => m.persistNewRace(newRace.uuid))
+        .catch((e) => console.warn("[live] could not queue the new race for the server", e));
+    }
 
     setAddNewwRace(false);
   } catch (error) {

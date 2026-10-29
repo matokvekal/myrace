@@ -4,39 +4,52 @@ import { render } from "@testing-library/react";
 
 import RacingRider from "../RacingRider";
 import { makeRider } from "@/test/factories";
+import type { RiderPhase } from "../../../../../../shared/race/finishPhases";
 
 const noop = () => {};
-const rider = (lapsCounter: number) =>
-  makeRider({ bibNumber: 7, totalLaps: 5, lapsCounter, raceStatus: "running" });
-const bell = (c: HTMLElement) => c.querySelector('[title^="2 laps left"]');
-const flag = (c: HTMLElement) => c.querySelector('[title^="Last lap"]');
+const T0 = Date.parse("2026-06-01T10:00:00Z");
+const rider = (lapsCounter: number, raceStatus: "running" | "finished" = "running") =>
+  makeRider({ bibNumber: 7, totalLaps: 5, lapsCounter, raceStatus,
+    lapsDetails: Array.from({ length: lapsCounter }, (_, i) => ({ lap: i + 1, endTime: new Date(T0 + (i + 1) * 300_000).toISOString() })) as never });
+const bell = (c: HTMLElement) => c.querySelector('[data-testid="bell"]');
+const flag = (c: HTMLElement) => c.querySelector('[data-testid="finish-flag"]');
+const phase = (icon: RiderPhase["icon"], remaining: number, finishPhase = false): RiderPhase =>
+  ({ icon, remaining, finishPhase, nextCrossingFinishes: icon === "flag" });
 
-describe("RacingRider bell / flag indicators", () => {
-  it("shows the individual bell preview at exactly 2 laps remaining", () => {
-    const { container } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(3)} color="#f00" />);
-    expect(bell(container)).not.toBeNull();
-    expect(flag(container)).toBeNull();
+describe("RacingRider bell / flag icons (what to show at the NEXT crossing)", () => {
+  it("own count: nothing at 3 to go, BELL at 2 to go, FLAG at 1 to go", () => {
+    const at = (laps: number) => render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(laps)} color="#f00" />);
+    const three = at(2);
+    expect(bell(three.container)).toBeNull();
+    expect(flag(three.container)).toBeNull();
+    three.unmount();
+    const two = at(3);
+    expect(bell(two.container)).not.toBeNull();
+    expect(two.getByText("2 left")).toBeTruthy();
+    two.unmount();
+    const one = at(4);
+    expect(flag(one.container)).not.toBeNull();
+    expect(bell(one.container)).toBeNull();
+    expect(one.getByText("1 left")).toBeTruthy();
   });
 
-  it("shows nothing at 3 laps remaining", () => {
-    const { container } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(2)} color="#f00" />);
+  it("the group phase overrides the own count: BELL with 2 to go for a rider far from the end", () => {
+    const { container, getByText } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(1)} color="#f00" phase={phase("bell", 2)} />);
+    expect(bell(container)).not.toBeNull();
+    expect(getByText("2 left")).toBeTruthy();
+  });
+
+  it("finish phase: FLAG with 0 to go, and the rider is not shown as finished", () => {
+    const { container, getByText, queryByText } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(1)} color="#f00" phase={phase("flag", 0, true)} />);
+    expect(flag(container)).not.toBeNull();
+    expect(getByText("0 left")).toBeTruthy();
+    expect(queryByText("Finished")).toBeNull();
+  });
+
+  it("an actually finished rider shows Finished, no bell and no flag", () => {
+    const { container, getByText } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(5, "finished")} color="#f00" phase={phase("finished", 0)} />);
+    expect(getByText("Finished")).toBeTruthy();
     expect(bell(container)).toBeNull();
     expect(flag(container)).toBeNull();
-  });
-
-  it("a category-wide bell (forceBell) rings for a rider far from the end", () => {
-    const { container } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(1)} color="#f00" forceBell />);
-    expect(bell(container)).not.toBeNull();
-  });
-
-  it("the finish flag replaces the bell once the category-wide finish is on", () => {
-    const { container } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(2)} color="#f00" forceBell forceFinish />);
-    expect(flag(container)).not.toBeNull();
-    expect(bell(container)).toBeNull();
-  });
-
-  it("shows the last-lap flag at 1 lap remaining", () => {
-    const { container } = render(<RacingRider onClick={noop} onDoubleClick={noop} rider={rider(4)} color="#f00" />);
-    expect(flag(container)).not.toBeNull();
   });
 });

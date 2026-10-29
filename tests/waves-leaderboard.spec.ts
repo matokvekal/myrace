@@ -1,5 +1,5 @@
 import { test, expect, Page, Locator } from "@playwright/test";
-import { loadDemoRace, selectWave } from "./helpers";
+import { loadDemoRace, selectWave, gotoRaceMode, openRaceView, finishWave } from "./helpers";
 
 /**
  * Focused coverage for the areas the big end-to-end run doesn't isolate:
@@ -25,16 +25,21 @@ const WAVE2_BIB = 31; // a Masters 50+ rider — scheduled, never on wave 1's bo
 
 /** Phase switcher. Call-site names are the old ids (Race=setup, Start=race mode); the tabs now read Create / Race / Live. */
 async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<void> {
-  await page.getByRole("tab", { name: ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase], exact: true }).click();
+  await gotoRaceMode(page, ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase]);
 }
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / …). */
 async function openSetupTab(page: Page, name: string): Promise<void> {
+  if (name === "Results") return gotoRaceMode(page, "Results"); // its own screen now
+  // The Create tabs only exist in Create mode (not on Results / Race / Live).
+  if ((await page.getByTestId("race-mode-indicator").getAttribute("data-mode")) !== "setup") {
+    await gotoRaceMode(page, "Create");
+  }
   await page.getByRole("button", { name, exact: true }).click();
 }
 
 async function openRaceModeTab(page: Page, name: "Grid" | "Check-In" | "Board"): Promise<void> {
-  await page.getByRole("button", { name, exact: true }).click();
+  await openRaceView(page, name); // Race screen: wave bottom sheet; Board: its own race mode
 }
 
 function racingCard(page: Page, bib: number): Locator {
@@ -59,11 +64,7 @@ function scheduleRow(page: Page, name: string): Locator {
 /** Sign off wave 1 (running in the seed) so results are final. Mirrors race-flow. */
 async function finishWave1(page: Page): Promise<void> {
   await gotoPhase(page, "Start");
-  await selectWave(page, 1);
-  await openRaceModeTab(page, "Grid");
-  await page.getByRole("button", { name: /Finish Wave/i }).click();
-  await page.getByRole("button", { name: /^Yes/i }).click();
-  await expect(page.getByText(/Wave 1 finished/)).toBeVisible();
+  await finishWave(page, 1); // card Finish → Live's typed FINISH confirmation
 }
 
 // ─── The tests ───────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ test.describe("Waves, leaderboard, winners & finisher times", () => {
   // 3 ── Race-mode wave selector offers both waves ────────────────────────────
   test("race mode offers a pill for each wave", async ({ page }) => {
     await gotoPhase(page, "Start");
-    await expect(page.locator('button[class*="wavePill"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid^="timeline-wave-"]')).toHaveCount(2);
     // Both are selectable without error.
     await selectWave(page, 1);
     await selectWave(page, 2);

@@ -11,10 +11,13 @@ interface Props {
   fixedCategory?: CategoryProps;
   /** Wave for the chosen category — overrides `waveNum` when the picker is shown. */
   waveOf?: (cat: CategoryProps) => number;
+  /** CREATE > Riders: only Bib, First name, Last name, Category. Chip, team and
+   *  relegation stay available where the full form is used (Check-In). */
+  essential?: boolean;
   onDone: () => void;
 }
 
-const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCategory, waveOf, onDone }) => {
+const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCategory, waveOf, essential = false, onDone }) => {
   const { riders, addNewRider } = useRiderStore();
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -87,6 +90,44 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
     await addNewRider(newRider);
     onDone();
   };
+
+  if (essential) {
+    return (
+      <div className={styles.form} data-testid="add-rider-form">
+        <div className={styles.formTitle}>Add rider{fixedCategory ? ` to ${fixedCategory.name}` : ""}</div>
+        <input
+          className={styles.input}
+          placeholder="Bib # *"
+          type="number"
+          inputMode="numeric"
+          autoFocus
+          value={form.bibNumber}
+          onChange={(e) => { set("bibNumber", e.target.value); setError(""); }}
+        />
+        <div className={styles.row2}>
+          <input className={styles.input} dir="auto" placeholder="First name *" value={form.firstName} onChange={(e) => set("firstName", e.target.value)} />
+          <input className={styles.input} dir="auto" placeholder="Last name *" value={form.lastName} onChange={(e) => set("lastName", e.target.value)} />
+        </div>
+        {!fixedCategory && (
+          <select
+            className={styles.input}
+            aria-label="Category"
+            value={form.category}
+            disabled={categories.length === 0}
+            onChange={(e) => set("category", e.target.value)}
+          >
+            {categories.length === 0 && <option value="">No categories yet (add them in Categories)</option>}
+            {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+        )}
+        {error && <div style={{ color: "#c2182b", fontSize: 12, fontWeight: 700 }}>{error}</div>}
+        <div className={styles.formActions}>
+          <button className={styles.cancelBtn} onClick={onDone}>Cancel</button>
+          <button className={styles.saveBtn} onClick={handleSave}>Add Rider</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.form}>

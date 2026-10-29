@@ -16,7 +16,8 @@ import {
    FIELD_KEYWORDS,
    AMBIGUOUS_ALIASES,
    AMBIGUOUS_ALIAS_CAP,
-   SEED_ORDER_ALIASES
+   SEED_ORDER_ALIASES,
+   isIdColumnHeader
 } from '@/types/csv.types';
 import { fuzzyMatchScore, normalize, contains } from '@/utils/levenshtein';
 import { detectFieldForHeader } from '@/utils/csvFieldDetector';
@@ -196,12 +197,16 @@ function findBestFieldMatch(
 
    const isSeedOrderHeader = SEED_ORDER_ALIASES.has(normalized);
    const isAmbiguousHeader = AMBIGUOUS_ALIASES.has(normalized);
+   const isRankingHeader = /דירוג|rank/i.test(columnName);
 
    for (const fieldKeywords of FIELD_KEYWORDS) {
       if (usedFields.has(fieldKeywords.field)) continue;
 
       // A serial/seed-order column is the pre-race standing, never the bib.
       if (isSeedOrderHeader && fieldKeywords.field === 'bibNumber') continue;
+
+      // A ranking column ("דירוג UCI", "UCI ranking") is a ranking, never the rider's UCI ID.
+      if (isRankingHeader && fieldKeywords.field === 'uciNumber') continue;
 
       // For mixed-language columns try all keywords; otherwise restrict to detected language
       const keywords = language === 'mixed'
@@ -277,6 +282,11 @@ export async function autoMapColumns(
 
    for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
+
+      // National ID / passport columns are never imported (PRD FR-45): no
+      // candidate at all, not even a learned mapping, so the column stays
+      // unmapped and can't steal another field by fuzzy match.
+      if (isIdColumnHeader(header)) continue;
 
       const memory = await getMappingFromMemory(header);
       if (memory) {

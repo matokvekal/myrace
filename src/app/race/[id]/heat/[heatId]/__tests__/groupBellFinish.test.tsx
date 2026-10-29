@@ -12,125 +12,159 @@ vi.mock("@/services/cloud/permissions", () => ({ canForRace }));
 vi.mock("@/services/analytics/analyticsClient", () => ({ logAnalyticsEvent: vi.fn() }));
 vi.mock("react-toastify", () => ({ toast }));
 
-import { useLapRecording, MIN_LAP_MS } from "../useLapRecording";
-import { computeGroupSignals, categoryGroupKey } from "@/utils/linkedGroups";
+import { useLapRecording } from "../useLapRecording";
+import { computeGroupPhases, phaseOfRider } from "@/utils/linkedGroups";
 import { riderInCategory } from "../../../schedule/Schedule";
 import { makeRider } from "@/test/factories";
 import type { CategoryProps, RiderProps } from "@/types/types";
 
+/**
+ * The bell / flag phases through the real lap recording (taps), as the live
+ * screen wires them: the icon is what the official shows at the NEXT crossing,
+ * and a FLAG rider's next crossing is their finish. Synthetic riders.
+ */
 const START = new Date("2026-06-01T10:00:00.000Z");
+const LAP = 5 * 60 * 1000;
 const cat = (name: string, over: Partial<CategoryProps> = {}) =>
   ({ id: 1, raceUuid: "race-1", name, subCategory: null, laps: 5, lapsCounter: 0, riders: 0, startTime: null,
      isConnected: false, color: null, heat: 1, status: "running", ...over }) as CategoryProps;
-const rider = (id: number, category: string, over: Partial<RiderProps> = {}) =>
-  makeRider({ id, bibNumber: id, category, raceStatus: "running", timeStartRace: START.toISOString(), totalLaps: 5,
-    timeArrive: new Date(START.getTime() + 5 * 60 * 1000 - 2 * MIN_LAP_MS).toISOString(), ...over });
+const rider = (bib: number, category: string, over: Partial<RiderProps> = {}) =>
+  makeRider({ id: bib, bibNumber: bib, category, raceStatus: "running", timeStartRace: START.toISOString(), totalLaps: 5,
+    lapsCounter: 0, lapsDetails: [], timeArrive: null, ...over });
 
-const mount = (cats: CategoryProps[], initial: RiderProps[]) =>
+const mount = (cats: CategoryProps[], initial: RiderProps[], enabled = true) =>
   renderHook(() => {
     const [riders, setRiders] = useState(initial);
     const [displayOrder, setDisplayOrder] = useState(initial.map((r) => r.id));
-    const signals = computeGroupSignals(cats, riders);
-    const isOnTrackAfterEnd = (r: RiderProps) => {
-      const c = cats.find((x) => riderInCategory(r, x));
-      return !!c && r.raceStatus !== "finished" && signals.finish.has(categoryGroupKey(c));
+    const phases = computeGroupPhases(cats, riders, enabled);
+    const phase = (bib: number) => {
+      const p = phaseOfRider(riders.find((r) => r.bibNumber === bib)!, cats, phases);
+      return `${p.icon}:${p.remaining}`;
     };
+    const isOnTrackAfterEnd = (r: RiderProps) =>
+      cats.find((c) => riderInCategory(r, c))?.status === "finished" ||
+      (r.raceStatus !== "finished" && phaseOfRider(r, cats, phases).nextCrossingFinishes);
     const lap = useLapRecording({
       raceUuid: "race-1", persistKey: "race-1:heat:1", riders,
       updateRider: (r) => setRiders((prev) => prev.map((x) => (x.id === r.id ? r : x))),
       updateAllRiders: (all) => setRiders(all),
       circuitKm: null, isOnTrackAfterEnd, getCatColor: () => "#f00",
-      displayOrder, setDisplayOrder, boardHoldMs: 2000,
+      displayOrder, setDisplayOrder, boardHoldMs: 0, minLapMsOverride: 1000,
     });
-    return { lap, riders, signals };
+    const of = (bib: number) => riders.find((r) => r.bibNumber === bib)!;
+    return { lap, riders, phase, of };
   });
+
+type Mounted = ReturnType<typeof mount>["result"];
+/** One crossing of `bib`, a little later than the previous one. */
+const cross = (result: Mounted, bib: number) => {
+  act(() => { vi.advanceTimersByTime(LAP / 5); });
+  act(() => result.current.lap.recordLap(result.current.of(bib)));
+};
 
 beforeEach(() => {
   localStorage.clear();
   vi.useFakeTimers();
-  vi.setSystemTime(new Date(START.getTime() + 5 * 60 * 1000));
+  vi.setSystemTime(START);
   recordRaceEvent.mockReset().mockResolvedValue({});
   canForRace.mockReset().mockReturnValue(true);
 });
 
-describe("group-wide bell and finish", () => {
-  const masters = [cat("Man Masters 30-39", { linkGroup: "masters" }), cat("Women Masters 40-49", { linkGroup: "masters" })];
-  const pro = cat("Man Pro");
+describe("bell / flag phases — the 5-lap example with 112, 102 and 107", () => {
+  it("runs the four stages exactly; actual laps and crossing times are never changed", () => {
+    const elite = cat("Elite");
+    const { result } = mount([elite], [rider(112, "Elite"), rider(102, "Elite"), rider(107, "Elite")]);
+    // Before stage 1: 112 three laps, 102 two, 107 one.
+    for (const bib of [112, 102, 107, 112, 102, 112]) cross(result, bib);
 
-  it("category-wide bell (1 lap left) reaches the whole configured group, not other categories in the wave", () => {
-    const { result } = mount([...masters, pro], [
-      rider(1, "Man Masters 30-39", { lapsCounter: 4 }), // 1 to go
-      rider(2, "Women Masters 40-49", { lapsCounter: 1 }),
-      rider(3, "Man Pro", { lapsCounter: 4 }),
+    // Stage 1: 112 completed lap 3 → BELL, 2 to go; 102 and 107 normal.
+    expect(result.current.of(112).lapsCounter).toBe(3);
+    expect(result.current.phase(112)).toBe("bell:2");
+    expect(result.current.phase(102)).toBe("none:3");
+    expect(result.current.phase(107)).toBe("none:4");
+
+    // Stage 2: 112 gets the bell (lap 4) → FLAG, 1 to go; everyone else BELL, 2 to go.
+    cross(result, 112);
+    expect(result.current.phase(112)).toBe("flag:1");
+    expect(result.current.phase(102)).toBe("bell:2");
+    expect(result.current.phase(107)).toBe("bell:2");
+
+    // Stage 3: 102 crosses (gets the bell) → FLAG, 1 to go; 107 stays BELL, 2 to go.
+    cross(result, 102);
+    expect(result.current.of(102)).toMatchObject({ lapsCounter: 3, raceStatus: "running" });
+    expect(result.current.phase(102)).toBe("flag:1");
+    expect(result.current.phase(107)).toBe("bell:2");
+
+    // Stage 4: 112 crosses and finishes → Finished; 102 and 107 FLAG, 0 to go.
+    cross(result, 112);
+    expect(result.current.of(112)).toMatchObject({ lapsCounter: 5, raceStatus: "finished" });
+    expect(result.current.phase(112)).toBe("finished:0");
+    expect(result.current.phase(102)).toBe("flag:0");
+    expect(result.current.phase(107)).toBe("flag:0");
+    // Category-wide finish display ≠ a recorded finish: nobody else is finished, laps untouched.
+    expect(result.current.of(102)).toMatchObject({ lapsCounter: 3, raceStatus: "running" });
+    expect(result.current.of(107)).toMatchObject({ lapsCounter: 1, raceStatus: "running" });
+    expect(result.current.of(107).lapsDetails).toHaveLength(1);
+
+    // Their next crossings finish them, each with their own laps and time.
+    cross(result, 107);
+    expect(result.current.of(107)).toMatchObject({ lapsCounter: 2, raceStatus: "finished" });
+    cross(result, 102);
+    expect(result.current.of(102)).toMatchObject({ lapsCounter: 4, raceStatus: "finished" });
+    expect(Date.parse(String(result.current.of(102).timeArrive))).toBeGreaterThan(Date.parse(String(result.current.of(107).timeArrive)));
+  });
+
+  it("a FLAG rider who crosses before the leader finishes is the first finish", () => {
+    const { result } = mount([cat("Elite")], [rider(112, "Elite"), rider(102, "Elite"), rider(107, "Elite")]);
+    for (const bib of [112, 112, 112, 112]) cross(result, bib); // 112 got the bell
+    cross(result, 102); // 102 gets the bell → FLAG
+    cross(result, 102); // 102's next crossing: finish
+    expect(result.current.of(102)).toMatchObject({ lapsCounter: 2, raceStatus: "finished" });
+    expect(result.current.phase(112)).toBe("flag:0");
+    expect(result.current.phase(107)).toBe("flag:0");
+  });
+
+  it("undoing the leader's finish restores the earlier phase for everyone", () => {
+    const { result } = mount([cat("Elite")], [rider(112, "Elite"), rider(107, "Elite")]);
+    for (let i = 0; i < 5; i++) cross(result, 112);
+    expect(result.current.phase(107)).toBe("flag:0");
+    act(() => { result.current.lap.revertLap(result.current.of(112)); });
+    expect(result.current.of(112)).toMatchObject({ lapsCounter: 4, raceStatus: "running" });
+    expect(result.current.phase(112)).toBe("flag:1");
+    expect(result.current.phase(107)).toBe("bell:2");
+  });
+
+  it("an explicit Finish Group shares the phases across categories and waves; other categories stay independent", () => {
+    const men = cat("Men L2", { linkGroup: "1", heat: 1 });
+    const women = cat("Women L2", { linkGroup: "1", heat: 3, laps: 3 });
+    const kids = cat("Kids", { heat: 1 });
+    const { result } = mount([men, women, kids], [
+      rider(1, "Women L2", { totalLaps: 3 }), rider(2, "Men L2"), rider(3, "Kids"),
     ]);
-    expect(result.current.signals.bell.has("g:masters")).toBe(true);
-    expect(result.current.signals.bell.has(categoryGroupKey(pro))).toBe(true); // Pro has its own leader at 1 to go
-    expect(result.current.signals.bell.has(categoryGroupKey(masters[0]))).toBe(true);
-    expect(result.current.signals.finish.size).toBe(0);
+    cross(result, 2);
+    cross(result, 1);
+    cross(result, 1); // women's rider gets the bell (lap 2 of 3)
+    expect(result.current.phase(1)).toBe("flag:1");
+    expect(result.current.phase(2)).toBe("bell:2");
+    expect(result.current.phase(3)).toBe("none:5");
+    cross(result, 1); // first finish of the Finish Group
+    expect(result.current.phase(2)).toBe("flag:0");
+    expect(result.current.phase(3)).toBe("none:5");
   });
 
-  it("leader finishing flags the group; followers finish on their NEXT crossing keeping their own laps", () => {
-    const { result } = mount([...masters, pro], [
-      rider(1, "Man Masters 30-39", { lapsCounter: 4 }),
-      rider(2, "Women Masters 40-49", { lapsCounter: 1 }),
-      rider(3, "Man Pro", { lapsCounter: 1 }),
-    ]);
-    act(() => result.current.lap.recordLap(result.current.riders[0]));
-    expect(result.current.riders[0].raceStatus).toBe("finished");
-    expect(result.current.signals.finish.has("g:masters")).toBe(true);
-
-    // Follower is flagged but NOT yet finished.
-    expect(result.current.riders[1].raceStatus).toBe("running");
-    act(() => result.current.lap.recordLap(result.current.riders[1]));
-    const f = result.current.riders[1];
-    expect(f).toMatchObject({ raceStatus: "finished", lapsCounter: 2 });
-    expect(f.lapsDetails).toHaveLength(1);
-    expect(f.timeArrive).toBeTruthy();
-
-    // Independent group is untouched.
-    act(() => result.current.lap.recordLap(result.current.riders[2]));
-    expect(result.current.riders[2]).toMatchObject({ raceStatus: "running", lapsCounter: 2 });
+  it("with first-finish-all-finish off, only each rider's own count drives the icons", () => {
+    const { result } = mount([cat("Elite")], [rider(112, "Elite"), rider(107, "Elite")], false);
+    for (let i = 0; i < 4; i++) cross(result, 112);
+    expect(result.current.phase(112)).toBe("flag:1");
+    expect(result.current.phase(107)).toBe("none:5");
   });
 
-  it("undo of the leader's finish restores the whole group; redo reapplies it", () => {
-    const { result } = mount(masters, [
-      rider(1, "Man Masters 30-39", { lapsCounter: 4 }),
-      rider(2, "Women Masters 40-49", { lapsCounter: 1 }),
-    ]);
-    const before = result.current.riders[0];
-    act(() => result.current.lap.recordLap(before));
-    expect(result.current.signals.finish.has("g:masters")).toBe(true);
-
-    act(() => { result.current.lap.revertLap(result.current.riders[0]); });
-    expect(result.current.riders[0]).toMatchObject({ raceStatus: "running", lapsCounter: 4 });
-    expect(result.current.signals.finish.size).toBe(0);
-    expect(result.current.signals.bell.has("g:masters")).toBe(true); // 1 to go: still bell
-
-    act(() => { vi.advanceTimersByTime(1000); });
-    act(() => result.current.lap.recordLap(result.current.riders[0])); // redo
-    expect(result.current.riders[0].raceStatus).toBe("finished");
-    expect(result.current.signals.finish.has("g:masters")).toBe(true);
-  });
-
-  it("is derived from rider data, so it survives a reload (persisted riders round-trip)", () => {
-    const riders = [
-      rider(1, "Man Masters 30-39", { lapsCounter: 5, raceStatus: "finished" }),
-      rider(2, "Women Masters 40-49", { lapsCounter: 1 }),
-    ];
-    const reloaded = JSON.parse(JSON.stringify(riders));
-    const s = computeGroupSignals(masters, reloaded);
-    expect(s.finish.has("g:masters")).toBe(true);
-    expect(s.bell.has("g:masters")).toBe(false); // finish flag replaces the bell
-  });
-
-  it("an explicit linkGroup joins otherwise unrelated categories; keeps separate classification", () => {
-    const a = cat("Man Elite", { linkGroup: "Open" });
-    const b = cat("Man Pro", { linkGroup: " open " });
-    expect(categoryGroupKey(a)).toBe(categoryGroupKey(b));
-    const s = computeGroupSignals([a, b], [rider(1, "Man Elite", { lapsCounter: 5, raceStatus: "finished" })]);
-    expect(s.finish.has(categoryGroupKey(b))).toBe(true);
-    // category identity (used for results/medals) is unchanged by grouping
-    expect(riderInCategory(rider(2, "Man Pro"), b)).toBe(true);
-    expect(riderInCategory(rider(2, "Man Pro"), a)).toBe(false);
+  it("is derived from recorded crossings only, so a reload computes the same phases", () => {
+    const { result } = mount([cat("Elite")], [rider(112, "Elite"), rider(102, "Elite")]);
+    for (let i = 0; i < 4; i++) cross(result, 112);
+    const reloaded = JSON.parse(JSON.stringify(result.current.riders)) as RiderProps[];
+    const phases = computeGroupPhases([cat("Elite")], reloaded);
+    const p = phaseOfRider(reloaded.find((r) => r.bibNumber === 102)!, [cat("Elite")], phases);
+    expect(`${p.icon}:${p.remaining}`).toBe("bell:2");
   });
 });

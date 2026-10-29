@@ -5,6 +5,11 @@ import useRaceStore from "@/stores/racesStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import CategoryManager from "../../components/categoryManager/CategoryManager";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import { riderDeletionBlock, riderLabel } from "@/utils/riderDeletion";
+import { normalizeColor } from "@/utils/bibColors";
+import { isValidUciId, normalizeUciId } from "@/utils/uciId";
+import { toast } from "react-toastify";
 
 interface Props {
   raceUuid: string;
@@ -22,6 +27,11 @@ interface FormState {
   heat: string;
   team: string;
   chipNumber: string;
+  /** Optional 11-digit UCI ID. */
+  uciNumber: string;
+  /** Per-rider bib colour overrides (empty = the category's). */
+  bibColor: string;
+  bibTextColor: string;
 }
 
 interface ParsedRow {
@@ -46,7 +56,10 @@ function emptyForm(cats: CategoryProps[]): FormState {
     categoryColor: cats[0]?.color ?? "#63A6FC",
     heat: String(cats[0]?.heat ?? 1),
     team: "",
-    chipNumber: ""
+    chipNumber: "",
+    uciNumber: "",
+    bibColor: "",
+    bibTextColor: ""
   };
 }
 
@@ -60,7 +73,10 @@ function riderToForm(r: RiderProps): FormState {
     categoryColor: r.color ?? "#63A6FC",
     heat: String(r.heat),
     team: r.team ?? "",
-    chipNumber: r.chipNumber ?? ""
+    chipNumber: r.chipNumber ?? "",
+    uciNumber: r.uciNumber ?? "",
+    bibColor: r.bibColor ?? "",
+    bibTextColor: r.bibTextColor ?? ""
   };
 }
 
@@ -162,6 +178,19 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
 
   const saveForm = async () => {
     if (!form.bibNumber || !form.firstName || !form.lastName) return;
+    // UCI ID: optional, 11 digits (spaces/dashes ignored). Bib colours: a name or #RRGGBB, or empty.
+    const uci = normalizeUciId(form.uciNumber);
+    if (!isValidUciId(uci)) {
+      toast.error("UCI ID must be 11 digits (or empty).");
+      return;
+    }
+    const bibColor = normalizeColor(form.bibColor);
+    const bibTextColor = normalizeColor(form.bibTextColor);
+    if ((form.bibColor.trim() && !bibColor) || (form.bibTextColor.trim() && !bibTextColor)) {
+      toast.error("Bib color not recognised — use a colour name or #RRGGBB.");
+      return;
+    }
+    const extras = { uciNumber: uci, bibColor, bibTextColor };
 
     if (addingNew) {
       const cat = categories.find(
@@ -201,7 +230,8 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
         image: null,
         comment: null,
         team: form.team || null,
-        chipNumber: form.chipNumber || undefined
+        chipNumber: form.chipNumber || undefined,
+        ...extras
       };
       await addNewRider(newRider);
       if (race) {
@@ -230,7 +260,8 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
         heat: parseInt(form.heat) || existing.heat,
         color: form.categoryColor,
         team: form.team || null,
-        chipNumber: form.chipNumber || undefined
+        chipNumber: form.chipNumber || undefined,
+        ...extras
       };
       await updateRider(updatedRider);
       if (race) {
@@ -368,12 +399,23 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
     setImportPreview(null);
   };
 
-  const handleDelete = async (id: number) => {
-    if (deleteConfirm !== id) {
-      setDeleteConfirm(id);
+  // Delete → a confirmation dialog with the rider's name and bib; nothing changes
+  // until Confirm. Riders with race activity are refused (give them a status).
+  const askDelete = (rider: RiderProps) => {
+    const blocked = riderDeletionBlock(rider);
+    if (blocked) {
+      toast.warn(`${riderLabel(rider)} cannot be deleted: ${blocked}. Set a status (DNS/DNF/DSQ) instead.`);
       return;
     }
+    setDeleteConfirm(rider.id);
+  };
+
+  const handleDelete = async (id: number) => {
     const existing = raceRiders.find((r) => r.id === id);
+    if (existing && riderDeletionBlock(existing)) {
+      setDeleteConfirm(null);
+      return;
+    }
     await deleteRider(id);
     if (race && existing) {
       AuditLogService.log({
@@ -547,6 +589,33 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
             value={form.team}
             onChange={(e) => setF("team", e.target.value)}
           />
+          <input
+            className={styles.input}
+            placeholder="UCI ID (11 digits, optional)"
+            aria-label="UCI ID"
+            inputMode="numeric"
+            data-testid="rider-uci-id"
+            value={form.uciNumber}
+            onChange={(e) => setF("uciNumber", e.target.value)}
+          />
+          <input
+            className={styles.input}
+            dir="auto"
+            placeholder="Bib background (empty = category)"
+            aria-label="Bib Background Color"
+            data-testid="rider-bib-color"
+            value={form.bibColor}
+            onChange={(e) => setF("bibColor", e.target.value)}
+          />
+          <input
+            className={styles.input}
+            dir="auto"
+            placeholder="Bib text color (empty = category)"
+            aria-label="Bib Text Color"
+            data-testid="rider-bib-text-color"
+            value={form.bibTextColor}
+            onChange={(e) => setF("bibTextColor", e.target.value)}
+          />
           <div className={styles.formActions}>
             <button className={styles.cancelBtn} onClick={cancelForm}>
               Cancel
@@ -598,16 +667,31 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
                 ✎
               </button>
               <button
-                className={`${styles.deleteBtn} ${deleteConfirm === rider.id ? styles.deleteConfirming : ""}`}
-                onClick={() => handleDelete(rider.id)}
-                onBlur={() => setDeleteConfirm(null)}
+                className={styles.deleteBtn}
+                onClick={() => askDelete(rider)}
+                aria-label={`Delete ${riderLabel(rider)}`}
+                title="Delete rider"
               >
-                {deleteConfirm === rider.id ? "Sure?" : "✕"}
+                ✕
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      {deleteConfirm !== null && (() => {
+        const target = raceRiders.find((r) => r.id === deleteConfirm);
+        if (!target) return null;
+        return (
+          <DeleteConfirmModal
+            requireTyping={false}
+            title="Delete rider?"
+            description={`${riderLabel(target)} will be removed from this race. This cannot be undone.`}
+            onConfirm={() => handleDelete(target.id)}
+            onCancel={() => setDeleteConfirm(null)}
+          />
+        );
+      })()}
     </div>
   );
 };

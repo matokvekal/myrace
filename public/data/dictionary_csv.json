@@ -87,13 +87,7 @@
     "מין"
   ],
 
-  "heat": [
-    "heat",
-    "race",
-    "wave",
-    "start wave",
-    "flight"
-  ],
+  "heat": ["heat", "wave", "start wave"],
 
   "total_laps": [
     "laps",

@@ -13,6 +13,7 @@ import { closeRace, refreshMemberSockets } from "../realtime/socket.js";
 import { projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
 import { deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
+import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
 import { accessSummary, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
 import { processActions } from "./actions.js";
 import { deleteRaceRows, insertRace, loadState } from "./repo.js";
@@ -27,7 +28,7 @@ function blankRace(uuid: string, ownerUserId: string, info: Partial<SharedRace>)
   return {
     uuid, ownerUserId, raceId: null, owner: "", name: "", location: "", time: "", date: "", image: "", heat: "", status: "upcoming",
     type: "", raceType: "MTB", level: "", orgenizer: "", manager: "", phone: "", takanon: "", site: "", map: "", distance: 0,
-    isActive: true, autoColor: null, leaderFinishAll: null, waveColors: null, mapCenter: null, mapZoom: null, trackPoints: null,
+    isActive: true, autoColor: null, leaderFinishAll: null, minLapSeconds: null, waveColors: null, mapCenter: null, mapZoom: null, trackPoints: null,
     mapMarkers: null, tracks: null, joinCode: randomCode(8), lastSeq: 0, createdAt: nowIso(), lastUpdateAt: nowIso(),
     ...info,
   };
@@ -41,6 +42,7 @@ const raceInfo = z
     orgenizer: z.string().max(200), manager: z.string().max(200), phone: z.string().max(50), takanon: z.string().max(100_000),
     site: z.string().max(500), map: z.string().max(2_000_000), distance: z.number(), isActive: z.boolean(),
     autoColor: z.boolean().nullable(), leaderFinishAll: z.boolean().nullable(),
+    minLapSeconds: z.number().int().min(0).max(3600).nullable(),
     waveColors: z.record(z.string(), z.string()).nullable(), mapCenter: z.object({ lat: z.number(), lng: z.number() }).nullable(),
     mapZoom: z.number().nullable(), trackPoints: z.array(z.tuple([z.number(), z.number()])).nullable(),
     mapMarkers: z.array(z.any()).nullable(), tracks: z.array(z.any()).nullable(),
@@ -56,7 +58,8 @@ async function addOwnerMembership(d: import("../db/pool.js").Db, raceUuid: strin
 racesRouter.post("/", route(async (req, res) => {
   const info = raceInfo.parse(req.body);
   const userId = authed(req).userId;
-  const state: RaceState = { race: blankRace(randomUUID(), userId, info as Partial<SharedRace>), categories: {}, riders: {} };
+  // A new race gets the current default minimum lap (180 s) unless it says otherwise.
+  const state: RaceState = { race: blankRace(randomUUID(), userId, { minLapSeconds: DEFAULT_MIN_LAP_SECONDS, ...(info as Partial<SharedRace>) }), categories: {}, riders: {} };
   await tx(async (d) => {
     await insertRace(d, state);
     await addOwnerMembership(d, state.race.uuid, userId);
@@ -84,7 +87,8 @@ racesRouter.post("/publish", route(async (req, res) => {
     state.categories[c.uuid] = {
       uuid: c.uuid, raceUuid, name: c.name, subCategory: c.subCategory ?? null, laps: c.laps ?? null, startTime: c.startTime ?? null,
       isConnected: false, color: c.color ?? null, heat: c.heat ?? null, status: "upcoming", linkedFinish: null,
-      linkGroup: c.linkGroup ?? null, startedAt: null, finishedAt: null, importOrder: c.importOrder ?? null,
+      linkGroup: c.linkGroup ?? null, ignored: false, bibColor: c.bibColor ?? null, bibTextColor: c.bibTextColor ?? null,
+      startedAt: null, finishedAt: null, importOrder: c.importOrder ?? null,
     } satisfies SharedCategory;
   }
   const bibs = body.riders.map((r) => r.bibNumber).filter((b) => b != null);
@@ -93,6 +97,7 @@ racesRouter.post("/publish", route(async (req, res) => {
       ...r, raceUuid, middleName: r.middleName ?? null, bibNumber: r.bibNumber ?? null, team: r.team ?? null, chipNumber: r.chipNumber ?? null,
       federation: r.federation ?? null, points: r.points ?? null, subCategory: r.subCategory ?? null, heat: r.heat ?? null,
       standing: r.standing ?? null, flag: r.flag ?? null, uciPoints: r.uciPoints ?? null, uciNumber: r.uciNumber ?? null,
+      bibColor: r.bibColor ?? null, bibTextColor: r.bibTextColor ?? null,
       image: r.image ?? null, comment: r.comment ?? null, checked: r.checked ?? false, status: r.status ?? "standing",
       viewOrder: 0, raceStatus: "upcoming", timeStartRace: null, timeArrive: null, lapsCounter: 0, lapsDetails: [], totalLaps: 0,
       elapsedLastLap: null, elapsedTimeFromStart: null, distance: null, position_start: null, position_category: 0, position_race: 0,

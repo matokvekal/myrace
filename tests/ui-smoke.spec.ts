@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard } from "./helpers";
+import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard, gotoRaceMode } from "./helpers";
 
 /**
  * Browser smoke test of the post-race features, on the built-in demo race.
@@ -11,12 +11,13 @@ import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard } from ".
  */
 
 test.describe("UI smoke", () => {
-  test("phase tabs read Create / Race / Live", async ({ page }) => {
+  test("race sidebar lists All Races, then Create / Race / Live / Results", async ({ page }) => {
     await loadDemoRace(page);
-    for (const name of ["Create", "Race", "Live"]) {
-      await expect(page.getByRole("tab", { name, exact: true })).toBeVisible();
-    }
-    await expect(page.getByRole("tab", { name: "Start", exact: true })).toHaveCount(0);
+    await page.getByTestId("race-menu-btn").click();
+    const ids = ["all", "setup", "race", "live", "results"];
+    const labels = await Promise.all(ids.map((id) => page.getByTestId(`race-nav-${id}`).innerText()));
+    expect(labels.map((l) => l.trim())).toEqual(["All Races", "Create", "Race", "Live", "Results"]);
+    await expect(page.getByTestId("race-nav-setup")).toHaveAttribute("aria-current", "page");
   });
 
   test("Schedule: open a rider, edit the name, see it update", async ({ page }) => {
@@ -39,6 +40,7 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("rider-category-header").first()).toBeVisible();
     const before = await page.getByTestId("rider-category-header").count();
 
+    await page.getByTestId("rider-tools-toggle").click(); // search sits behind the search icon
     const box = page.getByTestId("rider-search");
     await box.fill("1");
     const afterBib = await page.getByTestId("rider-category-header").count();
@@ -55,6 +57,7 @@ test.describe("UI smoke", () => {
 
     // category (upcoming one: the first running categories are editable too, finished are not)
     await page.locator('[data-testid^="edit-color-"]:not([disabled])').first().click();
+    await page.getByTestId("custom-color").click();
     await page.getByTestId("color-input").evaluate((el: HTMLInputElement) => {
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       set.call(el, "#ff8800");
@@ -65,6 +68,7 @@ test.describe("UI smoke", () => {
 
     // wave
     await page.getByTestId("edit-wave-color-2").click();
+    await page.getByTestId("custom-color").click();
     await page.getByTestId("wave-color-input").evaluate((el: HTMLInputElement) => {
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       set.call(el, "#00aa55");
@@ -75,12 +79,16 @@ test.describe("UI smoke", () => {
     // persisted: reopening shows the saved colour
     await page.getByTestId("edit-wave-color-2").click();
     await expect(page.getByText(/Current #00aa55/i)).toBeVisible();
+    // A preset swatch saves at once and closes the dialog
+    await page.getByTestId("swatch-1E88E5").click();
+    await expect(page.getByTestId("swatch-1E88E5")).toHaveCount(0);
+    await page.getByTestId("edit-wave-color-2").click();
+    await expect(page.getByTestId("swatch-1E88E5")).toHaveAttribute("aria-pressed", "true");
   });
 
   test("Board: complete board with expandable results", async ({ page }) => {
     await loadDemoRace(page);
-    await page.getByRole("tab", { name: "Race", exact: true }).click();
-    await page.getByRole("button", { name: "Board", exact: true }).click();
+    await gotoRaceMode(page, "Board"); // Board is its own race mode (sidebar, below Results)
     await expect(page.getByTestId("board-wave-1")).toBeVisible();
     await expect(page.getByTestId("board-wave-2")).toBeVisible();
     const toggle = page.locator('[data-testid^="board-expand-"]').first();
@@ -112,17 +120,22 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("redo-finish")).toHaveCount(0);
   });
 
-  test("Live: individual bell at 2 laps, last-lap flag at 1 lap", async ({ page }) => {
+  test("Live: the leader got the bell → leader FLAG (1 left), the rest of the category BELL (2 left)", async ({ page }) => {
     await openLiveDemo(page);
-    // The demo seeds Elite Men mid-race: leader on 6/7 (flag) with others further back.
-    await expect(page.locator('[data-testid^="racing-rider-"] [title^="Last lap"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid^="racing-rider-"] [title^="2 laps left"]').first()).toBeVisible();
+    // The demo seeds Elite Men mid-race: leader on 6/7 (got the bell) with others
+    // further back — the leader shows the FLAG, the others the BELL with 2 to go.
+    const flags = page.locator('[data-testid^="racing-rider-"]:has([data-testid="finish-flag"])');
+    await expect(flags.first()).toBeVisible();
+    await expect(flags.first()).toContainText("1 left");
+    const bells = page.locator('[data-testid^="racing-rider-"]:has([data-testid="bell"])');
+    expect(await bells.count()).toBeGreaterThan(1);
+    await expect(bells.first()).toContainText("2 left");
   });
 
   test("Results: one click from Live, grouped Wave → Category, Back returns to Live", async ({ page }) => {
     await openLiveDemo(page);
     const liveUrl = page.url();
-    await page.getByTestId("results-btn").click();
+    await gotoRaceMode(page, "Results");
     await expect(page).toHaveURL(/\/results$/);
     await expect(page.getByText(/^Wave 1$/).first()).toBeVisible();
     await expect(page.getByTestId("results-category").first()).toBeVisible();
@@ -136,17 +149,17 @@ test.describe("UI smoke", () => {
     if ((await chips.count()) > 1) await chips.nth(1).click();
     await expect(page).toHaveURL(/\/results$/);
 
-    await page.getByTestId("results-back").click();
+    await gotoRaceMode(page, "Live");
     await expect(page).toHaveURL(liveUrl);
     await expect(page.locator('[data-testid^="racing-rider-"]').first()).toBeVisible();
   });
 
   test("Results: also reachable from the Race screen and Back returns there", async ({ page }) => {
     await loadDemoRace(page);
-    await page.getByRole("tab", { name: "Race", exact: true }).click();
-    await page.getByTestId("results-btn").click();
+    await gotoRaceMode(page, "Race");
+    await gotoRaceMode(page, "Results");
     await expect(page.getByTestId("results-category").first()).toBeVisible();
-    await page.getByTestId("results-back").click();
-    await expect(page.getByRole("tab", { name: "Race", exact: true })).toHaveAttribute("aria-selected", "true");
+    await gotoRaceMode(page, "Race");
+    await expect(page.getByTestId("race-mode-indicator")).toHaveAttribute("data-mode", "race");
   });
 });

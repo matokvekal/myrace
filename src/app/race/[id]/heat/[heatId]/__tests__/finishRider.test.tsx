@@ -13,7 +13,7 @@ vi.mock("@/services/analytics/analyticsClient", () => ({ logAnalyticsEvent: vi.f
 vi.mock("react-toastify", () => ({ toast }));
 
 import { useLapRecording, MIN_LAP_MS } from "../useLapRecording";
-import { computeGroupSignals } from "@/utils/linkedGroups";
+import { computeGroupPhases, categoryGroupKey } from "@/utils/linkedGroups";
 import { makeRider } from "@/test/factories";
 import type { CategoryProps, RiderProps } from "@/types/types";
 
@@ -66,7 +66,7 @@ describe("manual Finish Race", () => {
       startTime: null, isConnected: false, color: null, heat: 1 } as CategoryProps;
     const { result } = mount([rider(1, "Man Pro"), rider(2, "Man Pro")]);
     act(() => { result.current.lap.finishRider(result.current.byId(1)); });
-    expect(computeGroupSignals([cat], result.current.riders).finish.size).toBe(0);
+    expect(computeGroupPhases([cat], result.current.riders).get(categoryGroupKey(cat))?.finishAt ?? null).toBeNull();
   });
 
   it("undo restores the exact pre-finish rider and offers redo", () => {
@@ -121,7 +121,7 @@ describe("manual Finish Race", () => {
     const id = result.current.lap.riderActions[0].id;
     act(() => { result.current.lap.cancelAction(id); });
     act(() => { result.current.lap.redoFinish(id); });
-    expect(computeGroupSignals([cat], result.current.riders).finish.size).toBe(0);
+    expect(computeGroupPhases([cat], result.current.riders).get(categoryGroupKey(cat))?.finishAt ?? null).toBeNull();
   });
 
   it("redo is refused once the rider changed after the undo", () => {

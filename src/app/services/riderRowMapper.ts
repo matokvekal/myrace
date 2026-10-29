@@ -1,7 +1,10 @@
 import type { ColumnMapping } from "@/types/csv.types";
+import { isIdColumnHeader } from "@/types/csv.types";
 import type { RiderProps } from "@/types/types";
 import { splitFullName } from "@/services/csvMapper";
 import useClubDictionaryStore from "@/stores/clubDictionaryStore";
+import { normalizeColor } from "@/utils/bibColors";
+import { normalizeUciId } from "@/utils/uciId";
 
 /**
  * Build a rider from one parsed CSV/scan row using the resolved column mappings.
@@ -26,6 +29,9 @@ export function rowToRider(
 
   mappings.forEach((mapping, colIdx) => {
     if (!mapping.targetField) return;
+    // National ID / passport values are never stored, whatever the column was
+    // mapped to — including a saved template or a manual "Keep as info" (FR-45).
+    if (isIdColumnHeader(mapping.sourceColumn)) return;
     const value = row[colIdx]?.trim() || "";
 
     switch (mapping.targetField) {
@@ -112,10 +118,13 @@ export function rowToRider(
         data.lastNameEnglish = value || null;
         break;
       case "uciNumber":
-        data.uciNumber = value || null;
+        data.uciNumber = normalizeUciId(value);
         break;
-      case "idNumber":
-        data.idNumber = value || null;
+      case "bibColor":
+        data.bibColor = normalizeColor(value);
+        break;
+      case "bibTextColor":
+        data.bibTextColor = normalizeColor(value);
         break;
       case "birthDate":
         data.birthDate = value || null;
@@ -148,7 +157,6 @@ export function rowToRider(
   const EXTRA_LABELS: Array<[string, string]> = [
     ["uciNumber", "UCI Number"],
     ["uciPoints", "UCI Points"],
-    ["idNumber", "ID Number"],
     ["birthDate", "Birth Date"],
     ["federationNumber", "Federation Number"],
     ["federationChip", "Federation Chip"],
@@ -202,6 +210,72 @@ export function rowToRider(
     uciPoints: data.uciPoints ?? null,
     federation: data.federation ?? null,
     uciNumber: data.uciNumber ?? null,
+    bibColor: data.bibColor ?? null,
+    bibTextColor: data.bibTextColor ?? null,
     extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined
   };
+}
+
+/** Why an import row does not become a rider. */
+export type ImportSkipReason = "blank" | "header" | "invalid";
+
+const norm = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * Whether a data row must be skipped instead of becoming a rider:
+ *   blank   — every cell empty;
+ *   header  — the header row again (files with one table per wave/category
+ *             repeat it): at least two cells, and at least half of the
+ *             non-empty cells, equal a header cell of the file;
+ *   invalid — no rider identity: no bib (a positive number) and no name.
+ * A header row imported as data became a rider named after the column titles
+ * ("שם פרטי שם משפחה", bib 0) in a category and wave named after the column
+ * titles — an extra wave numbered after the real ones.
+ */
+export function importSkipReason(row: string[], headers: string[], mappings: ColumnMapping[]): ImportSkipReason | null {
+  const cells = row.map(norm);
+  const filled = cells.filter(Boolean);
+  if (filled.length === 0) return "blank";
+
+  const headerSet = new Set(headers.map(norm).filter(Boolean));
+  const asHeader = filled.filter((c) => headerSet.has(c)).length;
+  if (asHeader >= 2 && asHeader * 2 >= filled.length) return "header";
+
+  const at = (field: ColumnMapping["targetField"]) => {
+    const i = mappings.findIndex((m) => m.targetField === field);
+    return i >= 0 ? cells[i] ?? "" : "";
+  };
+  const bib = parseInt(at("bibNumber"), 10);
+  const hasName = !!(at("firstName") || at("lastName") || at("fullName"));
+  if (!(bib > 0) && !hasName) return "invalid";
+  return null;
+}
+
+/**
+ * The rows that become riders, and the ones skipped (1-based data-row number,
+ * reason). Used by every import path before numbering text waves, so a skipped
+ * row can never create a wave.
+ */
+export function filterImportRows(rows: string[][], headers: string[], mappings: ColumnMapping[]) {
+  const kept: string[][] = [];
+  const skipped: { row: number; reason: ImportSkipReason }[] = [];
+  rows.forEach((row, i) => {
+    const reason = importSkipReason(row, headers, mappings);
+    if (reason) skipped.push({ row: i + 1, reason });
+    else kept.push(row);
+  });
+  return { rows: kept, skipped };
+}
+
+/** Text waves ("Wave A", "מקצה 1") numbered 1, 2, … in order of first appearance, from rows that become riders only. */
+export function buildHeatNameMap(rows: string[][], mappings: ColumnMapping[]): Map<string, number> {
+  const heatNameToNumber = new Map<string, number>();
+  const idx = mappings.findIndex((m) => m.targetField === "heat");
+  if (idx < 0) return heatNameToNumber;
+  let next = 1;
+  for (const row of rows) {
+    const val = row[idx]?.trim();
+    if (val && isNaN(Number(val)) && !heatNameToNumber.has(val)) heatNameToNumber.set(val, next++);
+  }
+  return heatNameToNumber;
 }

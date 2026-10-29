@@ -60,18 +60,21 @@ export const UNDOABLE_ACTION_TYPES = ["AddLap", "RiderFinished"] as const satisf
 export type StatusCorrectionValue = "standing" | "running" | "DNF" | "DSQ" | "DNS";
 
 /** Category fields a `CategoryEdited` may change. */
-export type CategoryEditableField = "name" | "laps" | "heat" | "startTime" | "color" | "linkGroup" | "linkedFinish" | "isConnected";
+export type CategoryEditableField = "name" | "laps" | "heat" | "startTime" | "color" | "linkGroup" | "linkedFinish" | "isConnected" | "ignored" | "bibColor" | "bibTextColor";
 /** Fields of a category a Start commissaire may change (start times, wave assignment). */
 export const START_EDITABLE_CATEGORY_FIELDS = ["startTime", "heat"] as const satisfies readonly CategoryEditableField[];
 
 /** A category as created by `CategoryAdded` / `RidersImported` (uuid made on the Device). */
-export type NewCategory = Pick<SharedCategory, "uuid" | "name" | "subCategory" | "laps" | "heat" | "startTime" | "color" | "linkGroup" | "importOrder">;
+export type NewCategory = Pick<SharedCategory, "uuid" | "name" | "subCategory" | "laps" | "heat" | "startTime" | "color" | "linkGroup" | "importOrder"> &
+  Partial<Pick<SharedCategory, "bibColor" | "bibTextColor">>;
 /** A rider as created by `RiderAdded` / `RidersImported`: identity and start-list fields only. */
-export type NewRider = Pick<SharedRider, "uuid" | RiderIdentityField | "standing" | "flag" | "uciPoints" | "uciNumber" | "image" | "comment">;
+export type NewRider = Pick<SharedRider, "uuid" | Exclude<RiderIdentityField, "bibColor" | "bibTextColor"> | "standing" | "flag" | "uciPoints" | "uciNumber" | "image" | "comment"> &
+  Partial<Pick<SharedRider, "bibColor" | "bibTextColor">>;
 
 
 export interface ActionPayloads {
-  AddLap: { riderUuid: RiderUuid };
+  /** recovered: a missed passage entered afterwards (RECAP), at its estimated time; enteredAt = when it was entered. */
+  AddLap: { riderUuid: RiderUuid; recovered?: true; enteredAt?: string };
   Undo: { targetActionId: ActionId };
   RiderFinished: { riderUuid: RiderUuid };
   LapCountCorrection: { riderUuid: RiderUuid; laps: number };

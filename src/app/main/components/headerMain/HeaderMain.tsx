@@ -1,52 +1,76 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styles from "./headerMain.module.css";
 import Images from "@/constants/Images";
 import Button from "@/components/ui/Button";
 import Version from "@/components/Version/Version";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useDataStore } from "@/stores/appStore";
 import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
-import { Bike, Download, Gamepad2, Globe, LogOut, Mail, Menu, MessageCircle, Palette, Timer, UserRound, X } from "lucide-react";
+import {
+  Bike, ChevronDown, Download, FileSpreadsheet, Globe, House, LifeBuoy, LogIn, LogOut,
+  Mail, Menu, MessageCircle, Palette, Smartphone, Timer, X,
+} from "lucide-react";
 // Relative: tsconfig only aliases specific "@/…" prefixes, and config isn't one.
 import { VERSION } from "../../../config/index";
 import { SUPPORTED_LANGUAGES } from "../../../i18n/i18n";
 import RiderFlag from "../../../race/components/riderFlag/RiderFlag";
 import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useSkin, type Skin } from "@/hooks/useSkin";
-import { useJokerMode } from "@/hooks/useJokerMode";
-import { BOARD_HOLD_OPTIONS, useBoardHold } from "@/stores/boardHoldStore";
 import { usePwaInstall, isIos } from "@/components/pwa/usePwaInstall";
+import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { toast } from "react-toastify";
 
-const THEME_OPTIONS: { value: Theme; label: string; bg: string; accent: string; text: string }[] = [
-  { value: 'light',    label: 'Light',    bg: '#f5f8fc', accent: '#63a6fc', text: '#14243c' },
-  { value: 'dark',     label: 'Dark',     bg: '#161b22', accent: '#63a6fc', text: '#e4e9f0' },
-  { value: 'contrast', label: 'Sun',      bg: '#ffffff', accent: '#0057ff', text: '#000000' },
+const THEME_OPTIONS: { value: Theme; labelKey: string; label: string; bg: string; accent: string }[] = [
+  { value: 'light',    labelKey: 'prefs.themeLight', label: 'Light', bg: '#f5f8fc', accent: '#63a6fc' },
+  { value: 'dark',     labelKey: 'prefs.themeDark',  label: 'Dark',  bg: '#161b22', accent: '#63a6fc' },
+  { value: 'contrast', labelKey: 'prefs.themeSun',   label: 'Sun',   bg: '#ffffff', accent: '#0057ff' },
 ];
 
 /** Where side-menu feedback lands. */
 const FEEDBACK_EMAIL = "info@commissaire.us";
 
 const SKIN_OPTIONS: { value: Skin; label: string; bg: string; radius: string }[] = [
-  { value: 'classic', label: 'Classic', bg: 'linear-gradient(145deg, #63a6fc, #4a8ee7)', radius: '10px' },
-  { value: 'gaming',  label: 'PRO',  bg: 'linear-gradient(145deg, #1d3d78, #e0a92c)', radius: '3px' },
+  { value: 'classic', label: 'Classic', bg: 'linear-gradient(145deg, #63a6fc, #4a8ee7)', radius: '4px' },
+  { value: 'gaming',  label: 'Pro',     bg: 'linear-gradient(145deg, #1d3d78, #e0a92c)', radius: '1px' },
 ];
+
+const MENU_BUTTON_ID = "main-menu-button";
+
+type PrefSection = 'appearance' | 'language' | 'timing';
 
 function HeaderMain() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<PrefSection | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user, getUser } = useDataStore();
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const { skin, setSkin } = useSkin();
-  const { jokerEnabled, toggleJokerEnabled } = useJokerMode();
-  const { holdMs, setHoldMs } = useBoardHold();
+  const raceSetupSummary = useRaceSetupSummary();
   const { hasNativePrompt, installed, promptInstall } = usePwaInstall();
 
   useEffect(() => {
     getUser();
   }, []);
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    document.getElementById(MENU_BUTTON_ID)?.focus();
+  };
+
+  // Keyboard: focus moves into the drawer on open, Escape closes it.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    closeBtnRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
   const handleLogout = () => {
     Cookies.remove("token");
@@ -55,14 +79,76 @@ function HeaderMain() {
     setDrawerOpen(false);
   };
 
+  const handleInstall = async () => {
+    if (hasNativePrompt) {
+      await promptInstall();
+    } else {
+      // No native prompt (iOS, or the browser hasn't offered one):
+      // tell the user where the browser keeps the install action.
+      toast.info(
+        isIos()
+          ? "Tap the Share button, then “Add to Home Screen”."
+          : "Open the browser menu (⋮) and choose “Install app” / “Add to Home screen”.",
+        { autoClose: 8000 }
+      );
+    }
+    setDrawerOpen(false);
+  };
+
+  const toggleSection = (s: PrefSection) =>
+    setOpenSection(cur => (cur === s ? null : s));
+
+  const currentLang =
+    SUPPORTED_LANGUAGES.find(l => l.code === i18n.resolvedLanguage) ?? SUPPORTED_LANGUAGES[0];
+  const themeOpt = THEME_OPTIONS.find(o => o.value === theme) ?? THEME_OPTIONS[0];
+  const skinOpt = SKIN_OPTIONS.find(o => o.value === skin) ?? SKIN_OPTIONS[0];
+
+  // One-line value shown on a collapsed section header.
+  const summaries: Record<PrefSection, string> = {
+    appearance: `${t(themeOpt.labelKey, themeOpt.label)} · ${t(`prefs.skin.${skinOpt.value}`, skinOpt.label)}`,
+    language: currentLang.label,
+    timing: raceSetupSummary,
+  };
+
+  /** Collapsible preference group: header button + body, one open at a time. */
+  const section = (key: PrefSection, icon: React.ReactNode, title: string, body: React.ReactNode) => {
+    const open = openSection === key;
+    const bodyId = `prefs-${key}-body`;
+    return (
+      <div className={`${styles.prefSection} ${open ? styles.prefSectionOpen : ''}`}>
+        <button
+          type="button"
+          className={styles.prefHeader}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => toggleSection(key)}
+          data-testid={`prefs-${key}`}
+        >
+          <span className={styles.prefIcon} aria-hidden="true">{icon}</span>
+          <span className={styles.prefTitle}>{title}</span>
+          {!open && <span className={styles.prefSummary} dir="auto">{summaries[key]}</span>}
+          <ChevronDown className={styles.prefChevron} aria-hidden="true" />
+        </button>
+        {open && (
+          <div id={bodyId} className={styles.prefBody} role="group" aria-label={title}>
+            {body}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <div className={styles.main}>
         <Button
+          id={MENU_BUTTON_ID}
           variant="icon"
           size="md"
           iconOnly
           aria-label="Open menu"
+          aria-expanded={drawerOpen}
+          aria-controls="main-side-menu"
           onClick={() => setDrawerOpen(true)}
           className={styles.navIconBtn}
         >
@@ -94,301 +180,222 @@ function HeaderMain() {
 
       {/* Overlay */}
       {drawerOpen && (
-        <div className={styles.overlay} onClick={() => setDrawerOpen(false)} />
+        <div className={styles.overlay} onClick={closeDrawer} />
       )}
 
       {/* Drawer */}
-      <div
+      <aside
+        id="main-side-menu"
         className={`${styles.drawer} ${drawerOpen ? styles.drawerOpen : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("nav.menu", "Menu")}
       >
+        {/* 1 · Header */}
         <div className={styles.drawerHeader}>
           <div className={styles.drawerTitleContainer}>
             <div className={styles.drawerTitle}>Commissaire</div>
             <div className={styles.drawerSlogan}>focus the race not the paper</div>
           </div>
-          <Button
-            variant="icon"
-            size="md"
-            iconOnly
+          <button
+            ref={closeBtnRef}
+            type="button"
             aria-label="Close menu"
-            onClick={() => setDrawerOpen(false)}
+            onClick={closeDrawer}
             className={styles.closeBtn}
           >
             <X className={styles.closeIcon} aria-hidden="true" />
-          </Button>
+          </button>
         </div>
 
         <div className={styles.drawerScroll}>
-        <div className={styles.drawerAvatar}>
-          <img src={Images.user} alt="user" className={styles.avatarImg} />
-          {user ? (
-            <>
-              <div className={styles.avatarName}>
-                {user.familyName || user.name}
+          {/* 2 · Account — exactly one action: sign in for guests, sign out otherwise */}
+          <div className={`${styles.account} ${user ? "" : styles.accountGuest}`}>
+            <img src={Images.user} alt="" className={styles.avatarImg} />
+            <div className={styles.accountText}>
+              <div className={styles.avatarName} dir="auto">
+                {user ? (user.familyName || user.name) : t("nav.guest", "Guest")}
               </div>
-              <div className={styles.avatarSub}>{user.phone}</div>
-            </>
-          ) : (
-            <>
-              <div className={styles.avatarName}>{t("nav.guest", "Guest")}</div>
-              <div className={styles.avatarSub}>{t("nav.notSignedIn", "Not signed in")}</div>
-            </>
+              <div className={styles.avatarSub} dir="auto">
+                {user ? (user.phone || t("nav.signedIn", "Signed in")) : t("nav.notSignedIn", "Not signed in")}
+              </div>
+            </div>
+          </div>
+          {/* Signed in: Logout stays with the account. Guests sign in from the footer. */}
+          {user && (
+            <div className={styles.accountActions}>
+              <button type="button" className={styles.accountAction} onClick={handleLogout}>
+                <LogOut aria-hidden="true" />
+                <span>{t("nav.logout", "Logout")}</span>
+              </button>
+            </div>
           )}
-        </div>
 
-        <nav className={styles.drawerNav}>
-          {user ? (
-            <Button
-              variant="ghost"
-              size="lg"
+          {/* 3 · Main navigation */}
+          <nav className={styles.drawerNav} aria-label={t("nav.mainNav", "Main")}>
+            <button
+              type="button"
               className={styles.navItem}
-              onClick={handleLogout}
+              aria-current={pathname === "/" ? "page" : undefined}
+              onClick={() => {
+                setDrawerOpen(false);
+                navigate("/");
+              }}
+              data-testid="nav-home"
             >
-              <LogOut className={styles.navItemIcon} aria-hidden="true" />
-              {t("nav.logout", "Logout")}
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="lg"
+              <House className={styles.navItemIcon} aria-hidden="true" />
+              <span>{t("nav.home", "Home")}</span>
+            </button>
+            <button
+              type="button"
+              className={styles.navItem}
+              aria-current={pathname.replace(/\/+$/, "") === "/main" ? "page" : undefined}
+              onClick={() => {
+                setDrawerOpen(false);
+                navigate("/main");
+              }}
+            >
+              <Bike className={styles.navItemIcon} aria-hidden="true" />
+              <span>{t("nav.myRaces", "My Races")}</span>
+            </button>
+            {/* Downloadable Excel start-list template — fill in your riders, then
+                import it. Served from public/ so it must go through BASE_URL. */}
+            <a
+              className={styles.navItem}
+              href={`${import.meta.env.BASE_URL}start-list-template.xlsx`}
+              download="start-list-template.xlsx"
+              onClick={() => setDrawerOpen(false)}
+            >
+              <FileSpreadsheet className={styles.navItemIcon} aria-hidden="true" />
+              <span>{t("nav.downloadTemplate", "Download start-list template")}</span>
+            </a>
+            <button
+              type="button"
               className={styles.navItem}
               onClick={() => {
                 setDrawerOpen(false);
-                navigate("/login");
+                navigate("/contact");
               }}
             >
-              <UserRound className={styles.navItemIcon} aria-hidden="true" />
-              {t("nav.registerLogin", "Register / Login")}
-              <span className={styles.soonBadge}>{t("login.soon", "Soon")}</span>
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="lg"
-            className={styles.navItem}
-            onClick={() => {
-              setDrawerOpen(false);
-              navigate("/contact");
-            }}
-          >
-            <MessageCircle className={styles.navItemIcon} aria-hidden="true" />
-            {t("nav.contact", "Contact")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="lg"
-            className={styles.navItem}
-            onClick={() => {
-              setDrawerOpen(false);
-              navigate("/main");
-            }}
-          >
-            <Bike className={styles.navItemIcon} aria-hidden="true" />
-            {t("nav.myRaces", "My Races")}
-          </Button>
-          {/* Downloadable Excel start-list template — fill in your riders, then
-              import it. Served from public/ so it must go through BASE_URL. */}
-          <a
-            className={`${styles.navItem} ${styles.navItemLink}`}
-            href={`${import.meta.env.BASE_URL}start-list-template.xlsx`}
-            download="start-list-template.xlsx"
-            onClick={() => setDrawerOpen(false)}
-          >
-            <Download className={styles.navItemIcon} aria-hidden="true" />
-            {t("nav.downloadTemplate", "Download start-list template")}
-          </a>
-          {!installed && (
-            <Button
-              variant="ghost"
-              size="lg"
-              className={styles.navItem}
-              onClick={async () => {
-                if (hasNativePrompt) {
-                  await promptInstall();
-                } else {
-                  // No native prompt (iOS, or the browser hasn't offered one):
-                  // tell the user where the browser keeps the install action.
-                  toast.info(
-                    isIos()
-                      ? "Tap the Share button, then “Add to Home Screen”."
-                      : "Open the browser menu (⋮) and choose “Install app” / “Add to Home screen”.",
-                    { autoClose: 8000 }
-                  );
-                }
-                setDrawerOpen(false);
-              }}
-            >
-              <Download className={styles.navItemIcon} aria-hidden="true" />
-              Install app
-            </Button>
-          )}
-        </nav>
+              <LifeBuoy className={styles.navItemIcon} aria-hidden="true" />
+              <span>{t("nav.contactSupport", "Contact & Support")}</span>
+            </button>
+          </nav>
 
-        {/* Theme picker */}
-        <div className={styles.themeSection}>
-          <div className={styles.themeSectionLabel}>
-            <Palette className={styles.themeSectionIcon} aria-hidden="true" />
-            Appearance
-          </div>
-          <div className={styles.themeOptions}>
-            {THEME_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                className={styles.themeOption}
-                onClick={() => setTheme(opt.value)}
-                aria-label={`${opt.label} theme`}
-                title={opt.label}
-              >
-                <span
-                  className={`${styles.themeSwatch} ${theme === opt.value ? styles.themeSwatchActive : ''}`}
-                  style={{ background: opt.bg }}
+          {/* 4 · Preferences — collapsed by default, one open at a time */}
+          <div className={styles.groupLabel}>{t("nav.preferences", "Preferences")}</div>
+          <div className={styles.prefs}>
+            {section('appearance', <Palette />, t("prefs.appearance", "Appearance"), (
+              <>
+                <div className={styles.fieldLabel} id="prefs-theme-label">{t("prefs.theme", "Theme")}</div>
+                <div className={styles.segmented} role="group" aria-labelledby="prefs-theme-label">
+                  {THEME_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={styles.segment}
+                      aria-pressed={theme === opt.value}
+                      aria-label={`${opt.label} theme`}
+                      onClick={() => setTheme(opt.value)}
+                    >
+                      <span
+                        className={styles.swatch}
+                        style={{ background: `linear-gradient(135deg, ${opt.bg} 55%, ${opt.accent} 55%)` }}
+                        aria-hidden="true"
+                      />
+                      {t(opt.labelKey, opt.label)}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.fieldLabel} id="prefs-skin-label">{t("prefs.buttonStyle", "Button style")}</div>
+                <div className={styles.segmented} role="group" aria-labelledby="prefs-skin-label">
+                  {SKIN_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={styles.segment}
+                      aria-pressed={skin === opt.value}
+                      aria-label={`${opt.label} button style`}
+                      onClick={() => setSkin(opt.value)}
+                    >
+                      <span
+                        className={styles.swatch}
+                        style={{ background: opt.bg, borderRadius: opt.radius }}
+                        aria-hidden="true"
+                      />
+                      {t(`prefs.skin.${opt.value}`, opt.label)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ))}
+
+            {section('language', <Globe />, t("prefs.language", "Language"), (
+              <div className={styles.selectRow}>
+                <span className={styles.selectFlag} aria-hidden="true">
+                  <RiderFlag flag={currentLang.flag} size={22} />
+                </span>
+                <select
+                  className={styles.select}
+                  value={currentLang.code}
+                  onChange={(e) => i18n.changeLanguage(e.target.value)}
+                  aria-label={t("prefs.language", "Language")}
+                  data-testid="language-select"
                 >
-                  <span
-                    className={styles.themeSwatchStripe}
-                    style={{ background: opt.accent }}
-                  />
-                  <span
-                    className={styles.themeSwatchDot}
-                    style={{ background: opt.text }}
-                  />
-                </span>
-                <span className={`${styles.themeLabel} ${theme === opt.value ? styles.themeLabelActive : ''}`}>
-                  {opt.label}
-                </span>
-              </button>
+                  {SUPPORTED_LANGUAGES.map(opt => (
+                    <option key={opt.code} value={opt.code}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+
+            {section('timing', <Timer />, t("prefs.timing", "Race Setup"), (
+              <RaceSetupSettings />
             ))}
           </div>
-        </div>
 
-        {/* Language picker */}
-        <div className={styles.themeSection}>
-          <div className={styles.themeSectionLabel}>
-            <Globe className={styles.themeSectionIcon} aria-hidden="true" />
-            Language
-          </div>
-          <div className={styles.languageGrid}>
-            {SUPPORTED_LANGUAGES.map(opt => (
+          {/* 5 · Footer */}
+          <div className={styles.drawerFooter}>
+            {!installed && (
+              <button type="button" className={styles.footerBtn} onClick={handleInstall}>
+                <Smartphone aria-hidden="true" />
+                <span>{t("nav.installApp", "Install app")}</span>
+                <Download className={styles.footerBtnTrail} aria-hidden="true" />
+              </button>
+            )}
+            {!user && (
               <button
-                key={opt.code}
-                className={styles.languageOption}
-                onClick={() => i18n.changeLanguage(opt.code)}
-                aria-label={opt.label}
-                title={opt.label}
+                type="button"
+                className={styles.footerBtn}
+                onClick={() => {
+                  setDrawerOpen(false);
+                  navigate("/login");
+                }}
               >
-                <span
-                  className={`${styles.languageFlag} ${i18n.resolvedLanguage === opt.code ? styles.languageFlagActive : ''}`}
-                >
-                  <RiderFlag flag={opt.flag} size={38} />
-                </span>
-                <span className={`${styles.themeLabel} ${i18n.resolvedLanguage === opt.code ? styles.themeLabelActive : ''}`}>
-                  {opt.label}
-                </span>
+                <LogIn aria-hidden="true" />
+                <span>{t("nav.registerLogin", "Register / Login")}</span>
+                <span className={styles.soonBadge}>{t("login.soon", "Soon")}</span>
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Button style picker */}
-        <div className={styles.themeSection}>
-          <div className={styles.themeSectionLabel}>
-            <Gamepad2 className={styles.themeSectionIcon} aria-hidden="true" />
-            Button Style
-          </div>
-          <div className={styles.themeOptions}>
-            {SKIN_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                className={styles.themeOption}
-                onClick={() => setSkin(opt.value)}
-                aria-label={`${opt.label} button style`}
-                title={opt.label}
+            )}
+            <div className={styles.footerMeta}>
+              {/* Direct line to the author — feedback goes to a person, not a form */}
+              <a
+                className={styles.feedbackLink}
+                href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(
+                  `Commissaire ${VERSION} — feedback`
+                )}`}
+                title={t("nav.feedbackHint", "Comments? Bugs? Please write — every message is read.")}
               >
-                <span
-                  className={`${styles.themeSwatch} ${skin === opt.value ? styles.themeSwatchActive : ''}`}
-                  style={{ background: opt.bg, borderRadius: opt.radius }}
-                />
-                <span className={`${styles.themeLabel} ${skin === opt.value ? styles.themeLabelActive : ''}`}>
-                  {opt.label}
-                </span>
-              </button>
-            ))}
+                <Mail aria-hidden="true" />
+                <span>{FEEDBACK_EMAIL}</span>
+              </a>
+              <span className={styles.footerVersion}>
+                <Version />
+              </span>
+            </div>
           </div>
         </div>
-
-        {/* Joker button toggle — instant time+arrival stamp for riders the
-            commissaire can't identify fast enough, resolved to a bib later */}
-        <div className={styles.themeSection}>
-          <div className={styles.themeSectionLabel}>
-            <Bike className={styles.themeSectionIcon} aria-hidden="true" />
-            Joker Button
-          </div>
-          <label className={styles.jokerToggleRow}>
-            <input
-              type="checkbox"
-              checked={jokerEnabled}
-              onChange={toggleJokerEnabled}
-            />
-            <span>Show Joker button on the live wave screen</span>
-          </label>
-          <p className={styles.jokerToggleDesc}>
-            Tap it to stamp a rider's arrival time instantly when you can't
-            read their bib in time — assign the bib afterward.
-          </p>
-        </div>
-
-        {/* Board hold — stops the live board reshuffling under the commissaire
-            while a whole bunch is being called out. Also on the live screen's
-            settings gear, so it can be retuned mid-wave. */}
-        <div className={styles.themeSection}>
-          <div className={styles.themeSectionLabel}>
-            <Timer className={styles.themeSectionIcon} aria-hidden="true" />
-            Board Hold
-          </div>
-          <select
-            className={styles.boardHoldSelect}
-            value={holdMs}
-            onChange={(e) => setHoldMs(Number(e.target.value))}
-            aria-label="Board hold delay"
-          >
-            {BOARD_HOLD_OPTIONS.map((ms) => (
-              <option key={ms} value={ms}>
-                {ms / 1000} seconds{ms === 2000 ? ' (default)' : ''}
-              </option>
-            ))}
-          </select>
-          <p className={styles.jokerToggleDesc}>
-            When riders arrive in a bunch, tapped cards stay put — marked with a
-            green ✓ — and all drop to the bottom together once {holdMs / 1000}{' '}
-            seconds pass with no new tap. Stops the board reshuffling while
-            you're still reading bibs.
-          </p>
-        </div>
-
-        {/* Direct line to the author — feedback goes to a person, not a form */}
-        <div className={styles.feedbackSection}>
-          <div className={styles.feedbackTitle}>
-            <Mail className={styles.feedbackIcon} aria-hidden="true" />
-            Comments? Bugs?
-          </div>
-          <p className={styles.feedbackText}>
-            Please write me — I read everything. Thanks!
-          </p>
-          <a
-            className={styles.feedbackLink}
-            href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(
-              `Commissaire ${VERSION} — feedback`
-            )}`}
-          >
-            {FEEDBACK_EMAIL}
-          </a>
-        </div>
-
-        {/* Version lives here in the side menu */}
-        <div className={styles.drawerFooter}>
-          <Version />
-        </div>
-        </div>
-      </div>
+      </aside>
     </>
   );
 }

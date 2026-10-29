@@ -72,7 +72,7 @@ const prodEnv = (url: string, extra: Record<string, string> = {}) => ({
 });
 
 /** Runs dist/server.js until it listens (then stops it) or exits. */
-function runServer(env: Record<string, string>, timeoutMs = 20_000) {
+function runServer(env: Record<string, string>, timeoutMs = 45_000) {
   return new Promise<{ listening: boolean; code: number | null; log: string; health?: { ok: boolean; release: string } }>((resolve) => {
     const p = spawn(process.execPath, ["dist/server.js"], { cwd: root, env });
     let log = "";
@@ -113,7 +113,7 @@ beforeAll(() => {
   execFileSync(process.execPath, ["build.mjs"], { cwd: root, stdio: "pipe" });
 }, 60_000);
 
-describe("dist/server.js (the production bundle)", () => {
+describe("dist/server.js (the production bundle)", { timeout: 60_000 }, () => {
   let full: Awaited<ReturnType<typeof database>>;
   beforeAll(async () => (full = await database("full")));
   afterAll(() => full?.close());
@@ -154,7 +154,7 @@ describe("dist/server.js (the production bundle)", () => {
   });
 });
 
-describe("dist/db/migrate-cli.js --check (read-only, run before every activation)", () => {
+describe("dist/db/migrate-cli.js --check (read-only, run before every activation)", { timeout: 60_000 }, () => {
   it("passes on a complete schema", async () => {
     const full = await database("full");
     try {

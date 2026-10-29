@@ -46,6 +46,17 @@ export interface RaceTrack {
   zoom?: number;
   /** Categories that ride this map, as catWaveKey(name, subCategory). Empty/unset = not assigned. */
   categoryKeys?: string[];
+  /** Route drawn in the map editor: the tapped points, in order. `points` holds the routed line. */
+  waypoints?: TrackWaypoint[];
+  /** Routing between waypoints: follow roads (car) or cycling paths/trails (bike). */
+  routeMode?: "car" | "bike";
+}
+
+/** A tapped route point; a label (Start, Water, …) also shows it on the map. */
+export interface TrackWaypoint {
+  lat: number;
+  lng: number;
+  label?: string;
 }
 
 export interface RaceProps {
@@ -73,6 +84,10 @@ export interface RaceProps {
   phone: string;
   takanon: string;
   site: string;
+  /** Event logo (data URL), shown on the Info page. */
+  logo?: string | null;
+  /** Organizer / federation logo (data URL), shown on the Info page. */
+  federationLogo?: string | null;
   createdAt: Date;
   lastUpdateAt: Date;
   isActive: boolean;
@@ -83,6 +98,8 @@ export interface RaceProps {
    * races keep the behaviour. Off means the organizer picks colours by hand.
    */
   autoColor?: boolean;
+  /** Minimum seconds between two counted passages of a rider. Unset = 60 (races before this setting); new races get 180. */
+  minLapSeconds?: number | null;
   /**
    * Optional colour per wave, keyed by wave number (heat). Independent of the
    * category colours — a wave without an entry simply has no colour of its own.
@@ -161,6 +178,8 @@ export interface RaceFinalization {
 
 export interface CategoryProps {
   id: number;
+  /** Shared races only: the category's id on the server (same on every Device). */
+  uuid?: string;
   raceUuid: string;
   name: string;
   subCategory?: string | null;  // Optional sub-category (e.g., age groups: "19-29", "30-39")
@@ -175,6 +194,11 @@ export interface CategoryProps {
   linkedFinish?: boolean;
   /** Categories sharing a group ring the bell / finish together. Empty = own category (Masters auto-group). */
   linkGroup?: string;
+  /** Wave ignored by the organizer: kept, but out of starts, laps, positions and results. */
+  ignored?: boolean;
+  /** Default bib background / text colour for this category's riders ("#RRGGBB"). */
+  bibColor?: string | null;
+  bibTextColor?: string | null;
   finishedAt?: number; // epoch ms when race was finished
   /** Position of the category's first rider in the uploaded file (0-based) — the file's schedule order. */
   importOrder?: number;
@@ -191,6 +215,8 @@ export interface CategoryTemplate {
 }
 
 export interface RiderProps {
+  /** Shared races only: the rider's id on the server (same on every Device). */
+  uuid?: string;
   bibNumber: number;
   category: string;
   subCategory?: string | null;  // Optional sub-category
@@ -205,7 +231,8 @@ export interface RiderProps {
   flag: string | null;
   id: number;
   lapsCounter: number | 0;
-  lapsDetails: Array<{ lap: number; startTime: Date; endTime: Date; lapTime: string; position?: number; speed_kph?: number }>;
+  /** `actionId`: shared races only — the AddLap that recorded the lap (Undo targets it). */
+  lapsDetails: Array<{ lap: number; startTime: Date; endTime: Date; lapTime: string; position?: number; speed_kph?: number; actionId?: string }>;
   lastName: string;
   position_start: number | null;
   position_category: number;
@@ -228,6 +255,9 @@ export interface RiderProps {
   uciPoints?: number | null;
   federation?: string | null;
   uciNumber?: string | null;
+  /** Bib colour overrides for this rider (unset = the category's). */
+  bibColor?: string | null;
+  bibTextColor?: string | null;
   /**
    * Imported columns kept for reference but NOT used by the app (BUGS.md #A).
    * Shown on the full rider card so a commissaire can see things like UCI

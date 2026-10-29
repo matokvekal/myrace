@@ -8,12 +8,18 @@ import Icons from "@/constants/Icons";
 import Button from "@/components/ui/Button";
 import { Plus, Edit2, GripVertical, X, Trash2, AlertTriangle, Play, Pause, Flag, ChevronUp, ChevronDown } from "lucide-react";
 import { riderInCategory } from "../schedule/Schedule";
+import { planWaveFinish } from "@/utils/waveFinish";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
+import { isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 
 interface Props {
   raceUuid: string;
   waveNum: number;
   categories: CategoryProps[];
+  /** Race-day bottom sheet: only who / when / Start Now · +1 Minute (same handlers). */
+  simple?: boolean;
+  /** Simple mode: "Fix" on a check-in warning opens Check-In. */
+  onFixCheckIn?: () => void;
 }
 
 interface StartGroup {
@@ -305,7 +311,7 @@ const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   );
 };
 
-const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
+const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories, simple = false, onFixCheckIn }) => {
   const { updateCategory, categories: allCategories } = useCategoryStore();
   const { riders, updateAllRiders } = useRiderStore();
   const { races, updateRace } = useRaceStore();
@@ -574,6 +580,14 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       setStartError(errors);
       return;
     }
+    // Shared race: one WaveStarted for this start group (the server stamps the start time).
+    const groupCats = group.categoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) as CategoryProps[];
+    const startPayload = {
+      heat: groupCats[0]?.heat ?? Number(waveNum),
+      categoryUuids: groupCats.filter((c) => c.status === "upcoming" && c.uuid).map((c) => c.uuid!),
+    };
+    if (!liveAllows(raceUuid, "WaveStarted", startPayload)) return;
+    if (isLiveRace(raceUuid) && startPayload.categoryUuids.length) void liveDispatch(raceUuid, "WaveStarted", startPayload);
 
     const now = new Date().toLocaleTimeString("en-GB", {
       hour: "2-digit",
@@ -701,6 +715,11 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       .map((id) => categories.find((c) => c.id === id))
       .filter(Boolean) as CategoryProps[];
 
+    if (isLiveRace(raceUuid)) {
+      const running = cats.filter((c) => c.status === "running" && c.uuid);
+      if (running.some((c) => !liveAllows(raceUuid, "CategoryFinished", { categoryUuid: c.uuid! }))) return;
+      for (const c of running) void liveDispatch(raceUuid, "CategoryFinished", { categoryUuid: c.uuid! });
+    }
     for (const cat of cats) {
       // Never-started categories have nothing to finalize.
       if (cat.status === "upcoming") continue;
@@ -722,6 +741,8 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
    */
   const finishCategory = async (cat: CategoryProps) => {
     if (cat.status !== "running") return;
+    if (cat.uuid && !liveAllows(raceUuid, "CategoryFinished", { categoryUuid: cat.uuid })) return;
+    if (isLiveRace(raceUuid) && cat.uuid) void liveDispatch(raceUuid, "CategoryFinished", { categoryUuid: cat.uuid });
     const now = new Date();
     await updateCategory({ ...cat, status: "finished" as const, finishedAt: now.getTime() });
     const updatedRiders = closeOutCategoryRiders(cat, now);
@@ -732,25 +753,18 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
   // finalized in the DB, and never-started categories are marked finished so
   // the wave signs off as done (no new start groups can be added afterwards).
   const finishWave = async () => {
+    const heat = Number(waveNum);
+    if (!liveAllows(raceUuid, "WaveFinished", { heat })) return;
+    if (isLiveRace(raceUuid)) void liveDispatch(raceUuid, "WaveFinished", { heat });
     const now = new Date();
     setCountdown(null);
-
-    for (const cat of categories) {
-      if (cat.status === "finished") continue;
-      const wasStarted = cat.status === "running";
-      await updateCategory({ ...cat, status: "finished" as const, finishedAt: now.getTime() });
-      // Categories that never started have no riders on the road to finalize.
-      if (!wasStarted) continue;
-
-      const updatedRiders = closeOutCategoryRiders(cat, now);
-      if (updatedRiders.length > 0) await updateAllRiders(updatedRiders);
-    }
-
-    // The wave is over: nobody is coming back to be clicked in, so every rider
-    // still on the road is closed out as a finisher on the laps they completed.
-    // Unlike finishing a single start, there is no "next crossing" left.
-    const closedOut = ridersStillOnTrack(categories).map(closeOutRiderOnTrack);
-    if (closedOut.length > 0) await updateAllRiders(closedOut);
+    // One wave-finish rule for Race → Start and Live (utils/waveFinish.ts):
+    // categories closed, finished riders finalized, riders still on the road
+    // closed out as (administrative) finishers on the laps they completed.
+    const plan = planWaveFinish(categories, riders, raceUuid, now);
+    for (const cat of plan.categories) await updateCategory(cat);
+    if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
+    if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
   };
 
   const adjustTime = (groupId: string, seconds: number) => {
@@ -866,8 +880,8 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
     return <div className={styles.empty}>No categories in this wave.</div>;
   }
 
-  return (
-    <div className={styles.container}>
+  const overlays = (
+    <>
       {startError && (
         <div className={styles.modalOverlay} onClick={() => setStartError(null)}>
           <div className={styles.errorModal} onClick={(e) => e.stopPropagation()}>
@@ -903,6 +917,132 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
           onCancel={() => setCountdown(null)}
         />
       )}
+
+    </>
+  );
+
+  // ── Simple race-day layout: the same start handlers, nothing else ──
+  if (simple) {
+    return (
+      <div className={styles.simple}>
+        {overlays}
+        {startGroups.map((group) => {
+          const cats = group.categoryIds
+            .map((id) => categories.find((c) => c.id === id))
+            .filter(Boolean) as CategoryProps[];
+          if (cats.length === 0) return null;
+          const upcoming = cats.some((c) => c.status === "upcoming");
+          const allDone = cats.every((c) => c.status === "finished");
+          const groupRiders = riders.filter(
+            (r) => r.raceUuid === raceUuid && cats.some((c) => riderInCategory(r, c)) && r.status !== "DNS"
+          );
+          const unchecked = groupRiders.filter((r) => !r.checked && !["DNF", "DSQ"].includes(r.status)).length;
+          const issues = upcoming ? validateGroup(group) : [];
+          const otherIssues = issues.filter((m) => !/not checked in/.test(m));
+          const started = groupRiders
+            .filter((r) => r.raceStatus !== "upcoming" && r.timeStartRace)
+            .map((r) => r.timeStartRace as string)
+            .sort()[0];
+          const blocked = issues.length > 0;
+          return (
+            <section key={group.id} className={styles.simpleGroup} data-testid="simple-start-group">
+              <div className={styles.simpleHead}>
+                <span className={styles.simpleTime}>{group.time || "No time"}</span>
+                <span className={styles.simpleCount}>{groupRiders.length} riders</span>
+              </div>
+              <ul className={styles.simpleCats}>
+                {cats.map((c) => (
+                  <li key={c.id} dir="auto">
+                    <span className={styles.simpleDot} style={{ background: c.color ?? "#9ca3af" }} />
+                    {c.name}{c.subCategory ? ` · ${c.subCategory}` : ""}
+                  </li>
+                ))}
+              </ul>
+              {upcoming ? (
+                <>
+                  {(unchecked > 0 || otherIssues.length > 0) && (
+                    <div className={styles.simpleWarn} role="alert">
+                      {unchecked > 0 && (
+                        <span>
+                          {unchecked} rider{unchecked === 1 ? "" : "s"} not checked in
+                          {onFixCheckIn && (
+                            <button type="button" className={styles.simpleFix} onClick={onFixCheckIn}>Fix</button>
+                          )}
+                        </span>
+                      )}
+                      {otherIssues.map((m) => <span key={m}>{m}</span>)}
+                    </div>
+                  )}
+                  <div className={styles.simpleActions}>
+                    <button
+                      type="button"
+                      data-testid="start-all"
+                      className={`${styles.simpleBtn} ${styles.simpleStart} ${blocked ? styles.btnBlocked : ""}`}
+                      disabled={otherWaveRunning}
+                      aria-disabled={blocked}
+                      title={otherWaveRunning ? "Another wave is still running" : undefined}
+                      onClick={() => startGroup(group)}
+                    >
+                      <Play size={15} /> Start Now
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.simpleBtn} ${blocked ? styles.btnBlocked : ""}`}
+                      disabled={otherWaveRunning || countdown?.groupId === group.id}
+                      aria-disabled={blocked}
+                      onClick={() => {
+                        if (otherWaveRunning) { setStartError(["Another wave is still running — finish it before starting this wave."]); return; }
+                        const errors = validateGroup(group);
+                        if (errors.length > 0) { setStartError(errors); return; }
+                        setCountdown({ groupId: group.id, seconds: 60 });
+                      }}
+                    >
+                      +1 Minute
+                    </button>
+                  </div>
+                </>
+              ) : allDone ? (
+                <div className={styles.simpleStarted}>✓ Finished{started ? ` · started ${started}` : ""}</div>
+              ) : (
+                <div className={styles.simpleRunning}>
+                  <span className={styles.simpleStarted}>✓ Started{started ? ` ${started}` : ""}</span>
+                  {/* Flag off this start group (existing endRace + confirmation) */}
+                  {confirmFinishId === group.id ? (
+                    <div className={styles.confirmInline}>
+                      <span className={styles.confirmText}>
+                        {ridersStillOnTrack(cats).length > 0 ? (
+                          <>Finish start? {ridersStillOnTrack(cats).length} still out — stay <strong>ON TRACK</strong>.</>
+                        ) : (
+                          "Finish start? Everyone is in."
+                        )}
+                      </span>
+                      <button data-testid="confirm-yes" className={styles.confirmYes} onClick={() => { endRace(group); setConfirmFinishId(null); }}>
+                        Yes <Flag size={14} />
+                      </button>
+                      <button className={styles.confirmNo} onClick={() => setConfirmFinishId(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="finish-start-group"
+                      className={styles.simpleBtn}
+                      onClick={() => setConfirmFinishId(group.id)}
+                    >
+                      <Flag size={15} /> Finish
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.container}>
+      {overlays}
 
       {editingStartId && (
         <ManageCategoriesModal

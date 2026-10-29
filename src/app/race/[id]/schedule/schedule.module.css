@@ -1289,3 +1289,393 @@ button.standingName {
 .colorSwatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); }
 .colorInput { width: 100%; height: 48px; border: 0; padding: 0; background: none; }
 .colorActions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Ignore / Restore Wave */
+.waveIgnored {
+  opacity: 0.6;
+}
+.ignoredBadge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fde68a;
+  color: #78350f;
+  font-size: 12px;
+  font-weight: 800;
+}
+.waveActionBtn {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.waveActionBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fgSuggested {
+  padding: 2px 8px;
+  border: 1px dashed #1d4ed8;
+  border-radius: 10px;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Finish Group on each category row */
+.fgRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 6px;
+  flex-wrap: wrap;
+}
+.fgCaption {
+  font-size: 11px;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fgSelect {
+  min-height: 36px;
+  padding: 2px 6px;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.fgSelectSuggested {
+  border-style: dashed;
+  border-color: #1d4ed8;
+  color: #1d4ed8;
+}
+.fgApplyAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-weight: 700;
+  min-height: 36px;
+}
+
+/* Phones: the category's actions (Finish Group, colour, standings) move to their
+   own line under the name, so nothing is squeezed or pushed off-screen. */
+@media (max-width: 640px) {
+  .categoryRow {
+    flex-wrap: wrap;
+  }
+  .catInfo {
+    min-width: 0;
+    flex: 1 1 60%;
+  }
+  .catActions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding-inline-start: 22px;
+  }
+  .fgRow {
+    flex: 1 1 auto;
+  }
+  .fgSelect {
+    flex: 1 1 140px;
+    min-width: 140px;
+  }
+}
+
+/* "No riders added yet" hint (new race) — one compact row, Schedule stays usable below */
+.emptyRiders {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary);
+}
+
+.emptyRidersIcon {
+  flex-shrink: 0;
+  color: var(--brand-strong);
+}
+
+.emptyRidersText {
+  flex: 1;
+  min-width: 0;
+}
+
+.emptyRidersTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.emptyRidersSub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.emptyRiders > button {
+  flex-shrink: 0;
+}
+
+/* ═══ Wave editor: one compact section per wave ═══ */
+.wvHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wvTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #14243c);
+}
+
+.wvHeaderEnd {
+  display: flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+.wvPrimary,
+.wvSecondary {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wvPrimary {
+  border: 1px solid var(--brand-strong, #3f86e7);
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+.wvSecondary {
+  border: 1px solid var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-weight: 500;
+}
+
+.wvEmpty {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.wv {
+  margin-bottom: 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  overflow: hidden;
+}
+
+.wvHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-surface, #f5f8ff);
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+}
+
+.wvName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #14243c);
+}
+
+.wvBase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvTime {
+  height: 30px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvHead .wvDanger {
+  margin-inline-start: auto;
+}
+
+.wvIcon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wvIcon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wvDanger {
+  color: var(--danger, #df4b7b);
+}
+
+/* category | interval | start | actions */
+.wvRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 76px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 2px 10px;
+  border-top: 1px solid var(--border-card, #d9e7fb);
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+}
+
+.wvRowHead {
+  min-height: 28px;
+  border-top: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvCat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wvCatName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wvGap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvGapInput {
+  width: 52px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvUnit {
+  font-size: 12px;
+}
+
+.wvStart {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.wvRowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wvMove,
+.wvAddCat {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvAddCat {
+  display: block;
+  margin: 6px 10px 8px;
+  height: 32px;
+  font-size: 13px;
+  color: var(--brand-strong, #3f86e7);
+}
+
+.wvNote {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvFg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+@media (max-width: 480px) {
+  .wvRow {
+    grid-template-columns: minmax(0, 1fr) 64px 68px;
+  }
+
+  .wvRowActions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .wvRowHead span:last-child {
+    display: none;
+  }
+}
+
+:root[data-skin="gaming"] .wv button:not(:disabled),
+:root[data-skin="gaming"] .wvHeader button:not(:disabled),
+:root[data-skin="gaming"] .wvFg button:not(:disabled),
+:root[data-skin="gaming"] .wvEmpty button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
+}

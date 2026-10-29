@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import styles from "./heat.module.css";
 import { toast } from "react-toastify";
@@ -14,15 +14,14 @@ import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { RiderProps } from "@/types/types";
 import { formatTime, formatTimeWithLeadingZeroes, parseClockTime } from "../../../../utils/timeUtils";
 import { useLapRecording } from "./useLapRecording";
+import { minLapMsFor } from "@/utils/minLap";
 import calculatePositions from "../../../../utils/calculatePosition";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, withCategoryLaps, getScheduleWaves } from "../../schedule/Schedule";
-import BibWarning from "../../../components/bibWarning/BibWarning";
 import useUIStore from "@/stores/uiStore";
-import { computeGroupSignals, categoryGroupKey, isLeaderFinishAll } from "@/utils/linkedGroups";
+import { computeGroupPhases, phaseOfRider, isLeaderFinishAll } from "@/utils/linkedGroups";
 import RiderLiveModal from "./RiderLiveModal";
 import { VoiceIndicator } from "@/components/voice/VoiceIndicator";
 import { useVoiceRecognition } from "@/components/voice/useVoiceRecognition";
-import { VoiceSettingsModal } from "./VoiceSettingsModal";
 import { MicPermissionModal } from "@/components/voice/MicPermissionModal";
 import { VoiceRadarIcon } from "@/components/voice/VoiceRadarIcon";
 import { DetectedNumbers } from "@/components/voice/DetectedNumbers";
@@ -36,7 +35,16 @@ import { useBoardHold } from "@/stores/boardHoldStore";
 import { useJokerQueue, type JokerEntry } from "./useJokerQueue";
 import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
+import { jokerResolveBlock } from "./jokerResolve";
+import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
+import { planWaveFinish } from "@/utils/waveFinish";
+import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { Bike, List, ChevronDown } from "lucide-react";
+import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
+import { AuditLogService } from "@/services/auditLog/auditLogService";
+// Shared races: the sync state where it matters most (offline / waiting to send).
+const SyncBadge = lazy(() => import("../../../../live/SyncBadge"));
 
 // Category identity is name + subCategory: the same name can exist in several
 // waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
@@ -52,8 +60,17 @@ const Heat: React.FC = () => {
   const heatId = params?.heatId ? parseInt(params.heatId as string, 10) : null;
 
   const { races, getRaces } = useRaceStore();
-  const { riders, getRiders, updateRider, updateAllRiders } = useRiderStore();
-  const { categories, getCategories } = useCategoryStore();
+  const { riders: storeRiders, getRiders, updateRider, updateAllRiders } = useRiderStore();
+  const { categories: storeCategories, getCategories } = useCategoryStore();
+  // Ignored waves take no part in Live: no cards, no laps, no positions (data kept).
+  // This race only: the store is a shared cache and can still hold another
+  // race's categories (e.g. the demo) when this race has none of its own —
+  // that is where a phantom "Wave 1" with foreign categories came from.
+  const categories = useMemo(
+    () => activeCategories(storeCategories.filter((c) => c.raceUuid === raceUuid)),
+    [storeCategories, raceUuid]
+  );
+  const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const { settings: voiceSettings } = useVoiceSettingsStore();
 
   // live cloud sync for this race (no-op when race is local-only)
@@ -67,7 +84,6 @@ const Heat: React.FC = () => {
   const [displayOrder, setDisplayOrder] = useState<number[]>([]);
   const [voiceActive, setVoiceActive] = useState(false);
   const [showMicPrompt, setShowMicPrompt] = useState(false);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [voiceAudioLevel, setVoiceAudioLevel] = useState(0);
   const [voiceIsListening, setVoiceIsListening] = useState(false);
   const [detectedNumbers, setDetectedNumbers] = useState<Array<{ bib: string; categoryColor?: string; timestamp: number }>>([]);
@@ -81,7 +97,7 @@ const Heat: React.FC = () => {
   const VOICE_LOG_LIMIT = 30;
   // Always-fresh refs so setTimeout callbacks can see latest store + handler
   const ridersRef = useRef(riders);
-  const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice') => void) | null>(null);
+  const handleRiderClickRef = useRef<((rider: RiderProps, source?: 'click' | 'voice', at?: Date) => void) | null>(null);
   // Voice buffer: queue of pending bib detections + 30s cooldown map per bib
   const voiceQueueRef = useRef<Array<{ bib: string; detectedAt: number }>>([]);
   const bibCooldownRef = useRef<Map<string, number>>(new Map());
@@ -113,6 +129,16 @@ const Heat: React.FC = () => {
     if (currentRace?.finalized) navigate(`/race/${raceUuid}`, { replace: true });
   }, [currentRace?.finalized, navigate, raceUuid]);
 
+  // Shared race: join its live room, and leave the screen if this member may not view Live.
+  useEffect(() => {
+    if (!isLiveRace(raceUuid)) return;
+    if (!canViewScreen(raceUuid, "live")) {
+      navigate(`/race/${raceUuid}`, { replace: true });
+      return;
+    }
+    void import("@/services/live/liveClient").then((m) => m.openLiveRace(raceUuid));
+  }, [raceUuid, navigate]);
+
   // treat race.distance as circuit km per lap (if set and reasonable)
   const circuitKm = currentRace?.distance && currentRace.distance > 0 ? currentRace.distance : null;
 
@@ -120,11 +146,7 @@ const Heat: React.FC = () => {
     if (heatId == null || categories.length === 0) return categories;
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const slotMap = schedule.get(heatId);
-    if (slotMap) {
-      const cats = [...slotMap.values()].flat();
-      if (cats.length > 0) return cats;
-    }
-    return categories;
+    return slotMap ? [...slotMap.values()].flat() : [];
   }, [categories, heatId]);
 
   // Every wave in this race's schedule, for the wave-switch dropdown next to
@@ -202,25 +224,28 @@ const Heat: React.FC = () => {
     return `+${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
 
-  // A rider "still on the track": their category's race has ended but they
-  // haven't finished — the organizer must not lose sight of them.
-  // Also true once anyone in the rider's bell/finish group has taken the finish:
-  // the rest of the group finishes on their next crossing, however many laps
-  // they have left. Derived from rider state, so undoing the leader's finish
-  // restores everyone.
-  const groupSignals = useMemo(
-    () => computeGroupSignals(waveCategories, filteredRiders, isLeaderFinishAll(currentRace)),
-    [waveCategories, filteredRiders, currentRace]
-  );
-  const groupOf = (rider: RiderProps) => {
-    const cat = waveCategories.find((c) => riderInCategory(rider, c));
-    return cat ? categoryGroupKey(cat) : null;
-  };
+  // Bell / flag phases of each category or explicit Finish Group (shared with
+  // the server engine: shared/race/finishPhases). Computed over the WHOLE race
+  // (every started category), not just this wave, so a Finish Group spans
+  // waves. Derived from recorded crossings only: undo and reload just recompute.
+  const groupPhases = useMemo(() => {
+    const started = categories.filter((c) => c.status === "running" || c.status === "finished");
+    const raceRiders = riders.filter((r) => r.raceUuid === raceUuid && r.raceStatus !== "upcoming");
+    return computeGroupPhases(started, withCategoryLaps(raceRiders, categories), isLeaderFinishAll(currentRace));
+  }, [categories, riders, raceUuid, currentRace]);
+  const phaseOf = (rider: RiderProps) => phaseOfRider(rider, categories, groupPhases);
+  // The next crossing finishes this rider: their category was ended (Finish
+  // Wave), or they show the FLAG (got the bell, or the group's first finish).
   const isOnTrackAfterEnd = (rider: RiderProps): boolean => {
     if (categories.find((c) => riderInCategory(rider, c))?.status === "finished") return true;
-    const g = groupOf(rider);
-    return g != null && rider.raceStatus !== "finished" && groupSignals.finish.has(g);
+    return rider.raceStatus !== "finished" && phaseOf(rider).nextCrossingFinishes;
   };
+  // The ON TRACK badge / count: only once the rider's category was actually ended
+  // (Finish Wave / Finish Race) and they are still out — never during normal
+  // racing, where the shared finish already shows as the chequered flag.
+  const isLeftOnTrack = (rider: RiderProps): boolean =>
+    rider.raceStatus !== "finished" &&
+    categories.find((c) => riderInCategory(rider, c))?.status === "finished";
 
 
   // Persist the action log (and Joker queue) per wave so a mid-wave reload
@@ -240,6 +265,7 @@ const Heat: React.FC = () => {
 
   // Lap recording + rollback live in a dedicated hook (BUGS.md #29). Same rules
   // and side effects as before — this component just drives it.
+  const recap = useRecapMode();
   const {
     riderActions,
     setRiderActions,
@@ -265,6 +291,8 @@ const Heat: React.FC = () => {
     displayOrder,
     setDisplayOrder,
     boardHoldMs,
+    // RECAP MODE: 6-minute duplicate check instead of the race's minimum.
+    minLapMsOverride: recap.active ? RECAP_MIN_LAP_SECONDS * 1000 : undefined,
     // The voice path renders its own detected-number chip, so only the tap path
     // adds one here — exactly as before the extraction.
     onLapRecorded: (rider, catColor, source) => {
@@ -278,8 +306,11 @@ const Heat: React.FC = () => {
     },
   });
 
-  const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click') => {
-    recordLap(rider, source);
+  // A tap records at the moment of the tap (the card waits 300 ms to tell a
+  // double-tap — rider history — from a single tap, and passes the tap time).
+  // In RECAP MODE the same flow applies, with the 6-minute duplicate check.
+  const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click', at?: Date) => {
+    recordLap(rider, source, at);
   };
 
   const handleRevertLap = (rider: RiderProps) => {
@@ -378,7 +409,7 @@ const Heat: React.FC = () => {
 
     // Add status change to action log for DNF/DSQ/DNS
     if (isOut) {
-      logStatusChange(updatedRider, status as 'DNF' | 'DSQ' | 'DNS');
+      logStatusChange(updatedRider, status as 'DNF' | 'DSQ' | 'DNS', rider);
     }
 
     setContextRider(null);
@@ -415,6 +446,71 @@ const Heat: React.FC = () => {
     [startedWaveCats]
   );
 
+  // ── Finish Wave (manual, from Live) ── one rule with Race → Start (planWaveFinish):
+  // only THIS wave; recorded laps and times kept; riders still racing become
+  // administrative finishers (no invented crossing time). Idempotent.
+  const [showFinishWave, setShowFinishWave] = useState(false);
+  // Race timeline → Finish lands here with ?finish=1: open the same FINISH confirmation.
+  const [searchParams, setSearchParams] = useSearchParams();
+  // RECAP MODE (useRecapMode, declared before useLapRecording): normal recording with a 6-minute duplicate check; ends after 30 s idle.
+  useEffect(() => {
+    if (!recap.active) return;
+    const onActivity = () => recap.touch();
+    document.addEventListener("pointerdown", onActivity);
+    document.addEventListener("keydown", onActivity);
+    return () => {
+      document.removeEventListener("pointerdown", onActivity);
+      document.removeEventListener("keydown", onActivity);
+    };
+  }, [recap.active, recap.touch]); // eslint-disable-line react-hooks/exhaustive-deps
+  const exitRecap = () => recap.exit();
+  // Leaving RECAP MODE (Exit, toggle or 30 s idle) restores normal Live: no review filter left on the board.
+  const wasRecapRef = useRef(false);
+  useEffect(() => {
+    if (wasRecapRef.current && !recap.active) setSearchTerm("");
+    wasRecapRef.current = recap.active;
+  }, [recap.active]);
+
+  const finishingWaveRef = useRef(false);
+  const waveAllRiders = useMemo(
+    () => riders.filter((r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))),
+    [riders, raceUuid, waveCategories]
+  );
+  const waveStillRacing = waveAllRiders.filter((r) => r.raceStatus === "running" && !["DNF", "DSQ", "DNS"].includes(r.status)).length;
+  const waveAllFinished = waveCategories.length > 0 && waveCategories.every((c) => c.status === "finished");
+  const finishWaveFromLive = async () => {
+    if (finishingWaveRef.current || waveAllFinished || heatId == null) return; // no double execution
+    if (!liveAllows(raceUuid, "WaveFinished", { heat: heatId })) return;
+    finishingWaveRef.current = true;
+    try {
+      const now = new Date();
+      if (isLiveRace(raceUuid)) void liveDispatch(raceUuid, "WaveFinished", { heat: heatId });
+      const plan = planWaveFinish(waveCategories, storeRiders, raceUuid, now);
+      for (const cat of plan.categories) await useCategoryStore.getState().updateCategory(cat);
+      if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
+      if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
+      if (currentRace) {
+        AuditLogService.log({
+          race: currentRace,
+          action: "FINISH_WAVE",
+          screen: "Live",
+          entityType: "wave",
+          entityId: heatId,
+          details: {
+            finishedAt: now.toISOString(),
+            categories: plan.categories.map((c) => c.name),
+            administrativelyFinished: plan.closedOut.map((r) => r.bibNumber),
+            alreadyFinished: plan.finalized.map((r) => r.bibNumber),
+          },
+        });
+      }
+      toast.success(`Wave ${heatId} finished — ${plan.closedOut.length} rider${plan.closedOut.length === 1 ? "" : "s"} still racing marked as finished (administrative).`);
+      setShowFinishWave(false);
+    } finally {
+      finishingWaveRef.current = false;
+    }
+  };
+
   const toggleCatFilter = (key: string) => {
     setFilterCats((prev) => {
       const next = new Set(prev);
@@ -447,8 +543,10 @@ const Heat: React.FC = () => {
       toast.error(`No active rider with bib ${bibNumber}`);
       return false;
     }
-    if (candidate.timeArrive && new Date(candidate.timeArrive).getTime() > new Date(joker.capturedAt).getTime()) {
-      toast.error(`Bib ${bibNumber} already has a more recent lap recorded`);
+    // Refused before anything is recorded, so the Joker stays and no duplicate lap is made.
+    const blocked = jokerResolveBlock(candidate, joker.capturedAt, minLapMsFor(races.find((r) => r.uuid === raceUuid)));
+    if (blocked) {
+      toast.error(blocked);
       return false;
     }
     recordLap(candidate, "click", new Date(joker.capturedAt));
@@ -690,26 +788,46 @@ const Heat: React.FC = () => {
     setShowMicPrompt(true);
   };
 
-  return (
-    <div className={styles.heat}>
-      <HeaderHeats raceId={raceUuid} onSettingsClick={() => setShowVoiceSettings(true)} />
+  useEffect(() => {
+    if (searchParams.get("finish") !== "1") return;
+    if (startedWaveCats.length > 0 && !waveAllFinished) setShowFinishWave(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("finish");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, startedWaveCats.length, waveAllFinished]);
 
-      {/* Upcoming categories Start would refuse — tap one to open its wave in Race */}
-      <BibWarning
-        raceUuid={raceUuid}
-        categories={categories}
-        riders={riders}
-        onFix={(cat) => {
-          const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
-          const wave = [...schedule.keys()].find((w) =>
-            [...(schedule.get(w)?.values() ?? [])].flat().some((c) => c.id === cat.id)
-          );
-          const ui = useUIStore.getState();
-          if (wave != null) ui.setSelectedWave(wave);
-          ui.setRaceMode(true);
-          navigate(`/race/${raceUuid}`);
-        }}
+  // One short message instead of an empty board, matched to the actual state.
+  const waveRiderTotal = riders.filter(
+    (r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))
+  ).length;
+  const liveEmpty =
+    scheduleWaves.length === 0
+      ? "No waves configured"
+      : waveCategories.length === 0
+        ? "No categories assigned to this wave"
+        : waveRiderTotal === 0
+          ? "No riders in this wave"
+          : startedWaveCats.length === 0
+            ? "Race has not started"
+            : null;
+  // Joker needs real riders on track in this wave (no waves, categories,
+  // riders or start yet → disabled, never an empty stamp).
+  const jokerReady = !liveEmpty && activeRiders.length > 0;
+
+  return (
+    <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
+      <HeaderHeats
+        raceId={raceUuid}
+        onClearBoard={waveStopped && !clearedWave ? () => setConfirmClear(true) : undefined}
       />
+      {isLiveRace(raceUuid) && (
+        <Suspense fallback={null}>
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 0" }}>
+            <SyncBadge raceUuid={raceUuid} />
+          </div>
+        </Suspense>
+      )}
 
       {/* Rider detail modal (double-click) */}
       {contextRider && (
@@ -725,6 +843,18 @@ const Heat: React.FC = () => {
         />
       )}
 
+      {showFinishWave && heatId != null && (
+        <DeleteConfirmModal
+          title={`Finish Wave ${heatId}?`}
+          description={`Wave ${heatId}: ${waveAllRiders.length} rider${waveAllRiders.length === 1 ? "" : "s"}, ${waveStillRacing} still racing. All remaining active riders in this wave will be marked as finished (administrative — no finish time is invented; their recorded laps and times are kept). Other waves are not affected.`}
+          confirmWord="FINISH"
+          confirmLabel="Finish Wave"
+          busyLabel="Finishing…"
+          onConfirm={finishWaveFromLive}
+          onCancel={() => setShowFinishWave(false)}
+        />
+      )}
+
       {/* Joker resolve modal — assign a bib to an unidentified stamped tap */}
       {resolvingJoker && (
         <JokerResolveModal
@@ -733,25 +863,6 @@ const Heat: React.FC = () => {
           onSave={(bib) => resolveJoker(resolvingJoker, bib)}
           onDelete={() => removeJoker(resolvingJoker.id)}
           onClose={() => setResolvingJoker(null)}
-        />
-      )}
-
-      {/* Voice settings modal */}
-      {showVoiceSettings && (
-        <VoiceSettingsModal
-          onClose={() => setShowVoiceSettings(false)}
-          voiceOnDevice={voiceActive && voiceSettings.enabled ? voiceOnDevice : null}
-          leaderFinishAll={isLeaderFinishAll(currentRace)}
-          onLeaderFinishAllChange={
-            currentRace && !currentRace.finalized
-              ? (on) => void useRaceStore.getState().updateRace({ ...currentRace, leaderFinishAll: on })
-              : undefined
-          }
-          canClearBoard={waveStopped && !clearedWave}
-          onClearBoard={() => {
-            setShowVoiceSettings(false);
-            setConfirmClear(true);
-          }}
         />
       )}
 
@@ -822,7 +933,18 @@ const Heat: React.FC = () => {
         {/* Control panel: clock, wave info, Joker and bib search, grouped
             into one elevated card so this reads as a single distinct zone
             between the header and the racing grid. */}
-        <div className={styles.controlPanel}>
+        <div className={`${styles.controlPanel} ${recap.active ? styles.controlPanelRecap : ""}`}>
+          {recap.active && (
+            <div className={styles.recapBanner} role="status" data-testid="recap-mode-banner">
+              <span className={styles.recapBannerTitle}>RECAP ACTIVE</span>
+              <span className={styles.recapBannerHint}>
+                Passages are recorded as usual, with a 6-minute duplicate check · ends after 30 s idle
+              </span>
+              <button type="button" className={styles.recapExit} onClick={exitRecap} data-testid="recap-exit">
+                Exit RECAP
+              </button>
+            </div>
+          )}
           {/* Timer row with wave-info button: which wave is live + its started categories */}
           <div className={styles.timerRow}>
             {/* Rider action log — lives in the timer row's empty left column so it
@@ -856,6 +978,7 @@ const Heat: React.FC = () => {
               </button>
             )}
             <p className={styles.timerText}>{elapsedTime}</p>
+            {currentWave && (
             <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
               {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
               {waveCategories
@@ -865,25 +988,26 @@ const Heat: React.FC = () => {
                   <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
                 ))}
             </button>
+            )}
           </div>
 
-          <div className={styles.searchWrapper}>
-            <div className={styles.searchWrapperLeft}>
-              {jokerEnabled && (
-                <button
-                  className={styles.jokerBtn}
-                  onClick={addJoker}
-                  aria-label="Add Joker"
-                  title="Stamp an unidentified rider's arrival time now"
-                >
-                  <Bike size={20} aria-hidden="true" />
-                  {jokers.length > 0 && (
-                    <span className={styles.jokerBadge}>{jokers.length}</span>
-                  )}
-                </button>
-              )}
-            </div>
-            <div className={styles.inputContainer}>
+          {/* Entry row: Unknown Rider · bib (prominent) · RECAP MODE */}
+          <div className={styles.entryRow}>
+            {jokerEnabled && (
+              <button
+                className={styles.jokerBtn}
+                onClick={jokerReady ? addJoker : undefined}
+                disabled={!jokerReady}
+                aria-label="Unknown Rider"
+                title={jokerReady ? "Unknown Rider" : "Unknown Rider: available once riders are racing in this wave"}
+                data-testid="unknown-rider-btn"
+              >
+                <Bike size={22} aria-hidden="true" />
+                <span className={styles.jokerQ} aria-hidden="true">?</span>
+                {jokers.length > 0 && <span className={styles.jokerBadge}>{jokers.length}</span>}
+              </button>
+            )}
+            <div className={`${styles.inputContainer} ${styles.bibEntry}`}>
               <input
                 type="text"
                 inputMode="numeric"
@@ -891,48 +1015,79 @@ const Heat: React.FC = () => {
                 maxLength={5}
                 className={styles.searchInput}
                 placeholder="#"
+                aria-label="Bib"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter records the rider with exactly this bib (same flow and duplicate check as a tap).
+                  if (e.key !== "Enter") return;
+                  const hit = activeRiders.find((r) => String(r.bibNumber) === searchTerm.trim());
+                  if (hit) handleRiderClick(hit, "click", new Date());
+                  else if (searchTerm.trim()) toast.info(`No racing rider with bib ${searchTerm.trim()}`);
+                }}
               />
               {searchTerm ? (
-                <button className={styles.clearSearch} onClick={() => setSearchTerm("")}>✕</button>
+                <button className={styles.clearSearch} onClick={() => setSearchTerm("")} aria-label="Clear bib">✕</button>
               ) : (
-                <img src={Icons.search} alt="search" width={16} height={16} className={styles.inputIcon} />
+                <img src={Icons.search} alt="" width={16} height={16} className={styles.inputIcon} />
               )}
             </div>
-            <div className={styles.searchWrapperRight}>
-              {scheduleWaves.length > 1 && (
-                <label className={styles.waveSwitcher} title="Switch wave">
-                  <span className={styles.waveSwitcherLabel}>Wave</span>
-                  <span
-                    className={[
-                      styles.waveSwitcherDot,
-                      currentWave?.status === "running" ? styles.waveSwitcherDotRunning : "",
-                      currentWave?.status === "finished" ? styles.waveSwitcherDotFinished : "",
-                    ].join(" ")}
-                    aria-hidden="true"
-                  />
-                  <span className={styles.waveSwitcherValue}>
-                    {currentWave ? currentWave.waveNum : heatId}
-                  </span>
-                  <select
-                    className={styles.waveSwitcherSelect}
-                    value={heatId ?? ""}
-                    onChange={(e) => handleWaveChange(Number(e.target.value))}
-                    aria-label="Switch wave"
-                  >
-                    {scheduleWaves.map((w) => (
-                      <option key={w.waveNum} value={w.waveNum}>
-                        Wave {w.waveNum}
-                        {w.startTime ? ` · ${w.startTime}` : ""}
-                        {w.status === "finished" ? " (done)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className={styles.waveSwitcherChevron} aria-hidden="true" />
-                </label>
-              )}
+          </div>
+
+          {/* Wave row, apart from timing entry: switch wave · Finish Wave */}
+          <div className={styles.waveRow}>
+            <div className={styles.waveRowStart}>
+                {scheduleWaves.length === 0 && (
+                  <span className={styles.noWaves} data-testid="no-waves">No waves configured</span>
+                )}
+                {scheduleWaves.length > 0 && (
+                  <label className={styles.waveSwitcher} title="Switch wave">
+                    <span className={styles.waveSwitcherLabel}>Wave</span>
+                    <span
+                      className={[
+                        styles.waveSwitcherDot,
+                        currentWave?.status === "running" ? styles.waveSwitcherDotRunning : "",
+                        currentWave?.status === "finished" ? styles.waveSwitcherDotFinished : "",
+                      ].join(" ")}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.waveSwitcherValue}>
+                      {currentWave ? currentWave.waveNum : heatId}
+                    </span>
+                    <select
+                      className={styles.waveSwitcherSelect}
+                      value={heatId ?? ""}
+                      onChange={(e) => handleWaveChange(Number(e.target.value))}
+                      aria-label="Switch wave"
+                    >
+                      {scheduleWaves.map((w) => (
+                        <option key={w.waveNum} value={w.waveNum}>
+                          Wave {w.waveNum}
+                          {w.startTime ? ` · ${w.startTime}` : ""}
+                          {w.status === "finished" ? " (done)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className={styles.waveSwitcherChevron} aria-hidden="true" />
+                  </label>
+                )}
             </div>
+            {waveCategories.length > 0 && (
+              waveAllFinished ? (
+                <span className={styles.waveFinishedTag} data-testid="wave-finished-tag">Wave {heatId} · Finished</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.finishWaveBtn}
+                  data-testid="finish-wave-btn"
+                  disabled={startedWaveCats.length === 0}
+                  title={startedWaveCats.length === 0 ? "This wave has not started" : "Finish this wave now"}
+                  onClick={() => setShowFinishWave(true)}
+                >
+                  Finish Wave {heatId}
+                </button>
+              )
+            )}
           </div>
         </div>
 
@@ -977,11 +1132,26 @@ const Heat: React.FC = () => {
                   </label>
                 );
               })}
+              <div className={styles.filterDivider} />
+              {/* RECAP: off the main screen, still available here */}
+              <label className={styles.filterPanelRow}>
+                <input
+                  type="checkbox"
+                  data-testid="recap-btn"
+                  checked={recap.active}
+                  onChange={() => (recap.active ? exitRecap() : recap.enter())}
+                />
+                <span>Recap mode <span className={styles.filterStatusTag}>6-min duplicate check, ends after 30 s idle</span></span>
+              </label>
             </div>
           </div>
         )}
 
-        <div className={styles.gridWrapper}>
+        {liveEmpty && (
+          <div className={styles.liveEmpty} data-testid="live-empty">{liveEmpty}</div>
+        )}
+
+        <div className={styles.gridWrapper} style={liveEmpty ? { display: "none" } : undefined}>
           <div className={styles.info}>
             <div className={styles.active}>
               Racing ({activeRiders.length})
@@ -989,7 +1159,7 @@ const Heat: React.FC = () => {
                 <span className={styles.filterActive}> · {filterCats.size} filtered</span>
               )}
               {(() => {
-                const onTrack = runningRiders.filter(isOnTrackAfterEnd).length;
+                const onTrack = runningRiders.filter(isLeftOnTrack).length;
                 return onTrack > 0 ? (
                   <span
                     className={styles.onTrackTotal}
@@ -1032,13 +1202,13 @@ const Heat: React.FC = () => {
                   key={rider.id}
                   rider={rider}
                   color={getCatColor(rider)}
-                  forceBell={(() => { const g = groupOf(rider); return g != null && groupSignals.bell.has(g); })()}
-                  forceFinish={(() => { const g = groupOf(rider); return g != null && groupSignals.finish.has(g); })()}
+                  phase={phaseOf(rider)}
                   isFlashing={flashingRiderId === rider.id}
                   isRecorded={pendingMoveSet.has(rider.id)}
-                  raceEnded={isOnTrackAfterEnd(rider)}
-                  onClick={() => handleRiderClick(rider)}
+                  raceEnded={isLeftOnTrack(rider)}
+                  onClick={(at) => handleRiderClick(rider, "click", at)}
                   onDoubleClick={() => setContextRider(rider)}
+                  minLapMs={recap.active ? RECAP_MIN_LAP_SECONDS * 1000 : minLapMsFor(currentRace)}
                 />
               ))}
             </div>
@@ -1141,7 +1311,11 @@ const Heat: React.FC = () => {
             <button
               className={styles.micButtonRadar}
               onClick={handleToggleVoice}
-              title={voiceActive ? "Disable voice input" : "Enable voice input"}
+              title={
+                voiceActive
+                  ? `Disable voice input${voiceSettings.enabled && voiceOnDevice != null ? (voiceOnDevice ? " · on device — works offline" : " · cloud — needs internet") : ""}`
+                  : "Enable voice input"
+              }
             >
               <VoiceRadarIcon
                 isActive={voiceActive}

@@ -10,19 +10,19 @@ import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../.
 export const RACE_COLUMNS = [
   "uuid", "ownerUserId", "raceId", "owner", "name", "location", "time", "date", "image", "heat", "status", "type",
   "raceType", "level", "orgenizer", "manager", "phone", "takanon", "site", "map", "distance", "isActive",
-  "autoColor", "leaderFinishAll", "waveColors", "mapCenter", "mapZoom", "trackPoints", "mapMarkers", "tracks",
+  "autoColor", "leaderFinishAll", "minLapSeconds", "waveColors", "mapCenter", "mapZoom", "trackPoints", "mapMarkers", "tracks",
   "joinCode", "lastSeq", "createdAt", "lastUpdateAt",
 ] as const;
 
 export const CATEGORY_COLUMNS = [
   "uuid", "raceUuid", "name", "subCategory", "laps", "startTime", "isConnected", "color", "heat", "status",
-  "linkedFinish", "linkGroup", "startedAt", "finishedAt", "importOrder",
+  "linkedFinish", "linkGroup", "ignored", "bibColor", "bibTextColor", "startedAt", "finishedAt", "importOrder",
 ] as const;
 
 export const RIDER_COLUMNS = [
   "uuid", "raceUuid", "bibNumber", "category", "subCategory", "checked", "firstName", "middleName", "lastName",
   "flag", "team", "standing", "heat", "status", "comment", "image", "chipNumber", "points", "uciPoints",
-  "federation", "uciNumber", "viewOrder", "raceStatus", "timeStartRace", "timeArrive", "lapsCounter", "lapsDetails",
+  "federation", "uciNumber", "bibColor", "bibTextColor", "viewOrder", "raceStatus", "timeStartRace", "timeArrive", "lapsCounter", "lapsDetails",
   "totalLaps", "elapsedLastLap", "elapsedTimeFromStart", "distance", "position_start", "position_category",
   "position_race", "color", "createdAt", "updatedAt",
 ] as const;
@@ -60,8 +60,9 @@ const AMENDED_IDS = `SELECT unnest("includeActionIds") FROM official_versions WH
 export async function loadMarks(d: Db, raceUuid: string, riderUuids: string[]): Promise<Map<string, RiderMark[]>> {
   const out = new Map<string, RiderMark[]>(riderUuids.map((u) => [u, []]));
   if (riderUuids.length === 0) return out;
-  const rows = await d.query<{ actionId: string; seq: number; type: RiderMark["type"]; riderUuid: string; laps: number | null; at: number }>(
+  const rows = await d.query<{ actionId: string; seq: number; type: RiderMark["type"]; riderUuid: string; laps: number | null; at: number; recovered: boolean | null }>(
     `SELECT "actionId", seq, type, payload->>'riderUuid' AS "riderUuid", (payload->>'laps')::int AS laps,
+            (payload->>'recovered')::boolean AS recovered,
             (extract(epoch FROM "eventAt") * 1000)::bigint AS at
      FROM race_events
      WHERE "raceUuid" = $1 AND type IN ('AddLap', 'RiderFinished', 'LapCountCorrection')
@@ -81,6 +82,7 @@ export async function loadMarks(d: Db, raceUuid: string, riderUuids: string[]): 
   for (const r of rows) {
     out.get(r.riderUuid)?.push({
       actionId: r.actionId, seq: r.seq, type: r.type, at: Number(r.at), laps: r.laps ?? undefined, undone: undone.has(r.actionId),
+      ...(r.recovered ? { recovered: true } : {}),
     });
   }
   return out;

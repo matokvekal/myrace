@@ -2,16 +2,18 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./headerHeat.module.css";
 import useRaceStore from "@/stores/racesStore";
-import { Settings } from "lucide-react";
-import RacePhaseSwitcher from "../racePhaseSwitcher/RacePhaseSwitcher";
+import useCategoryStore from "@/stores/categoryStore";
+import { Eraser } from "lucide-react";
+import RaceTopBar from "../raceSidebar/RaceTopBar";
 import { effectiveRaceStatus } from "@/utils/raceStatus";
 
 function HeaderHeat({
   raceId,
-  onSettingsClick,
+  onClearBoard,
 }: {
   raceId: string;
-  onSettingsClick?: () => void;
+  /** Set only once the wave has stopped and the board isn't cleared yet. */
+  onClearBoard?: () => void;
 }) {
   const { t } = useTranslation();
   const [currentTime, setCurrentTime] = useState<string>("");
@@ -25,8 +27,21 @@ function HeaderHeat({
   // Whether the RACE ITSELF is live — not whether the currently viewed wave
   // happens to be running. A finished/upcoming-but-past race, or a read-only
   // downloaded copy, is never "live" even while looking at its heat screen.
+  // ...and only once it has actually been started: a category of this race is
+  // running (the existing lifecycle). The date-based status alone made a new,
+  // unstarted race dated today read "RACE LIVE".
+  const anyCategoryRunning = useCategoryStore((s) =>
+    s.categories.some((c) => c.raceUuid === raceId && c.status === "running")
+  );
+  // "RACE PAST" only once the race has really happened; nothing before the start.
+  const hasRun = useCategoryStore((s) =>
+    s.categories.some((c) => c.raceUuid === raceId && c.status === "finished")
+  ) || !!race?.finalized;
   const isLive =
-    !race?.viewOnly && effectiveRaceStatus(race?.status, race?.date) === "running";
+    !race?.viewOnly &&
+    !race?.finalized &&
+    anyCategoryRunning &&
+    effectiveRaceStatus(race?.status, race?.date) === "running";
 
   useEffect(() => {
     const updateClock = () => {
@@ -41,35 +56,35 @@ function HeaderHeat({
     return () => clearInterval(interval);
   }, []);
 
+  // Live keeps its own controls in the shared race top bar's right-hand slot.
   return (
-    <div className={styles.headerRace}>
-      <div className={styles.leftSection}>
-        <div className={styles.raceName}>{race?.name || t("heat.defaultRaceName", "Race")}</div>
+    <RaceTopBar>
+      {isLive ? (
+        <div className={styles.raceLiveLabel}>
+          <span className={styles.liveDot}>●</span>
+          {t("heat.raceLive", "RACE LIVE")}
+        </div>
+      ) : hasRun ? (
+        <div className={styles.racePastLabel}>{t("heat.racePast", "RACE PAST")}</div>
+      ) : null}
+      <div className={styles.timeDisplay} aria-label={t("heat.clock", "Clock")}>
+        {currentTime}
       </div>
-
-      {/* Always-visible Setup / Race / Live switcher (icon-only on phones) */}
-      <RacePhaseSwitcher compact />
-
-      <div className={styles.rightSection}>
-        <div className={styles.liveWaveGroup}>
-          {isLive ? (
-            <div className={styles.raceLiveLabel}>
-              <span className={styles.liveDot}>●</span>
-              {t("heat.raceLive", "RACE LIVE")}
-            </div>
-          ) : (
-            <div className={styles.racePastLabel}>{t("heat.racePast", "RACE PAST")}</div>
-          )}
-        </div>
-        <div className={styles.timeDisplay}>
-          <div className={styles.timeLabel}>{t("heat.clock", "Clock")}</div>
-          <div className={styles.time}>{currentTime}</div>
-        </div>
-        <button className={styles.settingsBtn} onClick={onSettingsClick} title={t("heat.liveSettingsTitle", "Live settings")}>
-          <Settings size={18} />
+      {/* Clear board (BUGS.md #14) appears only when it can be used; every Live
+          setting lives in the main side menu → Timing & Live Controls. */}
+      {onClearBoard && (
+        <button
+          type="button"
+          className={styles.clearBoardBtn}
+          onClick={onClearBoard}
+          title={t("heat.clearBoardTitle", "Reset the clock and clear the rider cards; results stay in Results")}
+          data-testid="clear-board-btn"
+        >
+          <Eraser size={16} aria-hidden="true" />
+          <span>{t("heat.clearBoard", "Clear board")}</span>
         </button>
-      </div>
-    </div>
+      )}
+    </RaceTopBar>
   );
 }
 

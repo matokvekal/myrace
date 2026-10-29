@@ -36,7 +36,6 @@ const fieldNameMap: Record<StandardField, RiderFieldKey> = {
   'standing': 'standing',
   'gender': 'gender',
   'uci_number': 'uciNumber',
-  'id_number': 'idNumber',
   'birth_date': 'birthDate',
   'federation_number': 'federationNumber',
   'federation_chip': 'federationChip',

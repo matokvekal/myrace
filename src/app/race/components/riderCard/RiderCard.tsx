@@ -1,4 +1,5 @@
 import React from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import { RiderProps } from "@/types/types";
 import styles from "./riderCard.module.css";
 import { getRiderStatusInfo } from "@/utils/statusChip";
@@ -29,7 +30,7 @@ const RiderCard: React.FC<RiderProps> = (rider) => {
       {/* Top row */}
       <div className={styles.topRow}>
         <div className={styles.bibBlock}>
-          <span className={styles.bib}>#{rider.bibNumber || "—"}</span>
+          <BibBadge className={styles.bib} rider={rider} />
           <RiderFlag flag={rider.flag} className={styles.cardFlag} />
         </div>
 

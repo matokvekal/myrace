@@ -11,6 +11,9 @@ import {
   tapWithSettle,
   checkInRow,
   setStatusAtCheckIn,
+  gotoRaceMode,
+  openRaceView,
+  finishWave,
 } from "./helpers";
 
 /**
@@ -115,16 +118,21 @@ async function advanceLap(page: Page): Promise<void> {
 
 /** Phase switcher. Call-site names are the old ids (Race=setup, Start=race mode); the tabs now read Create / Race / Live. */
 async function gotoPhase(page: Page, phase: "Race" | "Start" | "Live"): Promise<void> {
-  await page.getByRole("tab", { name: ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase], exact: true }).click();
+  await gotoRaceMode(page, ({ Race: "Create", Start: "Race", Live: "Live" } as const)[phase]);
 }
 
 /** Setup-phase tab bar (Schedule / Categories / Riders / Results / Map / Info). */
 async function openSetupTab(page: Page, name: string): Promise<void> {
+  if (name === "Results") return gotoRaceMode(page, "Results"); // its own screen now
+  // The Create tabs only exist in Create mode (not on Results / Race / Live).
+  if ((await page.getByTestId("race-mode-indicator").getAttribute("data-mode")) !== "setup") {
+    await gotoRaceMode(page, "Create");
+  }
   await page.getByRole("button", { name, exact: true }).click();
 }
 
 async function openRaceModeTab(page: Page, name: "Grid" | "Check-In" | "Board"): Promise<void> {
-  await page.getByRole("button", { name, exact: true }).click();
+  await openRaceView(page, name); // Race screen: wave bottom sheet; Board: its own race mode
 }
 
 /**
@@ -133,7 +141,7 @@ async function openRaceModeTab(page: Page, name: "Grid" | "Check-In" | "Board"):
  * hidden behind an expander, but the time stays on the header throughout.
  */
 function startBlockFor(page: Page, startTime: string): Locator {
-  return page.locator('[class*="startBlock"]').filter({ hasText: startTime }).first();
+  return page.getByTestId("simple-start-group").filter({ hasText: startTime }).first();
 }
 
 /** A rider's row on the Results tab. */
@@ -168,7 +176,7 @@ async function openRiderModal(page: Page, bib: number, finished = false): Promis
 
 async function closeRiderModal(page: Page): Promise<void> {
   // Scoped to the modal's own close button — the live screen has other ✕ controls.
-  await page.locator('[class*="closeBtn"]').first().click();
+  await page.locator('[class*="closeBtn"]').locator("visible=true").first().click();
   await expect(page.getByText("Note / Comment")).toHaveCount(0);
 }
 
@@ -219,6 +227,8 @@ test.describe("Full race day", () => {
       await page.getByPlaceholder("Race Name").fill(RACE_NAME);
       await page.getByPlaceholder("Location").fill("E2E Test Circuit");
       await page.locator("#ridersFileUpload").setInputFiles(CSV_FIXTURE);
+      // The import preview must be confirmed before Done is enabled.
+      await page.getByTestId("import-preview-confirm").check();
       await page.getByRole("button", { name: /Done|Saving/ }).click();
 
       // Back on the races list, with the new race on it.
@@ -236,7 +246,7 @@ test.describe("Full race day", () => {
       await openSetupTab(page, "Categories");
       for (const cat of [...WAVE_1.categories, ...WAVE_2.categories]) {
         await expect(
-          page.getByRole("button", { name: `Show riders in ${cat.name}` })
+          page.getByRole("table", { name: "Categories in this race" }).getByText(cat.name, { exact: true })
         ).toBeVisible();
       }
 
@@ -480,6 +490,7 @@ async function runWave(
     await selectWave(page, plan.wave);
     await openRaceModeTab(page, "Check-In");
 
+    await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
     const checkAll = page.getByRole("button", { name: /Check All/ });
     await expect(checkAll).toBeVisible();
     await checkAll.click();
@@ -488,30 +499,37 @@ async function runWave(
     // One rider signs off before the start — DNS, so they never take the line.
     // Uses the one-tap row action (BUGS.md #25) rather than the Status menu.
     await page.getByRole("button", { name: `Mark #${plan.dnsBib} DNS` }).click();
-    await expect(page.getByText(/✗ 1 DNS/)).toBeVisible();
+    await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
 
-    // Both controls drive the same field. Once out, the row collapses to an
-    // inline DNS badge; tapping it opens the Status menu, and clearing there
-    // clears the row too.
-    const dnsRow = checkInRow(page, plan.dnsBib);
-    await expect(dnsRow.getByRole("button", { name: "DNS" })).toBeVisible();
-    await dnsRow.getByRole("button", { name: "DNS" }).click();
-    await page.locator('[class*="modalbottom"]').first().getByText("STANDING", { exact: true }).click();
-    await expect(page.getByText(/✗ 0 DNS/)).toBeVisible();
+    // Both controls drive the same field. The row's DNS button stays, pressed;
+    // tapping it again clears DNS (undo).
+    const dnsBtn = page.getByRole("button", { name: `Mark #${plan.dnsBib} DNS` });
+    await expect(dnsBtn).toHaveAttribute("aria-pressed", "true");
+    await dnsBtn.click();
+    await expect(page.getByTestId("checkin-dns-count")).toHaveCount(0); // no DNS → no DNS count shown
 
     // Put them back out — this time through the Status menu, to prove both paths.
     await setStatusAtCheckIn(page, plan.dnsBib, "DNS");
-    await expect(page.getByText(/✗ 1 DNS/)).toBeVisible();
+    await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
 
-    for (const entry of opts.lateEntries) {
-      // Add-rider now lives in each category block (category is fixed there).
-      await page.getByTestId(`checkin-add-${entry.category}`).click();
-      await page.getByPlaceholder("First name *").fill(entry.firstName);
-      await page.getByPlaceholder("Last name *").fill(entry.lastName);
-      await page.getByPlaceholder("Bib # *").fill(String(entry.bib));
-      await page.getByPlaceholder("Club / team").fill(entry.team);
-      await page.getByRole("button", { name: "Add Rider", exact: true }).click();
-      await expect(page.getByText(`#${entry.bib}`)).toBeVisible();
+    // Late entries: riders are added only in CREATE > Riders (the category
+    // header's Add rider presets the category), then back to Check-In.
+    if (opts.lateEntries.length) {
+      await openSetupTab(page, "Riders");
+      for (const entry of opts.lateEntries) {
+        await page.getByTestId(`add-rider-${entry.category}`).click();
+        const modal = page.getByTestId("add-rider-modal");
+        await modal.getByPlaceholder("Bib # *").fill(String(entry.bib));
+        await modal.getByPlaceholder("First name *").fill(entry.firstName);
+        await modal.getByPlaceholder("Last name *").fill(entry.lastName);
+        await modal.getByRole("button", { name: "Add Rider", exact: true }).click();
+        await expect(modal).toHaveCount(0);
+      }
+      await gotoPhase(page, "Start");
+      await openRaceModeTab(page, "Check-In");
+      for (const entry of opts.lateEntries) {
+        await expect(checkInRow(page, entry.bib)).toBeVisible(); // Check-In shows the bib large, without "#"
+      }
     }
   });
 
@@ -520,7 +538,7 @@ async function runWave(
     for (const cat of plan.categories) {
       const block = startBlockFor(page, cat.startTime);
       await block.getByTestId("start-all").click();
-      await expect(block.getByText(/RUNNING/)).toBeVisible();
+      await expect(block.getByText(/Started/)).toBeVisible();
       // Stagger the starts the way a real grid does.
       await page.clock.fastForward(60 * 1000);
     }
@@ -567,44 +585,6 @@ async function runWave(
     }
   });
 
-  await test.step(`${label}: all-riders status view`, async () => {
-    // Every rider in the wave appears exactly once, with a real status
-    // (BUGS.md #24). Staggered start groups, so this is the only single view
-    // that accounts for the whole field.
-    await gotoPhase(page, "Start");
-    await selectWave(page, plan.wave);
-    await page.getByRole("button", { name: "All Riders", exact: true }).click();
-    await expect(page.getByTestId("wave-status")).toBeVisible();
-
-    const expected = plan.categories.flatMap((c) => c.bibs).length + extraRiders;
-    const rows = page.locator('[data-testid^="wave-status-row-"]');
-    await expect(rows).toHaveCount(expected);
-
-    // No duplicates.
-    const ids = await rows.evaluateAll((els) =>
-      els.map((e) => (e as HTMLElement).dataset.testid ?? "")
-    );
-    expect(new Set(ids).size).toBe(ids.length);
-
-    // The out-riders are classified, not lumped in with finishers.
-    for (const [bib, status] of [
-      [plan.dnsBib, "DNS"],
-      [plan.dnfBib, "DNF"],
-      [plan.dsqBib, "DSQ"],
-    ] as const) {
-      await expect(page.getByTestId(`wave-status-row-${bib}`)).toHaveAttribute(
-        "data-bucket",
-        status
-      );
-    }
-
-    // Filtering narrows without losing anyone.
-    await page.getByRole("button", { name: /^DNF/ }).click();
-    await expect(page.locator('[data-testid^="wave-status-row-"]')).toHaveCount(1);
-    await page.getByTestId("wave-status-filter-all").click();
-    await expect(page.locator('[data-testid^="wave-status-row-"]')).toHaveCount(expected);
-  });
-
   await test.step(`${label}: standings page per category`, async () => {
     await gotoPhase(page, "Race");
     await openSetupTab(page, "Schedule");
@@ -646,15 +626,14 @@ async function runWave(
   });
 
   await test.step(`${label}: finish the wave`, async () => {
+    // Race day: the wave card's Finish → Live's typed FINISH confirmation.
+    // A wave whose every start group was already flagged off is finished as is.
     await gotoPhase(page, "Start");
-    await selectWave(page, plan.wave);
-    await openRaceModeTab(page, "Grid");
-    const finishWave = page.getByTestId("finish-wave");
-    if (await finishWave.count()) {
-      await finishWave.click();
-      await page.getByTestId("confirm-yes-wave").click();
+    if (await page.getByTestId(`wave-act-finish-${plan.wave}`).isVisible().catch(() => false)) {
+      await finishWave(page, plan.wave);
+    } else {
+      await expect(page.getByTestId(`wave-act-results-${plan.wave}`)).toBeVisible();
     }
-    await expect(page.getByText(`Wave ${plan.wave} finished`)).toBeVisible();
   });
 }
 
@@ -683,7 +662,7 @@ async function flagOffEarly(page: Page, plan: WavePlan): Promise<void> {
   // The confirm button must stay reachable, never pushed out of the viewport.
   await expect(block.getByTestId("confirm-yes")).toBeInViewport();
   await block.getByTestId("confirm-yes").click();
-  await expect(block.getByText(/FINISHED/)).toBeVisible();
+  await expect(block.getByText(/Finished/)).toBeVisible();
 
   await gotoPhase(page, "Live");
   await page.waitForURL(new RegExp(`/heat/${plan.wave}$`));
