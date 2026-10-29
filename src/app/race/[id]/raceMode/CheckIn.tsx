@@ -17,14 +17,14 @@ interface Props {
   slots?: Map<string, CategoryProps[]>;
 }
 
-type SortKey = "standing" | "bib" | "name" | "first";
+type SortKey = "standing" | "bib" | "name";
 
 /** Sort choice survives tab switches for this working session. */
 const SORT_SESSION_KEY = "commissaire.checkinSort";
 const loadSort = (): SortKey => {
   try {
     const v = sessionStorage.getItem(SORT_SESSION_KEY);
-    return v === "bib" || v === "name" || v === "first" ? v : "standing";
+    return v === "bib" ? "bib" : v === "name" || v === "first" ? "name" : "standing";
   } catch {
     return "standing";
   }
@@ -37,9 +37,10 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   const { riders, getRiders, updateRider, patchRiders } = useRiderStore();
   const { openModal } = useUIStore();
   const [search, setSearch] = useState("");
-  const [filterCat, setFilterCat] = useState("all");
+  // Check-In is always grouped by category, as a list (no filter / whole-wave / card modes).
+  const filterCat = "all" as string;
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "cards">("list");
+  const viewMode = "list" as "list" | "cards";
   const [sortKey, setSortKeyState] = useState<SortKey>(loadSort);
   const setSortKey = (k: SortKey) => {
     setSortKeyState(k);
@@ -47,7 +48,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   };
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [sortScope, setSortScope] = useState<"category" | "wave">("category");
+  const sortScope = "category" as "category" | "wave";
   const [editingBibId, setEditingBibId] = useState<number | null>(null);
   const [bibDraft, setBibDraft] = useState("");
   const [bibError, setBibError] = useState("");
@@ -76,10 +77,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
 
   const compare = (a: RiderProps, b: RiderProps) => {
     const dir = sortDir === "asc" ? 1 : -1;
-    if (sortKey === "first") {
-      const n = a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
-      return n * dir;
-    }
     if (sortKey === "name") {
       const n = a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
       return n * dir;
@@ -283,7 +280,10 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
         <span className={styles.rowColorBar} style={{ background: catColorOfRider(rider) }} title={rider.category} />
         {renderBib(rider)}
         <span className={styles.who}>
-          <span className={styles.name} dir="auto">{rider.lastName} {rider.firstName}</span>
+          <span className={styles.name} dir="auto">
+            {rider.lastName} {rider.firstName}
+            {st != null && <span className={styles.standing} title="Standing">S{st}</span>}
+          </span>
           {showCat && <span className={styles.cat} dir="auto">{rider.category}</span>}
         </span>
         <div className={styles.rowActions}>
@@ -302,13 +302,14 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           ) : (
             <>
               <button
-                className={`${styles.actBtn} ${rider.checked ? styles.actIn : ""}`}
+                className={`${styles.checkCircle} ${rider.checked ? styles.checkCircleOn : ""}`}
                 onClick={() => toggleCheck(rider)}
                 aria-pressed={!!rider.checked}
+                aria-label={rider.checked ? `Undo check-in #${rider.bibNumber}` : `Check in #${rider.bibNumber}`}
                 data-testid={`checkin-check-${rider.bibNumber}`}
                 title={rider.checked ? "Undo check-in" : "Check in"}
               >
-                {rider.checked ? "✓ In" : "Check In"}
+                {rider.checked ? "✓" : ""}
               </button>
               <button
                 className={`${styles.actBtn} ${rider.status === "DNS" ? styles.actDns : ""}`}
@@ -426,10 +427,9 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   };
 
   const sortOptions: { key: SortKey; label: string }[] = [
-    { key: "standing", label: "Start pos." },
+    { key: "standing", label: "Standing" },
     { key: "bib", label: "Bib" },
-    { key: "name", label: "Last name" },
-    { key: "first", label: "First name" },
+    { key: "name", label: "Name" },
   ];
 
   return (
@@ -497,18 +497,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
                 >{sortDir === "asc" ? "▲" : "▼"}</button>
               </div>
               <div className={styles.panelRow}>
-                <select className={styles.catSelect} value={filterCat} onChange={(e) => setFilterCat(e.target.value)} aria-label="Category filter">
-                  <option value="all">All categories</option>
-                  {catNames.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <div className={styles.scopeToggle}>
-                  <button className={`${styles.scopeBtn} ${sortScope === "category" ? styles.scopeBtnActive : ""}`} onClick={() => setSortScope("category")}>By category</button>
-                  <button className={`${styles.scopeBtn} ${sortScope === "wave" ? styles.scopeBtnActive : ""}`} onClick={() => setSortScope("wave")}>Whole wave</button>
-                </div>
-                <div className={styles.viewToggle}>
-                  <button className={`${styles.viewBtn} ${viewMode === "list" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("list")} title="List view">☰</button>
-                  <button className={`${styles.viewBtn} ${viewMode === "cards" ? styles.viewBtnActive : ""}`} onClick={() => setViewMode("cards")} title="Card view">⊞</button>
-                </div>
                 {!allAccountedFor && !isRaceActive && (
                   <button className={styles.scopeBtn} onClick={checkAll}>Check All</button>
                 )}

@@ -287,7 +287,7 @@ describe("Check-In: standing, rank and sorting", () => {
     seed(field());
     renderCheckIn([elite]);
     await openTools(user);
-    await user.click(screen.getByRole("button", { name: "Last name" }));
+    await user.click(screen.getByRole("button", { name: "Name" }));
     // Abel, Bar, Cohen, Dan
     expect(bibsIn(block("Men Elite"))).toEqual([20, 10, 30, 40]);
   });
@@ -316,29 +316,7 @@ describe("Check-In: standing, rank and sorting", () => {
     expect(bibsIn(block("Masters"))).toEqual([3, 4]);
   });
 
-  it("'Whole wave' scope merges the slot into one sorted list", async () => {
-    const user = userEvent.setup();
-    seed([
-      makeRider({ category: "Men Elite", bibNumber: 1, standing: 3 }),
-      makeRider({ category: "Masters", bibNumber: 2, standing: 1 }),
-      makeRider({ category: "Men Elite", bibNumber: 3, standing: 2 }),
-    ]);
-    renderCheckIn([elite, masters]);
-    await openTools(user);
-    await user.click(screen.getByRole("button", { name: "Whole wave" }));
-    expect(document.querySelectorAll(".catBlock")).toHaveLength(0);
-    const wave = document.querySelector<HTMLElement>(".waveBlock")!;
-    expect(bibsIn(wave)).toEqual([2, 3, 1]);
-  });
 
-  it("whole-wave scope has no add buttons either", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite" })]); // the Search/Sort panel needs riders to exist
-    renderCheckIn([elite, masters]);
-    await openTools(user);
-    await user.click(screen.getByRole("button", { name: "Whole wave" }));
-    expect(screen.queryByTestId(/^checkin-add-/)).not.toBeInTheDocument();
-  });
 });
 
 describe("Check-In: check-in, DNS, search, filter", () => {
@@ -406,18 +384,6 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     expect(screen.getByTestId("checkin-row-1")).toBeInTheDocument();
   });
 
-  it("category filter shows only that category", async () => {
-    const user = userEvent.setup();
-    seed([
-      makeRider({ category: "Men Elite", bibNumber: 1 }),
-      makeRider({ category: "Masters", bibNumber: 2 }),
-    ]);
-    renderCheckIn([elite, masters]);
-    await openTools(user);
-    await user.selectOptions(screen.getByDisplayValue("All categories"), "Masters");
-    expect(screen.queryByTestId("checkin-row-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("checkin-row-2")).toBeInTheDocument();
-  });
 
   it("locks check-in (no check / DNS buttons) once the race is running", () => {
     seed([makeRider({ category: "Men Elite", bibNumber: 1 })]);
@@ -427,13 +393,4 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     expect(screen.queryByRole("button", { name: /Check All/ })).not.toBeInTheDocument();
   });
 
-  it("card view renders the same riders with a bib editor", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite", bibNumber: 31 })]);
-    renderCheckIn([elite]);
-    await openTools(user);
-    await user.click(screen.getByTitle("Card view"));
-    expect(within(block("Men Elite")).getByText("31")).toBeInTheDocument();
-    expect(screen.getByTestId("checkin-editbib-31")).toBeInTheDocument();
-  });
 });

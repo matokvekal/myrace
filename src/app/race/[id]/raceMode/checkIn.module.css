@@ -1029,3 +1029,55 @@
   font-weight: 700;
   color: #0b1220;
 }
+
+/* ═══ Check-In v3: attendance list ═══ */
+.standing {
+  margin-inline-start: 8px;
+  padding: 0 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  vertical-align: middle;
+}
+
+/* Round check indicator: empty = not in, green check = checked in */
+.checkCircle {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #94a3b8;
+  border-radius: 50%;
+  background: #fff;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.checkCircleOn {
+  border-color: #15803d;
+  background: #15803d;
+}
+
+.checkCircle:hover:not(.checkCircleOn) {
+  border-color: #15803d;
+}
+
+/* DNS stays a quiet text toggle next to the check */
+.rowActions .actBtn {
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border-width: 1px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.catBlock {
+  box-shadow: none;
+}
