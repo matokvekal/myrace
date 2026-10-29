@@ -46,6 +46,17 @@ export interface RaceTrack {
   zoom?: number;
   /** Categories that ride this map, as catWaveKey(name, subCategory). Empty/unset = not assigned. */
   categoryKeys?: string[];
+  /** Route drawn in the map editor: the tapped points, in order. `points` holds the routed line. */
+  waypoints?: TrackWaypoint[];
+  /** Routing between waypoints: follow roads (car) or cycling paths/trails (bike). */
+  routeMode?: "car" | "bike";
+}
+
+/** A tapped route point; a label (Start, Water, …) also shows it on the map. */
+export interface TrackWaypoint {
+  lat: number;
+  lng: number;
+  label?: string;
 }
 
 export interface RaceProps {
