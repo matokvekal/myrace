@@ -26,8 +26,8 @@ const setup = (cat: CategoryProps, riders: RiderProps[]) => {
 };
 
 const lapsOf = (id: number) => useCategoryStore.getState().categories.find((c) => c.id === id)?.laps;
-const minus = () => screen.getAllByRole("button", { name: "−" })[0];
-const plus = () => screen.getAllByRole("button", { name: "+" })[0];
+const minus = () => screen.getAllByRole("button", { name: /^Fewer laps/ })[0];
+const plus = () => screen.getAllByRole("button", { name: /^More laps/ })[0];
 
 beforeEach(() => {
   vi.spyOn(window, "alert").mockImplementation(() => {});

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent , within} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("@/services/cloud/raceEvents", () => ({ recordRaceEvent: vi.fn().mockResolvedValue({}) }));
@@ -21,8 +21,13 @@ const setup = (cat: CategoryProps, riders: RiderProps[] = [makeRider({ category:
 };
 
 const startEdit = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
-  await user.click(screen.getByTitle(`Edit ${name}`));
+  await user.click(screen.getByRole("button", { name: `Edit ${name}` }));
+  // Wave and start time live under the form's "More" section.
+  await user.click(within(screen.getByTestId("category-edit-form")).getByRole("button", { name: /^More [▾▴]/ }));
 };
+
+/** The Add/Edit form (the table row above it has its own colour and laps controls). */
+const form = () => within(screen.getByTestId("category-edit-form"));
 
 beforeEach(() => {
   vi.spyOn(window, "alert").mockImplementation(() => {});
@@ -34,10 +39,10 @@ describe("Category edit form", () => {
     setup(makeCategory({ name: "Elite", status: "upcoming", color: "#63A6FC", laps: 4, heat: 2, startTime: "09:30" }));
     await startEdit(user, "Elite");
 
-    expect(screen.getByTestId("category-color-trigger")).toBeInTheDocument();
+    expect(form().getByTestId("category-color-trigger")).toBeInTheDocument();
     expect(screen.queryByTestId("category-color-palette")).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId("category-color-trigger"));
+    await user.click(form().getByTestId("category-color-trigger"));
     const palette = screen.getByTestId("category-color-palette");
     const swatches = palette.querySelectorAll("button");
     expect(swatches.length).toBeGreaterThan(3);
@@ -51,11 +56,11 @@ describe("Category edit form", () => {
     setup(cat);
     await startEdit(user, "Elite");
 
-    expect(screen.getByDisplayValue("09:30")).toBeEnabled();
-    expect(screen.getByDisplayValue("4")).toBeEnabled();
+    expect(form().getByDisplayValue("09:30")).toBeEnabled();
+    expect(form().getByDisplayValue("4")).toBeEnabled();
     // (the wave input snaps an empty value back to 1, so set it in one change)
-    fireEvent.change(screen.getByDisplayValue("2"), { target: { value: "3" } });
-    fireEvent.change(screen.getByDisplayValue("4"), { target: { value: "6" } });
+    fireEvent.change(form().getByDisplayValue("2"), { target: { value: "3" } });
+    fireEvent.change(form().getByDisplayValue("4"), { target: { value: "6" } });
     await user.click(screen.getByRole("button", { name: /Save/ }));
 
     await waitFor(async () => {
@@ -73,10 +78,10 @@ describe("Category edit form", () => {
     await startEdit(user, "Elite");
 
     expect(screen.getByTestId("category-lock-note")).toHaveTextContent(/started/i);
-    expect(screen.getByTestId("category-start-time")).toBeDisabled();
-    expect(screen.getByDisplayValue("1")).toBeDisabled(); // wave
+    expect(form().getByTestId("category-start-time")).toBeDisabled();
+    expect(form().getByDisplayValue("1")).toBeDisabled(); // wave
 
-    const laps = screen.getByDisplayValue("5");
+    const laps = form().getByDisplayValue("5");
     await user.clear(laps);
     await user.type(laps, "2");
     await user.click(screen.getByRole("button", { name: /Save/ }));
@@ -89,8 +94,8 @@ describe("Category edit form", () => {
     setup(makeCategory({ name: "Elite", status: "finished", laps: 5 }));
     await startEdit(user, "Elite");
     expect(screen.getByTestId("category-lock-note")).toHaveTextContent(/finished/i);
-    expect(screen.getByTestId("category-color-trigger")).toBeDisabled();
-    expect(screen.getByTestId("category-start-time")).toBeDisabled();
-    expect(screen.getByDisplayValue("5")).toBeDisabled();
+    expect(form().getByTestId("category-color-trigger")).toBeDisabled();
+    expect(form().getByTestId("category-start-time")).toBeDisabled();
+    expect(form().getByDisplayValue("5")).toBeDisabled();
   });
 });

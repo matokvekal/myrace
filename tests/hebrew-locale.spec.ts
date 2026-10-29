@@ -24,7 +24,9 @@ test.describe("Hebrew locale", () => {
 
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByText("המרוצים שלי").locator("visible=true").first()).toBeVisible();
+    await page.getByRole("button", { name: "Close menu" }).click();
 
     // Back to English restores today's markup (no dir attribute).
     await page.getByRole("button", { name: "Open menu" }).click();
@@ -42,6 +44,7 @@ test.describe("Hebrew browser without a choice", () => {
     await page.goto("/main");
     await acceptTerms(page);
     await page.reload();
+    await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByText("My Races").locator("visible=true").first()).toBeVisible();
     await expect(page.locator("html")).not.toHaveAttribute("dir", "rtl");
   });

@@ -1426,3 +1426,256 @@ button.standingName {
 .emptyRiders > button {
   flex-shrink: 0;
 }
+
+/* ═══ Wave editor: one compact section per wave ═══ */
+.wvHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wvTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #14243c);
+}
+
+.wvHeaderEnd {
+  display: flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+.wvPrimary,
+.wvSecondary {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wvPrimary {
+  border: 1px solid var(--brand-strong, #3f86e7);
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+.wvSecondary {
+  border: 1px solid var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-weight: 500;
+}
+
+.wvEmpty {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.wv {
+  margin-bottom: 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  overflow: hidden;
+}
+
+.wvHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-surface, #f5f8ff);
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+}
+
+.wvName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #14243c);
+}
+
+.wvBase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvTime {
+  height: 30px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvHead .wvDanger {
+  margin-inline-start: auto;
+}
+
+.wvIcon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wvIcon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wvDanger {
+  color: var(--danger, #df4b7b);
+}
+
+/* category | interval | start | actions */
+.wvRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 76px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 2px 10px;
+  border-top: 1px solid var(--border-card, #d9e7fb);
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+}
+
+.wvRowHead {
+  min-height: 28px;
+  border-top: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvCat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wvCatName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wvGap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvGapInput {
+  width: 52px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvUnit {
+  font-size: 12px;
+}
+
+.wvStart {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.wvRowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wvMove,
+.wvAddCat {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvAddCat {
+  display: block;
+  margin: 6px 10px 8px;
+  height: 32px;
+  font-size: 13px;
+  color: var(--brand-strong, #3f86e7);
+}
+
+.wvNote {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvFg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+@media (max-width: 480px) {
+  .wvRow {
+    grid-template-columns: minmax(0, 1fr) 64px 68px;
+  }
+
+  .wvRowActions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .wvRowHead span:last-child {
+    display: none;
+  }
+}
+
+:root[data-skin="gaming"] .wv button:not(:disabled),
+:root[data-skin="gaming"] .wvHeader button:not(:disabled),
+:root[data-skin="gaming"] .wvFg button:not(:disabled),
+:root[data-skin="gaming"] .wvEmpty button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
+}

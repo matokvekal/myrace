@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X } from "lucide-react";
+import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X, LayoutDashboard } from "lucide-react";
 import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
 import styles from "./raceSidebar.module.css";
@@ -18,13 +18,11 @@ export function useModeItems() {
     { key: "race", label: t("phase.race", "Race"), icon: <Flag aria-hidden="true" /> },
     { key: "live", label: t("phase.live", "Live"), icon: <Radio aria-hidden="true" /> },
     { key: "results", label: t("phase.results", "Results"), icon: <Trophy aria-hidden="true" /> },
+    { key: "board", label: t("phase.board", "Board"), icon: <LayoutDashboard aria-hidden="true" /> },
   ];
-  const available = finalized
-    ? all.filter((i) => i.key === "setup" || i.key === "results")
-    : all;
-  return mode === "setup" && !finalized
-    ? available.filter((i) => i.key !== "results")
-    : available;
+  if (finalized) return all.filter((i) => i.key === "setup" || i.key === "results" || i.key === "board");
+  // Create has no results to show yet; Results stays reachable from Race / Live.
+  return mode === "setup" ? all.filter((i) => i.key !== "results") : all;
 }
 
 const RaceSidebar: React.FC<{

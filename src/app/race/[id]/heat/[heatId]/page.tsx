@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import styles from "./heat.module.css";
 import { toast } from "react-toastify";
@@ -63,7 +63,13 @@ const Heat: React.FC = () => {
   const { riders: storeRiders, getRiders, updateRider, updateAllRiders } = useRiderStore();
   const { categories: storeCategories, getCategories } = useCategoryStore();
   // Ignored waves take no part in Live: no cards, no laps, no positions (data kept).
-  const categories = useMemo(() => activeCategories(storeCategories), [storeCategories]);
+  // This race only: the store is a shared cache and can still hold another
+  // race's categories (e.g. the demo) when this race has none of its own —
+  // that is where a phantom "Wave 1" with foreign categories came from.
+  const categories = useMemo(
+    () => activeCategories(storeCategories.filter((c) => c.raceUuid === raceUuid)),
+    [storeCategories, raceUuid]
+  );
   const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const { settings: voiceSettings } = useVoiceSettingsStore();
 
@@ -140,11 +146,7 @@ const Heat: React.FC = () => {
     if (heatId == null || categories.length === 0) return categories;
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const slotMap = schedule.get(heatId);
-    if (slotMap) {
-      const cats = [...slotMap.values()].flat();
-      if (cats.length > 0) return cats;
-    }
-    return categories;
+    return slotMap ? [...slotMap.values()].flat() : [];
   }, [categories, heatId]);
 
   // Every wave in this race's schedule, for the wave-switch dropdown next to
@@ -448,6 +450,8 @@ const Heat: React.FC = () => {
   // only THIS wave; recorded laps and times kept; riders still racing become
   // administrative finishers (no invented crossing time). Idempotent.
   const [showFinishWave, setShowFinishWave] = useState(false);
+  // Race timeline → Finish lands here with ?finish=1: open the same FINISH confirmation.
+  const [searchParams, setSearchParams] = useSearchParams();
   // RECAP MODE (useRecapMode, declared before useLapRecording): normal recording with a 6-minute duplicate check; ends after 30 s idle.
   useEffect(() => {
     if (!recap.active) return;
@@ -784,6 +788,33 @@ const Heat: React.FC = () => {
     setShowMicPrompt(true);
   };
 
+  useEffect(() => {
+    if (searchParams.get("finish") !== "1") return;
+    if (startedWaveCats.length > 0 && !waveAllFinished) setShowFinishWave(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("finish");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, startedWaveCats.length, waveAllFinished]);
+
+  // One short message instead of an empty board, matched to the actual state.
+  const waveRiderTotal = riders.filter(
+    (r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))
+  ).length;
+  const liveEmpty =
+    scheduleWaves.length === 0
+      ? "No waves configured"
+      : waveCategories.length === 0
+        ? "No categories assigned to this wave"
+        : waveRiderTotal === 0
+          ? "No riders in this wave"
+          : startedWaveCats.length === 0
+            ? "Race has not started"
+            : null;
+  // Joker needs real riders on track in this wave (no waves, categories,
+  // riders or start yet → disabled, never an empty stamp).
+  const jokerReady = !liveEmpty && activeRiders.length > 0;
+
   return (
     <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
       <HeaderHeats
@@ -947,6 +978,7 @@ const Heat: React.FC = () => {
               </button>
             )}
             <p className={styles.timerText}>{elapsedTime}</p>
+            {currentWave && (
             <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
               {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
               {waveCategories
@@ -956,6 +988,7 @@ const Heat: React.FC = () => {
                   <span key={cat.id} className={styles.miniDot} style={{ background: cat.color ?? "#ccc" }} />
                 ))}
             </button>
+            )}
           </div>
 
           {/* Entry row: Unknown Rider · bib (prominent) · RECAP MODE */}
@@ -963,9 +996,10 @@ const Heat: React.FC = () => {
             {jokerEnabled && (
               <button
                 className={styles.jokerBtn}
-                onClick={addJoker}
+                onClick={jokerReady ? addJoker : undefined}
+                disabled={!jokerReady}
                 aria-label="Unknown Rider"
-                title="Unknown Rider"
+                title={jokerReady ? "Unknown Rider" : "Unknown Rider: available once riders are racing in this wave"}
                 data-testid="unknown-rider-btn"
               >
                 <Bike size={22} aria-hidden="true" />
@@ -998,22 +1032,15 @@ const Heat: React.FC = () => {
                 <img src={Icons.search} alt="" width={16} height={16} className={styles.inputIcon} />
               )}
             </div>
-            <button
-              type="button"
-              className={`${styles.recapBtn} ${recap.active ? styles.recapOn : ""}`}
-              aria-pressed={recap.active}
-              data-testid="recap-btn"
-              onClick={() => (recap.active ? exitRecap() : recap.enter())}
-              title={recap.active ? "Exit RECAP" : "RECAP: record with a 6-minute duplicate check (ends after 30 s idle)"}
-            >
-              RECAP
-            </button>
           </div>
 
           {/* Wave row, apart from timing entry: switch wave · Finish Wave */}
           <div className={styles.waveRow}>
             <div className={styles.waveRowStart}>
-                {scheduleWaves.length > 1 && (
+                {scheduleWaves.length === 0 && (
+                  <span className={styles.noWaves} data-testid="no-waves">No waves configured</span>
+                )}
+                {scheduleWaves.length > 0 && (
                   <label className={styles.waveSwitcher} title="Switch wave">
                     <span className={styles.waveSwitcherLabel}>Wave</span>
                     <span
@@ -1105,11 +1132,26 @@ const Heat: React.FC = () => {
                   </label>
                 );
               })}
+              <div className={styles.filterDivider} />
+              {/* RECAP: off the main screen, still available here */}
+              <label className={styles.filterPanelRow}>
+                <input
+                  type="checkbox"
+                  data-testid="recap-btn"
+                  checked={recap.active}
+                  onChange={() => (recap.active ? exitRecap() : recap.enter())}
+                />
+                <span>Recap mode <span className={styles.filterStatusTag}>6-min duplicate check, ends after 30 s idle</span></span>
+              </label>
             </div>
           </div>
         )}
 
-        <div className={styles.gridWrapper}>
+        {liveEmpty && (
+          <div className={styles.liveEmpty} data-testid="live-empty">{liveEmpty}</div>
+        )}
+
+        <div className={styles.gridWrapper} style={liveEmpty ? { display: "none" } : undefined}>
           <div className={styles.info}>
             <div className={styles.active}>
               Racing ({activeRiders.length})
@@ -1166,6 +1208,7 @@ const Heat: React.FC = () => {
                   raceEnded={isLeftOnTrack(rider)}
                   onClick={(at) => handleRiderClick(rider, "click", at)}
                   onDoubleClick={() => setContextRider(rider)}
+                  minLapMs={recap.active ? RECAP_MIN_LAP_SECONDS * 1000 : minLapMsFor(currentRace)}
                 />
               ))}
             </div>

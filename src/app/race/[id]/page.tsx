@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
+import { CalendarClock, Info as InfoIcon, Map as MapIcon, Tags, Users, type LucideIcon } from "lucide-react";
 import styles from "./race.module.css";
 import HeaderRace from "../components/headerRace/HeaderRace";
-import Button from "@/components/ui/Button";
 import Loader from "@/components/Loader";
 import { resolveRaceImage } from "@/utils/resolveRaceImage";
 import RaceInfo from "../components/raceInfo/RaceInfo";
@@ -14,7 +14,6 @@ import Riders from "./riders/Riders";
 const Map = lazy(() => import("./map/Map"));
 import Schedule from "./schedule/Schedule";
 import Categories from "./categories/Categories";
-import Results from "./results/Results";
 import Info from "./info/Info";
 import RaceMode from "./raceMode/RaceMode";
 import EditRiders from "./editRiders/EditRiders";
@@ -26,6 +25,7 @@ import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { canForRace } from "@/services/cloud/permissions";
 import { isRaceFinalized } from "@/utils/raceLock";
 import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
+// Multi-user (only with a configured server): sharing, members, sync state.
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
 const LocalOnlyBadge = lazy(() => import("../../live/LocalOnlyBadge"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
@@ -34,19 +34,26 @@ const TABS = [
   "schedule",
   "categories",
   "riders",
-  "results",
   "map",
   // "cloud", // hidden for now
   "info"
 ] as const;
 type Tab = (typeof TABS)[number];
 
+const TAB_ICONS: Record<Tab, LucideIcon> = {
+  schedule: CalendarClock,
+  categories: Tags,
+  riders: Users,
+  map: MapIcon,
+  info: InfoIcon,
+};
+
 /**
  * Tabs a FINALIZED race still shows. Schedule and Categories are setup tools
  * for a race that hasn't happened yet — on a closed race they'd offer edits
- * that silently do nothing, so they're dropped and Results leads instead.
+ * that silently do nothing, so they're dropped. Results lives in the race sidebar.
  */
-const FINALIZED_TABS: Tab[] = ["results", "riders", "map", "info"];
+const FINALIZED_TABS: Tab[] = ["riders", "map", "info"];
 
 const Race: React.FC = () => {
   const params = useParams();
@@ -135,12 +142,9 @@ const Race: React.FC = () => {
   if (!race) return <div className={styles.loading}>Race not found.</div>;
 
   // Shared race: only the screens this member may view.
-  const availableTabs: readonly Tab[] = finalized
-    ? FINALIZED_TABS
-    : isRaceMode
-      ? TABS
-      : TABS.filter((tab) => tab !== "results");
-  const visibleTabs = availableTabs.filter((tab) => canViewScreen(raceUuid, tab));
+  const visibleTabs: readonly Tab[] = (finalized ? FINALIZED_TABS : TABS).filter(
+    (tab) => canViewScreen(raceUuid, tab)
+  );
   const activeTabSafe = (
     visibleTabs.includes(activeTab as Tab) ? activeTab : visibleTabs[0]
   ) as Tab;
@@ -195,19 +199,22 @@ const Race: React.FC = () => {
                 <LocalOnlyBadge raceUuid={raceUuid} />
               </Suspense>
             )}
-            <div className={styles.tabs}>
-              {visibleTabs.map((tab) => (
-                <Button
-                  key={tab}
-                  data-tab={tab}
-                  variant={activeTabSafe === tab ? "primary" : "secondary"}
-                  size="sm"
-                  className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </Button>
-              ))}
+            <div className={styles.tabs} role="group" aria-label="Create sections">
+              {visibleTabs.map((tab) => {
+                const Icon = TAB_ICONS[tab];
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
+                    aria-pressed={activeTabSafe === tab}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    <Icon size={15} aria-hidden="true" />
+                    <span>{tab.charAt(0).toUpperCase() + tab.slice(1)}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className={styles.tabContent}>
@@ -234,7 +241,6 @@ const Race: React.FC = () => {
                     readOnly={finalized}
                   />
                 ))}
-              {activeTabSafe === "results" && <Results raceUuid={raceUuid} />}
               {activeTabSafe === "map" && (
                 <Suspense fallback={<Loader />}>
                   <Map raceUuid={raceUuid} />

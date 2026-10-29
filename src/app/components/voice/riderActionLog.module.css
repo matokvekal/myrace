@@ -693,3 +693,94 @@
     font-size: 11px;
   }
 }
+
+/* Log toggle: compact labelled pill (was a round ⏱️ emoji button) */
+.toggleBtn {
+  width: auto;
+  height: 36px;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  box-shadow: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.toggleBtn.open {
+  color: #fff;
+  box-shadow: none;
+}
+
+.toggleLabel {
+  line-height: 1;
+}
+
+/* ═══ Responsive panel (rendered in <body> via a portal) ═══ */
+.overlay {
+  z-index: 1300;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+/* Desktop: inline top/left/width come from the Log button's position */
+.overlayAnchored {
+  display: block;
+  background: transparent;
+  padding: 0;
+}
+
+.panel {
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  color: var(--text-primary);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.panel .list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.closeBtn {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  color: var(--text-primary);
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+
+/* Phones: full-width bottom sheet */
+@media (max-width: 640px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    max-height: 85dvh;
+    border-radius: 14px 14px 0 0;
+    border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+.toggleBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

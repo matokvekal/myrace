@@ -8,6 +8,18 @@ import { IDBFactory } from "fake-indexeddb";
 // touching a real server or production data.
 vi.stubGlobal("fetch", () => Promise.reject(new Error("Network disabled in unit tests")));
 
+// jsdom has no layout engine and no ResizeObserver. Components that measure
+// themselves (RacingRider's pace ring) only need it to exist: with no layout
+// there is never a resize to report, so observe/unobserve/disconnect are no-ops.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    constructor(_callback: ResizeObserverCallback) {}
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 afterEach(async () => {
   cleanup();
   // Fresh IndexedDB + storage for every test => fully isolated, no shared state.

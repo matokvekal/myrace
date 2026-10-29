@@ -5,6 +5,7 @@ import {
   finishedCard as finished,
   tapWithSettle as tap,
   racingBibWithLapsLeft,
+  acceptTerms,
 } from "./helpers";
 
 /**

@@ -1,3 +1,4 @@
+import { Mic } from 'lucide-react';
 import styles from './voiceRadarIcon.module.css';
 
 interface VoiceRadarIconProps {
@@ -104,6 +105,9 @@ export function VoiceRadarIcon({ isActive, audioLevel, isListening }: VoiceRadar
           />
         )}
       </svg>
+
+      {/* Microphone in the centre so the button reads as "voice" at a glance */}
+      <Mic className={styles.micIcon} size={22} strokeWidth={2.4} aria-hidden="true" />
 
       {/* Outer glow when listening */}
       {isActive && isListening && (

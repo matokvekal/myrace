@@ -47,6 +47,7 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("rider-category-header").first()).toBeVisible();
     const before = await page.getByTestId("rider-category-header").count();
 
+    await page.getByTestId("rider-tools-toggle").click(); // search sits behind the search icon
     const box = page.getByTestId("rider-search");
     await box.fill("1");
     const afterBib = await page.getByTestId("rider-category-header").count();
@@ -94,8 +95,7 @@ test.describe("UI smoke", () => {
 
   test("Board: complete board with expandable results", async ({ page }) => {
     await loadDemoRace(page);
-    await gotoRaceMode(page, "Race");
-    await page.getByRole("button", { name: "Board", exact: true }).click();
+    await gotoRaceMode(page, "Board"); // Board is its own race mode (sidebar, below Results)
     await expect(page.getByTestId("board-wave-1")).toBeVisible();
     await expect(page.getByTestId("board-wave-2")).toBeVisible();
     const toggle = page.locator('[data-testid^="board-expand-"]').first();

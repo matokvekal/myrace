@@ -20,6 +20,8 @@ interface Props {
   defaultGroupBy?: GroupBy;
   /** Dedicated screen: adds a chip bar to jump between categories without leaving. */
   quickNav?: boolean;
+  /** Open with the wave filter preset (e.g. from a completed wave on the Race timeline). */
+  defaultWave?: number;
 }
 
 type SortKey = "place" | "name" | "bib" | "time";
@@ -94,12 +96,12 @@ function riderElapsed(rider: RiderProps): number {
   return ms >= 0 ? ms : Infinity;
 }
 
-const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quickNav = false }) => {
+const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quickNav = false, defaultWave }) => {
   const { riders, getRiders } = useRiderStore();
   const { categories } = useCategoryStore();
   const [sortBy, setSortBy] = useState<SortKey>("place");
   const [filterCategory, setFilterCategory] = useState("all");
-  const [waveFilter, setWaveFilter] = useState<"all" | number>("all");
+  const [waveFilter, setWaveFilter] = useState<"all" | number>(defaultWave ?? "all");
   const [groupBy, setGroupBy] = useState<GroupBy>(defaultGroupBy);
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});

@@ -9,7 +9,7 @@ import useCategoryStore from "@/stores/categoryStore";
 import { getDefaultLiveWave } from "../../[id]/schedule/Schedule";
 import { useRaceFinalized } from "@/utils/raceLock";
 
-export type RaceMode = "setup" | "race" | "live" | "results";
+export type RaceMode = "setup" | "race" | "live" | "results" | "board";
 
 export function useRaceModeNav() {
   const navigate = useNavigate();
@@ -17,7 +17,9 @@ export function useRaceModeNav() {
   const raceUuid = params?.id as string;
   // On the live lap screen the route carries :heatId — that means we're in Live.
   const onLiveRoute = params?.heatId != null;
-  const onResultsRoute = useLocation().pathname.replace(/\/+$/, "").endsWith("/results");
+  const path = useLocation().pathname.replace(/\/+$/, "");
+  const onResultsRoute = path.endsWith("/results");
+  const onBoardRoute = path.endsWith("/board");
 
   const isRaceMode = useUIStore((s) => s.isRaceMode);
   const setRaceMode = useUIStore((s) => s.setRaceMode);
@@ -26,14 +28,14 @@ export function useRaceModeNav() {
   // A finished race has no Race or Live mode left (see utils/raceLock.ts).
   const finalized = useRaceFinalized(raceUuid);
 
-  const mode: RaceMode = onResultsRoute ? "results" : onLiveRoute ? "live" : isRaceMode ? "race" : "setup";
+  const mode: RaceMode = onResultsRoute ? "results" : onBoardRoute ? "board" : onLiveRoute ? "live" : isRaceMode ? "race" : "setup";
 
   const goSetup = () => {
-    if (onLiveRoute || onResultsRoute) navigate(`/race/${raceUuid}`);
+    if (onLiveRoute || onResultsRoute || onBoardRoute) navigate(`/race/${raceUuid}`);
     setRaceMode(false);
   };
   const goRace = () => {
-    if (onLiveRoute || onResultsRoute) navigate(`/race/${raceUuid}`);
+    if (onLiveRoute || onResultsRoute || onBoardRoute) navigate(`/race/${raceUuid}`);
     setRaceMode(true);
   };
   // Opens whichever wave is actually live right now, never the Race screen's
@@ -51,6 +53,9 @@ export function useRaceModeNav() {
   const goResults = () => {
     if (!onResultsRoute) navigate(`/race/${raceUuid}/results`);
   };
+  const goBoard = () => {
+    if (!onBoardRoute) navigate(`/race/${raceUuid}/board`);
+  };
   const goAllRaces = () => navigate("/main");
 
   const go: Record<RaceMode, () => void> = {
@@ -58,6 +63,7 @@ export function useRaceModeNav() {
     race: goRace,
     live: goLive,
     results: goResults,
+    board: goBoard,
   };
 
   return { raceUuid, mode, finalized, go, goAllRaces };

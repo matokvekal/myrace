@@ -35,7 +35,7 @@ test.describe("Rider edits", () => {
 
     await test.step("changes persist in the list and on reopen", async () => {
       // Close the modal (close button has no accessible name; target its class).
-      await page.locator('[class*="closeBtn"]').first().click();
+      await page.locator('[class*="closeBtn"]').locator("visible=true").first().click();
       // The renamed rider shows in the underlying list.
       await expect(page.getByText("QAEDITED").first()).toBeVisible();
       // Reopen the rider — the modal now reflects the saved start time.

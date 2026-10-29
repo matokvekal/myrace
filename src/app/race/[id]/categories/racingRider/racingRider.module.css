@@ -33,7 +33,9 @@
   }
 }
 
-.rider:active {
+/* Pressed — also held through the minimum-lap cooldown after a lap */
+.rider:active,
+.rider[data-cooldown="true"] {
   transform: scale(0.91);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
@@ -225,7 +227,8 @@
     0 8px 14px rgba(0, 0, 0, 0.25);
 }
 
-:root[data-skin="gaming"] .rider:active {
+:root[data-skin="gaming"] .rider:active,
+:root[data-skin="gaming"] .rider[data-cooldown="true"] {
   transform: translateY(3px) scale(0.97);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
@@ -290,10 +293,20 @@
    just position (user req). */
 .paceRing {
   position: absolute;
-  top: 0;
-  left: 0;
+  /* the ring is sized to the card's border box (offsetWidth/Height), so pull it
+     out over the card's own border to sit on the outer edge */
+  top: -1px;
+  left: -1px;
+  /* above the .recorded wash (z 1), so the ring stays visible while the card
+     waits for the board hold / sits out its minimum-lap cooldown */
+  z-index: 2;
   pointer-events: none;
   overflow: visible;
+}
+
+:root[data-skin="gaming"] .paceRing {
+  top: -2px;
+  left: -2px;
 }
 
 .paceRingPath {
@@ -385,3 +398,4 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   z-index: 2;
 }
+
