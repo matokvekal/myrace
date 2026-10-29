@@ -75,7 +75,7 @@ const RaceSheet: React.FC<Props> = ({
     <>
       <div className={styles.backdrop} onClick={onClose} data-testid="sheet-backdrop" aria-hidden="true" />
       <section
-        className={`${styles.sheet} ${size === "full" ? styles.full : styles.half}`}
+        className={`${styles.sheet} ${size === "full" ? styles.full : view === "checkin" ? styles.checkinHalf : styles.half}`}
         role="dialog"
         aria-label={`Wave ${wave}`}
         data-testid="wave-sheet"
@@ -127,7 +127,7 @@ const RaceSheet: React.FC<Props> = ({
               <button
                 type="button"
                 className={styles.card}
-                onClick={() => { setView("checkin"); onSize("full"); }}
+                onClick={() => setView("checkin")}
                 data-testid="sheet-checkin"
               >
                 <span className={styles.cardIcon}><ClipboardCheck size={18} /></span>

@@ -158,7 +158,13 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   );
 
   const handleStatusChange = (status: any) => {
-    if (selectedRider) updateRider({ ...selectedRider, status });
+    if (!selectedRider) return;
+    // Write over the rider as it is now (the menu may have been opened before a
+    // check-in), with the same rule as the one-tap DNS: a DNS rider never takes
+    // the line, so they can't stay checked in. DNF / DSQ riders did start, so
+    // their check-in stands; going back to a racing status never re-checks.
+    const current = riders.find((r) => r.id === selectedRider.id) ?? selectedRider;
+    updateRider({ ...current, status, ...(status === "DNS" ? { checked: false } : {}) });
   };
 
   /**

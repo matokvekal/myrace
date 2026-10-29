@@ -332,6 +332,36 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     expect(useRiderStore.getState().riders[0].checked).toBe(false);
   });
 
+  it("setting DNS from the status menu clears check-in (persisted); back to standing does not re-check", async () => {
+    const user = userEvent.setup();
+    const r = makeRider({ category: "Men Elite", bibNumber: 8 });
+    await useRiderStore.getState().insertRiders([r]);
+    renderCheckIn([elite]);
+    await user.click(within(screen.getByTestId("checkin-row-8")).getByTitle("Check in"));
+    await waitFor(async () => expect((await stored())[0].checked).toBe(true));
+    expect(within(block("Men Elite")).getByText("✓ 1/1")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Status for #8"));
+    await user.click(screen.getByText("DNS", { selector: "[class*='line']" }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DNS", checked: false }));
+    expect(within(block("Men Elite")).getByText("✓ 0/1")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Status for #8"));
+    await user.click(screen.getByText("STANDING", { selector: "[class*='line']" }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "standing", checked: false }));
+  });
+
+  it("DNF from the status menu keeps a checked-in rider checked in (they started)", async () => {
+    const user = userEvent.setup();
+    const r = makeRider({ category: "Men Elite", bibNumber: 9 });
+    await useRiderStore.getState().insertRiders([r]);
+    renderCheckIn([elite]);
+    await user.click(within(screen.getByTestId("checkin-row-9")).getByTitle("Check in"));
+    await user.click(screen.getByLabelText("Status for #9"));
+    await user.click(screen.getByText("DNF", { selector: "[class*='line']" }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DNF", checked: true }));
+  });
+
   it("Check All checks everyone except DNS / DNF / DSQ", async () => {
     const user = userEvent.setup();
     await useRiderStore.getState().insertRiders([
