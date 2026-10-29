@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, ChevronRight, Circle, ClipboardCheck, Radio, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory } from "../schedule/Schedule";
@@ -53,15 +53,31 @@ const RaceSheet: React.FC<Props> = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Drag handle: up = expand, down = shrink / close
-  const dragY = useRef<number | null>(null);
+  // Snap heights (% of viewport): Check-In 50 → 70; start screen 50 → 90.
+  const snap = view === "checkin" ? { half: 50, full: 70 } : { half: 50, full: 90 };
+  // Drag handle: the sheet follows the finger, then snaps (half / full / close).
+  // Only the handle drags (pointer captured), so scrolling the list never moves the sheet.
+  const drag = useRef<{ y: number; vh: number } | null>(null);
+  const [dragVh, setDragVh] = useState<number | null>(null);
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { y: e.clientY, vh: size === "full" ? snap.full : snap.half };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    const dy = e.clientY - drag.current.y;
+    if (Math.abs(dy) < 4) return;
+    setDragVh(Math.min(snap.full, Math.max(20, drag.current.vh - (dy / window.innerHeight) * 100)));
+  };
   const onPointerUp = (e: React.PointerEvent) => {
-    if (dragY.current == null) return;
-    const dy = e.clientY - dragY.current;
-    dragY.current = null;
-    if (dy < -40) onSize("full");
-    else if (dy > 40) (size === "full" ? onSize("half") : onClose());
-    else onSize(size === "full" ? "half" : "full");
+    if (!drag.current) return;
+    const dy = e.clientY - drag.current.y;
+    const final = dragVh ?? drag.current.vh;
+    drag.current = null;
+    setDragVh(null);
+    if (Math.abs(dy) < 6) return onSize(size === "full" ? "half" : "full"); // tap toggles
+    if (final < snap.half - 12) return onClose();
+    onSize(final > (snap.half + snap.full) / 2 ? "full" : "half");
   };
 
   const waveRiders = riders.filter((r) => categories.some((c) => riderInCategory(r, c)));
@@ -75,15 +91,18 @@ const RaceSheet: React.FC<Props> = ({
     <>
       <div className={styles.backdrop} onClick={onClose} data-testid="sheet-backdrop" aria-hidden="true" />
       <section
-        className={`${styles.sheet} ${size === "full" ? styles.full : view === "checkin" ? styles.checkinHalf : styles.half}`}
+        className={`${styles.sheet} ${size === "full" ? (view === "checkin" ? styles.checkinFull : styles.full) : styles.half} ${dragVh != null ? styles.dragging : ""}`}
+        style={dragVh != null ? { height: `${dragVh}dvh` } : undefined}
         role="dialog"
         aria-label={`Wave ${wave}`}
         data-testid="wave-sheet"
       >
         <div
           className={styles.handleArea}
-          onPointerDown={(e) => { dragY.current = e.clientY; }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={() => { drag.current = null; setDragVh(null); }}
           role="button"
           tabIndex={0}
           aria-label={size === "full" ? "Shrink panel" : "Expand panel"}

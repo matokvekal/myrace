@@ -661,14 +661,19 @@
   background: var(--bg-surface, #f5f8ff);
 }
 
-/* Check-In opens a little lower (~45%); drag up for 90% */
-.checkinHalf {
-  height: 45vh;
-  height: calc(45dvh + env(safe-area-inset-bottom));
+/* Check-In: 50% → at most 70% */
+.checkinFull {
+  height: 70vh;
+  height: 70dvh;
 }
 
 @media (min-width: 960px) {
-  .checkinHalf {
-    height: calc(45dvh - 12px);
+  .checkinFull {
+    height: calc(70dvh - 12px);
   }
+}
+
+/* While the handle is dragged the sheet follows the finger (no easing) */
+.dragging {
+  transition: none;
 }

@@ -46,7 +46,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
     setSelectedWave(w);
     if (action === "checkin") {
       setSheetView("checkin");
-      setSheet((s) => (s === "full" ? "full" : "half")); // Check-In opens at ~45%
+      setSheet("half"); // Check-In opens at 50%; drag up to 70%
     } else if (action === "start") {
       setSheetView("summary");
       setSheet((s) => s ?? "half");
