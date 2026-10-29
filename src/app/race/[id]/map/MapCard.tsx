@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import styles from "./map.module.css";
+import PlaceSearch from "./PlaceSearch";
 
 /** View-only fallback for a map with nothing saved yet (no centre, route or points).
  *  Never written to the race — only "Set area" saves a view. */
@@ -322,6 +323,9 @@ const MapCard: React.FC<MapCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Find a place anywhere, then fine-tune the view and press Set area */}
+      {editing && <PlaceSearch onPick={(p) => setFocus({ lat: p.lat, lng: p.lng })} />}
 
       {editing && showHelp && (
         <div className={styles.helpPanel} role="note">

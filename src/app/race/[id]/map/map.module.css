@@ -545,3 +545,91 @@
     display: inline;
   }
 }
+
+/* ═══ Place search (Nominatim) ═══ */
+.placeSearch {
+  position: relative;
+}
+
+.placeInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-muted, #8498ba);
+}
+
+.placeInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 16px; /* no iOS zoom on focus */
+}
+
+.placeHint {
+  font-size: 13px;
+}
+
+.placeClear {
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  cursor: pointer;
+}
+
+.placeList {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline: 0;
+  z-index: 2100; /* above Leaflet panes */
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.placeItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.placeItem:last-child {
+  border-bottom: none;
+}
+
+.placeItem:hover {
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.placeItem svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--brand-strong, #3f86e7);
+}
+
+.placeMsg {
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text-muted, #8498ba);
+}
