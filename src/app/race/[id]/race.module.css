@@ -12,7 +12,8 @@
 .top {
   position: relative; /* Relative positioning for child absolute elements */
   width: 100%;
-  height: 248px; /* 300px minus the 52px race top bar now stacked above it */
+  /* Banner + race card in normal flow: the card overlaps the banner, and the
+     tabs below always start after the card (it can't cover them on any width). */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -23,7 +24,7 @@
 .imageWrapper {
   position: relative; /* For the fill layout of the image */
   width: 100%;
-  height: 100%; /* Full height */
+  height: 150px;
   overflow: hidden; /* Ensure no overflow */
 }
 
@@ -40,13 +41,14 @@
 }
 
 .raceInfo {
-  height: 174px;
+  min-height: 0;
   width: 90%;
   background: linear-gradient(165deg, #ffffff, #f6faff);
   border-radius: 16px;
   border: 1px solid rgba(99, 166, 252, 0.16);
-  position: absolute;
-  top: 98px;
+  position: relative;
+  margin-top: -52px; /* overlap the banner, as before */
+  z-index: 1;
   box-shadow:
     0 12px 24px rgba(99, 166, 252, 0.15),
     0 1px 0 rgba(255, 255, 255, 0.78) inset;
