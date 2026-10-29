@@ -52,6 +52,15 @@ export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" 
   const key = ({ Create: "setup", Race: "race", Live: "live", Results: "results" } as const)[mode];
   await page.getByTestId("race-menu-btn").click();
   await page.getByTestId(`race-nav-${key}`).click();
+  // Race opens on the full timeline; open the current wave's panel (Grid / Check-In / …).
+  if (key === "race") {
+    const panel = page.getByTestId("wave-panel");
+    if (!(await panel.isVisible().catch(() => false))) {
+      const current = page.locator('[data-testid^="timeline-wave-"][data-current="true"]');
+      await ((await current.count()) ? current.first() : page.locator('[data-testid^="timeline-wave-"]').first()).click();
+      await panel.waitFor();
+    }
+  }
 }
 
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */

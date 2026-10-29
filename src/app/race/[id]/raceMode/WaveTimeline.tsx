@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, Clock, Crosshair, Radio, SkipForward } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, Clock, Crosshair, Radio, SkipForward, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory, toMinutes, normalizeTime } from "../schedule/Schedule";
 import styles from "./waveTimeline.module.css";
@@ -56,6 +56,10 @@ interface Props {
   onSelect: (wave: number) => void;
   /** Race date, shown in the header. */
   date?: string;
+  /** Narrow rail next to the wave panel: wave number, time and status only. */
+  compact?: boolean;
+  /** The app's current wave (shared selected wave), marked on its card even when no panel is open. */
+  current?: number;
 }
 
 /**
@@ -63,7 +67,7 @@ interface Props {
  * time axis, a live "now" line, Now / Next / Active jumps. Presentation only —
  * selecting a wave just sets the shared selected wave.
  */
-const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date }) => {
+const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current }) => {
   const [now, setNow] = useState(nowMinutes);
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000);
@@ -170,21 +174,21 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
   const showNow = range && now >= range.from && now <= range.to;
 
   return (
-    <div className={styles.wrap}>
+    <div className={`${styles.wrap} ${compact ? styles.compact : ""}`}>
       <div className={styles.toolbar}>
         <span className={styles.dayLabel}>
           <Clock size={14} /> {hhmm(now)}
           {date && <span className={styles.date}> · {date}</span>}
         </span>
         <div className={styles.jumps}>
-          <button type="button" className={styles.jumpBtn} onClick={() => scrollToMinute(now)} title="Scroll to now">
-            <Crosshair size={14} /> Now
+          <button type="button" className={styles.jumpBtn} onClick={() => scrollToMinute(now)} title="Scroll to now" aria-label="Now">
+            <Crosshair size={14} /> <span className={styles.jumpLabel}>Now</span>
           </button>
-          <button type="button" className={styles.jumpBtn} onClick={() => jump(nextWave)} disabled={!nextWave} title="Next wave">
-            <SkipForward size={14} /> Next
+          <button type="button" className={styles.jumpBtn} onClick={() => jump(nextWave)} disabled={!nextWave} title="Next wave" aria-label="Next wave">
+            <SkipForward size={14} /> <span className={styles.jumpLabel}>Next</span>
           </button>
-          <button type="button" className={styles.jumpBtn} onClick={() => jump(activeWave)} disabled={!activeWave} title="Racing wave">
-            <Radio size={14} /> Active
+          <button type="button" className={styles.jumpBtn} onClick={() => jump(activeWave)} disabled={!activeWave} title="Racing wave" aria-label="Racing wave">
+            <Radio size={14} /> <span className={styles.jumpLabel}>Active</span>
           </button>
         </div>
       </div>
@@ -220,12 +224,13 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                     onClick={() => onSelect(it.wave)}
                     aria-pressed={isSel}
                     data-testid={`timeline-wave-${it.wave}`}
+                    data-current={it.wave === current ? "true" : undefined}
                   >
                     <span className={styles.cardTop}>
-                      <span className={styles.cardName}>Wave {it.wave}</span>
+                      <span className={styles.cardName}>{compact ? `W${it.wave}` : `Wave ${it.wave}`}</span>
                       <span className={styles.cardTime}>{it.startLabel}</span>
-                      <span className={`${styles.state} ${styles[`state_${it.state}`]}`}>
-                        <StateIcon s={it.state} /> {STATE_LABEL[it.state]}
+                      <span className={`${styles.state} ${styles[`state_${it.state}`]}`} title={STATE_LABEL[it.state]}>
+                        <StateIcon s={it.state} /> <span className={styles.stateLabel}>{STATE_LABEL[it.state]}</span>
                       </span>
                     </span>
                     <span className={styles.cardCats} dir="auto">{it.cats.map((c) => c.name).join(" · ")}</span>
@@ -276,7 +281,10 @@ export const WaveSummary: React.FC<{
   startLabel: string;
   cats: CategoryProps[];
   riders: RiderProps[];
-}> = ({ wave, state, startLabel, cats, riders }) => {
+  /** Panel header mode: one line + short stats (no big number), with a close button. */
+  compact?: boolean;
+  onClose?: () => void;
+}> = ({ wave, state, startLabel, cats, riders, compact = false, onClose }) => {
   const [catsOpen, setCatsOpen] = useState(false);
   const s = waveStats(cats, riders);
   const live = state !== "upcoming";
@@ -288,9 +296,14 @@ export const WaveSummary: React.FC<{
         <span className={`${styles.state} ${styles[`state_${state}`]}`}>
           <StateIcon s={state} size={14} /> {STATE_LABEL[state]}
         </span>
+        {onClose && (
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close wave panel" title="Back to the full timeline">
+            <X size={18} />
+          </button>
+        )}
       </div>
 
-      <div className={styles.bigStat}>
+      {!compact && <div className={styles.bigStat}>
         {live ? (
           <>
             <span className={styles.bigNum}>{s.onCourse}</span>
@@ -303,9 +316,10 @@ export const WaveSummary: React.FC<{
             <span className={styles.bigLabel}>riders registered · not started</span>
           </>
         )}
-      </div>
+      </div>}
 
       <div className={styles.statRow}>
+        {compact && live && <span className={styles.onCourse}><b>{s.onCourse}</b>/{s.registered} on course</span>}
         <span><b>{s.registered}</b> registered</span>
         <span><b>{live ? s.started : "—"}</b> started</span>
         <span><b>{live ? s.finished : "—"}</b> finished</span>
@@ -314,7 +328,7 @@ export const WaveSummary: React.FC<{
         {s.dsq > 0 && <span><b>{s.dsq}</b> DSQ</span>}
       </div>
 
-      <button type="button" className={styles.catToggle} onClick={() => setCatsOpen((o) => !o)} aria-expanded={catsOpen}>
+      <button type="button" className={`${styles.catToggle} ${compact ? styles.catToggleCompact : ""}`} onClick={() => setCatsOpen((o) => !o)} aria-expanded={catsOpen}>
         {cats.length} categor{cats.length === 1 ? "y" : "ies"}
         {catsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
@@ -334,7 +348,7 @@ export const WaveSummary: React.FC<{
             );
           })}
         </div>
-      ) : (
+      ) : compact ? null : (
         <div className={styles.catChips}>
           {cats.map((c) => (
             <span key={c.id} className={styles.catChip} dir="auto">

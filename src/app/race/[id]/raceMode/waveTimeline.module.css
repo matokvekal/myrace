@@ -427,3 +427,125 @@
     max-height: 42vh;
   }
 }
+
+/* ═══ Rail mode (wave panel open) ═══ */
+.wrap {
+  height: 100%;
+}
+
+.wrap .scroll {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+.compact .date,
+.compact .jumpLabel,
+.compact .cardCats,
+.compact .cardStats,
+.compact .stateLabel {
+  display: none;
+}
+
+.compact .toolbar {
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+}
+
+.compact .jumps {
+  margin-inline-start: 0;
+}
+
+.compact .jumpBtn {
+  padding: 0 6px;
+}
+
+.compact .lane {
+  inset-inline: 30px 3px;
+}
+
+.compact .tickLabel {
+  font-size: 9px;
+  inset-inline-start: 1px;
+}
+
+.compact .now {
+  inset-inline: 26px 0;
+}
+
+.compact .nowLabel {
+  display: none;
+}
+
+.compact .card {
+  padding: 4px 5px;
+}
+
+.compact .cardTop {
+  flex-wrap: wrap;
+  gap: 2px 4px;
+}
+
+.compact .cardName {
+  font-size: 13px;
+}
+
+.compact .cardTime {
+  font-size: 11px;
+}
+
+.compact .state {
+  margin-inline-start: 0;
+  padding: 1px 4px;
+}
+
+/* Panel header (compact summary) */
+.closeBtn {
+  margin-inline-start: auto;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-card, #cbd5e1);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1f3f);
+  cursor: pointer;
+}
+
+.sumHead .state + .closeBtn {
+  margin-inline-start: auto;
+}
+
+.sumHead .state {
+  margin-inline-start: 0;
+}
+
+.onCourse {
+  color: #15803d !important;
+  font-weight: 700;
+}
+
+.onCourse b {
+  color: #15803d !important;
+}
+
+.catToggleCompact {
+  margin: 6px 0 0;
+}
+
+.summary:has(.closeBtn) {
+  padding: 8px 10px;
+}
+
+@media (max-width: 640px) {
+  .compact .toolbar .dayLabel {
+    font-size: 11px;
+  }
+
+  .compact .jumpBtn {
+    height: 26px;
+  }
+}

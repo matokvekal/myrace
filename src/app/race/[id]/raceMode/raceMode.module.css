@@ -182,32 +182,107 @@
   }
 }
 
-/* ═══ Race day control center ═══ */
+/* ═══ Race day control center: full timeline → rail + sliding wave panel ═══ */
 .rdc {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 12px;
-  align-items: start;
+  display: flex;
+  gap: 8px;
   padding-top: 8px;
+  height: calc(100dvh - 128px); /* below the race top bar and tab strip */
+  min-height: 420px;
+}
+
+.rdcRail {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  transition: flex-basis 0.22s ease;
+}
+
+.rdcOpen .rdcRail {
+  flex: 0 0 22%;
 }
 
 .rdcPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex: 1 1 78%;
   min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  background: var(--bg-surface, #f5f8ff);
+  animation: panelIn 0.22s ease-out;
 }
 
-/* Desktop: the timeline stays in view while the panel scrolls */
-@media (min-width: 900px) {
-  .rdc > :first-child {
-    position: sticky;
-    top: 8px;
+@keyframes panelIn {
+  from {
+    transform: translateX(24%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
-@media (max-width: 899px) {
+:global(html[dir="rtl"]) .rdcPanel {
+  animation-name: panelInRtl;
+}
+
+@keyframes panelInRtl {
+  from {
+    transform: translateX(-24%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Wave header + Grid | Check-In | Board | All Riders stay pinned while the content scrolls */
+.panelHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-surface, #f5f8ff);
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+}
+
+.panelHead .subTabs {
+  margin-bottom: 0;
+}
+
+.rdcPanel > :not(.panelHead) {
+  margin: 8px;
+}
+
+@media (max-width: 640px) {
   .rdc {
-    grid-template-columns: 1fr;
+    gap: 4px;
+    height: calc(100dvh - 112px);
+  }
+
+  .rdcOpen .rdcRail {
+    flex: 0 0 18%;
+    min-width: 58px;
+  }
+
+  .subTab {
+    font-size: 13px;
+    padding: 0 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rdcRail,
+  .rdcPanel {
+    transition: none;
+    animation: none;
   }
 }
