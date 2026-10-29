@@ -104,11 +104,11 @@ describe("Check-In: wave → category structure", () => {
     expect(screen.getByTestId("checkin-row-1")).toBeInTheDocument();
   });
 
-  it("still shows an empty category, with an add button", () => {
+  it("still shows an empty category, without an add button (riders are added in CREATE > Riders)", () => {
     seed([makeRider({ category: "Men Elite" })]);
     renderCheckIn();
     expect(within(block("Juniors")).getByText("No riders yet")).toBeInTheDocument();
-    expect(screen.getByTestId("checkin-add-Juniors")).toBeInTheDocument();
+    expect(screen.queryByTestId("checkin-add-Juniors")).not.toBeInTheDocument();
   });
 
   it("falls back to a single block when no slot map is given", () => {
@@ -128,91 +128,12 @@ describe("Check-In: wave → category structure", () => {
   });
 });
 
-describe("Check-In: add rider to a specific category", () => {
-  it("adds the rider to that category only, fixed category, no picker", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite", bibNumber: 1 })]);
-    renderCheckIn();
-
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    expect(within(block("Masters")).queryByRole("combobox")).toBeNull(); // category picker hidden: category is fixed
-    await user.type(screen.getByPlaceholderText("First name *"), "Noa");
-    await user.type(screen.getByPlaceholderText("Last name *"), "Cohen");
-    await user.type(screen.getByPlaceholderText("Bib # *"), "555");
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-
-    await waitFor(() => expect(bibsIn(block("Masters"))).toEqual([555]));
-    expect(bibsIn(block("Men Elite"))).toEqual([1]);
-
-    const added = useRiderStore.getState().riders.find((r) => r.bibNumber === 555)!;
-    expect(added).toMatchObject({ category: "Masters", raceUuid: RACE, heat: 1, firstName: "Noa", checked: true });
-    expect(added.standing).toBe(1);
-    expect((await stored()).some((r) => r.bibNumber === 555)).toBe(true);
-  });
-
-  it("gives new riders the next standing within their category", async () => {
-    const user = userEvent.setup();
-    seed([
-      makeRider({ category: "Men Elite", standing: 1, position_start: 1 }),
-      makeRider({ category: "Men Elite", standing: 2, position_start: 2 }),
-    ]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Men Elite"));
-    await user.type(screen.getByPlaceholderText("First name *"), "A");
-    await user.type(screen.getByPlaceholderText("Last name *"), "B");
-    await user.type(screen.getByPlaceholderText("Bib # *"), "900");
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-    await waitFor(() => expect(useRiderStore.getState().riders).toHaveLength(3));
-    expect(useRiderStore.getState().riders.find((r) => r.bibNumber === 900)!.standing).toBe(3);
-  });
-
-  it("rejects a bib already used in the race and adds nothing", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite", bibNumber: 42, lastName: "Taken", firstName: "Already" })]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.type(screen.getByPlaceholderText("First name *"), "Noa");
-    await user.type(screen.getByPlaceholderText("Last name *"), "Cohen");
-    await user.type(screen.getByPlaceholderText("Bib # *"), "42");
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-
-    expect(await screen.findByText(/Bib 42 already used by Taken Already/)).toBeInTheDocument();
-    expect(useRiderStore.getState().riders).toHaveLength(1);
-  });
-
-  it("requires first name, last name and bib", async () => {
-    const user = userEvent.setup();
+describe("Check-In: no add-rider action", () => {
+  it("offers no Add rider: riders are added and managed in CREATE > Riders", () => {
     seed([]);
     renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-    expect(await screen.findByText(/required/i)).toBeInTheDocument();
-    expect(useRiderStore.getState().riders).toHaveLength(0);
-  });
-
-  it("Cancel closes the form without adding", async () => {
-    const user = userEvent.setup();
-    seed([]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId(/^checkin-add-/)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("First name *")).not.toBeInTheDocument();
-  });
-
-  it("opens only one add form at a time", async () => {
-    const user = userEvent.setup();
-    seed([]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.click(screen.getByTestId("checkin-add-Juniors"));
-    expect(screen.getAllByPlaceholderText("First name *")).toHaveLength(1);
-    expect(within(block("Juniors")).getByPlaceholderText("First name *")).toBeInTheDocument();
-  });
-
-  it("hides add buttons once the race is running", () => {
-    seed([]);
-    renderCheckIn([makeCategory({ name: "Men Elite", status: "running" })]);
-    expect(screen.queryByTestId("checkin-add-Men Elite")).not.toBeInTheDocument();
   });
 });
 
@@ -410,14 +331,13 @@ describe("Check-In: standing, rank and sorting", () => {
     expect(bibsIn(wave)).toEqual([2, 3, 1]);
   });
 
-  it("whole-wave scope keeps per-category add buttons", async () => {
+  it("whole-wave scope has no add buttons either", async () => {
     const user = userEvent.setup();
     seed([makeRider({ category: "Men Elite" })]); // the Search/Sort panel needs riders to exist
     renderCheckIn([elite, masters]);
     await openTools(user);
     await user.click(screen.getByRole("button", { name: "Whole wave" }));
-    expect(screen.getByTestId("checkin-add-Men Elite")).toBeInTheDocument();
-    expect(screen.getByTestId("checkin-add-Masters")).toBeInTheDocument();
+    expect(screen.queryByTestId(/^checkin-add-/)).not.toBeInTheDocument();
   });
 });
 

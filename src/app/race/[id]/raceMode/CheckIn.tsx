@@ -4,7 +4,6 @@ import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
 import StatusModal from "../../components/modals/StatusModal";
-import QuickAddRider from "./QuickAddRider";
 import Icons from "@/constants/Icons";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
@@ -40,7 +39,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
-  const [addingFor, setAddingFor] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "cards">("list");
   const [sortKey, setSortKeyState] = useState<SortKey>(loadSort);
   const setSortKey = (k: SortKey) => {
@@ -377,27 +375,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
       <div className={styles.cardGrid}>{list.map(renderCard)}</div>
     );
 
-  const renderAddForm = (key: string, cat: CategoryProps) =>
-    addingFor === key ? (
-      <QuickAddRider
-        raceUuid={raceUuid}
-        waveNum={waveNum}
-        categories={categories}
-        fixedCategory={cat}
-        onDone={() => setAddingFor(null)}
-      />
-    ) : null;
-
-  const renderAddBtn = (key: string, cat: CategoryProps, label = "+ Add rider") =>
-    isRaceActive ? null : (
-      <button
-        className={styles.catAddBtn}
-        onClick={() => setAddingFor((k) => (k === key ? null : key))}
-        data-testid={`checkin-add-${cat.name}`}
-      >
-        {addingFor === key ? "− Close" : label}
-      </button>
-    );
+  // Riders are added and managed in CREATE > Riders, not here.
 
   const renderCategoryBlock = (cat: CategoryProps) => {
     const key = catKey(cat);
@@ -411,9 +389,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           <span className={styles.catGroupName} dir="auto">{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
           <span className={styles.catGroupCount}>✓ {all.filter((r) => r.checked).length}/{all.length}</span>
           {dns > 0 && <span className={styles.catDnsCount}>{dns} DNS</span>}
-          {renderAddBtn(key, cat)}
         </div>
-        {renderAddForm(key, cat)}
         {shown.length > 0 ? (
           renderRiders(shown)
         ) : (
@@ -439,14 +415,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           <div className={styles.waveBody}>{visibleCats.map(renderCategoryBlock)}</div>
         ) : (
           <div className={styles.waveBody}>
-            <div className={styles.addChips}>
-              {visibleCats.map((c) => (
-                <React.Fragment key={catKey(c)}>{renderAddBtn(catKey(c), c, `+ ${c.name}`)}</React.Fragment>
-              ))}
-            </div>
-            {visibleCats.map((c) => (
-              <React.Fragment key={catKey(c)}>{renderAddForm(catKey(c), c)}</React.Fragment>
-            ))}
             {renderRiders(
               filtered.filter((r) => visibleCats.some((c) => riderInCategory(r, c))).sort(compare),
               true

@@ -510,15 +510,24 @@ async function runWave(
     await setStatusAtCheckIn(page, plan.dnsBib, "DNS");
     await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
 
-    for (const entry of opts.lateEntries) {
-      // Add-rider now lives in each category block (category is fixed there).
-      await page.getByTestId(`checkin-add-${entry.category}`).click();
-      await page.getByPlaceholder("First name *").fill(entry.firstName);
-      await page.getByPlaceholder("Last name *").fill(entry.lastName);
-      await page.getByPlaceholder("Bib # *").fill(String(entry.bib));
-      await page.getByPlaceholder("Club / team").fill(entry.team);
-      await page.getByRole("button", { name: "Add Rider", exact: true }).click();
-      await expect(checkInRow(page, entry.bib)).toBeVisible(); // Check-In shows the bib large, without "#"
+    // Late entries: riders are added only in CREATE > Riders (the category
+    // header's Add rider presets the category), then back to Check-In.
+    if (opts.lateEntries.length) {
+      await openSetupTab(page, "Riders");
+      for (const entry of opts.lateEntries) {
+        await page.getByTestId(`add-rider-${entry.category}`).click();
+        const modal = page.getByTestId("add-rider-modal");
+        await modal.getByPlaceholder("Bib # *").fill(String(entry.bib));
+        await modal.getByPlaceholder("First name *").fill(entry.firstName);
+        await modal.getByPlaceholder("Last name *").fill(entry.lastName);
+        await modal.getByRole("button", { name: "Add Rider", exact: true }).click();
+        await expect(modal).toHaveCount(0);
+      }
+      await gotoPhase(page, "Start");
+      await openRaceModeTab(page, "Check-In");
+      for (const entry of opts.lateEntries) {
+        await expect(checkInRow(page, entry.bib)).toBeVisible(); // Check-In shows the bib large, without "#"
+      }
     }
   });
 
