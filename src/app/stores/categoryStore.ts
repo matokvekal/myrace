@@ -8,6 +8,7 @@ import categoryStorageAdapter from "./indexDb/categoryStorageAdapter";
 import { COLORS } from "@/constants/index";
 import useRiderStore from "./ridersStore";
 import { isRaceUuidFinalized } from "@/utils/raceLock";
+import { isApplyingRemote, isLiveRace, liveBridge } from "@/services/live/liveBridge";
 
 /**
  * Hard guard for a FINALIZED race — the category twin of the rider guard in
@@ -15,6 +16,7 @@ import { isRaceUuidFinalized } from "@/utils/raceLock";
  * here and not only in the UI.
  */
 function blockIfFinalized(cats: { raceUuid: string }[], action: string): boolean {
+  if (isApplyingRemote()) return false; // shared race: the server decides
   const locked = [...new Set(cats.map((c) => c.raceUuid))].filter(isRaceUuidFinalized);
   if (locked.length === 0) return false;
   console.warn(`Race ${locked.join(", ")} is finalized — ignored category ${action}.`);
@@ -29,6 +31,7 @@ interface CategoryState {
   updateRiderColor: (categoryName: string, color: string, raceUuid: string) => Promise<void>;
   updateCategory: (updatedCategory: CategoryProps) => void;
   upsertCategories: (cats: CategoryProps[]) => Promise<void>;
+  deleteCategory: (categoryId: number) => Promise<void>;
 }
 
 const useCategoryStore = create<CategoryState>()(
@@ -70,6 +73,8 @@ const useCategoryStore = create<CategoryState>()(
       // a race has zero categories, as a derive-from-riders recovery. Blocking
       // it would leave a finalized race with nothing to group its results by.
       createCategoriesFromRiders: async (raceUuid) => {
+        // Never for a shared race (matrix row 47): its categories come from Actions.
+        if (isLiveRace(raceUuid)) return;
         try {
           const normTime = (t: string | null | undefined): string | null => {
             if (!t) return null;
@@ -188,6 +193,8 @@ const useCategoryStore = create<CategoryState>()(
 
       rebuildCategoriesFromRiders: async (raceUuid) => {
         if (blockIfFinalized([{ raceUuid }], "rebuild")) return;
+        // Never rebuild a shared race's categories (matrix row 42): they come from Actions.
+        if (isLiveRace(raceUuid)) return;
         try {
           // Clear existing categories for this race from IDB
           const db = await initIndexedDB();
@@ -255,6 +262,11 @@ const useCategoryStore = create<CategoryState>()(
       upsertCategories: async (cats: CategoryProps[]) => {
         if (cats.length === 0) return;
         if (blockIfFinalized(cats, "upsert")) return;
+        {
+          const byId = new Map(get().categories.map((c) => [c.id, c]));
+          const before = cats.map((c) => byId.get(c.id)).filter((c): c is CategoryProps => !!c);
+          if (liveBridge()?.beforeCategories("upsert", before, cats) === false) return;
+        }
         set((state) => {
           const byId = new Map(state.categories.map((c) => [c.id, c]));
           for (const cat of cats) byId.set(cat.id, cat);
@@ -273,8 +285,29 @@ const useCategoryStore = create<CategoryState>()(
         }
       },
 
+      deleteCategory: async (categoryId: number) => {
+        const target = get().categories.find((c) => c.id === categoryId);
+        if (!target) return;
+        if (blockIfFinalized([target], "delete")) return;
+        if (liveBridge()?.beforeCategories("delete", [target], []) === false) return;
+        set((state) => ({ categories: state.categories.filter((c) => c.id !== categoryId) }));
+        try {
+          const db = await initIndexedDB();
+          const tx = db.transaction("categories", "readwrite");
+          await tx.objectStore("categories").delete(categoryId);
+          await tx.done;
+          db.close();
+        } catch (error) {
+          console.error("Error deleting category from IDB:", error);
+        }
+      },
+
       updateCategory: async (updatedCategory: CategoryProps) => {
         if (blockIfFinalized([updatedCategory], "update")) return;
+        {
+          const prev = get().categories.find((c) => c.id === updatedCategory.id);
+          if (liveBridge()?.beforeCategories("upsert", prev ? [prev] : [], [updatedCategory]) === false) return;
+        }
         try {
           const { categories } = get();
 

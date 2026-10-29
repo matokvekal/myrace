@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import { useTranslation } from "react-i18next";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Camera, ChevronDown, Plus, Search, X } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Minus, Search, X, SquarePlus, SquareMinus, UserRoundPlus } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -87,29 +88,30 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
+  // Category the Add Rider form was opened from (preset, picker hidden); null = pick one.
+  const [addFor, setAddFor] = useState<CategoryProps | null>(null);
+  const openAddRider = (cat: CategoryProps | null) => { setAddFor(cat); setShowAddRider(true); };
+  // Search / view / sort stay folded behind one search icon until needed.
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [importMode, setImportMode] = useState<"file" | "scan">("file");
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const actionsRef = useRef<HTMLDivElement>(null);
+  // Collapsed rider groups — display state only (never rider data, filters or
+  // sorting). Empty on entry: every group expanded.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  // Close the actions dropdown on outside click
-  useEffect(() => {
-    if (!actionsOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
-        setActionsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [actionsOpen]);
 
   const { getRiders, riders, deleteRidersByRace } = useRiderStore(
     (state) => ({
@@ -210,6 +212,47 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
     return map;
   }, [filteredAndSorted, groupByCategory]);
 
+  // Every group currently shown: category groups in the table, categories in "group by category".
+  const groupKeys = useMemo((): string[] => {
+    if (viewMode === "table") return waveGroups.flatMap((wg) => wg.categories.map((cg) => `t:${wg.wave ?? "none"}:${cg.key}`));
+    if (grouped) return [...grouped.keys()].map((name) => `g:${name}`);
+    return [];
+  }, [viewMode, waveGroups, grouped]);
+  // Global resets: they override every individual choice.
+  const collapseAll = () => setCollapsedGroups(new Set(groupKeys));
+  const expandAll = () => setCollapsedGroups(new Set());
+
+  /** "+" on a category header: add a rider straight into that category. */
+  const catAddBtn = (cat: CategoryProps | undefined, name: string) =>
+    readOnly ? null : (
+      <button
+        type="button"
+        className={styles.catAddBtn}
+        aria-label={`Add rider to ${name}`}
+        title={`Add rider to ${name}`}
+        data-testid={`add-rider-${name}`}
+        onClick={(e) => { e.stopPropagation(); openAddRider(cat ?? null); }}
+      >
+        <UserRoundPlus size={16} />
+      </button>
+    );
+
+  const groupToggle = (key: string, label: string) => {
+    const open = !collapsedGroups.has(key);
+    return (
+      <button
+        type="button"
+        className={styles.groupToggle}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+        title={open ? "Collapse" : "Expand"}
+        onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
+      >
+        {open ? <SquareMinus size={16} /> : <SquarePlus size={16} />}
+      </button>
+    );
+  };
+
   const sortOptions = [
     { key: "name" as SortKey, label: "Name A–Z" },
     { key: "bib" as SortKey, label: "Bib #" },
@@ -219,10 +262,74 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
 
   return (
     <div className={styles.riders}>
+      {/* Toolbar: Search | View | Sort | Import · Edit | Add Rider — wraps on phones */}
       <div className={styles.topBar}>
-        <div className={styles.leftControls}>
-          {/* Sort dropdown */}
-          <div className={styles.sortDropdownWrapper}>
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${toolsOpen || searchTerm ? styles.iconBtnActive : ""}`}
+          aria-label="Search, sort and view"
+          aria-expanded={toolsOpen || !!searchTerm}
+          title="Search, sort and view"
+          onClick={() => setToolsOpen((o) => !o)}
+          data-testid="rider-tools-toggle"
+        >
+          <Search size={16} />
+        </button>
+
+        {(toolsOpen || !!searchTerm) && (
+          <>
+            <div className={styles.searchBox}>
+              <Search size={15} aria-hidden="true" />
+              <input
+                type="search"
+                dir="auto"
+                className={styles.searchInput}
+                data-testid="rider-search"
+                placeholder="Search name or bib"
+                aria-label="Search riders"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className={styles.viewModeGroup} role="group" aria-label="Riders view">
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
+                aria-pressed={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+                title="Table view"
+                aria-label="Table view"
+              >
+                <LayoutList size={16} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
+                aria-pressed={viewMode === "cards" && !groupByCategory}
+                onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
+                title="Cards view"
+                aria-label="Cards view"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
+                aria-pressed={groupByCategory && viewMode === "cards"}
+                onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
+                title="Group by category"
+                aria-label="Group by category"
+              >
+                <Layers size={16} />
+              </button>
+            </div>
+
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -235,111 +342,46 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* View mode buttons */}
-          <div className={styles.viewModeGroup}>
-            <button
-              className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
-              onClick={() => setViewMode("table")}
-              title="Table view"
-            >
-              <LayoutList size={16} />
-            </button>
-            <button
-              className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
-              onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
-              title="Cards view"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
-              onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
-              title="Group by category"
-            >
-              <Layers size={16} />
-            </button>
-          </div>
-        </div>
-
-        {!readOnly && (
-          <button
-            type="button"
-            className={styles.actionsTrigger}
-            data-testid="add-rider-btn"
-            onClick={() => setShowAddRider(true)}
-          >
-            <Plus size={14} /> Add Rider
-          </button>
+          </>
         )}
 
-        {/* Actions dropdown — Import / Scan / Edit (right end of the bar).
-            Gone entirely on a finalized race: nothing in it would work. */}
+        {/* Former Actions menu: Import and Edit as icon buttons. Scan (coming
+            soon) stays on the empty state. None of it on a finalized race. */}
         {!readOnly && (
-        <div className={styles.actionsMenu} ref={actionsRef}>
+          <div className={styles.toolActions}>
             <button
               type="button"
-              className={styles.actionsTrigger}
-              onClick={() => setActionsOpen((o) => !o)}
-              aria-haspopup="menu"
-              aria-expanded={actionsOpen}
+              className={styles.iconBtn}
+              onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+              title="Import CSV"
+              aria-label="Import CSV"
             >
-              <Pencil size={13} /> Actions
-              <ChevronDown size={14} className={styles.actionsChevron} />
+              <Upload size={16} />
             </button>
-            {actionsOpen && (
-              <div className={styles.actionsList} role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.actionItem}
-                  onClick={() => { setActionsOpen(false); setImportMode("file"); setShowImportWizard(true); }}
-                >
-                  <Upload size={15} /> Import CSV
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.actionItem}
-                  disabled
-                  title={t("scan.tooltip", "Scan Start List — coming soon")}
-                >
-                  <Camera size={15} /> {t("scan.list", "Scan Start List")}
-                  <span className={styles.comingSoonBadge}>{t("scan.soon", "Soon")}</span>
-                </button>
-                {onEditMode && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={styles.actionItem}
-                    onClick={() => { setActionsOpen(false); onEditMode(); }}
-                  >
-                    <Pencil size={15} /> Edit Riders
-                  </button>
-                )}
-              </div>
+            {onEditMode && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                onClick={onEditMode}
+                title="Edit Riders"
+                aria-label="Edit Riders"
+              >
+                <Pencil size={16} />
+              </button>
             )}
-        </div>
-        )}
-      </div>
-
-      <div className={styles.searchBox}>
-        <Search size={15} aria-hidden="true" />
-        <input
-          type="search"
-          dir="auto"
-          className={styles.searchInput}
-          data-testid="rider-search"
-          placeholder="Search name or bib"
-          aria-label="Search riders"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        {searchTerm && (
-          <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
-            <X size={14} />
-          </button>
+            {viewMode === "cards" && !groupByCategory && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                data-testid="add-rider-btn"
+                aria-label="Add rider"
+                title="Add rider"
+                onClick={() => openAddRider(null)}
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -386,6 +428,14 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
       {filteredAndSorted.length > 0 && (
         <div className={styles.tabCount}>
           Riders ({filteredAndSorted.length})
+          <span className={styles.groupBulk}>
+            <button type="button" className={styles.groupBulkBtn} onClick={collapseAll} disabled={groupKeys.length === 0} data-testid="collapse-all" aria-label="Collapse all" title="Collapse all">
+              <SquareMinus size={16} />
+            </button>
+            <button type="button" className={styles.groupBulkBtn} onClick={expandAll} disabled={groupKeys.length === 0} data-testid="expand-all" aria-label="Expand all" title="Expand all">
+              <SquarePlus size={16} />
+            </button>
+          </span>
         </div>
       )}
 
@@ -414,14 +464,17 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                   </div>
                   {wg.categories.map((cg) => {
                     const catColor = cg.category?.color ?? cg.riders[0]?.color ?? "#ddd";
+                    const gKey = `t:${wg.wave ?? "none"}:${cg.key}`;
                     return (
                       <React.Fragment key={cg.key}>
                         <div className={styles.catSeparator} style={{ borderLeftColor: catColor }} data-testid="rider-category-header">
+                          {groupToggle(gKey, cg.name)}
                           <span className={styles.catSepDot} style={{ background: catColor }} />
                           {cg.name}
                           <span className={styles.groupCount}>{cg.riders.length}</span>
+                          {catAddBtn(cg.category ?? undefined, cg.name)}
                         </div>
-                        {cg.riders.map((rider, idx) => {
+                        {!collapsedGroups.has(gKey) && cg.riders.map((rider, idx) => {
                           const isOut = ["DNS", "DNF", "DSQ"].includes(rider.status);
                           const isRunning = rider.raceStatus === "running" && !isOut;
                           const isFinished = rider.raceStatus === "finished" && !isOut;
@@ -436,7 +489,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                               <span className={styles.colFlag}>
                                 <RiderFlag flag={rider.flag} className={styles.flagIcon} />
                               </span>
-                              <span className={styles.colBib}><strong>#{rider.bibNumber || "—"}</strong></span>
+                              <span className={styles.colBib}><strong><BibBadge rider={rider} category={cg.category ?? null} /></strong></span>
                               <span className={styles.colName} dir="auto">
                                 {rider.lastName || rider.firstName
                                   ? `${rider.lastName} ${rider.firstName}`.trim()
@@ -470,8 +523,13 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
           ) : groupByCategory && grouped ? (
             [...grouped.entries()].map(([catName, catRiders]) => (
               <div key={catName} className={styles.catGroup}>
-                <div className={styles.catGroupHeader}>{catName}</div>
-                {catRiders.map((rider) => (
+                <div className={styles.catGroupHeader} data-testid="rider-category-header">
+                  {groupToggle(`g:${catName}`, catName)}
+                  {catName}
+                  <span className={styles.groupCount}>{catRiders.length}</span>
+                  {catAddBtn(categories.find((c) => c.name === catName), catName)}
+                </div>
+                {!collapsedGroups.has(`g:${catName}`) && catRiders.map((rider) => (
                   <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
                     <RiderCard {...rider} />
                   </div>
@@ -503,6 +561,13 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
           <p className={styles.empty}>No riders yet.</p>
           {!readOnly && (
             <div className={styles.emptyActions}>
+              <button
+                className={styles.emptyImportBtn}
+                data-testid="add-rider-btn"
+                onClick={() => openAddRider(null)}
+              >
+                <Plus size={14} /> Add Rider
+              </button>
               <button
                 className={styles.emptyImportBtn}
                 onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
@@ -538,6 +603,8 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
               waveNum={waves[0] ?? 1}
               waveOf={(c) => catWaveMap.get(catWaveKey(c.name, c.subCategory)) ?? waves[0] ?? 1}
               categories={categories}
+              fixedCategory={addFor ?? undefined}
+              essential
               onDone={() => setShowAddRider(false)}
             />
           </div>

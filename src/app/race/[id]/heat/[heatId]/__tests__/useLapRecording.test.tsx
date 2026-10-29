@@ -96,6 +96,25 @@ describe("useLapRecording: recording laps", () => {
     expect(toast.info).toHaveBeenCalledWith(expect.stringMatching(/Wait \d+s/));
   });
 
+  it("uses the race's minimum lap time: 3 min refuses a passage 2 min after the last, accepts one 4 min after", async () => {
+    const useRaceStore = (await import("@/stores/racesStore")).default;
+    useRaceStore.setState({ races: [{ uuid: "race-1", minLapSeconds: 180 } as never] });
+    try {
+      const early = startedRider({ lapsCounter: 1, timeArrive: new Date(Date.now() - 120_000).toISOString() });
+      const a = mount([early]);
+      act(() => a.result.current.lap.recordLap(early));
+      expect(a.result.current.riders[0].lapsCounter).toBe(1);
+      expect(toast.info).toHaveBeenCalledWith(expect.stringMatching(/Wait 60s/));
+
+      const later = startedRider({ lapsCounter: 1, timeArrive: new Date(Date.now() - 240_000).toISOString() });
+      const b = mount([later]);
+      act(() => b.result.current.lap.recordLap(later));
+      expect(b.result.current.riders[0].lapsCounter).toBe(2);
+    } finally {
+      useRaceStore.setState({ races: [] });
+    }
+  });
+
   it("swallows an accidental double tap on the same rider (<500ms)", () => {
     const r = startedRider();
     const { result } = mount([r]);

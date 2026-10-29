@@ -126,8 +126,10 @@ test.describe("Finish Race", () => {
 
     // The Create/Race/Live switcher collapses to a seal — no phase left to enter.
     await expect(page.getByTestId("phase-final")).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Live", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("tab", { name: "Race", exact: true })).toHaveCount(0);
+    await page.getByTestId("race-menu-btn").click();
+    await expect(page.getByTestId("race-nav-live")).toHaveCount(0);
+    await expect(page.getByTestId("race-nav-race")).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
     // Setup-only tabs are gone; results-facing ones stay.
     await expect(page.getByRole("button", { name: "Schedule", exact: true })).toHaveCount(0);

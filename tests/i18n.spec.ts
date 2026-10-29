@@ -25,12 +25,19 @@ test.describe("i18n", () => {
     expect(resolved).toBe("Escanear inicio");
   });
 
-  test("Scan Start List is disabled with a Soon badge (Riders actions menu)", async ({ page }) => {
-    await loadDemoRace(page);
+  test("Scan Start List is disabled with a Soon badge (empty Riders screen)", async ({ page }) => {
+    // A race with no riders: Riders shows the import actions, Scan among them.
+    await page.goto("/main");
+    await acceptTerms(page);
+    await page.reload();
+    await page.getByRole("button", { name: /Create new race|^Add$/ }).first().click();
+    await page.getByPlaceholder("Race Name").fill("Scan Check Race");
+    await page.getByPlaceholder("Location").fill("Nowhere");
+    await page.getByRole("button", { name: /Done|Saving/ }).click();
+    await page.getByText("Scan Check Race").first().click();
     await openTab(page, "Riders");
 
-    await page.getByRole("button", { name: "Actions" }).click();
-    const scanItem = page.getByRole("menuitem", { name: /Scan Start List/ });
+    const scanItem = page.getByRole("button", { name: /Scan Start List/ });
     await expect(scanItem).toBeVisible();
     await expect(scanItem).toBeDisabled();
     await expect(scanItem.getByText("Soon")).toBeVisible();
@@ -43,7 +50,8 @@ test.describe("i18n", () => {
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByText("Register / Login")).toBeVisible();
 
-    await page.getByRole("button", { name: "Español" }).click();
+    await page.getByTestId("prefs-language").click();
+    await page.getByTestId("language-select").selectOption("es");
 
     // No remount required — react-i18next re-renders on the language-change
     // event, same requirement that drove boardHoldStore to be a zustand store

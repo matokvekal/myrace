@@ -12,7 +12,8 @@
 .top {
   position: relative; /* Relative positioning for child absolute elements */
   width: 100%;
-  height: 300px;
+  /* Banner + race card in normal flow: the card overlaps the banner, and the
+     tabs below always start after the card (it can't cover them on any width). */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -20,24 +21,10 @@
   transition: height 0.2s ease;
 }
 
-.topCompact {
-  height: 72px;
-}
-.headerRaceWrapper {
-  position: absolute; /* Position the header on top of the image */
-  top: 0;
-  left: 0;
-  width: 100%; /* Full width */
-  z-index: 10; /* Higher z-index to ensure it appears above the image */
-  display: flex;
-  justify-content: space-between; /* Adjust as per your header layout */
-  padding: 10px 20px; /* Add padding for spacing */
-}
-
 .imageWrapper {
   position: relative; /* For the fill layout of the image */
   width: 100%;
-  height: 100%; /* Full height */
+  height: 150px;
   overflow: hidden; /* Ensure no overflow */
 }
 
@@ -54,13 +41,14 @@
 }
 
 .raceInfo {
-  height: 174px;
+  min-height: 0;
   width: 90%;
   background: linear-gradient(165deg, #ffffff, #f6faff);
   border-radius: 16px;
   border: 1px solid rgba(99, 166, 252, 0.16);
-  position: absolute;
-  top: 150px;
+  position: relative;
+  margin-top: -52px; /* overlap the banner, as before */
+  z-index: 1;
   box-shadow:
     0 12px 24px rgba(99, 166, 252, 0.15),
     0 1px 0 rgba(255, 255, 255, 0.78) inset;
@@ -93,96 +81,76 @@
     0 12px 24px rgba(99, 166, 252, 0.15);
 }
 
-/* ── Casino/game-style tab bar (styled after public/casino.png):
-   dark backing, vivid color pills with gold frames + diagonal shine ── */
+/* ── CREATE section tabs: classic segmented bar (matches the Riders view control) ── */
 .tabs {
   display: flex;
-  margin-top: 21px;
-  background: linear-gradient(180deg, #262e40, #171d2b);
-  border-radius: 16px;
-  padding: 7px;
-  gap: 7px;
-  border: 1px solid rgba(224, 169, 44, 0.35);
-  box-shadow: 0 10px 18px rgba(10, 16, 30, 0.35);
-  overflow-x: auto;
+  gap: 2px;
+  margin-top: 12px;
+  padding: 2px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+  overflow-x: auto; /* last resort on very narrow phones — no wrap, no page overflow */
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .button {
   flex: 1 0 auto;
-  min-width: max-content;
-  position: relative;
-  overflow: hidden;
-  padding: 10px 16px;
-  font-size: 12px;
-  font-weight: 900;
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
-  color: #fff;
-  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.45);
-  border: 2px solid #e0a92c;
-  border-radius: 8px;
-  transform: skewX(-8deg);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -6px 10px rgba(0, 0, 0, 0.25),
-    0 3px 6px rgba(0, 0, 0, 0.3);
   cursor: pointer;
-  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
-/* Diagonal glossy shine streak across every pill */
-.button::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 38%,
-    rgba(255, 255, 255, 0.4) 42%,
-    rgba(255, 255, 255, 0.1) 52%,
-    transparent 56%
-  );
-  pointer-events: none;
+.button svg {
+  flex-shrink: 0;
 }
 
-/* Each tab gets its own casino colour — vivid, arcade-bright */
-.tabs .button:nth-child(1) { background: linear-gradient(180deg, #ff5040 0%, #c11a0a 100%); }
-.tabs .button:nth-child(2) { background: linear-gradient(180deg, #34a1ff 0%, #0b5ecc 100%); }
-.tabs .button:nth-child(3) { background: linear-gradient(180deg, #d24dff 0%, #8a10c9 100%); }
-.tabs .button:nth-child(4) { background: linear-gradient(180deg, #7ce83c 0%, #3fa60d 100%); }
-.tabs .button:nth-child(5) { background: linear-gradient(180deg, #ffa63d 0%, #cc6a0b 100%); }
-.tabs .button:nth-child(6) { background: linear-gradient(180deg, #3de0ff 0%, #0b9ecc 100%); }
-
-/* Idle tabs stay readable (bright sun) — just a touch muted; the selected
-   one is distinguished by its ring/halo/lift, not by darkening the rest */
-.tabs .button:not(.activeTab) {
-  filter: saturate(0.92) brightness(0.9);
-  border-color: rgba(224, 169, 44, 0.5);
+.button:hover {
+  color: var(--text-primary, #14243c);
 }
 
-.tabs .button:not(.activeTab):hover {
-  filter: saturate(1) brightness(1);
-}
-
-/* Active tab: full colour, bright ring + gold halo, lifted and enlarged */
 .button.activeTab {
-  filter: none;
-  opacity: 1;
-  z-index: 1;
-  border-color: #fff7e0;
-  transform: skewX(-8deg) translateY(-2px) scale(1.07);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -6px 10px rgba(0, 0, 0, 0.25),
-    0 0 0 2px rgba(255, 205, 90, 0.95),
-    0 0 18px rgba(255, 200, 80, 0.65),
-    0 6px 12px rgba(0, 0, 0, 0.4);
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+  font-weight: 600;
 }
 
-.button:active {
-  transform: skewX(-8deg) translateY(1px);
+/* Phones: icons over labels would crowd; keep labels, shrink spacing */
+@media (max-width: 420px) {
+  .button {
+    padding: 0 8px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .button svg {
+    display: none;
+  }
+}
+
+/* PRO skin: keep the bar flat */
+:root[data-skin="gaming"] .tabs .button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .tabContent {

@@ -60,5 +60,5 @@ Recognition rules (useVoiceRecognition.ts)
   `recognition.phrases` (bib list as contextual biasing) and `processLocally`
   (on-device, offline) — used only when `SpeechRecognition.available()` says the
   model is already installed; we never trigger a download mid-race. The mode is
-  shown in Live Settings → Engine.
+  shown in the Live mic button's tooltip while voice is on.
 - Tests: `__tests__/useVoiceRecognition.test.ts` uses a fake SpeechRecognition.

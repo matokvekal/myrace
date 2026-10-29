@@ -196,9 +196,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  gap: 2px;
+  min-width: 56px;
   height: 44px;
-  border-radius: 50%;
+  padding: 0 10px;
+  border-radius: 22px;
   border: 2px solid #7846d2;
   background: #fff;
   color: #7846d2;
@@ -660,8 +662,8 @@
   }
 }
 
-/* ── Clear board (BUGS.md #14) — trigger lives in VoiceSettingsModal
-   (Live Settings); this confirm dialog stays on the Heat page. ── */
+/* ── Clear board (BUGS.md #14) — trigger is the race top bar's Clear board
+   button (HeaderHeat); this confirm dialog stays on the Heat page. ── */
 .clearConfirmText {
   margin: 0;
   font-size: 13px;
@@ -1262,4 +1264,266 @@
     width: 48px;
     height: 48px;
   }
+}
+
+/* Unknown Rider: bicycle + "?" in the same button (purple, dashed like its cards) */
+.jokerQ {
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+.jokerLabel {
+  margin-inline-start: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .jokerLabel {
+    display: none;
+  }
+}
+
+/* Finish Wave (manual, from Live) */
+.finishWaveBtn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  border: 2px solid #b91c1c;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.finishWaveBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.waveFinishedTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: #e5e7eb;
+  color: #111827;
+  font-weight: 800;
+}
+
+/* RECAP toggle */
+.recapBtn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  border: 2px solid #1e40af;
+  background: #fff;
+  color: #1e40af;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+/* RECAP active: the button itself shows it too (same brown as the RECAP ACTIVE banner) */
+.recapBtn.recapOn {
+  background: #78350f;
+  border-color: #78350f;
+  color: #fff;
+}
+
+/* ── LIVE control area (redesign) ─────────────────────────────────────────
+   Entry row: Unknown Rider · bib (prominent, grows) · RECAP.
+   Wave row, separated by a divider: wave switcher · Finish Wave. */
+.entryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border-soft, rgba(20, 40, 80, 0.1));
+  padding-top: 8px;
+  margin-top: 2px;
+}
+.bibEntry {
+  flex: 1 1 auto;
+  min-width: 120px;
+  max-width: 360px;
+  margin: 0 auto;
+}
+.bibEntry .searchInput {
+  height: 52px;
+  font-size: 24px;
+}
+.entryRow .jokerBtn,
+.entryRow .recapBtn {
+  flex: 0 0 auto;
+  min-height: 48px;
+}
+.entryRow .jokerBtn {
+  min-width: 64px;
+}
+.jokerBtn .jokerQ {
+  font-size: 24px;
+}
+.waveRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-soft, rgba(20, 40, 80, 0.15));
+}
+.waveRowStart {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.waveRow .finishWaveBtn {
+  min-height: 44px;
+  margin-inline-start: auto;
+}
+
+/* ── RECAP MODE: unmistakably different from normal Live ── */
+.heatRecap {
+  background: repeating-linear-gradient(135deg, #fef3c7 0 18px, #fde68a 18px 36px) !important;
+}
+.controlPanelRecap {
+  border: 3px solid #b45309;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35);
+}
+.recapBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #78350f;
+  color: #fff;
+}
+.recapBannerTitle {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  font-size: 15px;
+}
+.recapBannerHint {
+  flex: 1 1 200px;
+  font-size: 13px;
+  opacity: 0.95;
+}
+.recapExit {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: 2px solid #fff;
+  background: #fff;
+  color: #78350f;
+  font-weight: 900;
+  cursor: pointer;
+}
+.heatRecap .recapBtn {
+  background: #78350f;
+  border-color: #78350f;
+  color: #fff;
+}
+
+/* Tablet / phone: keep the bib field big; nothing clipped. */
+@media (max-width: 640px) {
+  .entryRow {
+    gap: 6px;
+  }
+  .bibEntry {
+    max-width: none;
+  }
+  .entryRow .recapBtn {
+    padding: 0 10px;
+  }
+}
+@media (max-width: 380px) {
+  .entryRow .jokerBtn {
+    min-width: 52px;
+    padding: 0 6px;
+  }
+}
+
+/* ═══ LIVE cleanup: outdoor-readable controls ═══ */
+.info {
+  gap: 8px;
+}
+
+.active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #15803d;
+  border-radius: 8px;
+  background: rgba(21, 128, 61, 0.08);
+  color: #14532d;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: none;
+  transform: none;
+}
+
+:global([data-theme="dark"]) .active {
+  color: #4ade80;
+}
+
+.filterIconBtn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-card, #c7d4e8);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1220);
+  font-size: 13px;
+  font-weight: 600;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: none;
+  transform: none;
+}
+
+.filterIconBtn.filterIconActive {
+  border-color: var(--brand-strong, #3f86e7);
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+:root[data-skin="gaming"] .filterIconBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  text-transform: none;
+}
+
+.noWaves {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #0b1220);
+}
+
+.liveEmpty {
+  margin: 12px 0;
+  padding: 16px 12px;
+  border: 1px solid var(--border-card, #c7d4e8);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1220);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Joker disabled: no racing riders in this wave */
+.jokerBtn:disabled {
+  opacity: 0.35;
+  filter: grayscale(1);
+  cursor: not-allowed;
+  pointer-events: none;
 }

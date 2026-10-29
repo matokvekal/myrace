@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import styles from "./results.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
+import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
+import { isAdministrativeFinish } from "@/utils/waveFinish";
 import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
+import RiderLapTable from "./RiderLapTable";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
 import { Trophy, SlidersHorizontal } from "lucide-react";
 import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
@@ -16,6 +20,8 @@ interface Props {
   defaultGroupBy?: GroupBy;
   /** Dedicated screen: adds a chip bar to jump between categories without leaving. */
   quickNav?: boolean;
+  /** Open with the wave filter preset (e.g. from a completed wave on the Race timeline). */
+  defaultWave?: number;
 }
 
 type SortKey = "place" | "name" | "bib" | "time";
@@ -90,12 +96,12 @@ function riderElapsed(rider: RiderProps): number {
   return ms >= 0 ? ms : Infinity;
 }
 
-const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quickNav = false }) => {
+const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quickNav = false, defaultWave }) => {
   const { riders, getRiders } = useRiderStore();
   const { categories } = useCategoryStore();
   const [sortBy, setSortBy] = useState<SortKey>("place");
   const [filterCategory, setFilterCategory] = useState("all");
-  const [waveFilter, setWaveFilter] = useState<"all" | number>("all");
+  const [waveFilter, setWaveFilter] = useState<"all" | number>(defaultWave ?? "all");
   const [groupBy, setGroupBy] = useState<GroupBy>(defaultGroupBy);
   const [podiumMode, setPodiumMode] = useState(false);
   const [podiumSizes, setPodiumSizes] = useState<Record<string, 3 | 5>>({});
@@ -122,14 +128,15 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
       return next;
     });
 
+  // Ignored waves are left out of results (their data is kept).
   const raceCategories = useMemo(
-    () => categories.filter((c) => c.raceUuid === raceUuid),
+    () => categories.filter((c) => c.raceUuid === raceUuid && !c.ignored),
     [categories, raceUuid]
   );
   // Laps resolved from the category so results read 0/5, not 0/0 (BUGS.md #7)
   const raceRiders = useMemo(
-    () => withCategoryLaps(riders.filter((r) => r.raceUuid === raceUuid), raceCategories),
-    [riders, raceUuid, raceCategories]
+    () => withCategoryLaps(withoutIgnoredRiders(riders.filter((r) => r.raceUuid === raceUuid), categories), raceCategories),
+    [riders, raceUuid, raceCategories, categories]
   );
 
   const { waveNums, catWaveMap } = useMemo(() => {
@@ -258,7 +265,12 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
               <span className={`${styles.pos} ${podiumMode && sortBy === "place" && !isOut && idx < 3 ? styles[`pos${idx + 1}`] : ""}`}>
                 {showMedal ? MEDAL[idx] : posLabel}
               </span>
-              {visibleFields.has("bib") && <span className={styles.bib}>#{rider.bibNumber}</span>}
+              {visibleFields.has("bib") && <BibBadge className={styles.bib} rider={rider} />}
+              {isAdministrativeFinish(rider) && (
+                <span className={styles.adminFinish} data-testid="admin-finish" title="Finished administratively when the wave was closed: no finish-line time was recorded">
+                  Admin finish
+                </span>
+              )}
               <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
               {visibleFields.has("laps") && <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>}
               {visibleFields.has("time") && (
@@ -421,7 +433,10 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
       </div>
 
       {selectedRider && (
-        <RiderDetailModal rider={selectedRider} onClose={() => setSelectedRider(null)} />
+        <RiderDetailModal rider={selectedRider} onClose={() => setSelectedRider(null)}>
+          {/* Lap-by-lap performance below the rider's details; the latest rider data, laps resolved */}
+          <RiderLapTable rider={raceRiders.find((r) => r.id === selectedRider.id) ?? selectedRider} field={raceRiders} />
+        </RiderDetailModal>
       )}
 
       {groupBy === "wave"

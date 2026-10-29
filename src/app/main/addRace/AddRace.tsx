@@ -3,6 +3,7 @@ import styles from "./addRace.module.css";
 import Images from "@/constants/Images";
 import Button from "@/components/ui/Button";
 import { saveRace } from "@/utils/saveRace";
+import { previewStartListFile, type StartListPreview } from "@/utils/startListPreview";
 import { compressImage } from "@/utils/compressImage";
 import useRaceStore from "@/stores/racesStore";
 import { ArrowLeft, ImagePlus } from "lucide-react";
@@ -28,6 +29,13 @@ const RACE_TYPES: { value: RaceType; label: string; soon?: boolean }[] = [
 ];
 
 const today = new Date().toISOString().split("T")[0];
+
+/** Readable names of the import fields shown in the preview's column list. */
+const FIELD_LABEL: Record<string, string> = {
+  bibNumber: "Bib", firstName: "First name", lastName: "Last name", fullName: "Full name", category: "Category",
+  subCategory: "Sub-category", team: "Team", heat: "Wave", startTime: "Start time", totalLaps: "Laps", standing: "Standing",
+  uciNumber: "UCI ID", uciPoints: "UCI points", federation: "Federation", bibColor: "Bib color", bibTextColor: "Bib text color",
+};
 const BASE = import.meta.env.BASE_URL; // "/commissire-race/" in prod, "/" in dev
 
 const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
@@ -97,13 +105,39 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Start-list preview: what the import will create, with warnings — confirmed before saving.
+  const [preview, setPreview] = useState<StartListPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewConfirmed, setPreviewConfirmed] = useState(false);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) setRidersFile(file);
+    event.target.value = "";
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewConfirmed(false);
+    if (!file) return;
+    setRidersFile(file);
+    try {
+      setPreview(await previewStartListFile(file));
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : String(err));
+    }
   };
+
+  const clearRidersFile = () => {
+    setRidersFile(null);
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewConfirmed(false);
+  };
+
+  const importBlocked = !!ridersFile && (!!previewError || !preview || !previewConfirmed);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (importBlocked) return; // the start list must be previewed and confirmed first
     setLoading(true);
     try {
       await saveRace(
@@ -120,6 +154,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
       );
     } catch (error) {
       console.error("Failed to save race:", error);
+      setSaveError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -256,8 +291,74 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
               onChange={handleFileUpload}
               style={{ display: "none" }}
             />
-            {ridersFile && <p>{ridersFile.name}</p>}
+            {ridersFile && (
+              <p>
+                {ridersFile.name}{" "}
+                <button type="button" className={styles.linkBtn} onClick={clearRidersFile}>Remove</button>
+              </p>
+            )}
           </div>
+
+          {saveError && (
+            <div className={styles.previewError} role="alert" data-testid="save-error">
+              {saveError}
+            </div>
+          )}
+          {previewError && (
+            <div className={styles.previewError} role="alert" data-testid="import-preview-error">
+              This file cannot be imported: {previewError}
+            </div>
+          )}
+          {preview && (
+            <div className={styles.preview} data-testid="import-preview">
+              <strong>Import preview</strong>
+              <details className={styles.previewMapping} data-testid="import-preview-mapping">
+                <summary>Columns detected ({preview.mapping.filter((m) => m.field).length} of {preview.mapping.length} used)</summary>
+                <ul>
+                  {preview.mapping.map((m, i) => (
+                    <li key={`${m.header}-${i}`} dir="auto">
+                      {m.header || "(no header)"} → {m.field ? FIELD_LABEL[m.field] ?? m.field : "not used"}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+              <p>
+                {preview.riders} rider{preview.riders === 1 ? "" : "s"} · {preview.categories.length} categor
+                {preview.categories.length === 1 ? "y" : "ies"} ·{" "}
+                {preview.waveSource === "column" ? `${preview.waves.length} wave${preview.waves.length === 1 ? "" : "s"} (wave column)` : "waves from start times"}
+                {preview.skipped.length > 0 && ` · ${preview.skipped.length} row(s) skipped`}
+              </p>
+              <ul className={styles.previewList}>
+                {preview.categories.map((c) => (
+                  <li key={`${c.name}::${c.wave}`} dir="auto">
+                    {preview.waveSource === "column" ? `Wave ${c.wave || "—"} · ` : ""}{c.name} · {c.riders}
+                  </li>
+                ))}
+              </ul>
+              {preview.warnings.length > 0 && (
+                <ul className={styles.previewWarnings} data-testid="import-preview-warnings">
+                  {preview.warnings.map((w) => (
+                    <li key={w} dir="auto">⚠ {w}</li>
+                  ))}
+                </ul>
+              )}
+              {preview.skipped.length > 0 && (
+                <p className={styles.previewSkipped}>
+                  Skipped rows: {preview.skipped.slice(0, 12).map((s) => `${s.row + 1} (${s.reason})`).join(", ")}
+                  {preview.skipped.length > 12 ? "…" : ""}
+                </p>
+              )}
+              <label className={styles.previewConfirm}>
+                <input
+                  type="checkbox"
+                  checked={previewConfirmed}
+                  onChange={(e) => setPreviewConfirmed(e.target.checked)}
+                  data-testid="import-preview-confirm"
+                />
+                Confirm import — this is what should be created
+              </label>
+            </div>
+          )}
 
           <label className={styles.autoColorRow}>
             <input
@@ -279,6 +380,8 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
             variant="success"
             size="md"
             className={styles.submitButton}
+            disabled={importBlocked || loading}
+            title={importBlocked ? "Check and confirm the import preview first" : undefined}
           >
             {loading ? "Saving..." : "Done"}
           </Button>

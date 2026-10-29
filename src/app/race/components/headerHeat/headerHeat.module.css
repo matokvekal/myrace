@@ -1,95 +1,34 @@
-.headerRace {
-  height: 64px;
-  /* Sibling .wrapper uses flex:1 (flex-basis 0%), so when total page content
-     is taller than the viewport (shorter, wider laptop screens hit this far
-     more than a phone held vertically), the browser's shrink math gives this
-     header — whose own flex-basis is its natural ~64px, not 0 — almost all of
-     the negative space, squashing/clipping the title. Same fix HeaderMain's
-     own header already has. */
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
+/* Live controls in the shared race top bar's right-hand slot
+   (raceSidebar/RaceTopBar). Theme tokens only, so they follow Light/Dark/Sun. */
+
+.raceLiveLabel,
+.racePastLabel {
+  display: inline-flex;
   align-items: center;
-  background: linear-gradient(135deg, #1f3558 0%, #162640 100%);
-  /* Crisp accent line under the dark header, in the same green as the RACE
-     LIVE pill — a clear boundary against the bright control panel/grid below,
-     instead of the header just fading into the page. */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 0 rgba(62, 221, 164, 0.5);
-  padding: 0 16px;
-  gap: 16px;
-}
-
-/* Left section: back button + race info */
-.leftSection {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0; /* let the race name truncate instead of pushing the clock off-screen */
-}
-
-.backBtn {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: white;
-  flex-shrink: 0;
-}
-
-.backBtn:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.backBtn:active {
-  transform: scale(0.95);
-}
-
-/* Race name — the only thing left in leftSection. RACE LIVE / Wave moved
-   into rightSection (between the clock and the settings gear): the left
-   edge was too tight against the phase switcher's Race button on narrow
-   screens for a 3-line stack to fit without the text overflowing on top
-   of it. */
-.raceName {
-  font-size: 18px;
-  font-weight: 800;
-  color: #ffffff;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex-shrink: 1;
-}
-
-/* RACE LIVE + Wave, stacked and right-aligned like timeDisplay beside it */
-.liveWaveGroup {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
 }
 
 .raceLiveLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.4);
+  background: rgba(22, 163, 74, 0.08);
+}
+
+:global([data-theme="dark"]) .raceLiveLabel {
   color: #3edda4;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: rgba(62, 221, 164, 0.12);
-  border: 1px solid rgba(62, 221, 164, 0.35);
-  border-radius: 20px;
-  padding: 4px 10px;
-  white-space: nowrap;
+}
+
+.racePastLabel {
+  color: var(--text-muted);
+  border: 1px solid var(--border-card);
 }
 
 .liveDot {
@@ -106,134 +45,60 @@
   }
 }
 
-/* Wave started but every category in it finished — static, no blink, since
-   nothing is actively live anymore. */
-.racePastLabel {
-  font-size: 11px;
-  font-weight: 800;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  padding: 4px 10px;
+.timeDisplay {
+  padding: 4px 8px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* Right section: time + settings */
-.rightSection {
-  display: flex;
+.clearBoardBtn {
+  height: 32px;
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.timeDisplay {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.2);
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--danger);
   border-radius: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.timeLabel {
-  font-size: 10px;
-  font-weight: 700;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.time {
-  font-size: 16px;
-  font-weight: 900;
-  color: #3edda4;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
-}
-
-.settingsBtn {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: white;
   flex-shrink: 0;
-  padding: 0;
 }
 
-.settingsBtn:hover {
-  background: rgba(255, 255, 255, 0.25);
+.clearBoardBtn:hover {
+  background: var(--bg-surface);
 }
 
-.settingsBtn:active {
-  transform: scale(0.95);
+:root[data-skin="gaming"] .clearBoardBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 8px !important;
 }
 
-@media (max-width: 640px) {
-  .headerRace {
-    height: 56px;
-    padding: 0 10px;
-    gap: 8px;
-  }
-
-  .backBtn,
-  .settingsBtn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .raceName {
-    font-size: 14px;
-  }
-
-  .liveWaveGroup {
-    gap: 1px;
-  }
-
+/* Phones: the mode chip already says LIVE; keep the clock. */
+@media (max-width: 600px) {
   .raceLiveLabel,
   .racePastLabel {
-    font-size: 9px;
-    padding: 2px 7px;
-    letter-spacing: 0.04em;
-  }
-
-  .time {
-    font-size: 13px;
-    letter-spacing: 0;
+    display: none;
   }
 
   .timeDisplay {
-    padding: 5px 8px;
+    font-size: 13px;
+    padding: 3px 6px;
+    letter-spacing: 0;
   }
 
-  /* Clock digits alone are enough on a phone */
-  .timeLabel {
+  /* Icon-only on phones */
+  .clearBoardBtn span {
     display: none;
-  }
-
-  .rightSection {
-    gap: 8px;
-  }
-}
-
-/* Very narrow phones: drop the race name — the RACE LIVE/PAST pill says enough */
-@media (max-width: 400px) {
-  .raceName {
-    display: none;
-  }
-
-  .headerRace {
-    gap: 6px;
   }
 }

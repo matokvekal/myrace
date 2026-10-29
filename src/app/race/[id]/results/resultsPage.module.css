@@ -1,47 +1,6 @@
 .page {
-  min-height: 100vh;
-  padding: 0 12px 24px;
+  min-height: calc(100vh - 52px); /* below the shared race top bar */
+  padding: 8px 12px 24px;
   max-width: 900px;
   margin: 0 auto;
-}
-
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  background: var(--bg, #fff);
-}
-
-.backBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  background: rgba(128, 128, 128, 0.12);
-  color: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 900;
-  font-size: 16px;
-  min-width: 0;
-}
-
-.raceName {
-  font-weight: 600;
-  opacity: 0.65;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

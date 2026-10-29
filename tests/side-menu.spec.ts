@@ -16,7 +16,6 @@ test.describe("Side menu", () => {
     await expect(menuButton).toBeVisible();
     await menuButton.click();
 
-    await expect(page.getByText("Comments? Bugs?")).toBeVisible();
     const link = page.getByRole("link", { name: FEEDBACK_EMAIL });
     await expect(link).toBeVisible();
     // mailto, pre-filled subject so replies are easy to triage.
@@ -27,6 +26,7 @@ test.describe("Side menu", () => {
     await page.goto("/main");
     await acceptTerms(page);
     await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByTestId("prefs-timing").click();
 
     const select = page.getByRole("combobox", { name: "Board hold delay" });
     await expect(select).toHaveValue("2000");
@@ -38,6 +38,7 @@ test.describe("Side menu", () => {
     // reload a commissaire does mid-event.
     await page.reload();
     await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByTestId("prefs-timing").click();
     await expect(page.getByRole("combobox", { name: "Board hold delay" })).toHaveValue("5000");
   });
 });

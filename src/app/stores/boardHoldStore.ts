@@ -49,9 +49,8 @@ interface BoardHoldStore {
 
 /**
  * A store rather than a `useState` hook (unlike `useJokerMode`) because the
- * setting is edited from two places that can be open over the live screen —
- * the main side menu and the live screen's settings gear — and the heat page
- * has to pick the new value up immediately, without a remount.
+ * setting is edited in the main side menu (Timing & Live Controls) and the heat
+ * page has to pick the new value up immediately, without a remount.
  */
 export const useBoardHold = create<BoardHoldStore>()(
   persist(

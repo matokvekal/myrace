@@ -1,4 +1,6 @@
 import React, { useEffect } from "react";
+import { minLapMsFor } from "@/utils/minLap";
+import useRaceStore from "@/stores/racesStore";
 import styles from "./liveCards.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
@@ -9,7 +11,7 @@ import { riderInCategory, withCategoryLaps } from "../schedule/Schedule";
 import { formatTime, parseClockTime } from "@/utils/timeUtils";
 import { toast } from "react-toastify";
 
-const MIN_LAP_MS = 60 * 1000;
+
 
 interface Props {
   raceUuid: string;
@@ -51,8 +53,9 @@ const LiveCards: React.FC<Props> = ({ raceUuid, categories }) => {
     const clickTime = new Date();
     if (rider.timeArrive) {
       const msSinceLast = clickTime.getTime() - new Date(rider.timeArrive).getTime();
-      if (msSinceLast < MIN_LAP_MS) {
-        const remaining = Math.ceil((MIN_LAP_MS - msSinceLast) / 1000);
+      const minLapMs = minLapMsFor(useRaceStore.getState().races.find((r) => r.uuid === raceUuid));
+      if (msSinceLast < minLapMs) {
+        const remaining = Math.ceil((minLapMs - msSinceLast) / 1000);
         toast.info(`Wait ${remaining}s before next lap`);
         return;
       }

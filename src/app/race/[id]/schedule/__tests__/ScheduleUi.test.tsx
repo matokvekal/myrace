@@ -123,6 +123,7 @@ describe("Schedule: edit colour", () => {
     const user = userEvent.setup();
     setup();
     await user.click(screen.getByTestId(`edit-color-${upcoming.id}`));
+    await user.click(screen.getByTestId("custom-color"));
     const input = screen.getByTestId("color-input") as HTMLInputElement;
     expect(input.value).toBe("#112233");
     // <input type=color> takes a value change, not typing
@@ -155,6 +156,7 @@ describe("Schedule: wave colour", () => {
     useRaceStore.setState({ races: [race] });
     setup();
     await user.click(screen.getByTestId("edit-wave-color-1"));
+    await user.click(screen.getByTestId("custom-color"));
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(screen.getByTestId("wave-color-input"), { target: { value: "#00aa55" } });
     await user.click(screen.getByTestId("wave-color-save"));
@@ -186,7 +188,7 @@ describe("Edit schedule", () => {
     setup([{ ...upcoming, riders: 12 }, finished]);
     await user.click(screen.getByRole("button", { name: /Edit Schedule/ }));
     expect(screen.queryByText(/12 riders/)).not.toBeInTheDocument();
-    // the time nudge buttons (-5 / +5) are working controls, not stray data, and stay
-    expect(screen.getAllByText("−5").length).toBeGreaterThan(0);
+    // each wave's start time is edited directly (the ±5 nudges were dropped with the wave editor)
+    expect(screen.getAllByLabelText(/Wave \d+ start time/).length).toBeGreaterThan(0);
   });
 });

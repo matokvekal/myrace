@@ -667,3 +667,277 @@
   background: #fdecea;
   color: #b3261e;
 }
+
+/* ═══ Event presentation (view mode) ═══ */
+.evHero {
+  margin-bottom: 12px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-1, #fff);
+}
+
+/* Short banner strip: imagery stays out of the way of the text */
+.evBanner {
+  height: 110px;
+  background-size: cover;
+  background-position: center;
+  background-color: #0b1f3f;
+}
+
+.evHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 0 16px 14px;
+  border-top: 4px solid #0b1f3f;
+  background: linear-gradient(180deg, #ffffff, #f7f9fc);
+}
+
+:global([data-theme="dark"]) .evHead {
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+}
+
+.evLogo,
+.evFedLogo {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  margin-top: -36px; /* sits on the banner edge */
+  padding: 6px;
+  object-fit: contain;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(11, 31, 63, 0.15);
+}
+
+.evFedLogo {
+  width: 60px;
+  height: 60px;
+  margin-top: 12px;
+  margin-inline-start: auto;
+  box-shadow: none;
+}
+
+.evTitleBlock {
+  flex: 1;
+  min-width: 0;
+  padding-top: 12px;
+}
+
+.evKicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c8102e;
+}
+
+.evName {
+  margin: 2px 0 8px;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-primary, #0b1f3f);
+  overflow-wrap: anywhere;
+}
+
+.evChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.evChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #0b1f3f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.evGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.evCard {
+  padding: 12px 14px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  background: var(--surface-1, #fff);
+}
+
+.evCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #c8102e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-primary, #0b1f3f);
+}
+
+.evItem {
+  display: grid;
+  grid-template-columns: 20px 100px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  font-size: 14px;
+}
+
+.evItemIcon {
+  display: inline-flex;
+  color: #1d3d78;
+}
+
+:global([data-theme="dark"]) .evItemIcon {
+  color: #63a6fc;
+}
+
+.evItemLabel {
+  color: var(--text-muted, #5b6b85);
+  font-size: 13px;
+}
+
+.evItemValue {
+  font-weight: 600;
+  color: var(--text-primary, #0b1f3f);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+a.evItemValue {
+  color: #1d4ed8;
+}
+
+.evItemEmpty {
+  font-weight: 400;
+  color: var(--text-muted, #8498ba);
+}
+
+.evLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .evGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .evBanner {
+    height: 90px;
+  }
+
+  .evName {
+    font-size: 20px;
+  }
+
+  .evLogo {
+    width: 60px;
+    height: 60px;
+    margin-top: -30px;
+  }
+
+  .evFedLogo {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ═══ Branding (edit mode) ═══ */
+.brandGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 10px;
+}
+
+.brandItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.brandLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #5b6b85);
+}
+
+.brandBannerPreview,
+.brandLogoPreview {
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-card, #c7d4e8);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.brandBannerPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brandLogoPreview img {
+  max-width: 90%;
+  max-height: 80px;
+  object-fit: contain;
+}
+
+.brandEmpty {
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.brandActions {
+  display: flex;
+  gap: 6px;
+}
+
+.brandBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-card, #c7d4e8);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .brandGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .brandGrid > :first-child {
+    grid-column: 1 / -1;
+  }
+}

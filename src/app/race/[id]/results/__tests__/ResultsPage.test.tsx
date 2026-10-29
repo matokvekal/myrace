@@ -84,7 +84,7 @@ describe("Results screen", () => {
     (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
     await user.click(chips[1]);
     await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
-    expect(screen.getByTestId("results-back")).toBeInTheDocument();
+    expect(screen.getByTestId("race-mode-indicator")).toHaveAttribute("data-mode", "results");
   });
 
   it("updates when race data changes", async () => {
@@ -98,17 +98,20 @@ describe("Results screen", () => {
     expect(await screen.findByText("Late Zed")).toBeInTheDocument();
   });
 
-  it("Back returns to the previous screen (Live)", async () => {
+  it("the race sidebar marks Results current and opens Live", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByTestId("results-back"));
+    await user.click(screen.getByTestId("race-menu-btn"));
+    expect(screen.getByTestId("race-nav-results")).toHaveAttribute("aria-current", "page");
+    await user.click(screen.getByTestId("race-nav-live"));
     expect(screen.getByTestId("live-screen")).toBeInTheDocument();
   });
 
-  it("Back on a directly-opened Results page falls back to the race", async () => {
+  it("the race sidebar returns to the Create screen", async () => {
     const user = userEvent.setup();
     renderPage([`/race/${RACE}/results`]);
-    await user.click(screen.getByTestId("results-back"));
+    await user.click(screen.getByTestId("race-menu-btn"));
+    await user.click(screen.getByTestId("race-nav-setup"));
     expect(screen.getByTestId("race-screen")).toBeInTheDocument();
   });
 });

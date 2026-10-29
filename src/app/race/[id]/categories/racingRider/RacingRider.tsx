@@ -1,17 +1,18 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
+import BibBadge from "@/components/ui/BibBadge";
 import styles from "./racingRider.module.css";
 import { RiderProps } from "@/types/types";
 import { formatTime, parseClockTimeMs } from "@/utils/timeUtils";
 import { useSkin } from "@/hooks/useSkin";
 import { Bell } from "lucide-react";
+import { toPhaseRider } from "@/utils/linkedGroups";
+import { riderPhase, NO_GROUP_PHASE, type RiderPhase } from "../../../../../shared/race/finishPhases";
 
 interface Props {
   rider: RiderProps;
   color: string;
-  /** Someone in this rider's bell group reached the bell lap — show the bell whatever the lap count. */
-  forceBell?: boolean;
-  /** Someone in the group finished — this rider's next crossing is their finish. */
-  forceFinish?: boolean;
+  /** Bell / flag phase from the category or Finish Group (shared/race/finishPhases). */
+  phase?: RiderPhase;
   isFlashing?: boolean;
   /**
    * Lap recorded, but the board hold is keeping the card in place until the
@@ -20,8 +21,11 @@ interface Props {
    */
   isRecorded?: boolean;
   raceEnded?: boolean;
-  onClick: () => void;
+  /** A single tap, with the moment it happened (the card waits 300 ms to rule out a double-tap). */
+  onClick: (tappedAt?: Date) => void;
   onDoubleClick: () => void;
+  /** The minimum lap interval in force (race setting, or RECAP's): the card locks for it after a lap. */
+  minLapMs?: number;
 }
 
 type Pt = { x: number; y: number };
@@ -30,8 +34,8 @@ type Pt = { x: number; y: number };
 // starting at top-center ("the start line") and walking clockwise. Used to
 // trace the pace ring directly on the card's actual edge. The card's height
 // is only a *minimum* (racingRider.module.css `.rider` uses min-height, not
-// height) and its border-radius differs by skin (16px classic, 12px gaming —
-// the ring only ever renders in gaming), so the geometry is computed from
+// height) and its border-radius differs by skin (16px classic, 12px gaming),
+// so the geometry is computed from
 // the card's real measured size, not assumed constants.
 function roundedRectGeometry(w: number, h: number, r: number) {
   const straightX = w / 2 - r;
@@ -100,10 +104,10 @@ function roundedRectPathD(w: number, h: number, r: number): string {
 // from offsetWidth/offsetHeight, which already includes the border), so it
 // reads as the card's own border lighting up rather than a frame drawn
 // inside it. Gaming-skin card radius is 12px; match it exactly.
-const PACE_RING_CARD_RADIUS = 12;
+const PACE_RING_CARD_RADIUS = { classic: 16, gaming: 12 };
 const PACE_RING_INSET = 0;
 
-const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFinish = false, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick }) => {
+const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick, minLapMs }) => {
   const clickCountRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { skin } = useSkin();
@@ -111,23 +115,24 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
 
   // Measure the card's real rendered box (not the min-height default) so the
   // pace ring traces its actual edge instead of drifting off it when content
-  // pushes the card taller. Only observed in the gaming skin, where the ring
-  // can render at all.
+  // pushes the card taller. Both skins.
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardSize, setCardSize] = useState<{ w: number; h: number }>({ w: 76, h: 84 });
   useEffect(() => {
-    if (!isPro || !cardRef.current) return;
+    if (!cardRef.current) return;
     const el = cardRef.current;
     const ro = new ResizeObserver(() => {
       setCardSize({ w: el.offsetWidth, h: el.offsetHeight });
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [isPro]);
+  }, []);
 
-  const paceRingW = Math.max(cardSize.w - PACE_RING_INSET * 2, PACE_RING_CARD_RADIUS * 2 + 1);
-  const paceRingH = Math.max(cardSize.h - PACE_RING_INSET * 2, PACE_RING_CARD_RADIUS * 2 + 1);
-  const paceRingR = PACE_RING_CARD_RADIUS - PACE_RING_INSET;
+  const cardRadius = isPro ? PACE_RING_CARD_RADIUS.gaming : PACE_RING_CARD_RADIUS.classic;
+
+  const paceRingW = Math.max(cardSize.w - PACE_RING_INSET * 2, cardRadius * 2 + 1);
+  const paceRingH = Math.max(cardSize.h - PACE_RING_INSET * 2, cardRadius * 2 + 1);
+  const paceRingR = cardRadius - PACE_RING_INSET;
   const paceRingGeometry = useMemo(
     () => roundedRectGeometry(paceRingW, paceRingH, paceRingR),
     [paceRingW, paceRingH, paceRingR]
@@ -137,11 +142,13 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
     [paceRingW, paceRingH, paceRingR]
   );
 
-  const lapsRemaining = rider.totalLaps - rider.lapsCounter;
-  // Individual bell at 2 to go is unchanged; a category-wide bell (leader at 1 to
-  // go) joins it; once the leader has finished, the finish flag replaces the bell.
-  const showBell = !forceFinish && (forceBell || lapsRemaining === 2);
-  const showStripes = forceFinish || (lapsRemaining === 1);
+  // What the official shows this rider at their NEXT crossing: BELL (bell
+  // next), FLAG (finish next) — or Finished (their own finish is recorded).
+  // Laps to go follow the phase, not target − laps.
+  const phase = groupPhase ?? riderPhase(toPhaseRider(rider), NO_GROUP_PHASE);
+  const hasFinished = phase.icon === "finished";
+  const showBell = phase.icon === "bell";
+  const showStripes = phase.icon === "flag";
 
   // Live ticking clock: how long since this rider last crossed (or since race start if never).
   // Only ticks once the race has actually started — before that the card shows a frozen 00:00.
@@ -164,20 +171,20 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
     : null;
   const lastLapTime = lastLap?.lapTime ?? rider.elapsedLastLap ?? null;
 
-  // PRO-only pace border: how far into an "expected" lap (paced off the rider's own
+  // Pace border (both skins): how far into an "expected" lap (paced off the rider's own
   // last lap) they are right now, traced clockwise around the card's edge starting
   // top-center. Sampled on its own 10s tick — deliberately chunkier than the 1s
   // "since arrival" tick above, which keeps driving the text row untouched.
   const [paceNow, setPaceNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!isPro || !hasStarted) return;
+    if (!hasStarted) return;
     const t = setInterval(() => setPaceNow(Date.now()), 10000);
     return () => clearInterval(t);
-  }, [isPro, hasStarted]);
+  }, [hasStarted]);
 
   const lastLapMs = lastLap ? new Date(lastLap.endTime).getTime() - new Date(lastLap.startTime).getTime() : null;
   const paceSinceArriveMs = hasStarted && sinceArriveBaseline != null ? paceNow - sinceArriveBaseline : null;
-  const paceProgress = isPro && hasStarted && lastLapMs && lastLapMs > 0 && paceSinceArriveMs != null
+  const paceProgress = hasStarted && lastLapMs && lastLapMs > 0 && paceSinceArriveMs != null
     ? paceSinceArriveMs / lastLapMs
     : null;
   const paceOverdue = paceProgress != null && paceProgress >= 1;
@@ -212,15 +219,27 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
   // old 300ms mobile click delay). A separate touchend-based detector used to run in
   // parallel with this one — two independent state machines reacting to the same taps —
   // which could desync and swallow a double-tap on active (still-racing) riders.
+  // Minimum-lap cooldown, from the recorded arrival (persisted, so it survives a
+  // refresh): the same timeArrive + minimum the lap engine checks. While it runs a
+  // single tap does nothing (no "wait" message) and the card holds its pressed
+  // look (the :active style); double-tap (details) still works,
+  // and the engine keeps its own check for bib entry / voice.
+  const cooldownLeftMs =
+    minLapMs && rider.timeArrive && rider.raceStatus === "running"
+      ? new Date(rider.timeArrive).getTime() + minLapMs - now
+      : 0;
+  const coolingDown = cooldownLeftMs > 0;
+
   const handleClick = (e: React.MouseEvent) => {
     clickCountRef.current++;
 
     if (clickCountRef.current === 1) {
+      const tappedAt = new Date(); // the passage time is the tap, not the end of the wait
       // Wait to see if a second click comes within 300ms
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = setTimeout(() => {
-        if (clickCountRef.current === 1) {
-          onClick(); // Single click
+        if (clickCountRef.current === 1 && !coolingDown) {
+          onClick(tappedAt); // Single click
           setNow(Date.now()); // snap the "since arrive" clock to 0 right away, don't wait for the next tick
         }
         clickCountRef.current = 0;
@@ -251,6 +270,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
       data-testid={`racing-rider-${rider.bibNumber}`}
       data-laps={`${rider.lapsCounter}/${rider.totalLaps}`}
       data-recorded={isRecorded ? "true" : undefined}
+      data-cooldown={coolingDown ? "true" : undefined}
       className={`${styles.rider} ${glowClass} ${isRecorded ? styles.recorded : ""} ${raceEnded ? styles.onTrack : ""}`}
       style={{ background: bgStyle, "--glow-color": color } as React.CSSProperties}
       onClick={handleClick}
@@ -304,17 +324,17 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
         </div>
       )}
       {showBell && (
-        <div className={styles.bellBadge} title={`2 laps left! (${rider.lapsCounter}/${rider.totalLaps})`}>
+        <div className={styles.bellBadge} data-testid="bell" title={`Give the bell at the next crossing (${rider.lapsCounter}/${rider.totalLaps})`}>
           <Bell size={16} color="#ffd60a" fill="#ffd60a" />
         </div>
       )}
       {showStripes && (
-        <div className={styles.flagBadge} title={`Last lap! (${rider.lapsCounter}/${rider.totalLaps})`}>
+        <div className={styles.flagBadge} data-testid="finish-flag" title={phase.finishPhase ? "Category finished: this rider finishes at the next crossing" : `Final lap: finish at the next crossing (${rider.lapsCounter}/${rider.totalLaps})`}>
           <div className={styles.flagCloth} />
           <div className={styles.flagPole} />
         </div>
       )}
-      <div className={styles.bib}>{rider.bibNumber}</div>
+      <div className={styles.bib}><BibBadge rider={rider} prefix="" /></div>
       <div className={styles.laps}>
         <span className={styles.lapsLabel}>finish:</span>
         {rider.lapsCounter}/{rider.totalLaps}
@@ -324,7 +344,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, forceBell = false, forceFi
           {/* Category-wide signals override the rider's own count: once the
               leader is on the last lap everyone is, and once the leader has
               finished everyone finishes on the next crossing. */}
-          {forceFinish ? 'Finish' : forceBell || lapsRemaining === 1 ? 'Last' : `${Math.max(0, lapsRemaining)} left`}
+          {hasFinished ? 'Finished' : `${phase.remaining} left`}
         </div>
       )}
       {!hasStarted ? (

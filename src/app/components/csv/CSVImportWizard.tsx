@@ -13,7 +13,7 @@ import { parseCSVFile } from "@/utils/csvParser";
 // parseXLSXFile pulls in xlsx (~430 kB) — loaded only when an Excel file is
 // actually uploaded (BUGS.md #1). CSV uploads never touch it.
 import { autoMapColumns } from "@/services/csvMapper";
-import { rowToRider } from "@/services/riderRowMapper";
+import { buildHeatNameMap, filterImportRows, rowToRider } from "@/services/riderRowMapper";
 import { touchTemplate } from "@/services/templateStorage";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
@@ -183,20 +183,11 @@ export default function CSVImportWizard({
         targetRaceUuid = newUuid;
       }
 
-      // Build heat name → number map
-      const heatNameToNumber = new Map<string, number>();
-      const heatColIdx = columnMappings.findIndex((m) => m.targetField === "heat");
-      if (heatColIdx >= 0) {
-        let nextHeatNum = 1;
-        for (const row of rows) {
-          const val = row[heatColIdx]?.trim();
-          if (val && isNaN(Number(val)) && !heatNameToNumber.has(val)) {
-            heatNameToNumber.set(val, nextHeatNum++);
-          }
-        }
-      }
+      // Header / blank / invalid rows never become riders or number a wave.
+      const dataRows = filterImportRows(rows, parseResult.headers, columnMappings).rows;
+      const heatNameToNumber = buildHeatNameMap(dataRows, columnMappings);
 
-      const riders = rows.map((row, idx) =>
+      const riders = dataRows.map((row, idx) =>
         rowToRider(row, columnMappings, targetRaceUuid, totalSuccessful + idx, heatNameToNumber, clubDictionary)
       );
       await insertRiders(riders);
@@ -224,8 +215,14 @@ export default function CSVImportWizard({
     );
 
     const totalInFile = parseResult.rows.length;
-    const validRows = parseResult.rows.filter((_, i) => !errorRowIndices.has(i));
-    const failedCount = errorRowIndices.size;
+    // Rows with validation errors, repeated header rows, blank rows and rows
+    // without a bib or a name are all skipped — before text waves are numbered.
+    const { rows: validRows } = filterImportRows(
+      parseResult.rows.filter((_, i) => !errorRowIndices.has(i)),
+      parseResult.headers,
+      columnMappings
+    );
+    const failedCount = totalInFile - validRows.length;
 
     setSkippedIssues(errorIssues);
     setImportProgress({
@@ -236,18 +233,8 @@ export default function CSVImportWizard({
       status: "importing"
     });
 
-    // Build text-heat → number map if heat column contains non-numeric strings
-    const heatColIdx = columnMappings.findIndex((m) => m.targetField === "heat");
-    const heatNameToNumber = new Map<string, number>();
-    if (heatColIdx >= 0) {
-      let nextHeatNum = 1;
-      for (const row of parseResult.rows) {
-        const val = row[heatColIdx]?.trim();
-        if (val && isNaN(Number(val)) && !heatNameToNumber.has(val)) {
-          heatNameToNumber.set(val, nextHeatNum++);
-        }
-      }
-    }
+    // Text heats → numbers, from the rows that become riders only.
+    const heatNameToNumber = buildHeatNameMap(validRows, columnMappings);
 
     try {
       const riders = validRows.map((row, i) =>

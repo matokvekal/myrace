@@ -1,0 +1,63 @@
+name: Backend rollback / status
+
+# Manual only, approved in the "production" environment. Uses the same
+# restricted deploy key as deploy.yml: the server's deploy-gate.sh allows
+# nothing but receive / activate / rollback / status.
+#   rollback  → the previous release (or the one named), with health check
+#   status    → current and previous release, releases kept, health
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [status, rollback]
+        default: status
+      release:
+        description: "Rollback target release id (empty = previous release), e.g. 20261027T120000Z-29962be9c126"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://api.commissaire.us/api/v1/health
+    env:
+      ACTION: ${{ inputs.action }}
+      TARGET: ${{ inputs.release }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      API_URL: ${{ vars.VITE_SERVER_URL || 'https://api.commissaire.us' }}
+    steps:
+      - name: Validate input
+        run: |
+          [[ "$ACTION" == status || "$ACTION" == rollback ]] || { echo "::error::invalid action"; exit 1; }
+          [[ -z "$TARGET" || "$TARGET" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]] || { echo "::error::invalid release id"; exit 1; }
+      - name: SSH (dedicated deploy key, pinned host key)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_KNOWN_HOSTS" && -n "$DEPLOY_HOST" && -n "$DEPLOY_USER" ]] || { echo "::error::Deploy secrets/variables are not configured"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+      - name: Run on the server
+        run: |
+          cmd="$ACTION"
+          [[ "$ACTION" == rollback && -n "$TARGET" ]] && cmd="rollback $TARGET"
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$cmd" < /dev/null
+      - name: Health through Nginx
+        run: curl -fsS --retry 5 --retry-delay 2 "$API_URL/api/v1/health"; echo

@@ -54,7 +54,8 @@ export type RiderFieldKey =
    | 'uciPoints'
    | 'federation'
    | 'uciNumber'
-   | 'idNumber'
+   | 'bibColor'
+   | 'bibTextColor'
    | 'birthDate'
    | 'federationNumber'
    | 'federationChip'
@@ -330,26 +331,23 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
    },
    {
       field: 'heat',
+      // Only an explicit start-wave column is a wave. Colour, stage, round or
+      // "מקצה" (the race class — see category) are never waves: absent a wave
+      // column, waves come from start times.
       hebrew: [
-         'גל', 'גל התחלה', 'גל פתיחה', 'גל מס\'',
-         // Some organisers mark the wave by colour ("אדום" / "Red" → one wave)
-         'צבע', 'צבע גל', 'סבב', 'קבוצת התחלה', 'קבוצת פתיחה',
-         'עלייה', 'שלב'
+         'גל', 'גל זינוק', 'גל התחלה', 'גל פתיחה', 'גל מס\'', 'מספר גל', 'קבוצת זינוק'
       ],
       english: [
          'wave', 'wave no', 'wave number', 'wave#', 'wave num',
          'heat', 'heat no', 'heat number', 'heat#',
-         'flight', 'flight no',
-         'color', 'colour', 'wave color', 'wave colour',
-         'start group', 'start wave', 'start heat', 'startgroup',
-         'group no', 'group number'
+         'start group', 'start wave', 'start heat', 'startgroup'
       ],
       priority: 7
    },
    {
       field: 'startTime',
       hebrew: [
-         'שעה', 'שעת התחלה', 'זמן התחלה',
+         'שעה', 'שעת התחלה', 'זמן התחלה', 'שעת זינוק', 'זמן זינוק', 'זינוק',
          'זמן פתיחה', 'שעת פתיחה', 'זמן', 'שעת סטארט'
       ],
       english: [
@@ -427,6 +425,25 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
          'friday', 'saturday', 'sunday', 'monday'
       ],
       priority: 8
+   },
+   {
+      field: 'uciNumber',
+      hebrew: ['מספר UCI', 'מזהה UCI', 'UCI ID', 'קוד UCI'],
+      // Not a bare "uci": "דירוג UCI" / "UCI ranking" is a ranking, not the 11-digit UCI ID.
+      english: ['uci id', 'uci number', 'uci no', 'uci code', 'uciid'],
+      priority: 6
+   },
+   {
+      field: 'bibColor',
+      hebrew: ['צבע מספר', 'צבע לוחית', 'צבע רקע מספר', 'רקע מספר'],
+      english: ['bib color', 'bib colour', 'plate color', 'plate colour', 'bib background', 'number background'],
+      priority: 5
+   },
+   {
+      field: 'bibTextColor',
+      hebrew: ['צבע ספרות', 'צבע טקסט מספר', 'צבע כיתוב'],
+      english: ['bib text color', 'bib text colour', 'number color', 'number colour', 'digit color', 'digits color'],
+      priority: 5
    }
 ];
 
@@ -442,6 +459,45 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
 export const IGNORED_FIELDS = new Set<RiderFieldKey>(['subCategory']);
 
 /**
+ * Columns that hold government identity numbers (national ID / passport).
+ *
+ * Commissaire never collects, stores, synchronizes or exports these (PRD FR-45,
+ * AGENTS.md privacy policy). A start list may still contain such a column: the
+ * import succeeds and the column is skipped — never auto-mapped, never storable
+ * by a manual mapping, never kept as "info". This is the ONE shared list.
+ */
+export const ID_COLUMN_HEADERS = new Set<string>([
+   'id', 'id number', 'id no', 'id no.', 'id #', 'national id', 'personal id',
+   'identity', 'identity number', 'passport', 'passport number', 'passport no',
+   'תז', 'ת"ז', 'ת.ז', 'ת.ז.', 'תעודת זהות', 'מספר זהות', 'מספר תעודה',
+   'זהות', 'דרכון', 'מספר דרכון', 'תז/דרכון', 'ת"ז/דרכון', 'ת.ז/דרכון'
+]);
+
+const normalizeIdHeader = (header: string) =>
+   header.trim().toLowerCase().replace(/[״׳]/g, '"').replace(/\s+/g, ' ');
+
+/** True when a column header names a national ID / passport number column. */
+export function isIdColumnHeader(header: string): boolean {
+   const h = normalizeIdHeader(header);
+   if (ID_COLUMN_HEADERS.has(h)) return true;
+   // Same header written without quote marks ("תז/דרכון", "ID Number").
+   return ID_COLUMN_HEADERS.has(h.replace(/["']/g, ''));
+}
+
+/**
+ * A rider's reference columns with any ID / passport entry removed. Races
+ * imported before FR-45 may still hold one (e.g. "ID Number") — it is left in
+ * the local store untouched (D-14) but never leaves the device in an export.
+ */
+export function withoutIdFields(
+   extra: Record<string, string> | undefined
+): Record<string, string> | undefined {
+   if (!extra) return extra;
+   const kept = Object.fromEntries(Object.entries(extra).filter(([label]) => !isIdColumnHeader(label)));
+   return Object.keys(kept).length > 0 ? kept : undefined;
+}
+
+/**
  * Aliases that name a rider field only weakly — they are just as likely to head
  * a seeding/serial column ("מס'" = serial no.) as the real bib column.
  * Matches on these are capped so a specific header ("מספר רוכב", "bib") always
@@ -450,7 +506,9 @@ export const IGNORED_FIELDS = new Set<RiderFieldKey>(['subCategory']);
  */
 export const AMBIGUOUS_ALIASES = new Set<string>([
    'no', 'no.', 'num', 'number', '#', 'sno', 'sn',
-   'מס', 'מס.', "מס'", 'מספר', 'רוכב'
+   'מס', 'מס.', "מס'", 'מספר', 'רוכב',
+   // "מקצה" alone is the race class; a real "קטגוריה" column must win over it.
+   'מקצה'
 ]);
 
 /**

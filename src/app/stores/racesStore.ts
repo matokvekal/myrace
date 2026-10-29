@@ -4,6 +4,7 @@ import { fetchRaces as fetchRacesFromAPI } from "@/services/fetchRaces";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { RaceProps, CategoryProps, RiderProps } from "@/types/types";
 import raceStorageAdapter from "./indexDb/raceStorageAdapter";
+import { isApplyingRemote, liveBridge } from "@/services/live/liveBridge";
 
 interface RaceState {
    races: RaceProps[];
@@ -125,7 +126,8 @@ const useRaceStore = create<RaceState>()(
                // Only the local bookkeeping fields above may still move. This is
                // the backstop for any screen that forgot to hide its Edit button.
                const existing = races.find((r) => r.uuid === updatedRace.uuid);
-               if (existing?.finalized) {
+               if (existing && liveBridge()?.beforeRace(existing, updatedRace) === false) return;
+               if (existing?.finalized && !isApplyingRemote()) {
                   const blocked = blockedFinalizedFields(existing, updatedRace);
                   if (blocked.length > 0) {
                      console.warn(

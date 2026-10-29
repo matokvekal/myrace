@@ -38,7 +38,7 @@ export async function loadDemoRace(page: Page): Promise<void> {
   // be either side of our first look.
   await expect(async () => {
     if (/\/heat\//.test(page.url())) {
-      await page.getByRole("tab", { name: "Create", exact: true }).click();
+      await gotoRaceMode(page, "Create");
     }
     // The race tab bar is up once the Riders tab button is present.
     await expect(page.getByRole("button", { name: "Riders", exact: true })).toBeVisible({
@@ -47,17 +47,88 @@ export async function loadDemoRace(page: Page): Promise<void> {
   }).toPass({ timeout: 20_000 });
 }
 
+/** Switch race mode through the race sidebar (hamburger → Create / Race / Live / Results / Board). */
+export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" | "Results" | "Board"): Promise<void> {
+  const key = ({ Create: "setup", Race: "race", Live: "live", Results: "results", Board: "board" } as const)[mode];
+  // An open wave sheet dims the whole screen: tap outside to close it first.
+  const backdrop = page.getByTestId("sheet-backdrop");
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("wave-sheet")).toHaveCount(0);
+  }
+  await page.getByTestId("race-menu-btn").click();
+  await page.getByTestId(`race-nav-${key}`).click();
+  // Race opens on the full timeline; open the current wave's bottom sheet
+  // (a completed wave opens none, a fully running one goes to Live).
+  if (key === "race") {
+    const panel = page.getByTestId("wave-sheet");
+    if (!(await panel.isVisible().catch(() => false))) {
+      const current = page.locator('[data-testid^="timeline-wave-"][data-current="true"]');
+      const card = (await current.count()) ? current.first() : page.locator('[data-testid^="timeline-wave-"]').first();
+      // Only tap when the card opens a sheet (a racing wave with nothing left to start goes to Live).
+      if ((await card.getAttribute("data-opens")) === "sheet") {
+        await card.click();
+        await panel.waitFor({ timeout: 3000 }).catch(() => {});
+      }
+    }
+  }
+}
+
+/**
+ * Open a Race-screen view: "Grid" = the start screen inside the wave bottom
+ * sheet; "Check-In" opens Check-In there; Board is its own race mode (sidebar).
+ */
+export async function openRaceView(page: Page, view: "Grid" | "Check-In" | "Board"): Promise<void> {
+  if (view === "Board") return gotoRaceMode(page, "Board");
+  const sheet = page.getByTestId("wave-sheet");
+  if (!(await sheet.isVisible().catch(() => false))) await gotoRaceMode(page, "Race");
+  const back = sheet.getByRole("button", { name: "Back to wave" });
+  if (await back.isVisible().catch(() => false)) await back.click();
+  if (view === "Check-In") await page.getByTestId("sheet-checkin").click();
+  else await page.getByTestId("sheet-start").waitFor();
+}
+
+/**
+ * Finish a racing wave the race-day way: the wave card's Finish → Live's typed
+ * FINISH confirmation. Ends on the Live screen.
+ */
+export async function finishWave(page: Page, wave: number): Promise<void> {
+  const backdrop = page.getByTestId("sheet-backdrop");
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ position: { x: 5, y: 5 } });
+  }
+  if (!(await page.getByTestId(`wave-act-finish-${wave}`).isVisible().catch(() => false))) {
+    await gotoRaceMode(page, "Race");
+    const b = page.getByTestId("sheet-backdrop");
+    if (await b.isVisible().catch(() => false)) await b.click({ position: { x: 5, y: 5 } });
+  }
+  await page.getByTestId(`wave-act-finish-${wave}`).click();
+  await page.waitForURL(new RegExp(`/heat/${wave}`));
+  await page.getByPlaceholder("FINISH").fill("FINISH");
+  await page.getByRole("button", { name: "Finish Wave", exact: true }).click();
+  await expect(page.getByText(new RegExp(`Wave ${wave} finished`)).first()).toBeVisible();
+}
+
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */
 export async function openTab(page: Page, name: string): Promise<void> {
   await page.getByRole("button", { name, exact: true }).click();
 }
 
-/** Pick a wave in race mode. Pills read like "2 · 09:00". */
+/** Pick a wave in race mode: its card on the race-day timeline. */
 export async function selectWave(page: Page, wave: number): Promise<void> {
-  await page
-    .locator('button[class*="wavePill"]', { hasText: new RegExp(`^${wave}\\b`) })
-    .first()
-    .click();
+  // The Board screen picks its wave from a dropdown.
+  const boardWave = page.getByTestId("board-wave");
+  if (await boardWave.isVisible().catch(() => false)) {
+    await boardWave.selectOption(String(wave));
+    return;
+  }
+  // An open bottom sheet dims the timeline: tap outside to close it first.
+  const backdrop = page.getByTestId("sheet-backdrop");
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("wave-sheet")).toHaveCount(0);
+  }
+  await page.getByTestId(`timeline-wave-${wave}`).click();
 }
 
 // ─── Live/heat helpers (hoisted from joker.spec.ts / lap-recording.spec.ts /
@@ -96,7 +167,7 @@ export async function openLiveDemo(page: Page): Promise<void> {
   // The demo's one-shot onboarding lands us on Live; make sure we're there.
   await expect(async () => {
     if (!/\/heat\//.test(page.url())) {
-      await page.getByRole("tab", { name: "Live", exact: true }).click();
+      await gotoRaceMode(page, "Live");
     }
     await expect(page.locator('[data-testid^="racing-rider-"]').first()).toBeVisible({
       timeout: 2_000,

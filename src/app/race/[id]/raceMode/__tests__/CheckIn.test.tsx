@@ -37,6 +37,9 @@ const block = (name: string) => {
   if (!el) throw new Error(`no category block for ${name}`);
   return el as HTMLElement;
 };
+/** Search, sort, filter and view sit in the Search/Sort panel. */
+const openTools = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByTestId("checkin-tools"));
+
 const bibsIn = (el: HTMLElement) =>
   within(el)
     .queryAllByTestId(/^checkin-row-/)
@@ -101,11 +104,11 @@ describe("Check-In: wave → category structure", () => {
     expect(screen.getByTestId("checkin-row-1")).toBeInTheDocument();
   });
 
-  it("still shows an empty category, with an add button", () => {
+  it("still shows an empty category, without an add button (riders are added in CREATE > Riders)", () => {
     seed([makeRider({ category: "Men Elite" })]);
     renderCheckIn();
     expect(within(block("Juniors")).getByText("No riders yet")).toBeInTheDocument();
-    expect(screen.getByTestId("checkin-add-Juniors")).toBeInTheDocument();
+    expect(screen.queryByTestId("checkin-add-Juniors")).not.toBeInTheDocument();
   });
 
   it("falls back to a single block when no slot map is given", () => {
@@ -125,91 +128,12 @@ describe("Check-In: wave → category structure", () => {
   });
 });
 
-describe("Check-In: add rider to a specific category", () => {
-  it("adds the rider to that category only, fixed category, no picker", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite", bibNumber: 1 })]);
-    renderCheckIn();
-
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    expect(within(block("Masters")).queryByRole("combobox")).toBeNull(); // category picker hidden: category is fixed
-    await user.type(screen.getByPlaceholderText("First name *"), "Noa");
-    await user.type(screen.getByPlaceholderText("Last name *"), "Cohen");
-    await user.type(screen.getByPlaceholderText("Bib # *"), "555");
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-
-    await waitFor(() => expect(bibsIn(block("Masters"))).toEqual([555]));
-    expect(bibsIn(block("Men Elite"))).toEqual([1]);
-
-    const added = useRiderStore.getState().riders.find((r) => r.bibNumber === 555)!;
-    expect(added).toMatchObject({ category: "Masters", raceUuid: RACE, heat: 1, firstName: "Noa", checked: true });
-    expect(added.standing).toBe(1);
-    expect((await stored()).some((r) => r.bibNumber === 555)).toBe(true);
-  });
-
-  it("gives new riders the next standing within their category", async () => {
-    const user = userEvent.setup();
-    seed([
-      makeRider({ category: "Men Elite", standing: 1, position_start: 1 }),
-      makeRider({ category: "Men Elite", standing: 2, position_start: 2 }),
-    ]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Men Elite"));
-    await user.type(screen.getByPlaceholderText("First name *"), "A");
-    await user.type(screen.getByPlaceholderText("Last name *"), "B");
-    await user.type(screen.getByPlaceholderText("Bib # *"), "900");
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-    await waitFor(() => expect(useRiderStore.getState().riders).toHaveLength(3));
-    expect(useRiderStore.getState().riders.find((r) => r.bibNumber === 900)!.standing).toBe(3);
-  });
-
-  it("rejects a bib already used in the race and adds nothing", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite", bibNumber: 42, lastName: "Taken", firstName: "Already" })]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.type(screen.getByPlaceholderText("First name *"), "Noa");
-    await user.type(screen.getByPlaceholderText("Last name *"), "Cohen");
-    await user.type(screen.getByPlaceholderText("Bib # *"), "42");
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-
-    expect(await screen.findByText(/Bib 42 already used by Taken Already/)).toBeInTheDocument();
-    expect(useRiderStore.getState().riders).toHaveLength(1);
-  });
-
-  it("requires first name, last name and bib", async () => {
-    const user = userEvent.setup();
+describe("Check-In: no add-rider action", () => {
+  it("offers no Add rider: riders are added and managed in CREATE > Riders", () => {
     seed([]);
     renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.click(screen.getByRole("button", { name: "Add Rider" }));
-    expect(await screen.findByText(/required/i)).toBeInTheDocument();
-    expect(useRiderStore.getState().riders).toHaveLength(0);
-  });
-
-  it("Cancel closes the form without adding", async () => {
-    const user = userEvent.setup();
-    seed([]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId(/^checkin-add-/)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("First name *")).not.toBeInTheDocument();
-  });
-
-  it("opens only one add form at a time", async () => {
-    const user = userEvent.setup();
-    seed([]);
-    renderCheckIn();
-    await user.click(screen.getByTestId("checkin-add-Masters"));
-    await user.click(screen.getByTestId("checkin-add-Juniors"));
-    expect(screen.getAllByPlaceholderText("First name *")).toHaveLength(1);
-    expect(within(block("Juniors")).getByPlaceholderText("First name *")).toBeInTheDocument();
-  });
-
-  it("hides add buttons once the race is running", () => {
-    seed([]);
-    renderCheckIn([makeCategory({ name: "Men Elite", status: "running" })]);
-    expect(screen.queryByTestId("checkin-add-Men Elite")).not.toBeInTheDocument();
   });
 });
 
@@ -233,7 +157,8 @@ describe("Check-In: edit bib", () => {
 
     expect(await screen.findByTestId("checkin-row-777")).toBeInTheDocument();
     expect(screen.queryByTestId("checkin-row-10")).not.toBeInTheDocument();
-    expect(screen.getByText("✓ Saved")).toBeInTheDocument();
+    // The row re-renders from the store before saveBib's await returns and sets "Saved".
+    expect(await screen.findByText("✓ Saved")).toBeInTheDocument();
     expect((await stored()).find((r) => r.id === a.id)!.bibNumber).toBe(777);
     expect(recordRaceEvent).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: "RIDER_EDITED", riderId: a.id, bibNumber: 777 })
@@ -330,14 +255,14 @@ describe("Check-In: standing, rank and sorting", () => {
   it("shows the standing badge on every row", () => {
     seed(field());
     renderCheckIn([elite]);
-    expect(within(screen.getByTestId("checkin-row-10")).getByText("S1")).toBeInTheDocument();
-    expect(within(screen.getByTestId("checkin-row-40")).getByText("S–")).toBeInTheDocument();
+    expect(screen.getByTestId("checkin-row-10")).toHaveAttribute("data-standing", "1");
+    expect(screen.getByTestId("checkin-row-40")).toHaveAttribute("data-standing", "");
   });
 
   it("falls back to position_start when standing is not set (older races)", () => {
     seed([makeRider({ category: "Men Elite", bibNumber: 1, standing: null, position_start: 8 })]);
     renderCheckIn([elite]);
-    expect(within(screen.getByTestId("checkin-row-1")).getByText("S8")).toBeInTheDocument();
+    expect(screen.getByTestId("checkin-row-1")).toHaveAttribute("data-standing", "8");
   });
 
   it("defaults to standing order with unranked riders last", () => {
@@ -350,6 +275,7 @@ describe("Check-In: standing, rank and sorting", () => {
     const user = userEvent.setup();
     seed(field());
     renderCheckIn([elite]);
+    await openTools(user);
     await user.click(screen.getByRole("button", { name: "Bib" }));
     expect(bibsIn(block("Men Elite"))).toEqual([10, 20, 30, 40]);
     await user.click(screen.getByTitle("Ascending"));
@@ -360,6 +286,7 @@ describe("Check-In: standing, rank and sorting", () => {
     const user = userEvent.setup();
     seed(field());
     renderCheckIn([elite]);
+    await openTools(user);
     await user.click(screen.getByRole("button", { name: "Name" }));
     // Abel, Bar, Cohen, Dan
     expect(bibsIn(block("Men Elite"))).toEqual([20, 10, 30, 40]);
@@ -369,6 +296,7 @@ describe("Check-In: standing, rank and sorting", () => {
     const user = userEvent.setup();
     seed(field());
     renderCheckIn([elite]);
+    await openTools(user);
     await user.click(screen.getByTitle("Ascending"));
     expect(bibsIn(block("Men Elite"))).toEqual([30, 20, 10, 40]);
   });
@@ -382,33 +310,13 @@ describe("Check-In: standing, rank and sorting", () => {
       makeRider({ category: "Masters", bibNumber: 3, standing: 1 }),
     ]);
     renderCheckIn([elite, masters]);
+    await openTools(user);
     await user.click(screen.getByRole("button", { name: "Bib" }));
     expect(bibsIn(block("Men Elite"))).toEqual([1, 2]);
     expect(bibsIn(block("Masters"))).toEqual([3, 4]);
   });
 
-  it("'Whole wave' scope merges the slot into one sorted list", async () => {
-    const user = userEvent.setup();
-    seed([
-      makeRider({ category: "Men Elite", bibNumber: 1, standing: 3 }),
-      makeRider({ category: "Masters", bibNumber: 2, standing: 1 }),
-      makeRider({ category: "Men Elite", bibNumber: 3, standing: 2 }),
-    ]);
-    renderCheckIn([elite, masters]);
-    await user.click(screen.getByRole("button", { name: "Whole wave" }));
-    expect(document.querySelectorAll(".catBlock")).toHaveLength(0);
-    const wave = document.querySelector<HTMLElement>(".waveBlock")!;
-    expect(bibsIn(wave)).toEqual([2, 3, 1]);
-  });
 
-  it("whole-wave scope keeps per-category add buttons", async () => {
-    const user = userEvent.setup();
-    seed([]);
-    renderCheckIn([elite, masters]);
-    await user.click(screen.getByRole("button", { name: "Whole wave" }));
-    expect(screen.getByTestId("checkin-add-Men Elite")).toBeInTheDocument();
-    expect(screen.getByTestId("checkin-add-Masters")).toBeInTheDocument();
-  });
 });
 
 describe("Check-In: check-in, DNS, search, filter", () => {
@@ -420,8 +328,38 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     await user.click(within(screen.getByTestId("checkin-row-7")).getByTitle("Check in"));
     await waitFor(async () => expect((await stored())[0].checked).toBe(true));
     expect(recordRaceEvent).toHaveBeenCalledWith(expect.objectContaining({ eventType: "RIDER_CHECKIN" }));
-    await user.click(within(screen.getByTestId("checkin-row-7")).getByTitle("Uncheck"));
+    await user.click(within(screen.getByTestId("checkin-row-7")).getByTitle("Undo check-in"));
     expect(useRiderStore.getState().riders[0].checked).toBe(false);
+  });
+
+  it("setting DNS from the status menu clears check-in (persisted); back to standing does not re-check", async () => {
+    const user = userEvent.setup();
+    const r = makeRider({ category: "Men Elite", bibNumber: 8 });
+    await useRiderStore.getState().insertRiders([r]);
+    renderCheckIn([elite]);
+    await user.click(within(screen.getByTestId("checkin-row-8")).getByTitle("Check in"));
+    await waitFor(async () => expect((await stored())[0].checked).toBe(true));
+    expect(within(block("Men Elite")).getByText("✓ 1/1")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Status for #8"));
+    await user.click(screen.getByText("DNS", { selector: "[class*='line']" }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DNS", checked: false }));
+    expect(within(block("Men Elite")).getByText("✓ 0/1")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Status for #8"));
+    await user.click(screen.getByText("STANDING", { selector: "[class*='line']" }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "standing", checked: false }));
+  });
+
+  it("DNF from the status menu keeps a checked-in rider checked in (they started)", async () => {
+    const user = userEvent.setup();
+    const r = makeRider({ category: "Men Elite", bibNumber: 9 });
+    await useRiderStore.getState().insertRiders([r]);
+    renderCheckIn([elite]);
+    await user.click(within(screen.getByTestId("checkin-row-9")).getByTitle("Check in"));
+    await user.click(screen.getByLabelText("Status for #9"));
+    await user.click(screen.getByText("DNF", { selector: "[class*='line']" }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DNF", checked: true }));
   });
 
   it("Check All checks everyone except DNS / DNF / DSQ", async () => {
@@ -433,6 +371,7 @@ describe("Check-In: check-in, DNS, search, filter", () => {
       makeRider({ category: "Men Elite", bibNumber: 4, status: "DSQ" }),
     ]);
     renderCheckIn([elite]);
+    await openTools(user); // Check All sits in the Search/Sort panel
     await user.click(screen.getByRole("button", { name: /Check All/ }));
     await waitFor(() => {
       const byBib = Object.fromEntries(useRiderStore.getState().riders.map((r) => [r.bibNumber, r.checked]));
@@ -446,7 +385,7 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     renderCheckIn([elite]);
     await user.click(screen.getByLabelText("Mark #9 DNS"));
     expect(useRiderStore.getState().riders[0]).toMatchObject({ status: "DNS", checked: false });
-    expect(screen.getByText("✗ 1 DNS")).toBeInTheDocument();
+    expect(screen.getByTestId("checkin-dns-count")).toHaveTextContent("1 DNS");
   });
 
   it("search narrows by name or bib across categories", async () => {
@@ -456,6 +395,7 @@ describe("Check-In: check-in, DNS, search, filter", () => {
       makeRider({ category: "Masters", bibNumber: 202, lastName: "Mizrahi" }),
     ]);
     renderCheckIn([elite, masters]);
+    await openTools(user);
     await user.type(screen.getByPlaceholderText(/Search/), "miz");
     expect(screen.queryByTestId("checkin-row-101")).not.toBeInTheDocument();
     expect(screen.getByTestId("checkin-row-202")).toBeInTheDocument();
@@ -469,21 +409,11 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     const user = userEvent.setup();
     seed([makeRider({ category: "Men Elite", bibNumber: 1, lastName: "לוי", firstName: "דנה" })]);
     renderCheckIn([elite]);
+    await openTools(user);
     await user.type(screen.getByPlaceholderText(/Search/), "לוי");
     expect(screen.getByTestId("checkin-row-1")).toBeInTheDocument();
   });
 
-  it("category filter shows only that category", async () => {
-    const user = userEvent.setup();
-    seed([
-      makeRider({ category: "Men Elite", bibNumber: 1 }),
-      makeRider({ category: "Masters", bibNumber: 2 }),
-    ]);
-    renderCheckIn([elite, masters]);
-    await user.selectOptions(screen.getByDisplayValue("All categories"), "Masters");
-    expect(screen.queryByTestId("checkin-row-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("checkin-row-2")).toBeInTheDocument();
-  });
 
   it("locks check-in (no check / DNS buttons) once the race is running", () => {
     seed([makeRider({ category: "Men Elite", bibNumber: 1 })]);
@@ -493,12 +423,4 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     expect(screen.queryByRole("button", { name: /Check All/ })).not.toBeInTheDocument();
   });
 
-  it("card view renders the same riders with a bib editor", async () => {
-    const user = userEvent.setup();
-    seed([makeRider({ category: "Men Elite", bibNumber: 31 })]);
-    renderCheckIn([elite]);
-    await user.click(screen.getByTitle("Card view"));
-    expect(within(block("Men Elite")).getByText("31")).toBeInTheDocument();
-    expect(screen.getByTestId("checkin-editbib-31")).toBeInTheDocument();
-  });
 });

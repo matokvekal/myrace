@@ -6,6 +6,7 @@ import { RiderProps } from "@/types/types";
 import indexedDBStorage from "./indexDb/riderStorageAdapter";
 import { shallow } from "zustand/shallow";
 import { isRaceUuidFinalized } from "@/utils/raceLock";
+import { isApplyingRemote, liveBridge } from "@/services/live/liveBridge";
 
 /**
  * Hard guard for a FINALIZED race (see `utils/raceLock.ts`). Every rider write
@@ -17,10 +18,20 @@ import { isRaceUuidFinalized } from "@/utils/raceLock";
  * mixed-race batches are rejected only if a finalized race is involved.
  */
 function blockIfFinalized(riders: { raceUuid: string }[], action: string): boolean {
+  if (isApplyingRemote()) return false; // shared race: the server's official versions decide
   const locked = [...new Set(riders.map((r) => r.raceUuid))].filter(isRaceUuidFinalized);
   if (locked.length === 0) return false;
   console.warn(`Race ${locked.join(", ")} is finalized — ignored rider ${action}.`);
   return true;
+}
+
+/** Shared races: let the live bridge turn a batch update into Actions (or block it). */
+function liveCheck(current: RiderProps[], updated: RiderProps[]): boolean {
+  const lb = liveBridge();
+  if (!lb) return true;
+  const byId = new Map(current.map((r) => [r.id, r]));
+  const pairs = updated.filter((r) => byId.has(r.id));
+  return lb.beforeRiders("update", pairs.map((r) => byId.get(r.id)!), pairs) !== false;
 }
 
 interface RiderState {
@@ -159,6 +170,7 @@ const useRiderStore = create<RiderState>()(
 
       addNewRider: async (newRider) => {
         if (blockIfFinalized([newRider], "add")) return;
+        if (liveBridge()?.beforeRiders("add", [], [newRider]) === false) return;
         try {
           set((state) => ({
             ...state,
@@ -178,6 +190,7 @@ const useRiderStore = create<RiderState>()(
 
       insertRiders: async (newRiders) => {
         if (blockIfFinalized(newRiders, "import")) return;
+        if (liveBridge()?.beforeRiders("import", [], newRiders) === false) return;
         try {
           set((state) => ({
             ...state,
@@ -204,6 +217,8 @@ const useRiderStore = create<RiderState>()(
 
       updateRider: async (updatedRider) => {
         if (blockIfFinalized([updatedRider], "update")) return;
+        const prev = get().riders.find((r) => r.id === updatedRider.id);
+        if (prev && liveBridge()?.beforeRiders("update", [prev], [updatedRider]) === false) return;
         try {
           set((state) => ({
             ...state,
@@ -241,6 +256,7 @@ const useRiderStore = create<RiderState>()(
       patchRiders: async (updatedRiders) => {
         if (updatedRiders.length === 0) return;
         if (blockIfFinalized(updatedRiders, "patch")) return;
+        if (!liveCheck(get().riders, updatedRiders)) return;
         const byId = new Map(updatedRiders.map((r) => [r.id, r]));
         set((state) => ({
           ...state,
@@ -261,6 +277,7 @@ const useRiderStore = create<RiderState>()(
 
       updateAllRiders: async (updatedRiders) => {
         if (blockIfFinalized(updatedRiders, "update")) return;
+        if (!liveCheck(get().riders, updatedRiders)) return;
         const updatedIds = new Set(updatedRiders.map((r) => r.id));
         set((state) => ({
           ...state,
@@ -285,6 +302,7 @@ const useRiderStore = create<RiderState>()(
       deleteRider: async (riderId) => {
         const target = get().riders.find((r) => r.id === riderId);
         if (target && blockIfFinalized([target], "delete")) return;
+        if (target && liveBridge()?.beforeRiders("delete", [target], []) === false) return;
         try {
           set((state) => ({
             ...state,

@@ -7,7 +7,9 @@ import useRaceStore from "@/stores/racesStore";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
 import { useAuthStore } from "@/stores/authStore";
-import { Edit2, Check, X, ExternalLink, Download, Upload, ShieldCheck, ScrollText, Flag, Lock } from "lucide-react";
+import { Edit2, Check, X, ExternalLink, Download, Upload, ShieldCheck, ScrollText, Flag, Lock, Calendar, Clock, MapPin, Route, Trophy, Bike, Building2, UserRound, Phone, Globe, ImagePlus, Trash2 } from "lucide-react";
+import { compressImage } from "@/utils/compressImage";
+import { resolveRaceImage } from "@/utils/resolveRaceImage";
 // xlsx (~430 kB) and its wrappers load on demand from the handlers below so they
 // stay out of the Race page's initial chunk (BUGS.md #1). Types are erased.
 import type { VerificationResult } from "@/utils/raceExport";
@@ -27,6 +29,7 @@ import {
   type FinalizationCheck,
 } from "@/utils/raceSignature";
 import { toast } from "react-toastify";
+import { isLiveRace } from "@/services/live/liveBridge";
 
 interface Props {
   race: RaceProps;
@@ -36,8 +39,16 @@ interface Props {
 type EditForm = Pick<
   RaceProps,
   "name" | "date" | "time" | "location" | "distance" | "type" | "level" |
-  "orgenizer" | "manager" | "phone" | "site" | "takanon"
+  "orgenizer" | "manager" | "phone" | "site" | "takanon" | "image" | "logo" | "federationLogo"
 >;
+
+/** "2026-06-12" → "Fri, 12 June 2026" (date-only string, parsed as a local date). */
+const formatEventDate = (d: string): string => {
+  const m = d?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return d || "";
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return dt.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+};
 
 const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   const [showDeleteRace, setShowDeleteRace] = useState(false);
@@ -85,7 +96,8 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   );
 
   useEffect(() => {
-    if (!finalized) { setFinalCheck(null); return; }
+    // A shared race's official result is keyed by rider uuid and signed by the server.
+    if (!finalized || isLiveRace(race.uuid)) { setFinalCheck(null); return; }
     let cancelled = false;
     verifyRaceFinalization(finalized, raceRiders)
       .then((result) => { if (!cancelled) setFinalCheck(result); })
@@ -96,6 +108,18 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   }, [finalized, storedDigest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFinishRace = async () => {
+    if (isLiveRace(race.uuid)) {
+      // Shared race: the server closes every wave, computes and signs the official result.
+      try {
+        const { finalizeShared } = await import("@/services/live/liveClient");
+        const n = await finalizeShared(race.uuid);
+        setShowFinishRace(false);
+        toast.success(`Race finished — ${n} results are official (signed by the server).`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not finish the race");
+      }
+      return;
+    }
     const result = await finalizeRace(race, actingUser);
     AuditLogService.log({
       race,
@@ -346,6 +370,9 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
       phone: race.phone ?? "",
       site: race.site ?? "",
       takanon: race.takanon ?? "",
+      image: race.image ?? "",
+      logo: race.logo ?? null,
+      federationLogo: race.federationLogo ?? null,
     };
     setForm(snapshot);
     setOriginalForm(snapshot);
@@ -368,8 +395,22 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
 
   const handleCancel = () => setEditMode(false);
 
-  const set = (field: keyof EditForm, value: string | number) =>
+  const set = (field: keyof EditForm, value: string | number | null) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+
+  // Banner and logos: compressed like the race cover (logos stay PNG for transparency).
+  const uploadImage = async (field: "image" | "logo" | "federationLogo", file?: File) => {
+    if (!file) return;
+    try {
+      const data =
+        field === "image"
+          ? await compressImage(file)
+          : await compressImage(file, { maxDimension: 512, maxBytes: 120_000, mimeType: "image/png" });
+      set(field, data);
+    } catch {
+      toast.error("Couldn't process that image. Please pick a JPG or PNG.");
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -400,6 +441,46 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
       {editMode && !finalized ? (
         /* ── EDIT FORM ── */
         <>
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Branding</div>
+            <div className={styles.brandGrid}>
+              {([
+                ["image", "Banner"],
+                ["logo", "Event logo"],
+                ["federationLogo", "Federation / organizer logo"],
+              ] as const).map(([field, label]) => (
+                <div key={field} className={styles.brandItem}>
+                  <span className={styles.brandLabel}>{label}</span>
+                  <div className={field === "image" ? styles.brandBannerPreview : styles.brandLogoPreview}>
+                    {field === "image" ? (
+                      <img src={resolveRaceImage(form.image)} alt="" />
+                    ) : form[field] ? (
+                      <img src={form[field] as string} alt="" />
+                    ) : (
+                      <span className={styles.brandEmpty}>No logo</span>
+                    )}
+                  </div>
+                  <div className={styles.brandActions}>
+                    <label className={styles.brandBtn}>
+                      <ImagePlus size={14} /> {field === "image" || form[field] ? "Replace" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(e) => { void uploadImage(field, e.target.files?.[0]); e.target.value = ""; }}
+                      />
+                    </label>
+                    {field !== "image" && form[field] && (
+                      <button type="button" className={styles.brandBtn} onClick={() => set(field, null)} aria-label={`Remove ${label}`}>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Race Details</div>
             <FormRow label="Name">
@@ -449,43 +530,88 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
           </div>
         </>
       ) : (
-        /* ── VIEW MODE ── */
+        /* ── VIEW MODE: event presentation ── */
         <>
-          <div className={styles.section}>
-            <div className={styles.sectionTitle}>Race Details</div>
-            <Row icon={Icons.calander} label="Date"     value={race.date} />
-            <Row icon={Icons.time}     label="Start"    value={race.time} />
-            <Row icon={Icons.earth}    label="Location" value={race.location} />
-            <Row icon={Icons.road}     label="Distance" value={race.distance ? `${race.distance} km` : "—"} />
-            <Row icon={Icons.setting}  label="Type"     value={race.type} />
-            <Row icon={Icons.setting}  label="Level"    value={race.level} />
-          </div>
-
-          <div className={styles.section}>
-            <div className={styles.sectionTitle}>Organisation</div>
-            <Row icon={Icons.rider1}   label="Organiser" value={race.orgenizer} />
-            <Row icon={Icons.rider1}   label="Manager"   value={race.manager} />
-            <Row icon={Icons.mainMsg}  label="Phone"     value={race.phone} />
-            {race.site && <Row icon={Icons.earth} label="Website" value={race.site} />}
-          </div>
-
-          <div className={styles.section}>
-            <div className={styles.sectionTitle}>Rules / תקנון</div>
-            {race.takanon ? (
-              <a href={race.takanon} target="_blank" rel="noopener noreferrer" className={styles.takanonLink}>
-                <ExternalLink size={14} />
-                View Rules Document
-              </a>
-            ) : (
-              <div className={styles.takanonEmpty}>No rules document — tap Edit to add a link</div>
-            )}
-          </div>
-
-          <div className={styles.section}>
-            <div className={styles.sectionTitle}>Status</div>
-            <div className={`${styles.statusBadge} ${styles[race.status ?? "upcoming"]}`}>
-              {race.status ?? "upcoming"}
+          <section className={styles.evHero}>
+            <div className={styles.evBanner} style={{ backgroundImage: `url("${resolveRaceImage(race.image)}")` }} role="img" aria-label="Event banner" />
+            <div className={styles.evHead}>
+              {race.logo && <img className={styles.evLogo} src={race.logo} alt="Event logo" />}
+              <div className={styles.evTitleBlock}>
+                <div className={styles.evKicker}>
+                  {[race.raceType ?? "MTB", race.type, race.level].filter(Boolean).join(" · ")}
+                </div>
+                <h2 className={styles.evName} dir="auto">{race.name}</h2>
+                <div className={styles.evChips}>
+                  {race.date && <span className={styles.evChip}><Calendar size={14} /> {formatEventDate(race.date)}</span>}
+                  {race.time && <span className={styles.evChip}><Clock size={14} /> {race.time}</span>}
+                  {race.location && <span className={styles.evChip} dir="auto"><MapPin size={14} /> {race.location}</span>}
+                </div>
+              </div>
+              {race.federationLogo && <img className={styles.evFedLogo} src={race.federationLogo} alt="Organizer logo" />}
             </div>
+          </section>
+
+          <div className={styles.evGrid}>
+            <section className={styles.evCard}>
+              <h3 className={styles.evCardTitle}><Trophy size={15} /> Race details</h3>
+              <InfoItem icon={<Calendar size={15} />} label="Date" value={formatEventDate(race.date)} />
+              <InfoItem icon={<Clock size={15} />} label="Start" value={race.time} />
+              <InfoItem icon={<Route size={15} />} label="Distance" value={race.distance ? `${race.distance} km` : ""} />
+              <InfoItem icon={<Bike size={15} />} label="Discipline" value={race.raceType ?? "MTB"} />
+              <InfoItem icon={<Flag size={15} />} label="Type" value={race.type} />
+              <InfoItem icon={<Trophy size={15} />} label="Level" value={race.level} />
+            </section>
+
+            <section className={styles.evCard}>
+              <h3 className={styles.evCardTitle}><MapPin size={15} /> Venue</h3>
+              <InfoItem icon={<MapPin size={15} />} label="Location" value={race.location} />
+              {race.location && (
+                <a
+                  className={styles.evLink}
+                  href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(race.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink size={13} /> Open in map
+                </a>
+              )}
+            </section>
+
+            <section className={styles.evCard}>
+              <h3 className={styles.evCardTitle}><Building2 size={15} /> Organisation</h3>
+              <InfoItem icon={<Building2 size={15} />} label="Organiser" value={race.orgenizer} />
+              <InfoItem icon={<UserRound size={15} />} label="Race manager" value={race.manager} />
+            </section>
+
+            <section className={styles.evCard}>
+              <h3 className={styles.evCardTitle}><Phone size={15} /> Contact</h3>
+              <InfoItem
+                icon={<Phone size={15} />}
+                label="Phone"
+                value={race.phone}
+                href={race.phone ? `tel:${race.phone.replace(/[^\d+]/g, "")}` : undefined}
+              />
+              <InfoItem icon={<Globe size={15} />} label="Website" value={race.site} href={race.site || undefined} external />
+            </section>
+
+            <section className={styles.evCard}>
+              <h3 className={styles.evCardTitle}><ScrollText size={15} /> Rules / תקנון</h3>
+              {race.takanon ? (
+                <a href={race.takanon} target="_blank" rel="noopener noreferrer" className={styles.takanonLink}>
+                  <ExternalLink size={14} />
+                  View Rules Document
+                </a>
+              ) : (
+                <div className={styles.takanonEmpty}>No rules document yet.</div>
+              )}
+            </section>
+
+            <section className={styles.evCard}>
+              <h3 className={styles.evCardTitle}><Flag size={15} /> Status</h3>
+              <div className={`${styles.statusBadge} ${styles[race.status ?? "upcoming"]}`}>
+                {race.status ?? "upcoming"}
+              </div>
+            </section>
           </div>
         </>
       )}
@@ -782,6 +908,27 @@ const Row: React.FC<{ icon: string; label: string; value: string }> = ({ icon, l
     <img src={icon} alt="" width={16} height={16} className={styles.rowIcon} />
     <span className={styles.rowLabel}>{label}</span>
     <span className={styles.rowValue}>{value || "—"}</span>
+  </div>
+);
+
+/** One labelled value in an Info card; empty shows "—" (never hidden). */
+const InfoItem: React.FC<{ icon: React.ReactNode; label: string; value?: string | null; href?: string; external?: boolean }> = ({
+  icon, label, value, href, external,
+}) => (
+  <div className={styles.evItem}>
+    <span className={styles.evItemIcon}>{icon}</span>
+    <span className={styles.evItemLabel}>{label}</span>
+    {value ? (
+      href ? (
+        <a className={styles.evItemValue} href={href} dir="auto" {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+          {value}
+        </a>
+      ) : (
+        <span className={styles.evItemValue} dir="auto">{value}</span>
+      )
+    ) : (
+      <span className={`${styles.evItemValue} ${styles.evItemEmpty}`}>—</span>
+    )}
   </div>
 );
 

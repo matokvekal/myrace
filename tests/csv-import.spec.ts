@@ -4,7 +4,7 @@ import { loadDemoRace, openTab, DEMO_RIDER_COUNT } from "./helpers";
 
 /**
  * Uploading a CSV file adds riders and doesn't break the app.
- * Uses the Edit-Riders CSV importer (Actions → Edit Riders → 📁 CSV), which is
+ * Uses the Edit-Riders CSV importer (Edit Riders → 📁 CSV), which is
  * the simple pick-file → preview → confirm path.
  */
 const FIXTURE = path.resolve(__dirname, "fixtures", "riders-import.csv");
@@ -16,8 +16,7 @@ test.describe("CSV upload", () => {
 
     await test.step("open Edit Riders", async () => {
       await openTab(page, "Riders");
-      await page.getByRole("button", { name: "Actions" }).click();
-      await page.getByRole("menuitem", { name: /Edit Riders/i }).click();
+      await page.getByRole("button", { name: "Edit Riders" }).click();
       await expect(page.getByPlaceholder(/Name or bib/i)).toBeVisible();
       await expect(page.getByText(`${DEMO_RIDER_COUNT} riders`)).toBeVisible();
     });
