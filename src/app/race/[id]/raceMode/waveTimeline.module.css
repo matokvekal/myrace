@@ -623,3 +623,65 @@
   border-radius: 6px !important;
   text-transform: none;
 }
+
+/* ═══ Compact wave cards (three tight rows) ═══ */
+.card {
+  gap: 1px;
+  padding: 3px 6px 4px;
+  line-height: 1.2;
+}
+
+.cardTop {
+  gap: 5px;
+}
+
+.cardName {
+  font-size: 13px;
+}
+
+.cardTime {
+  font-size: 12px;
+}
+
+.state {
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+/* Categories + riders + Check-In on ONE line; long lists ellipsize */
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cardMeta .cardCats {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.cardMeta .cardStats {
+  flex-shrink: 0;
+  gap: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ciTag {
+  font-size: 10px;
+  padding: 0 5px;
+}
+
+.actions {
+  gap: 3px;
+  margin-top: 1px;
+  padding-top: 0;
+}
+
+.act {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+}

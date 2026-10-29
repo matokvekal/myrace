@@ -40,7 +40,7 @@ const hhmm = (min: number) => {
 };
 
 const PX_PER_MIN = 1.2; // 72 px per hour
-const CARD_MIN_PX = 92; // room for the action row
+const CARD_MIN_PX = 62; // three compact rows: title · categories + riders · actions
 
 interface Item {
   wave: number;
@@ -236,6 +236,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                     onClick={() => onSelect(it.wave)}
                     aria-pressed={isSel}
                     data-testid={`timeline-wave-${it.wave}`}
+                    title={`Wave ${it.wave} · ${it.startLabel} · ${it.cats.map((c) => c.name).join(", ")}`}
                     data-current={it.wave === current ? "true" : undefined}
                   >
                     <span className={styles.cardTop}>
@@ -245,6 +246,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         <StateIcon s={it.state} /> <span className={styles.stateLabel}>{STATE_LABEL[it.state]}</span>
                       </span>
                     </span>
+                    <span className={styles.cardMeta}>
                     <span className={styles.cardCats} dir="auto">{it.cats.map((c) => c.name).join(" · ")}</span>
                     <span className={styles.cardStats}>
                       {it.state === "running" ? (
@@ -262,6 +264,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                           {s.accounted}/{s.registered}
                         </span>
                       )}
+                    </span>
                     </span>
                     {onAction && !compact && (
                       <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
