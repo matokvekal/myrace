@@ -697,3 +697,31 @@
   background: #fee2e2;
   color: #b91c1c;
 }
+
+/* Finished wave: soft light-red diagonal stripes + red edge — clear, never loud */
+.card_finished {
+  border-color: #fecaca;
+  border-inline-start-color: #ef4444;
+  background-color: #fff5f5;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, 0.13) 0 8px,
+    rgba(239, 68, 68, 0) 8px 16px
+  );
+  color: #475569;
+}
+
+.card_finished .state_finished {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+:global([data-theme="dark"]) .card_finished {
+  background-color: #2a1d22;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(248, 113, 113, 0.16) 0 8px,
+    rgba(248, 113, 113, 0) 8px 16px
+  );
+  color: #cbd5e1;
+}
