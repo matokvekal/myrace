@@ -84,6 +84,10 @@ export interface RaceProps {
   phone: string;
   takanon: string;
   site: string;
+  /** Event logo (data URL), shown on the Info page. */
+  logo?: string | null;
+  /** Organizer / federation logo (data URL), shown on the Info page. */
+  federationLogo?: string | null;
   createdAt: Date;
   lastUpdateAt: Date;
   isActive: boolean;
