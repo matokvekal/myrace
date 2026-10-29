@@ -75,10 +75,11 @@ describe("Riders: search", () => {
 });
 
 describe("Riders: Add Rider", () => {
-  it("opens the add form, validates the bib, and adds the rider to the chosen category", async () => {
+  it("opens the add form from a category header, validates the bib, and adds the rider to that category", async () => {
     const user = userEvent.setup();
     setup();
-    await user.click(screen.getByTestId("add-rider-btn"));
+    await user.click(screen.getByTestId("add-rider-Juniors")); // "+" on the Juniors header
+    expect(within(screen.getByTestId("add-rider-modal")).queryByRole("combobox")).toBeNull(); // category preset
     const modal = screen.getByTestId("add-rider-modal");
 
     // duplicate bib is refused by the shared validation
@@ -91,7 +92,6 @@ describe("Riders: Add Rider", () => {
     const bib = within(modal).getByPlaceholderText("Bib # *");
     await user.clear(bib);
     await user.type(bib, "99");
-    await user.selectOptions(within(modal).getByRole("combobox"), "Juniors");
     await user.click(within(modal).getByRole("button", { name: "Add Rider" }));
 
     await waitFor(() => expect(screen.queryByTestId("add-rider-modal")).not.toBeInTheDocument());

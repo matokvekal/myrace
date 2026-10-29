@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import BibBadge from "@/components/ui/BibBadge";
 import { useTranslation } from "react-i18next";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Minus, Search, X, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Minus, Search, X, SquarePlus, SquareMinus, UserRoundPlus } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -88,6 +88,9 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
+  // Category the Add Rider form was opened from (preset, picker hidden); null = pick one.
+  const [addFor, setAddFor] = useState<CategoryProps | null>(null);
+  const openAddRider = (cat: CategoryProps | null) => { setAddFor(cat); setShowAddRider(true); };
   // Search / view / sort stay folded behind one search icon until needed.
   const [toolsOpen, setToolsOpen] = useState(false);
   const [importMode, setImportMode] = useState<"file" | "scan">("file");
@@ -219,6 +222,21 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const collapseAll = () => setCollapsedGroups(new Set(groupKeys));
   const expandAll = () => setCollapsedGroups(new Set());
 
+  /** "+" on a category header: add a rider straight into that category. */
+  const catAddBtn = (cat: CategoryProps | undefined, name: string) =>
+    readOnly ? null : (
+      <button
+        type="button"
+        className={styles.catAddBtn}
+        aria-label={`Add rider to ${name}`}
+        title={`Add rider to ${name}`}
+        data-testid={`add-rider-${name}`}
+        onClick={(e) => { e.stopPropagation(); openAddRider(cat ?? null); }}
+      >
+        <UserRoundPlus size={16} />
+      </button>
+    );
+
   const groupToggle = (key: string, label: string) => {
     const open = !collapsedGroups.has(key);
     return (
@@ -230,7 +248,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
         title={open ? "Collapse" : "Expand"}
         onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
       >
-        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        {open ? <SquareMinus size={16} /> : <SquarePlus size={16} />}
       </button>
     );
   };
@@ -351,14 +369,18 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                 <Pencil size={16} />
               </button>
             )}
-            <button
-              type="button"
-              className={styles.addRiderBtn}
-              data-testid="add-rider-btn"
-              onClick={() => setShowAddRider(true)}
-            >
-              <Plus size={14} /> Add Rider
-            </button>
+            {viewMode === "cards" && !groupByCategory && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                data-testid="add-rider-btn"
+                aria-label="Add rider"
+                title="Add rider"
+                onClick={() => openAddRider(null)}
+              >
+                <Plus size={16} />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -408,10 +430,10 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
           Riders ({filteredAndSorted.length})
           <span className={styles.groupBulk}>
             <button type="button" className={styles.groupBulkBtn} onClick={collapseAll} disabled={groupKeys.length === 0} data-testid="collapse-all" aria-label="Collapse all" title="Collapse all">
-              <ChevronsUp size={15} />
+              <SquareMinus size={16} />
             </button>
             <button type="button" className={styles.groupBulkBtn} onClick={expandAll} disabled={groupKeys.length === 0} data-testid="expand-all" aria-label="Expand all" title="Expand all">
-              <ChevronsDown size={15} />
+              <SquarePlus size={16} />
             </button>
           </span>
         </div>
@@ -450,6 +472,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                           <span className={styles.catSepDot} style={{ background: catColor }} />
                           {cg.name}
                           <span className={styles.groupCount}>{cg.riders.length}</span>
+                          {catAddBtn(cg.category ?? undefined, cg.name)}
                         </div>
                         {!collapsedGroups.has(gKey) && cg.riders.map((rider, idx) => {
                           const isOut = ["DNS", "DNF", "DSQ"].includes(rider.status);
@@ -504,6 +527,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                   {groupToggle(`g:${catName}`, catName)}
                   {catName}
                   <span className={styles.groupCount}>{catRiders.length}</span>
+                  {catAddBtn(categories.find((c) => c.name === catName), catName)}
                 </div>
                 {!collapsedGroups.has(`g:${catName}`) && catRiders.map((rider) => (
                   <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
@@ -539,6 +563,13 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
             <div className={styles.emptyActions}>
               <button
                 className={styles.emptyImportBtn}
+                data-testid="add-rider-btn"
+                onClick={() => openAddRider(null)}
+              >
+                <Plus size={14} /> Add Rider
+              </button>
+              <button
+                className={styles.emptyImportBtn}
                 onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
               >
                 Import CSV
@@ -572,6 +603,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
               waveNum={waves[0] ?? 1}
               waveOf={(c) => catWaveMap.get(catWaveKey(c.name, c.subCategory)) ?? waves[0] ?? 1}
               categories={categories}
+              fixedCategory={addFor ?? undefined}
               essential
               onDone={() => setShowAddRider(false)}
             />

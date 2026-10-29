@@ -659,3 +659,57 @@
   align-items: center;
   justify-content: center;
 }
+
+/* "+" on each category header (right-aligned, visible when collapsed) */
+.catAddBtn {
+  margin-inline-start: auto;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--brand-strong, #3f86e7);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--brand-strong, #3f86e7);
+  cursor: pointer;
+}
+
+.catAddBtn:hover {
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+:root[data-skin="gaming"] .catAddBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+}
+
+/* Category header: count badge + Add rider together on the right */
+.catSeparator .groupCount,
+.catGroupHeader .groupCount {
+  margin-inline-start: auto;
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #1d3d78;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 1;
+}
+
+.catSeparator .catAddBtn,
+.catGroupHeader .catAddBtn {
+  margin-inline-start: 8px;
+}
+
+/* Expand/collapse: plain square icon, clearly not the Add rider button */
+.groupToggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+}

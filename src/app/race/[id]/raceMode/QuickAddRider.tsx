@@ -94,7 +94,7 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
   if (essential) {
     return (
       <div className={styles.form} data-testid="add-rider-form">
-        <div className={styles.formTitle}>Add rider</div>
+        <div className={styles.formTitle}>Add rider{fixedCategory ? ` to ${fixedCategory.name}` : ""}</div>
         <input
           className={styles.input}
           placeholder="Bib # *"
