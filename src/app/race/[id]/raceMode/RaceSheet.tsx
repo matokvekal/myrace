@@ -11,6 +11,8 @@ import {
   SlidersHorizontal,
   Users,
   X,
+  Loader2,
+  MoreHorizontal,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import type { CategoryProps, RiderProps } from "@/types/types";
@@ -69,6 +71,18 @@ const RaceSheet: React.FC<Props> = ({
   const [confirmSlot, setConfirmSlot] = useState<string | null>(null);
   const [busySlot, setBusySlot] = useState<string | null>(null);
   const [error, setError] = useState<{ slot: string; msg: string } | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [nowSec, setNowSec] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  });
+  useEffect(() => {
+    const t = setInterval(() => {
+      const d = new Date();
+      setNowSec(d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds());
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
   const { otherWaveRunning, validateGroup, startGroup } = useWaveStart(raceUuid, wave, categories);
 
   // A different wave resets the working state (never the race data).
@@ -183,6 +197,29 @@ const RaceSheet: React.FC<Props> = ({
             {started && <span>Started {started}</span>}
           </div>
         </div>
+        <div className={styles.moreWrap}>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => setMoreOpen((o) => !o)}
+            aria-expanded={moreOpen}
+            aria-label="More"
+            title="More"
+            data-testid="sheet-more"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+          {moreOpen && (
+            <div className={styles.moreMenu} role="menu">
+              <button type="button" role="menuitem" className={styles.moreItem} onClick={() => { setMoreOpen(false); open("riders"); }} data-testid="sheet-all-riders">
+                <Users size={15} /> All riders
+              </button>
+              <button type="button" role="menuitem" className={styles.moreItem} onClick={() => { setMoreOpen(false); open("advanced"); }} data-testid="sheet-start-controls">
+                <SlidersHorizontal size={15} /> Start controls
+              </button>
+            </div>
+          )}
+        </div>
         <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Close" title="Close">
           <X size={18} />
         </button>
@@ -229,12 +266,28 @@ const RaceSheet: React.FC<Props> = ({
                 const time = key === "TBD" ? "No start time" : normalizeTime(key) ?? key;
                 const gStarted = actualStart(cats, riders);
                 const blocked = otherWaveRunning || issues.length > 0;
+                // Live countdown to the scheduled start (negative = due / late)
+                const diff = key === "TBD" ? null : Math.round(toMinutes(key) * 60) - nowSec;
+                const fmt = (secs: number) => {
+                  const a = Math.abs(secs);
+                  const h = Math.floor(a / 3600), m = Math.floor((a % 3600) / 60), sec = a % 60;
+                  const mmss = `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+                  return h ? `${h}:${mmss}` : mmss;
+                };
+                const approaching = diff != null && diff <= 600;
+                const ready = gState === "upcoming" && approaching && !blocked;
+                const warnings = [...new Set(issues)];
                 return (
                   <div key={key} className={styles.startRow} data-testid={`sheet-start-${key}`}>
                     <div className={styles.startInfo}>
                       <span className={styles.startTime}>{time}</span>
                       <span className={styles.startCats} dir="auto">{cats.map((c) => c.name).join(" · ")}</span>
                     </div>
+                    {gState === "upcoming" && diff != null && (
+                      <span className={`${styles.countdown} ${diff <= 0 ? styles.countdownDue : approaching ? styles.countdownSoon : ""}`} aria-label="Time to scheduled start">
+                        {diff > 0 ? `−${fmt(diff)}` : `+${fmt(diff)}`}
+                      </span>
+                    )}
                     {gState === "upcoming" && !canStart ? (
                       <span className={`${styles.state} ${styles.state_upcoming}`}><Circle size={13} /> Upcoming</span>
                     ) : gState === "upcoming" ? (
@@ -251,14 +304,14 @@ const RaceSheet: React.FC<Props> = ({
                               Cancel
                             </button>
                             <button type="button" className={styles.primary} onClick={() => void doStart(key, cats)} disabled={busySlot === key} data-testid="sheet-confirm-start">
-                              {busySlot === key ? "Starting…" : "Confirm Start"}
+                              {busySlot === key ? <><Loader2 size={15} className={styles.spin} /> Starting</> : "Confirm Start"}
                             </button>
                           </div>
                         </div>
                       ) : (
                         <button
                           type="button"
-                          className={styles.startBtn}
+                          className={`${styles.startBtn} ${ready ? styles.startReady : approaching ? styles.startSoon : ""}`}
                           disabled={blocked}
                           onClick={() => { setError(null); setConfirmSlot(key); }}
                           title={blocked ? "Resolve the warnings first" : `Start Wave ${wave}`}
@@ -268,14 +321,14 @@ const RaceSheet: React.FC<Props> = ({
                         </button>
                       )
                     ) : (
-                      <span className={`${styles.state} ${styles[`state_${gState}`]}`}>
-                        {gState === "running" ? <Radio size={13} /> : <CheckCircle2 size={13} />}
-                        {gState === "running" ? `Racing${gStarted ? ` · ${gStarted}` : ""}` : "Completed"}
+                      <span className={styles.started}>
+                        <CheckCircle2 size={15} />
+                        {gState === "running" ? `Started${gStarted ? ` ${gStarted}` : ""}` : "Completed"}
                       </span>
                     )}
-                    {issues.length > 0 && (
+                    {warnings.length > 0 && (
                       <ul className={styles.issues}>
-                        {issues.map((m) => <li key={m}><AlertTriangle size={12} /> {m}</li>)}
+                        {warnings.map((m) => <li key={m}><AlertTriangle size={12} /> {m}</li>)}
                       </ul>
                     )}
                     {error?.slot === key && (
@@ -289,24 +342,6 @@ const RaceSheet: React.FC<Props> = ({
               })}
             </div>
 
-            {/* Categories */}
-            <div className={styles.chips}>
-              {categories.map((c) => (
-                <span key={c.id} className={styles.chip} dir="auto">
-                  <span className={styles.dot} style={{ background: c.color ?? "#9ca3af" }} />
-                  {c.name}
-                </span>
-              ))}
-            </div>
-
-            <div className={styles.links}>
-              <button type="button" className={styles.link} onClick={() => open("riders")} data-testid="sheet-all-riders">
-                <Users size={15} /> All riders <ChevronRight size={15} />
-              </button>
-              <button type="button" className={styles.link} onClick={() => open("advanced")} data-testid="sheet-start-controls">
-                <SlidersHorizontal size={15} /> Start controls <ChevronRight size={15} />
-              </button>
-            </div>
           </>
         )}
 

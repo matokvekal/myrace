@@ -520,3 +520,143 @@
     animation: none;
   }
 }
+
+/* ═══ Start: understated, outlined controls; the countdown leads ═══ */
+.startBtn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0b1f3f;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.startBtn:hover:not(:disabled) {
+  border-color: #64748b;
+}
+
+.startSoon {
+  border-color: #0b1f3f;
+  font-weight: 600;
+}
+
+.startReady {
+  border-color: #15803d;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.startBtn:disabled {
+  opacity: 0.55;
+  background: #fff;
+  color: #64748b;
+}
+
+.primary {
+  height: 38px;
+  border: 1px solid #15803d;
+  border-radius: 8px;
+  background: #fff;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.secondary {
+  height: 38px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.confirm {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.countdown {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: #0b1f3f;
+}
+
+.countdownSoon {
+  color: #1d4ed8;
+}
+
+.countdownDue {
+  color: #b45309;
+}
+
+.started {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+}
+
+.issues {
+  color: #b91c1c;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+:global([data-theme="dark"]) .startBtn,
+:global([data-theme="dark"]) .primary {
+  background: transparent;
+}
+
+:global([data-theme="dark"]) .startBtn,
+:global([data-theme="dark"]) .countdown {
+  color: #e2e8f0;
+}
+
+/* Header ⋯ menu (All riders, Start controls) */
+.moreWrap {
+  position: relative;
+}
+
+.moreMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline-end: 0;
+  z-index: 5;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border-card, #cbd5e1);
+  border-radius: 10px;
+  background: var(--surface-1, #fff);
+  box-shadow: 0 8px 24px rgba(11, 31, 63, 0.18);
+}
+
+.moreItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #0b1f3f);
+  font-size: 14px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.moreItem:hover {
+  background: var(--bg-surface, #f5f8ff);
+}

@@ -80,6 +80,7 @@ export async function openRaceView(page: Page, view: "Grid" | "Check-In" | "All 
   const back = sheet.getByRole("button", { name: "Back to wave" });
   if (await back.isVisible().catch(() => false)) await back.click();
   const id = ({ Grid: "sheet-start-controls", "Check-In": "sheet-checkin", "All Riders": "sheet-all-riders" } as const)[view];
+  if (view !== "Check-In") await page.getByTestId("sheet-more").click(); // in the header's ⋯ menu
   await page.getByTestId(id).click();
 }
 
