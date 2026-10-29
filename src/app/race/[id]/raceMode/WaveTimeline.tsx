@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, Radio, SkipForward, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, LayoutDashboard, Radio, SkipForward, Trophy, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory, toMinutes, normalizeTime } from "../schedule/Schedule";
 import styles from "./waveTimeline.module.css";
 
 export type WaveState = "upcoming" | "running" | "finished";
-export type WaveAction = "checkin" | "start" | "live" | "finish";
+export type WaveAction = "checkin" | "start" | "live" | "finish" | "results" | "board";
 
 const OUT = ["DNF", "DSQ", "DNS"];
 
@@ -268,6 +268,17 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                     </span>
                     {onAction && !compact && (
                       <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
+                        {it.state === "finished" ? (
+                          <>
+                            <button type="button" className={styles.act} onClick={() => onAction(it.wave, "results")} aria-label={`Results, wave ${it.wave}`} data-testid={`wave-act-results-${it.wave}`}>
+                              <Trophy size={13} /> Results
+                            </button>
+                            <button type="button" className={styles.act} onClick={() => onAction(it.wave, "board")} aria-label={`Board, wave ${it.wave}`} data-testid={`wave-act-board-${it.wave}`}>
+                              <LayoutDashboard size={13} /> Board
+                            </button>
+                          </>
+                        ) : (
+                        <>
                         <button type="button" className={styles.act} onClick={() => onAction(it.wave, "checkin")} aria-label={`Check-In, wave ${it.wave}`} data-testid={`wave-act-checkin-${it.wave}`}>
                           <ClipboardCheck size={13} /> Check-In
                         </button>
@@ -285,6 +296,8 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                               <FlagTriangleRight size={13} /> Finish
                             </button>
                           </>
+                        )}
+                        </>
                         )}
                       </span>
                     )}

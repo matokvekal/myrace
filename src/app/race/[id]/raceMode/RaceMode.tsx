@@ -50,6 +50,9 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
     } else if (action === "start") {
       setSheetView("summary");
       setSheet((s) => s ?? "half");
+    } else if (action === "results" || action === "board") {
+      // The existing screens, opened on this wave
+      navigate(`/race/${raceUuid}/${action}?wave=${w}`);
     } else {
       navigate(`/race/${raceUuid}/heat/${w}${action === "finish" ? "?finish=1" : ""}`);
     }

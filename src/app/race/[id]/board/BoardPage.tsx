@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import useRaceStore from "@/stores/racesStore";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
 import RaceTopBar from "../../components/raceSidebar/RaceTopBar";
 import LiveBoard from "../raceMode/LiveBoard";
-import { getScheduleWaves } from "../schedule/Schedule";
+import { getScheduleWaves, buildSchedule } from "../schedule/Schedule";
 import { canViewScreen } from "@/services/live/liveBridge";
 import styles from "./boardPage.module.css";
 
@@ -16,6 +16,10 @@ import styles from "./boardPage.module.css";
  */
 const BoardPage: React.FC = () => {
   const raceUuid = useParams().id as string;
+  // Opened from a wave (?wave=N): show that wave only. From the sidebar: every wave.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const waveParam = Number(searchParams.get("wave"));
+  const oneWave = waveParam > 0;
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
   const getRaces = useRaceStore((s) => s.getRaces);
   const allCategories = useCategoryStore((s) => s.categories);
@@ -38,8 +42,14 @@ const BoardPage: React.FC = () => {
   const waves = useMemo(() => getScheduleWaves(categories), [categories]);
 
   useEffect(() => {
-    if (waves.length && !waves.some((w) => w.waveNum === selectedWave)) setSelectedWave(waves[0].waveNum);
-  }, [waves, selectedWave, setSelectedWave]);
+    if (oneWave && waveParam !== selectedWave) setSelectedWave(waveParam);
+    else if (waves.length && !waves.some((w) => w.waveNum === selectedWave)) setSelectedWave(waves[0].waveNum);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waves, oneWave, waveParam]);
+  const boardCategories = useMemo(
+    () => (oneWave ? [...(buildSchedule(categories).get(waveParam)?.values() ?? [])].flat() : categories),
+    [oneWave, waveParam, categories]
+  );
 
   return (
     <>
@@ -48,7 +58,11 @@ const BoardPage: React.FC = () => {
           <select
             className={styles.waveSelect}
             value={selectedWave}
-            onChange={(e) => setSelectedWave(Number(e.target.value))}
+            onChange={(e) => {
+              const w = Number(e.target.value);
+              setSelectedWave(w);
+              if (oneWave) setSearchParams({ wave: String(w) }, { replace: true });
+            }}
             aria-label="Wave"
             data-testid="board-wave"
           >
@@ -66,7 +80,7 @@ const BoardPage: React.FC = () => {
         ) : waves.length === 0 ? (
           <p className={styles.note}>No waves configured</p>
         ) : (
-          <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={categories} />
+          <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={boardCategories} />
         )}
       </div>
     </>

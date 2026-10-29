@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import useRaceStore from "@/stores/racesStore";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
@@ -14,6 +14,7 @@ import styles from "./resultsPage.module.css";
  */
 const ResultsPage: React.FC = () => {
   const params = useParams();
+  const waveParam = Number(useSearchParams()[0].get("wave"));
   const raceUuid = params.id as string;
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
   const getRaces = useRaceStore((s) => s.getRaces);
@@ -34,7 +35,7 @@ const ResultsPage: React.FC = () => {
     <>
       <RaceTopBar />
       <div className={styles.page}>
-        <Results raceUuid={raceUuid} defaultGroupBy="wave" quickNav />
+        <Results raceUuid={raceUuid} defaultGroupBy="wave" quickNav defaultWave={waveParam > 0 ? waveParam : undefined} />
       </div>
     </>
   );
