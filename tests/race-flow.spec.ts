@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadDemoRace, selectWave, gotoRaceMode } from "./helpers";
+import { loadDemoRace, selectWave, gotoRaceMode, openRaceView } from "./helpers";
 
 /**
  * End-to-end smoke of the core Commissaire flow:
@@ -51,9 +51,9 @@ test.describe("Commissaire race flow", () => {
     await test.step("enter Race mode", async () => {
       // Phase switcher: "Create" = setup, "Race" = race mode, "Live" = live.
       await gotoRaceMode(page, "Race");
-      // Sub-tab bar of race mode
-      await expect(page.getByRole("button", { name: "Grid", exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Check-In", exact: true })).toBeVisible();
+      // The wave bottom sheet: Check-In and Start controls
+      await expect(page.getByTestId("sheet-checkin")).toBeVisible();
+      await expect(page.getByTestId("sheet-start-controls")).toBeVisible();
     });
 
     // ── 5b. Close out wave 1 ─────────────────────────────────────────────────
@@ -62,7 +62,7 @@ test.describe("Commissaire race flow", () => {
     // signed off before wave 2 can take the line.
     await test.step("finish the wave already on course", async () => {
       await selectWave(page, 1);
-      await page.getByRole("button", { name: "Grid", exact: true }).click();
+      await openRaceView(page, "Grid");
       await page.getByRole("button", { name: /Finish Wave/i }).click();
       await page.getByRole("button", { name: /^Yes/i }).click();
       await expect(page.getByText(/Wave 1 finished/)).toBeVisible();
@@ -71,7 +71,7 @@ test.describe("Commissaire race flow", () => {
 
     // ── 6. Check-in all riders in the selected wave ──────────────────────────
     await test.step("check in wave riders", async () => {
-      await page.getByRole("button", { name: "Check-In", exact: true }).click();
+      await openRaceView(page, "Check-In");
       await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
       const checkAll = page.getByRole("button", { name: /Check All/i });
       await expect(checkAll).toBeVisible();
@@ -82,7 +82,7 @@ test.describe("Commissaire race flow", () => {
 
     // ── 7. Start the first start group ───────────────────────────────────────
     await test.step("start a wave", async () => {
-      await page.getByRole("button", { name: "Grid", exact: true }).click();
+      await openRaceView(page, "Grid");
       const startBtn = page.getByRole("button", { name: /Start All/i }).first();
       await expect(startBtn).toBeVisible();
       await startBtn.click();

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, Clock, Crosshair, Radio, SkipForward, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Radio, SkipForward, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory, toMinutes, normalizeTime } from "../schedule/Schedule";
 import styles from "./waveTimeline.module.css";
@@ -20,6 +20,8 @@ export function waveStats(cats: CategoryProps[], riders: RiderProps[]) {
     dnf: list.filter((r) => r.status === "DNF").length,
     dns: list.filter((r) => r.status === "DNS").length,
     dsq: list.filter((r) => r.status === "DSQ").length,
+    /** Check-In: checked in, or already accounted for as DNS/DNF/DSQ. */
+    accounted: list.filter((r) => r.checked || out(r)).length,
   };
 }
 
@@ -239,6 +241,16 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         <b>{s.onCourse} / {s.started} on course</b>
                       ) : (
                         <>{s.registered} riders</>
+                      )}
+                      {it.state === "upcoming" && s.registered > 0 && (
+                        <span
+                          className={`${styles.ciTag} ${s.accounted === s.registered ? styles.ciDone : s.accounted > 0 ? styles.ciPart : ""}`}
+                          title={`Check-In ${s.accounted} / ${s.registered}`}
+                          aria-label={`Check-In ${s.accounted} of ${s.registered}`}
+                        >
+                          {s.accounted === s.registered ? <CheckCircle2 size={12} /> : <ClipboardCheck size={12} />}
+                          {s.accounted}/{s.registered}
+                        </span>
                       )}
                     </span>
                   </button>

@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { TERMS_VERSION } from "../src/app/legal/terms";
-import { racingCard, gotoRaceMode } from "./helpers";
+import { racingCard, gotoRaceMode, openRaceView, selectWave } from "./helpers";
 
 /**
  * Multi-user race, end to end through the real app UI, with two independently
@@ -156,8 +156,8 @@ test("two commissaires run one shared race live, both ways, within their waves",
 
   await test.step("owner starts wave 1 on the Grid; the counter's app sees it", async () => {
     await gotoRaceMode(A.page, "Race");
-    await A.page.getByTestId("timeline-wave-1").click();
-    await A.page.getByRole("button", { name: "Grid", exact: true }).click();
+    await selectWave(A.page, 1);
+    await openRaceView(A.page, "Grid");
     await A.page.getByTestId("start-all").first().click();
     await expect(A.page.getByText(/RUNNING/).first()).toBeVisible();
     await expect.poll(() => B.page.evaluate(async (u) => {

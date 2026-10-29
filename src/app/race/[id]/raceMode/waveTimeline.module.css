@@ -549,3 +549,32 @@
     height: 26px;
   }
 }
+
+/* Check-In indicator on upcoming wave cards */
+.cardStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ciTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ciPart {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ciDone {
+  background: #dcfce7;
+  color: #15803d;
+}

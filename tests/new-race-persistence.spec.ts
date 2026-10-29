@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { TERMS_VERSION } from "../src/app/legal/terms";
-import { racingCard, gotoRaceMode } from "./helpers";
+import { racingCard, gotoRaceMode, openRaceView, selectWave } from "./helpers";
 
 /**
  * A NEW race is persisted to PostgreSQL by itself, end to end through the app UI:
@@ -110,13 +110,13 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
 
   await test.step("check in wave 1 and start it on the Grid", async () => {
     await gotoRaceMode(page, "Race");
-    await page.getByTestId("timeline-wave-1").click();
-    await page.getByRole("button", { name: "Check-In", exact: true }).click();
+    await selectWave(page, 1);
+    await openRaceView(page, "Check-In");
     await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
     const checkAll = page.getByRole("button", { name: /Check All/ });
     await checkAll.click();
     await expect(checkAll).toHaveCount(0);
-    await page.getByRole("button", { name: "Grid", exact: true }).click();
+    await openRaceView(page, "Grid");
     await page.getByTestId("start-all").first().click();
     await expect(page.getByText(/RUNNING/).first()).toBeVisible();
   });

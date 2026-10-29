@@ -12,6 +12,7 @@ import {
   checkInRow,
   setStatusAtCheckIn,
   gotoRaceMode,
+  openRaceView,
 } from "./helpers";
 
 /**
@@ -130,7 +131,7 @@ async function openSetupTab(page: Page, name: string): Promise<void> {
 }
 
 async function openRaceModeTab(page: Page, name: "Grid" | "Check-In" | "Board"): Promise<void> {
-  await page.getByRole("button", { name, exact: true }).click();
+  await openRaceView(page, name); // Race screen: wave bottom sheet; Board: its own race mode
 }
 
 /**
@@ -589,7 +590,7 @@ async function runWave(
     // that accounts for the whole field.
     await gotoPhase(page, "Start");
     await selectWave(page, plan.wave);
-    await page.getByRole("button", { name: "All Riders", exact: true }).click();
+    await openRaceView(page, "All Riders");
     await expect(page.getByTestId("wave-status")).toBeVisible();
 
     const expected = plan.categories.flatMap((c) => c.bibs).length + extraRiders;

@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X } from "lucide-react";
+import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X, LayoutDashboard } from "lucide-react";
 import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
 import styles from "./raceSidebar.module.css";
@@ -18,8 +18,9 @@ export function useModeItems() {
     { key: "race", label: t("phase.race", "Race"), icon: <Flag aria-hidden="true" /> },
     { key: "live", label: t("phase.live", "Live"), icon: <Radio aria-hidden="true" /> },
     { key: "results", label: t("phase.results", "Results"), icon: <Trophy aria-hidden="true" /> },
+    { key: "board", label: t("phase.board", "Board"), icon: <LayoutDashboard aria-hidden="true" /> },
   ];
-  return finalized ? all.filter((i) => i.key === "setup" || i.key === "results") : all;
+  return finalized ? all.filter((i) => i.key === "setup" || i.key === "results" || i.key === "board") : all;
 }
 
 const RaceSidebar: React.FC<{

@@ -47,20 +47,40 @@ export async function loadDemoRace(page: Page): Promise<void> {
   }).toPass({ timeout: 20_000 });
 }
 
-/** Switch race mode through the race sidebar (hamburger → Create / Race / Live / Results). */
-export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" | "Results"): Promise<void> {
-  const key = ({ Create: "setup", Race: "race", Live: "live", Results: "results" } as const)[mode];
+/** Switch race mode through the race sidebar (hamburger → Create / Race / Live / Results / Board). */
+export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" | "Results" | "Board"): Promise<void> {
+  const key = ({ Create: "setup", Race: "race", Live: "live", Results: "results", Board: "board" } as const)[mode];
+  // An open wave sheet dims the whole screen: tap outside to close it first.
+  const backdrop = page.getByTestId("sheet-backdrop");
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("wave-sheet")).toHaveCount(0);
+  }
   await page.getByTestId("race-menu-btn").click();
   await page.getByTestId(`race-nav-${key}`).click();
-  // Race opens on the full timeline; open the current wave's panel (Grid / Check-In / …).
+  // Race opens on the full timeline; open the current wave's bottom sheet.
   if (key === "race") {
-    const panel = page.getByTestId("wave-panel");
+    const panel = page.getByTestId("wave-sheet");
     if (!(await panel.isVisible().catch(() => false))) {
       const current = page.locator('[data-testid^="timeline-wave-"][data-current="true"]');
       await ((await current.count()) ? current.first() : page.locator('[data-testid^="timeline-wave-"]').first()).click();
       await panel.waitFor();
     }
   }
+}
+
+/**
+ * Open a Race-screen view in the wave bottom sheet: Grid (= Start controls),
+ * Check-In or All Riders; Board is its own race mode now (sidebar).
+ */
+export async function openRaceView(page: Page, view: "Grid" | "Check-In" | "All Riders" | "Board"): Promise<void> {
+  if (view === "Board") return gotoRaceMode(page, "Board");
+  const sheet = page.getByTestId("wave-sheet");
+  if (!(await sheet.isVisible().catch(() => false))) await gotoRaceMode(page, "Race");
+  const back = sheet.getByRole("button", { name: "Back to wave" });
+  if (await back.isVisible().catch(() => false)) await back.click();
+  const id = ({ Grid: "sheet-start-controls", "Check-In": "sheet-checkin", "All Riders": "sheet-all-riders" } as const)[view];
+  await page.getByTestId(id).click();
 }
 
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */
@@ -70,6 +90,18 @@ export async function openTab(page: Page, name: string): Promise<void> {
 
 /** Pick a wave in race mode: its card on the race-day timeline. */
 export async function selectWave(page: Page, wave: number): Promise<void> {
+  // The Board screen picks its wave from a dropdown.
+  const boardWave = page.getByTestId("board-wave");
+  if (await boardWave.isVisible().catch(() => false)) {
+    await boardWave.selectOption(String(wave));
+    return;
+  }
+  // An open bottom sheet dims the timeline: tap outside to close it first.
+  const backdrop = page.getByTestId("sheet-backdrop");
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("wave-sheet")).toHaveCount(0);
+  }
   await page.getByTestId(`timeline-wave-${wave}`).click();
 }
 

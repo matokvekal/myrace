@@ -3,7 +3,6 @@ import styles from "./raceMode.module.css";
 import { CategoryProps } from "@/types/types";
 import StartManager from "./StartManager";
 import CheckIn from "./CheckIn";
-import LiveBoard from "./LiveBoard";
 import WaveStatus from "./WaveStatus";
 import BibWarning from "../../components/bibWarning/BibWarning";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, normalizeTime } from "../schedule/Schedule";
@@ -12,15 +11,14 @@ import useCategoryStore from "@/stores/categoryStore";
 import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import useUIStore from "@/stores/uiStore";
 import useRaceStore from "@/stores/racesStore";
-import WaveTimeline, { WaveSummary } from "./WaveTimeline";
+import WaveTimeline from "./WaveTimeline";
+import RaceSheet, { type SheetSize } from "./RaceSheet";
 import { canViewScreen } from "@/services/live/liveBridge";
 
 interface Props {
   raceUuid: string;
   categories: CategoryProps[];
 }
-
-type SubTab = "start" | "checkin" | "board" | "status";
 
 const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   // Group categories by time gap (same logic as Schedule view)
@@ -32,12 +30,11 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   // Shared across Race and Live phases so the top switcher opens the right heat
   const selectedWave = useUIStore((s) => s.selectedWave);
   const setSelectedWave = useUIStore((s) => s.setSelectedWave);
-  const [subTab, setSubTab] = useState<SubTab>("start");
-  // Wave workspace: closed on entry (full timeline); opens on a wave tap.
-  const [panelOpen, setPanelOpen] = useState(false);
+  // Bottom sheet: closed on entry (full timeline); a wave tap opens it at half height.
+  const [sheet, setSheet] = useState<SheetSize | null>(null);
   const openWave = (w: number) => {
     setSelectedWave(w);
-    setPanelOpen(true);
+    setSheet((s) => s ?? "half");
   };
 
   // Ensure the selected wave is valid for this race's schedule
@@ -73,78 +70,14 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const raceRiders = useMemo(() => riders.filter((r) => r.raceUuid === raceUuid), [riders, raceUuid]);
   const raceDate = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid)?.date);
-  const needsCheckIn = useMemo(() => {
-    if (waveStatusMap.get(selectedWave) !== "upcoming") return false;
-    const waveRiders = riders.filter(
-      (r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))
-    );
-    if (waveRiders.length === 0) return false;
-    return waveRiders.every(
-      (r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status)
-    );
-  }, [riders, raceUuid, waveCategories, waveStatusMap, selectedWave]);
+  const startLabel = (() => {
+    const k = [...(schedule.get(selectedWave)?.keys() ?? [])].find((x) => x !== "TBD");
+    return k ? normalizeTime(k) ?? k : "TBD";
+  })();
+  const deny = <p style={{ padding: 16 }}>Your role in this race does not include this screen.</p>;
 
   return (
     <div className={styles.container}>
-      {/* Race day control center: full timeline; a wave tap slides in its workspace */}
-      <div className={`${styles.rdc} ${panelOpen ? styles.rdcOpen : ""}`}>
-        <div className={styles.rdcRail}>
-          <WaveTimeline
-            schedule={schedule}
-            states={waveStatusMap}
-            riders={raceRiders}
-            selected={panelOpen ? selectedWave : -1}
-            onSelect={openWave}
-            date={raceDate}
-            compact={panelOpen}
-            current={selectedWave}
-          />
-        </div>
-        {panelOpen && (
-        <div className={styles.rdcPanel} data-testid="wave-panel">
-          <div className={styles.panelHead}>
-          {waveNums.includes(selectedWave) && (
-            <WaveSummary
-              wave={selectedWave}
-              state={waveStatusMap.get(selectedWave) ?? "upcoming"}
-              startLabel={(() => {
-                const k = [...(schedule.get(selectedWave)?.keys() ?? [])].find((x) => x !== "TBD");
-                return k ? normalizeTime(k) ?? k : "TBD";
-              })()}
-              cats={waveCategories}
-              riders={raceRiders}
-              compact
-              onClose={() => setPanelOpen(false)}
-            />
-          )}
-      {/* Sub-tab bar */}
-        <div className={styles.subTabs}>
-          {canViewScreen(raceUuid, "start") && <button className={`${styles.subTab} ${styles.tabGrid} ${subTab === "start" ? styles.subTabActive : ""}`} onClick={() => setSubTab("start")}>
-            Grid
-          </button>}
-          {canViewScreen(raceUuid, "checkin") && <button
-            className={[
-              styles.subTab,
-              styles.tabCheckin,
-              subTab === "checkin" ? styles.subTabActive : "",
-              needsCheckIn && subTab !== "checkin" ? styles.subTabGlow : "",
-            ].join(" ")}
-            onClick={() => setSubTab("checkin")}
-          >
-            Check-In
-          </button>}
-          {canViewScreen(raceUuid, "board") && <button className={`${styles.subTab} ${styles.tabBoard} ${subTab === "board" ? styles.subTabActive : ""}`} onClick={() => setSubTab("board")}>
-            Board
-          </button>}
-          {/* Everyone in the wave with their current status (BUGS.md #24) */}
-          {canViewScreen(raceUuid, "status") && <button
-            className={`${styles.subTab} ${styles.tabStatus} ${subTab === "status" ? styles.subTabActive : ""}`}
-            onClick={() => setSubTab("status")}
-          >
-            All Riders
-          </button>}
-        </div>
-          </div>
       {/* Bib problems anywhere in the race, before anyone reaches Start */}
       <BibWarning
         raceUuid={raceUuid}
@@ -155,20 +88,52 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
             [...(schedule.get(w)?.values() ?? [])].flat().some((c) => c.id === cat.id)
           );
           if (wave != null) openWave(wave);
-          setSubTab("checkin");
         }}
       />
 
-      <div className={styles.content}>
-        {!canViewScreen(raceUuid, subTab) && <p style={{ padding: 16 }}>Your role in this race does not include this screen.</p>}
-        {subTab === "start"   && canViewScreen(raceUuid, "start") && <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
-        {subTab === "checkin" && canViewScreen(raceUuid, "checkin") && <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} slots={schedule.get(selectedWave)} />}
-        {subTab === "board"   && canViewScreen(raceUuid, "board") && <LiveBoard raceUuid={raceUuid} waveNum={selectedWave} categories={categories} />}
-        {subTab === "status"  && canViewScreen(raceUuid, "status") && <WaveStatus raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />}
+      {/* Race day timeline: the main screen. A wave tap opens its bottom sheet. */}
+      <div className={`${styles.rdc} ${sheet ? styles.rdcWithSheet : ""}`}>
+        <WaveTimeline
+          schedule={schedule}
+          states={waveStatusMap}
+          riders={raceRiders}
+          selected={sheet ? selectedWave : -1}
+          onSelect={openWave}
+          date={raceDate}
+          current={selectedWave}
+        />
       </div>
-        </div>
-        )}
-      </div>
+
+      {sheet && waveNums.includes(selectedWave) && (
+        <RaceSheet
+          raceUuid={raceUuid}
+          wave={selectedWave}
+          state={waveStatusMap.get(selectedWave) ?? "upcoming"}
+          startLabel={startLabel}
+          categories={waveCategories}
+          slots={schedule.get(selectedWave) ?? new Map()}
+          riders={raceRiders}
+          size={sheet}
+          onSize={setSheet}
+          onClose={() => setSheet(null)}
+          canStart={canViewScreen(raceUuid, "start")}
+          renderCheckIn={() =>
+            canViewScreen(raceUuid, "checkin")
+              ? <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} slots={schedule.get(selectedWave)} />
+              : deny
+          }
+          renderAllRiders={() =>
+            canViewScreen(raceUuid, "status")
+              ? <WaveStatus raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />
+              : deny
+          }
+          renderAdvanced={() =>
+            canViewScreen(raceUuid, "start")
+              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />
+              : deny
+          }
+        />
+      )}
     </div>
   );
 };

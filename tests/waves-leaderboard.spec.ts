@@ -1,5 +1,5 @@
 import { test, expect, Page, Locator } from "@playwright/test";
-import { loadDemoRace, selectWave, gotoRaceMode } from "./helpers";
+import { loadDemoRace, selectWave, gotoRaceMode, openRaceView } from "./helpers";
 
 /**
  * Focused coverage for the areas the big end-to-end run doesn't isolate:
@@ -39,7 +39,7 @@ async function openSetupTab(page: Page, name: string): Promise<void> {
 }
 
 async function openRaceModeTab(page: Page, name: "Grid" | "Check-In" | "Board"): Promise<void> {
-  await page.getByRole("button", { name, exact: true }).click();
+  await openRaceView(page, name); // Race screen: wave bottom sheet; Board: its own race mode
 }
 
 function racingCard(page: Page, bib: number): Locator {

@@ -88,8 +88,7 @@ test.describe("UI smoke", () => {
 
   test("Board: complete board with expandable results", async ({ page }) => {
     await loadDemoRace(page);
-    await gotoRaceMode(page, "Race");
-    await page.getByRole("button", { name: "Board", exact: true }).click();
+    await gotoRaceMode(page, "Board"); // Board is its own race mode (sidebar, below Results)
     await expect(page.getByTestId("board-wave-1")).toBeVisible();
     await expect(page.getByTestId("board-wave-2")).toBeVisible();
     const toggle = page.locator('[data-testid^="board-expand-"]').first();
