@@ -98,7 +98,7 @@ test.describe("Waves, leaderboard, winners & finisher times", () => {
   // 3 ── Race-mode wave selector offers both waves ────────────────────────────
   test("race mode offers a pill for each wave", async ({ page }) => {
     await gotoPhase(page, "Start");
-    await expect(page.locator('button[class*="wavePill"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid^="timeline-wave-"]')).toHaveCount(2);
     // Both are selectable without error.
     await selectWave(page, 1);
     await selectWave(page, 2);

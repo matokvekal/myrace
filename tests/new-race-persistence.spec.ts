@@ -110,7 +110,7 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
 
   await test.step("check in wave 1 and start it on the Grid", async () => {
     await gotoRaceMode(page, "Race");
-    await page.locator('button[class*="wavePill"]', { hasText: /^1\b/ }).first().click();
+    await page.getByTestId("timeline-wave-1").click();
     await page.getByRole("button", { name: "Check-In", exact: true }).click();
     await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
     const checkAll = page.getByRole("button", { name: /Check All/ });

@@ -156,7 +156,7 @@ test("two commissaires run one shared race live, both ways, within their waves",
 
   await test.step("owner starts wave 1 on the Grid; the counter's app sees it", async () => {
     await gotoRaceMode(A.page, "Race");
-    await A.page.locator('button[class*="wavePill"]', { hasText: /^1\b/ }).first().click();
+    await A.page.getByTestId("timeline-wave-1").click();
     await A.page.getByRole("button", { name: "Grid", exact: true }).click();
     await A.page.getByTestId("start-all").first().click();
     await expect(A.page.getByText(/RUNNING/).first()).toBeVisible();

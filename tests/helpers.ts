@@ -59,12 +59,9 @@ export async function openTab(page: Page, name: string): Promise<void> {
   await page.getByRole("button", { name, exact: true }).click();
 }
 
-/** Pick a wave in race mode. Pills read like "2 · 09:00". */
+/** Pick a wave in race mode: its card on the race-day timeline. */
 export async function selectWave(page: Page, wave: number): Promise<void> {
-  await page
-    .locator('button[class*="wavePill"]', { hasText: new RegExp(`^${wave}\\b`) })
-    .first()
-    .click();
+  await page.getByTestId(`timeline-wave-${wave}`).click();
 }
 
 // ─── Live/heat helpers (hoisted from joker.spec.ts / lap-recording.spec.ts /

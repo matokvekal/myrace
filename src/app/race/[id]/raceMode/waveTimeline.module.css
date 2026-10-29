@@ -1,0 +1,429 @@
+/* Race-day timeline (calendar day view) + selected wave summary */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  background: var(--surface-1, #fff);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+  background: #0b1f3f;
+  color: #fff;
+}
+
+.dayLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.date {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.jumps {
+  display: flex;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.jumpBtn {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.jumpBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.grid {
+  position: relative;
+  margin: 4px 0;
+}
+
+/* Time axis */
+.tick {
+  position: absolute;
+  inset-inline: 0;
+  height: 0;
+  border-top: 1px solid var(--border-card, #e2e8f0);
+}
+
+.tickHalf {
+  border-top-style: dashed;
+  opacity: 0.6;
+}
+
+.tickLabel {
+  position: absolute;
+  inset-inline-start: 6px;
+  top: -8px;
+  padding: 0 3px;
+  background: var(--surface-1, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted, #475569);
+  font-variant-numeric: tabular-nums;
+}
+
+.lane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline: 54px 6px;
+}
+
+/* Wave card */
+.card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid #93c5fd;
+  border-inline-start-width: 4px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #0b1f3f;
+  text-align: start;
+  overflow: hidden;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.card_running {
+  border-color: #16a34a;
+  background: #dcfce7;
+  box-shadow: 0 1px 6px rgba(22, 163, 74, 0.25);
+}
+
+.card_finished {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.cardSel {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 1px;
+  z-index: 2;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.cardTime {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardCats {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardStats {
+  font-size: 12px;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.state_upcoming {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.state_running {
+  background: #15803d;
+  color: #fff;
+}
+
+.state_finished {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+/* Now line */
+.now {
+  position: absolute;
+  inset-inline: 48px 0;
+  height: 0;
+  border-top: 2px solid #dc2626;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.now::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -5px;
+  top: -6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+.nowLabel {
+  position: absolute;
+  inset-inline-end: 6px;
+  top: -18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.unscheduled {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border-card, #d9e7fb);
+}
+
+.unschedLabel {
+  font-size: 12px;
+  color: var(--text-muted, #475569);
+}
+
+.chip {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-card, #cbd5e1);
+  border-radius: 999px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1f3f);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chipSel {
+  border-color: #1d4ed8;
+  color: #1d4ed8;
+}
+
+.empty {
+  padding: 16px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary, #0b1f3f);
+}
+
+/* ── Selected wave summary ── */
+.summary {
+  padding: 12px 14px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-inline-start: 5px solid #3b82f6;
+  border-radius: 12px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #0b1f3f);
+}
+
+.summary_running {
+  border-inline-start-color: #16a34a;
+}
+
+.summary_finished {
+  border-inline-start-color: #94a3b8;
+}
+
+.sumHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sumName {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.sumTime {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-muted, #475569);
+  font-variant-numeric: tabular-nums;
+}
+
+.bigStat {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.bigNum {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bigOf {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-muted, #475569);
+}
+
+.bigLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+}
+
+.statRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+  color: var(--text-muted, #475569);
+}
+
+.statRow b {
+  color: var(--text-primary, #0b1f3f);
+}
+
+.catToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.catChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.catChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--border-card, #cbd5e1);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.catDot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.catList {
+  display: flex;
+  flex-direction: column;
+}
+
+.catRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border-top: 1px solid var(--border-card, #e2e8f0);
+  font-size: 13px;
+}
+
+.catName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catNums {
+  color: var(--text-muted, #475569);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+:root[data-skin="gaming"] .wrap button:not(:disabled),
+:root[data-skin="gaming"] .summary button:not(:disabled) {
+  box-shadow: none !important;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+:root[data-skin="gaming"] .card:not(:disabled) {
+  border-radius: 8px !important;
+}
+
+/* Phones: shorter timeline so the selected wave's controls stay close */
+@media (max-width: 899px) {
+  .scroll {
+    max-height: 42vh;
+  }
+}

@@ -181,3 +181,33 @@
     transform: translateY(0);
   }
 }
+
+/* ═══ Race day control center ═══ */
+.rdc {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 12px;
+  align-items: start;
+  padding-top: 8px;
+}
+
+.rdcPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Desktop: the timeline stays in view while the panel scrolls */
+@media (min-width: 900px) {
+  .rdc > :first-child {
+    position: sticky;
+    top: 8px;
+  }
+}
+
+@media (max-width: 899px) {
+  .rdc {
+    grid-template-columns: 1fr;
+  }
+}
