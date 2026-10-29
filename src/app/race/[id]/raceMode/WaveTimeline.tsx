@@ -164,11 +164,6 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range]);
 
-  const jump = (it?: Item) => {
-    if (!it) return;
-    onSelect(it.wave);
-    scrollToMinute(it.start);
-  };
 
   if (!items.length && !unscheduled.length) {
     return <div className={styles.empty}>No waves configured</div>;
@@ -185,17 +180,6 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
           <Clock size={14} /> {hhmm(now)}
           {date && <span className={styles.date}> · {date}</span>}
         </span>
-        <div className={styles.jumps}>
-          <button type="button" className={styles.jumpBtn} onClick={() => scrollToMinute(now)} title="Scroll to now" aria-label="Now">
-            <Crosshair size={14} /> <span className={styles.jumpLabel}>Now</span>
-          </button>
-          <button type="button" className={styles.jumpBtn} onClick={() => jump(nextWave)} disabled={!nextWave} title="Next wave" aria-label="Next wave">
-            <SkipForward size={14} /> <span className={styles.jumpLabel}>Next</span>
-          </button>
-          <button type="button" className={styles.jumpBtn} onClick={() => jump(activeWave)} disabled={!activeWave} title="Racing wave" aria-label="Racing wave">
-            <Radio size={14} /> <span className={styles.jumpLabel}>Active</span>
-          </button>
-        </div>
       </div>
 
       {range && (
