@@ -643,3 +643,19 @@
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* Table header: white labels on the blue bar (column classes set dark text) */
+.dataTableHeader span {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Collapse / expand all: compact icon buttons */
+.groupBulkBtn {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

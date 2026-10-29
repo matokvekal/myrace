@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import BibBadge from "@/components/ui/BibBadge";
 import { useTranslation } from "react-i18next";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Minus, Search, X } from "lucide-react";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Minus, Search, X, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown } from "lucide-react";
 import styles from "./riders.module.css";
 import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
@@ -227,9 +227,10 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
         className={styles.groupToggle}
         aria-expanded={open}
         aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+        title={open ? "Collapse" : "Expand"}
         onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
       >
-        {open ? <Minus size={14} /> : <Plus size={14} />}
+        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
     );
   };
@@ -406,11 +407,11 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
         <div className={styles.tabCount}>
           Riders ({filteredAndSorted.length})
           <span className={styles.groupBulk}>
-            <button type="button" className={styles.groupBulkBtn} onClick={collapseAll} disabled={groupKeys.length === 0} data-testid="collapse-all">
-              <Minus size={13} /> Collapse All
+            <button type="button" className={styles.groupBulkBtn} onClick={collapseAll} disabled={groupKeys.length === 0} data-testid="collapse-all" aria-label="Collapse all" title="Collapse all">
+              <ChevronsUp size={15} />
             </button>
-            <button type="button" className={styles.groupBulkBtn} onClick={expandAll} disabled={groupKeys.length === 0} data-testid="expand-all">
-              <Plus size={13} /> Expand All
+            <button type="button" className={styles.groupBulkBtn} onClick={expandAll} disabled={groupKeys.length === 0} data-testid="expand-all" aria-label="Expand all" title="Expand all">
+              <ChevronsDown size={15} />
             </button>
           </span>
         </div>
