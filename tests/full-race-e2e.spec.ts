@@ -584,44 +584,6 @@ async function runWave(
     }
   });
 
-  await test.step(`${label}: all-riders status view`, async () => {
-    // Every rider in the wave appears exactly once, with a real status
-    // (BUGS.md #24). Staggered start groups, so this is the only single view
-    // that accounts for the whole field.
-    await gotoPhase(page, "Start");
-    await selectWave(page, plan.wave);
-    await openRaceView(page, "All Riders");
-    await expect(page.getByTestId("wave-status")).toBeVisible();
-
-    const expected = plan.categories.flatMap((c) => c.bibs).length + extraRiders;
-    const rows = page.locator('[data-testid^="wave-status-row-"]');
-    await expect(rows).toHaveCount(expected);
-
-    // No duplicates.
-    const ids = await rows.evaluateAll((els) =>
-      els.map((e) => (e as HTMLElement).dataset.testid ?? "")
-    );
-    expect(new Set(ids).size).toBe(ids.length);
-
-    // The out-riders are classified, not lumped in with finishers.
-    for (const [bib, status] of [
-      [plan.dnsBib, "DNS"],
-      [plan.dnfBib, "DNF"],
-      [plan.dsqBib, "DSQ"],
-    ] as const) {
-      await expect(page.getByTestId(`wave-status-row-${bib}`)).toHaveAttribute(
-        "data-bucket",
-        status
-      );
-    }
-
-    // Filtering narrows without losing anyone.
-    await page.getByRole("button", { name: /^DNF/ }).click();
-    await expect(page.locator('[data-testid^="wave-status-row-"]')).toHaveCount(1);
-    await page.getByTestId("wave-status-filter-all").click();
-    await expect(page.locator('[data-testid^="wave-status-row-"]')).toHaveCount(expected);
-  });
-
   await test.step(`${label}: standings page per category`, async () => {
     await gotoPhase(page, "Race");
     await openSetupTab(page, "Schedule");

@@ -3,7 +3,6 @@ import styles from "./raceMode.module.css";
 import { CategoryProps } from "@/types/types";
 import StartManager from "./StartManager";
 import CheckIn from "./CheckIn";
-import WaveStatus from "./WaveStatus";
 import BibWarning from "../../components/bibWarning/BibWarning";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, riderInCategory, normalizeTime } from "../schedule/Schedule";
 import useRiderStore from "@/stores/ridersStore";
@@ -106,30 +105,22 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
 
       {sheet && waveNums.includes(selectedWave) && (
         <RaceSheet
-          raceUuid={raceUuid}
           wave={selectedWave}
           state={waveStatusMap.get(selectedWave) ?? "upcoming"}
           startLabel={startLabel}
           categories={waveCategories}
-          slots={schedule.get(selectedWave) ?? new Map()}
           riders={raceRiders}
           size={sheet}
           onSize={setSheet}
           onClose={() => setSheet(null)}
-          canStart={canViewScreen(raceUuid, "start")}
+          renderStart={() =>
+            canViewScreen(raceUuid, "start")
+              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />
+              : deny
+          }
           renderCheckIn={() =>
             canViewScreen(raceUuid, "checkin")
               ? <CheckIn raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} slots={schedule.get(selectedWave)} />
-              : deny
-          }
-          renderAllRiders={() =>
-            canViewScreen(raceUuid, "status")
-              ? <WaveStatus raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />
-              : deny
-          }
-          renderAdvanced={() =>
-            canViewScreen(raceUuid, "start")
-              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />
               : deny
           }
         />

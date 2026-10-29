@@ -70,18 +70,17 @@ export async function gotoRaceMode(page: Page, mode: "Create" | "Race" | "Live" 
 }
 
 /**
- * Open a Race-screen view in the wave bottom sheet: Grid (= Start controls),
- * Check-In or All Riders; Board is its own race mode now (sidebar).
+ * Open a Race-screen view: "Grid" = the start screen inside the wave bottom
+ * sheet; "Check-In" opens Check-In there; Board is its own race mode (sidebar).
  */
-export async function openRaceView(page: Page, view: "Grid" | "Check-In" | "All Riders" | "Board"): Promise<void> {
+export async function openRaceView(page: Page, view: "Grid" | "Check-In" | "Board"): Promise<void> {
   if (view === "Board") return gotoRaceMode(page, "Board");
   const sheet = page.getByTestId("wave-sheet");
   if (!(await sheet.isVisible().catch(() => false))) await gotoRaceMode(page, "Race");
   const back = sheet.getByRole("button", { name: "Back to wave" });
   if (await back.isVisible().catch(() => false)) await back.click();
-  const id = ({ Grid: "sheet-start-controls", "Check-In": "sheet-checkin", "All Riders": "sheet-all-riders" } as const)[view];
-  if (view !== "Check-In") await page.getByTestId("sheet-more").click(); // in the header's ⋯ menu
-  await page.getByTestId(id).click();
+  if (view === "Check-In") await page.getByTestId("sheet-checkin").click();
+  else await page.getByTestId("sheet-start").waitFor();
 }
 
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */

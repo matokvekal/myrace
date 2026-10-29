@@ -53,7 +53,7 @@ test.describe("Commissaire race flow", () => {
       await gotoRaceMode(page, "Race");
       // The wave bottom sheet: Check-In and Start controls
       await expect(page.getByTestId("sheet-checkin")).toBeVisible();
-      await expect(page.getByTestId("sheet-more")).toBeVisible(); // Start controls / All riders live in the ⋯ menu
+      await expect(page.getByTestId("sheet-start")).toBeVisible(); // the start screen sits in the sheet
     });
 
     // ── 5b. Close out wave 1 ─────────────────────────────────────────────────
