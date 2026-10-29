@@ -15,7 +15,10 @@ const StatusModal: React.FC<StatusModalProps> = ({ rider, onStatusChange }) => {
 
   if (!modals.modalStatus) return null;
 
-  const statuses = ["finished", "running", "standing", "DNF", "DSQ", "DNS"];
+  // Out-statuses first — DNF, then DSQ, then DNS. These are what a commissaire
+  // actually reaches for mid-race; "finished"/"running"/"standing" are internal
+  // states set by the race flow itself and are rarely chosen by hand (BUGS.md #9).
+  const statuses = ["DNF", "DSQ", "DNS", "standing", "running", "finished"];
 
   return (
     <div className={styles.modal}>

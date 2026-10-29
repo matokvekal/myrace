@@ -26,8 +26,15 @@ const CategorySettingsModal: React.FC<CategorySettingsModalProps> = ({
     const updatedCategory = { ...category, startTime, color, laps };
     await updateCategory(updatedCategory);
 
+    // Laps must follow onto the riders, or riders imported without a laps
+    // column stay at 0 and the live screen reads 0/0 instead of 0/5
+    // (BUGS.md #7). Matched on sub-category too so a legacy nested category
+    // ("Man Masters 30-39") doesn't overwrite its siblings.
     const updatedRiders = riders.map((rider) =>
-      rider.category === category.name ? { ...rider, color } : rider
+      rider.category === category.name &&
+      (rider.subCategory ?? null) === (category.subCategory ?? null)
+        ? { ...rider, color, totalLaps: laps || rider.totalLaps }
+        : rider
     );
     await updateAllRiders(updatedRiders);
     closeModal("modalCategorySettings");

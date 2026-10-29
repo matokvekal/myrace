@@ -1,24 +1,34 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   padding: 16px;
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
 }
 
 .spacer {
   flex: 1 1 auto;
 }
 
+/* ── Page bar ── */
+.pageBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* ── Buttons ── */
 .btn,
 .btnGhost,
-.btnPrimary {
+.btnPrimary,
+.btnDanger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -38,10 +48,19 @@
   background: var(--bg-card-2);
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .btnActive {
   background: #3b82f6;
   border-color: #3b82f6;
   color: #fff;
+}
+
+.btnActive:hover {
+  background: #3b82f6;
 }
 
 .btnGhost {
@@ -60,6 +79,17 @@
   cursor: not-allowed;
 }
 
+.btnDanger {
+  margin-left: auto;
+  background: transparent;
+  color: #ef4444;
+  border-color: transparent;
+}
+
+.btnDanger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
 .hint {
   font-size: 12.5px;
   line-height: 1.5;
@@ -70,32 +100,106 @@
   padding: 10px 12px;
 }
 
+/* ── Map card ── */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cardTitleBlock {
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.cardSub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.cardEditHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.titleInput,
+.headerInput {
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.titleInput {
+  flex: 1 1 160px;
+  font-weight: 700;
+}
+
+.headerInput {
+  flex: 2 1 220px;
+}
+
+.editTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editTools .btn {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
 .mapBox {
+  /* own stacking context so Leaflet's panes can't paint over dropdown menus */
+  isolation: isolate;
+  position: relative;
   width: 100%;
-  height: 60vh;
-  min-height: 360px;
-  border-radius: 12px;
+  height: 340px;
+  border-radius: 10px;
   border: 1px solid var(--border-card);
   overflow: hidden;
 }
 
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Points list (edit mode) ── */
 .markerList {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
+  gap: 2px;
   border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.markerListTitle {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
+  padding: 4px 0;
 }
 
 .markerRow {
@@ -143,4 +247,404 @@
 .markerRemove:hover {
   color: #ef4444;
   background: var(--bg-card-2);
+}
+
+/* ── Category dropdown ── */
+.menuWrap {
+  position: relative;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1999;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 2000;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.menuRight {
+  left: auto;
+  right: 0;
+}
+
+.catMenu {
+  min-width: 250px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.menuGroup {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.menuEmpty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.catCheck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 7px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.catCheck:hover {
+  background: var(--bg-card-2);
+}
+
+/* ═══ Map-first layout + grouped toolbar ═══ */
+.wrap {
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.pageTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn,
+.btnGhost,
+.btnPrimary,
+.btnDanger {
+  height: 32px;
+  padding: 0 10px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.btnPrimary {
+  background: var(--brand-strong, #3f86e7);
+  border-color: var(--brand-strong, #3f86e7);
+}
+
+.card {
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+/* Segmented group, same look as the Riders view control */
+.toolGroup {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.tool {
+  height: 30px;
+  min-width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolbar > .tool,
+.toolbarEnd .tool {
+  border-color: var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--surface-1, #fff);
+  border-color: var(--border-card, #d9e7fb);
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolActive,
+.toolActive:hover:not(:disabled) {
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+  font-weight: 600;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.menuDanger {
+  color: #ef4444;
+}
+
+/* The map takes most of the screen */
+.mapBox {
+  height: min(70vh, 640px);
+  min-height: 320px;
+  border-radius: 8px;
+}
+
+:root[dir="rtl"] .menuRight,
+:global(html[dir="rtl"]) .menuRight {
+  right: auto;
+  left: 0;
+}
+
+@media (max-width: 480px) {
+  .tool span {
+    display: none;
+  }
+
+  .mapBox {
+    height: 62vh;
+  }
+}
+
+:root[data-skin="gaming"] .card button:not(:disabled),
+:root[data-skin="gaming"] .pageBar button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* ═══ Fixed map names, help and active-tool strip ═══ */
+.fixedName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-primary, #14243c);
+}
+
+.helpPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 32px 8px 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+  font-size: 12px;
+  color: var(--text-primary, #14243c);
+}
+
+.helpPanel span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.helpClose {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  cursor: pointer;
+}
+
+.modeStrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--brand, #63a6fc);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+  color: var(--brand-strong, #3f86e7);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.modeCancel {
+  margin-inline-start: auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--brand-strong, #3f86e7);
+  border-radius: 6px;
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .tool span.keepLabel {
+    display: inline;
+  }
+}
+
+/* ═══ Place search (Nominatim) ═══ */
+.placeSearch {
+  position: relative;
+}
+
+.placeInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-muted, #8498ba);
+}
+
+.placeInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 16px; /* no iOS zoom on focus */
+}
+
+.placeHint {
+  font-size: 13px;
+}
+
+.placeClear {
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  cursor: pointer;
+}
+
+.placeList {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline: 0;
+  z-index: 2100; /* above Leaflet panes */
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.placeItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.placeItem:last-child {
+  border-bottom: none;
+}
+
+.placeItem:hover {
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.placeItem svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--brand-strong, #3f86e7);
+}
+
+.placeMsg {
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text-muted, #8498ba);
+}
+
+/* Card preview: wrap the 300px preview map (drawing has its own full screen),
+   so stacked maps have no empty gap between them. */
+.mapBox,
+.card .mapBox {
+  height: auto;
+  min-height: 0;
+}
+
+@media (max-width: 480px) {
+  .mapBox,
+  .card .mapBox {
+    height: auto;
+  }
 }

@@ -1,0 +1,135 @@
+name: CI quality gates
+
+# Runs on every pull request and push to a non-main branch, and is also called by
+# deploy.yml so that NOTHING reaches production unless every job below is green.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast gate (~1-2 min): static checks, unit/integration tests, production build.
+  quality:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript (app + tests)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit & integration tests (Vitest) with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
+
+      - name: Production build
+        run: npm run build
+
+      # The live (multi-user) code path, as production builds it for GitHub Pages.
+      - name: Production build with the API configured
+        run: npm run build
+        env:
+          VITE_SERVER_URL: https://api.commissaire.us
+
+  # The multi-user server (server/, its own package): typecheck, build, and its
+  # integration tests against an in-process PostgreSQL (PGlite) — no database
+  # service or secrets needed. The tests include the real dist/server.js and
+  # dist/db/migrate-cli.js bundles (test/dist-smoke.test.ts), and the deploy
+  # gate is exercised end to end with real release archives.
+  server:
+    name: Server typecheck, tests, build, deploy gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+
+      - name: TypeScript (server + shared race model)
+        run: npm run typecheck
+
+      - name: Integration tests (Vitest + PGlite, incl. the built bundles)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy scripts (shellcheck)
+        run: shellcheck deploy/*.sh deploy/test/*.sh
+
+      - name: Deploy gate end to end (receive, activate, automatic rollback, rollback)
+        run: bash deploy/test/gate-e2e.sh
+
+  # Slower gate: real browser, full user flows. Runs in parallel with `quality`.
+  # Also the "local-race regression" gate (Epic 1, Story 1.1): the whole suite runs
+  # with no sync server configured, so every PR proves a Local race still works
+  # exactly as before. tests/local-race-regression.spec.ts additionally asserts a
+  # Local race makes no external network requests.
+  e2e:
+    name: Playwright E2E (local-race regression)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npx playwright test
+        env:
+          CI: "true"
+          # Multi-user sync must stay off for the regression gate.
+          VITE_SERVER_URL: ""
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore

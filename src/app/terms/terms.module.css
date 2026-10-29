@@ -1,0 +1,57 @@
+.page {
+  min-height: 100vh;
+  background: #0f1420;
+  color: #e6ecf5;
+  padding: 24px 16px 60px;
+}
+
+.content {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.back {
+  background: transparent;
+  border: none;
+  color: #7ea6ff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 900;
+  margin: 0 0 4px;
+}
+
+.meta {
+  font-size: 13px;
+  color: #8fa0bd;
+  margin: 0 0 4px;
+}
+
+.draftNote {
+  font-size: 12px;
+  color: #e0a92c;
+  margin: 0 0 24px;
+}
+
+.section {
+  margin-bottom: 22px;
+}
+
+.heading {
+  font-size: 17px;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.para {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #c2cddf;
+  margin: 0 0 8px;
+}

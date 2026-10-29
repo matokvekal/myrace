@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './riderActionLog.module.css';
 import { RiderProps } from '@/types/types';
-import { Bell, Search, X } from 'lucide-react';
+import { Bell, History, Search, X } from 'lucide-react';
+import { parseClockTimeMs } from '@/utils/timeUtils';
 
 interface RiderAction {
   id: string;
@@ -9,7 +11,7 @@ interface RiderAction {
   timestamp: number;
   source: 'click' | 'voice';
   categoryColor: string;
-  statusChange?: 'DNF' | 'DSQ' | 'DNS';
+  statusChange?: 'DNF' | 'DSQ' | 'DNS' | 'FINISH';
 }
 
 interface RiderActionLogProps {
@@ -32,19 +34,36 @@ function formatDuration(ms: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-function parseTimeToMs(t: string | null | undefined): number | null {
-  if (!t) return null;
-  if (t.includes('T')) return new Date(t).getTime();
-  const today = new Date();
-  const [h, m, s = 0] = t.split(':').map(Number);
-  today.setHours(h, m, s, 0);
-  return today.getTime();
-}
-
 export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderActionLogProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<Record<string, number>>({});
   const [sortBy, setSortBy] = useState<'arrival' | 'bib'>('arrival');
+  // Desktop: the panel opens next to the Log button, clamped inside the viewport.
+  // Phones (≤640px): CSS turns it into a full-width bottom sheet instead.
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [anchorStyle, setAnchorStyle] = useState<CSSProperties | undefined>();
+  useEffect(() => {
+    if (!isOpen) return;
+    const place = () => {
+      const btn = btnRef.current;
+      if (!btn || window.matchMedia('(max-width: 640px)').matches) {
+        setAnchorStyle(undefined);
+        return;
+      }
+      const rect = btn.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const width = Math.min(420, vw - 16);
+      const rtl = document.documentElement.dir === 'rtl';
+      const left = Math.max(8, Math.min(rtl ? rect.right - width : rect.left, vw - width - 8));
+      const below = rect.bottom + 6;
+      const top = vh - below < 260 ? 8 : below;
+      setAnchorStyle({ position: 'fixed', top, left, width, maxHeight: vh - top - 8 });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [isOpen]);
   const [now, setNow] = useState(() => Date.now());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -141,18 +160,27 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
     <>
       {/* Toggle button */}
       <button
+        ref={btnRef}
         className={`${styles.toggleBtn} ${isOpen ? styles.open : ''}`}
+        // No entries yet → nothing to open (never an empty panel).
+        disabled={actions.length === 0 && !isOpen}
         onClick={onToggle}
+        // Without this the ⏱️ glyph IS the accessible name — `title` is only a
+        // fallback, so the button announced as "⏱️" and was unaddressable.
+        aria-label="View rider action history"
         title="View rider action history"
       >
-        <span className={styles.icon}>⏱️</span>
+        <History size={16} aria-hidden="true" />
+        <span className={styles.toggleLabel}>Log</span>
         {actions.length > 0 && <span className={styles.badge}>{actions.length}</span>}
       </button>
 
       {/* Log panel */}
-      {isOpen && (
-        <div className={styles.overlay} onClick={onToggle}>
-          <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
+      {/* Portal to <body>: a transformed ancestor on the Live page would otherwise
+          make `position: fixed` relative to it and clip the panel. */}
+      {isOpen && createPortal(
+        <div className={`${styles.overlay} ${anchorStyle ? styles.overlayAnchored : ''}`} onClick={onToggle}>
+          <div className={styles.panel} style={anchorStyle} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Rider log">
             <div className={styles.header}>
               <h3>Rider Log</h3>
               <div className={styles.sortControls}>
@@ -176,7 +204,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
               >
                 <Search size={16} />
               </button>
-              <button className={styles.closeBtn} onClick={onToggle}>✕</button>
+              <button className={styles.closeBtn} onClick={onToggle} aria-label="Close rider log">✕</button>
             </div>
 
             {searchOpen && (
@@ -217,7 +245,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
                   const laps = rider.lapsDetails ?? [];
                   const lastLap = laps.length > 0 ? laps[laps.length - 1] : null;
                   const lastLapTime = lastLap?.lapTime ?? rider.elapsedLastLap ?? null;
-                  const sinceArriveBaseline = parseTimeToMs(rider.timeArrive) ?? parseTimeToMs(rider.timeStartRace);
+                  const sinceArriveBaseline = parseClockTimeMs(rider.timeArrive) ?? parseClockTimeMs(rider.timeStartRace);
                   const sinceArrive = !isOut && !isFinished && sinceArriveBaseline != null
                     ? formatDuration(now - sinceArriveBaseline)
                     : null;
@@ -338,7 +366,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
 
                   const lastLap = laps.length > 0 ? laps[laps.length - 1] : null;
                   const lastLapTime = lastLap?.lapTime ?? rider.elapsedLastLap ?? null;
-                  const sinceArriveBaseline = parseTimeToMs(rider.timeArrive) ?? parseTimeToMs(rider.timeStartRace);
+                  const sinceArriveBaseline = parseClockTimeMs(rider.timeArrive) ?? parseClockTimeMs(rider.timeStartRace);
                   const sinceArrive = !isOut && !isFinished && sinceArriveBaseline != null
                     ? formatDuration(now - sinceArriveBaseline)
                     : null;
@@ -472,7 +500,8 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

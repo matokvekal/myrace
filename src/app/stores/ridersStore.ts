@@ -5,6 +5,34 @@ import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { RiderProps } from "@/types/types";
 import indexedDBStorage from "./indexDb/riderStorageAdapter";
 import { shallow } from "zustand/shallow";
+import { isRaceUuidFinalized } from "@/utils/raceLock";
+import { isApplyingRemote, liveBridge } from "@/services/live/liveBridge";
+
+/**
+ * Hard guard for a FINALIZED race (see `utils/raceLock.ts`). Every rider write
+ * runs through this, so a screen that forgot to hide its edit control still
+ * cannot alter a signed result. `utils/finalizeRace.ts` writes its riders
+ * BEFORE stamping the race, so its own close-out is not blocked by this.
+ *
+ * Takes the riders being written and reports whether the write is blocked;
+ * mixed-race batches are rejected only if a finalized race is involved.
+ */
+function blockIfFinalized(riders: { raceUuid: string }[], action: string): boolean {
+  if (isApplyingRemote()) return false; // shared race: the server's official versions decide
+  const locked = [...new Set(riders.map((r) => r.raceUuid))].filter(isRaceUuidFinalized);
+  if (locked.length === 0) return false;
+  console.warn(`Race ${locked.join(", ")} is finalized — ignored rider ${action}.`);
+  return true;
+}
+
+/** Shared races: let the live bridge turn a batch update into Actions (or block it). */
+function liveCheck(current: RiderProps[], updated: RiderProps[]): boolean {
+  const lb = liveBridge();
+  if (!lb) return true;
+  const byId = new Map(current.map((r) => [r.id, r]));
+  const pairs = updated.filter((r) => byId.has(r.id));
+  return lb.beforeRiders("update", pairs.map((r) => byId.get(r.id)!), pairs) !== false;
+}
 
 interface RiderState {
   riders: RiderProps[];
@@ -15,6 +43,7 @@ interface RiderState {
   getRidersByCategory: (raceUuid: string, category: string) => RiderProps[];
   updateRider: (updatedRider: RiderProps) => Promise<void>;
   updateAllRiders: (updatedRiders: RiderProps[]) => Promise<void>;
+  patchRiders: (updatedRiders: RiderProps[]) => Promise<void>;
   insertRiders: (newRiders: RiderProps[]) => Promise<void>;
   addNewRider: (newRider: RiderProps) => Promise<void>;
   deleteRider: (riderId: number) => Promise<void>;
@@ -140,6 +169,8 @@ const useRiderStore = create<RiderState>()(
       },
 
       addNewRider: async (newRider) => {
+        if (blockIfFinalized([newRider], "add")) return;
+        if (liveBridge()?.beforeRiders("add", [], [newRider]) === false) return;
         try {
           set((state) => ({
             ...state,
@@ -158,10 +189,19 @@ const useRiderStore = create<RiderState>()(
       },
 
       insertRiders: async (newRiders) => {
+        if (blockIfFinalized(newRiders, "import")) return;
+        if (liveBridge()?.beforeRiders("import", [], newRiders) === false) return;
         try {
           set((state) => ({
             ...state,
             riders: [...state.riders, ...newRiders],
+            // Mark the imported race as loaded so the next `getRiders` for it
+            // serves the cache. Without this the cache guard stays off after an
+            // import and EVERY screen that mounts re-reads `db.getAll("riders")`
+            // — an async snapshot that replaces the whole array and can revert
+            // edits made while it was in flight (check-ins silently unticking).
+            lastFetchedRaceUuid:
+              newRiders[0]?.raceUuid ?? state.lastFetchedRaceUuid,
           }));
 
           const db = await initIndexedDB();
@@ -176,6 +216,9 @@ const useRiderStore = create<RiderState>()(
       },
 
       updateRider: async (updatedRider) => {
+        if (blockIfFinalized([updatedRider], "update")) return;
+        const prev = get().riders.find((r) => r.id === updatedRider.id);
+        if (prev && liveBridge()?.beforeRiders("update", [prev], [updatedRider]) === false) return;
         try {
           set((state) => ({
             ...state,
@@ -195,7 +238,46 @@ const useRiderStore = create<RiderState>()(
         }
       },
 
+      /**
+       * Batch update that PRESERVES the existing array order, in ONE store set
+       * and ONE IDB transaction.
+       *
+       * Use this for bulk screen actions (e.g. Check-in "Check all"). Looping
+       * `updateRider` instead costs an openDB + transaction PER rider, and the
+       * `persist` middleware re-writes the whole riders array after every one
+       * of those sets — O(n²) puts, which freezes the UI on a real start list
+       * and leaves a wide window for a stale `getRiders` read to overwrite the
+       * result.
+       *
+       * Differs from `updateAllRiders`, which moves the updated riders to the
+       * END of the array — the heat screen depends on that to apply a new sort
+       * order, so don't "simplify" the two into one.
+       */
+      patchRiders: async (updatedRiders) => {
+        if (updatedRiders.length === 0) return;
+        if (blockIfFinalized(updatedRiders, "patch")) return;
+        if (!liveCheck(get().riders, updatedRiders)) return;
+        const byId = new Map(updatedRiders.map((r) => [r.id, r]));
+        set((state) => ({
+          ...state,
+          riders: state.riders.map((r) => byId.get(r.id) ?? r),
+        }));
+
+        try {
+          const db = await initIndexedDB();
+          const tx = db.transaction("riders", "readwrite");
+          const store = tx.objectStore("riders");
+          await Promise.all(updatedRiders.map((rider) => store.put(rider)));
+          await tx.done;
+          db.close();
+        } catch (error) {
+          console.error("Error patching riders in IDB:", error);
+        }
+      },
+
       updateAllRiders: async (updatedRiders) => {
+        if (blockIfFinalized(updatedRiders, "update")) return;
+        if (!liveCheck(get().riders, updatedRiders)) return;
         const updatedIds = new Set(updatedRiders.map((r) => r.id));
         set((state) => ({
           ...state,
@@ -218,6 +300,9 @@ const useRiderStore = create<RiderState>()(
       },
 
       deleteRider: async (riderId) => {
+        const target = get().riders.find((r) => r.id === riderId);
+        if (target && blockIfFinalized([target], "delete")) return;
+        if (target && liveBridge()?.beforeRiders("delete", [target], []) === false) return;
         try {
           set((state) => ({
             ...state,
@@ -234,6 +319,10 @@ const useRiderStore = create<RiderState>()(
       },
 
       deleteRidersByRace: async (raceUuid) => {
+        // Deleting the whole RACE is still allowed: `racesStore.deleteRace`
+        // removes the race first, so by the time this runs as its cleanup step
+        // the uuid is no longer finalized and the purge goes through.
+        if (blockIfFinalized([{ raceUuid }], "bulk delete")) return;
         try {
           const db = await initIndexedDB();
           const allRiders = await db.getAll("riders");

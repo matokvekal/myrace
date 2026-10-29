@@ -232,11 +232,22 @@
     "standing",
     "ranking",
     "rank",
+    "seed",
+    "seeding",
+    "serial",
+    "serial no",
+    "index",
+    "order",
     "דירוג",
     "דירוג UCI",
     "דירוג ישראלי",
     "דירוג כללי",
-    "ראנקינג"
+    "ראנקינג",
+    "מס״ד",
+    "מסד",
+    "מספר סידורי",
+    "סידורי",
+    "סדר"
   ],
   "gender": [
     "gender",
@@ -260,22 +271,6 @@
     "מספר UCI",
     "קוד UCI",
     "ID UCI"
-  ],
-  "id_number": [
-    "id",
-    "id number",
-    "id no",
-    "passport",
-    "passport number",
-    "identity",
-    "identity number",
-    "personal id",
-    "ת\"ז",
-    "תז",
-    "ת\"ז/דרכון",
-    "דרכון",
-    "מספר זהות",
-    "מספר תעודה"
   ],
   "birth_date": [
     "birth date",

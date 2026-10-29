@@ -5,96 +5,123 @@
   padding-bottom: 32px;
 }
 
-/* ── Top control bar ── */
+/* ── Toolbar: Search | View | Sort | Import · Edit | Add Rider ── */
 .topBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: linear-gradient(180deg, #ffffff, #f2f7ff);
-  border: 1px solid #c9defc;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 10px 18px rgba(99, 166, 252, 0.14);
-}
-
-.leftControls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* Sort dropdown */
-.sortDropdownWrapper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sortLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: #3a5080;
-  margin: 0;
+  flex-wrap: wrap; /* wraps instead of overflowing on phones */
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 10px;
 }
 
 .sortDropdown {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #d5e4fb;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background-color: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
   border-radius: 8px;
-  background: white;
-  color: #1a304f;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.sortDropdown:hover {
-  border-color: #a8c5f8;
-  background: #f8fbff;
-}
-
-.sortDropdown:focus {
-  outline: none;
-  border-color: #63a6fc;
-  box-shadow: 0 0 0 2px rgba(99, 166, 252, 0.2);
-}
-
-/* View mode buttons */
+/* View modes: classic segmented control */
 .viewModeGroup {
-  display: flex;
-  gap: 2px;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
+  display: inline-flex;
+  flex-shrink: 0;
   padding: 2px;
-  background: white;
+  gap: 2px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
 }
 
 .viewModeBtn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
+  width: 34px;
+  height: 30px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
-  color: #6b7fa8;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8498ba);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
 .viewModeBtn:hover {
-  background: rgba(99, 166, 252, 0.08);
-  color: #3a5080;
+  color: var(--text-primary, #14243c);
 }
 
 .viewModeBtn.active {
-  background: #63a6fc;
-  color: white;
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+}
+
+/* Import · Edit · Add Rider — pushed to the inline end */
+.toolActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.iconBtnActive {
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.addRiderBtn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--brand-strong, #3f86e7);
+  border-radius: 8px;
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.addRiderBtn:hover {
+  filter: brightness(1.06);
+}
+
+/* PRO skin: keep the toolbar flat */
+:root[data-skin="gaming"] .topBar button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* Import button */
@@ -165,10 +192,21 @@
   box-shadow: 0 0 0 2px rgba(99, 166, 252, 0.2);
 }
 
+/* Slanted navy count plate — kit language */
 .tabCount {
-  font-weight: 700;
-  font-size: 14px;
-  color: #1a304f;
+  display: inline-block;
+  align-self: flex-start;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: linear-gradient(180deg, #1d3d78, #122a54);
+  padding: 5px 16px;
+  border-radius: 6px;
+  transform: skewX(-8deg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 5px rgba(20, 40, 80, 0.25);
 }
 
 .catGroup {
@@ -177,41 +215,50 @@
   gap: 4px;
 }
 
-/* ── Category separator row in table view ── */
+/* ── Category separator row: glossy game band (matches schedule starts) ── */
 .catSeparator {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 700;
-  color: #1a304f;
+  font-weight: 900;
+  font-style: italic;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   padding: 8px 12px;
-  background: linear-gradient(180deg, #f2f7ff, #eef4ff);
-  border: 1px solid #d5e4fb;
-  border-left: 3px solid #63a6fc;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(135deg, #4a80cc, #31609f);
+  border: none;
   border-radius: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.05em;
   margin-top: 6px;
 }
 
+/* Category colour bar inside the separator band */
 .catSepDot {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 18px;
   border-radius: 3px;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .catGroupHeader {
   font-size: 13px;
-  font-weight: 600;
-  color: #1a304f;
+  font-weight: 900;
+  font-style: italic;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   padding: 8px 12px;
-  background: linear-gradient(180deg, #f2f7ff, #eef4ff);
-  border: 1px solid #d5e4fb;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(135deg, #4a80cc, #31609f);
+  border: none;
   border-radius: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.05em;
 }
 
 .empty {
@@ -247,28 +294,30 @@
   cursor: pointer;
 }
 
-/* ── Data table view ── */
+/* ── Data table view: timing-sheet style — navy header, gold trim ── */
 .dataTable {
   display: flex;
   flex-direction: column;
-  border: 1px solid #e4eaf4;
-  border-radius: 10px;
+  border: 1.5px solid #9dbbe0;
+  border-radius: 12px;
   overflow: hidden;
   font-size: 13px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(20, 40, 80, 0.1);
 }
 
 .dataTableHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #f2f6ff;
-  border-bottom: 1px solid #dce8fb;
+  padding: 9px 12px;
+  background: linear-gradient(90deg, #1d3d78, #122a54);
+  border-bottom: 2px solid #e0a92c;
   font-size: 11px;
-  font-weight: 700;
-  color: #6b7fa8;
+  font-weight: 800;
+  color: #cfe0f5;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.06em;
 }
 
 .dataRow {
@@ -298,8 +347,8 @@
 }
 
 .colDot {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 18px;
   border-radius: 3px;
   flex-shrink: 0;
   background: #ddd;
@@ -321,30 +370,55 @@
   display: block;
 }
 
+/* Bib reads like a race number */
 .colBib {
   width: 48px;
   flex-shrink: 0;
-  font-size: 13px;
-  color: #3a5080;
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  color: #10315e;
+  font-variant-numeric: tabular-nums;
 }
 
+/* The name is what people look for — let it wrap to two lines instead of
+   being cut to "…" on a phone. */
 .colName {
   flex: 4;
-  font-weight: 600;
-  color: #1a304f;
-  min-width: 120px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #10233f;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .colCat {
   flex: 2;
   color: #3a5080;
-  min-width: 80px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Phone: drop the row counter and let the category wrap, so the name gets the room */
+@media (max-width: 600px) {
+  .colRow {
+    display: none;
+  }
+
+  .colCat {
+    flex: 1.5;
+    font-size: 12px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
 }
 
 .subCatLabel {
@@ -458,6 +532,10 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
+  /* Rescue scroll for tablets where real visible height < vh (browser
+     chrome/keyboard) — otherwise the wizard's step nav/footer can render
+     off-screen with nothing able to scroll it into view. */
+  overflow-y: auto;
 }
 
 .wizardModal {
@@ -466,14 +544,172 @@
   width: 100%;
   max-width: 95vw;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  margin: auto;
 }
 
 @media (min-width: 768px) {
   .wizardModal {
     max-width: 90vw;
   }
+}
+
+.searchBox {
+  flex: 1 1 200px; /* takes the free width; wraps onto its own row on phones */
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  color: var(--text-muted, #8498ba);
+}
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font: inherit;
+  font-size: 16px;
+}
+.searchClear { background: none; border: 0; color: inherit; cursor: pointer; display: inline-flex; padding: 4px; }
+.waveGroup { margin-bottom: 12px; }
+.waveGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(99, 166, 252, 0.14);
+  border-radius: 8px;
+  margin: 8px 0 4px;
+}
+.groupCount { margin-inline-start: auto; font-size: 11px; font-weight: 700; opacity: 0.7; }
+.addRiderModal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #14243c);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+/* Collapse / expand rider groups (display only) */
+.groupBulk {
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-start: 12px;
+  flex-wrap: wrap;
+}
+.groupBulkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.groupBulkBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.groupToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-end: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Table header: white labels on the blue bar (column classes set dark text) */
+.dataTableHeader span {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Collapse / expand all: compact icon buttons */
+.groupBulkBtn {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* "+" on each category header (right-aligned, visible when collapsed) */
+.catAddBtn {
+  margin-inline-start: auto;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--brand-strong, #3f86e7);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--brand-strong, #3f86e7);
+  cursor: pointer;
+}
+
+.catAddBtn:hover {
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+:root[data-skin="gaming"] .catAddBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+}
+
+/* Category header: count badge + Add rider together on the right */
+.catSeparator .groupCount,
+.catGroupHeader .groupCount {
+  margin-inline-start: auto;
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #1d3d78;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 1;
+}
+
+.catSeparator .catAddBtn,
+.catGroupHeader .catAddBtn {
+  margin-inline-start: 8px;
+}
+
+/* Expand/collapse: plain square icon, clearly not the Add rider button */
+.groupToggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #14243c);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { Camera } from "lucide-react";
 import Button from "@/components/ui/Button";
 import styles from "./scanDocumentButton.module.css";
@@ -16,10 +17,21 @@ export default function ScanDocumentButton({
   variant = "bar",
   className = "",
 }: ScanDocumentButtonProps) {
+  const { t } = useTranslation();
+  const label = t("scan.list", "Scan Start List");
+  const tooltip = t("scan.tooltip", "Scan Start List — coming soon");
+  const soon = t("scan.soon", "Soon");
+
   if (variant === "empty") {
     return (
-      <button type="button" className={`${styles.emptyBtn} ${className}`} onClick={onClick}>
-        <Camera size={16} /> Scan Start List
+      <button
+        type="button"
+        className={`${styles.emptyBtn} ${className}`}
+        disabled
+        title={tooltip}
+      >
+        <Camera size={16} /> {label}
+        <span className={styles.comingSoonBadge}>{soon}</span>
       </button>
     );
   }
@@ -28,10 +40,12 @@ export default function ScanDocumentButton({
       variant="secondary"
       size="sm"
       className={`${styles.barBtn} ${className}`}
-      onClick={onClick}
+      disabled
+      title={tooltip}
       startIcon={<Camera size={14} />}
+      endIcon={<span className={styles.comingSoonBadge}>{soon}</span>}
     >
-      Scan Start List
+      {label}
     </Button>
   );
 }

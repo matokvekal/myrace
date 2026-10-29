@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.pgdata/
+# server/src/config/env.ts holds no secrets (it validates process.env); the root
+# .gitignore ignores any env.ts, so keep this one tracked.
+!src/config/env.ts

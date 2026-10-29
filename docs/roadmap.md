@@ -1,34 +1,39 @@
 # Commissaire — Feature Roadmap
 
-**Last Updated:** 2026-06-27
+**Last Updated:** 2026-07-25
 
 ---
 
 ## Phase 1 — Bug Fixes (Current Priority)
 
-Fix these before starting new features. Full details in `docs/app-review.md`.
+Fix these before starting new features. Full details now live in `BUGS.md` item 6
+(`docs/app-review.md`, the original source, was retired — its content was
+transcribed there and here).
 
 ### Critical (do first)
-- [ ] **BUG-01** — Fix `timeStartRace` format: change StartManager to store ISO string (`new Date().toISOString()`) instead of `"HH:MM:SS"`. Breaks Results timing for all races.
-  - File: `src/app/race/[id]/raceMode/StartManager.tsx` line 570
+- [x] **BUG-01** — Fix `timeStartRace` format — **fixed**, confirmed by code read
+  (`StartManager.tsx` no longer stores `"HH:MM:SS"` via `toLocaleTimeString`).
 - [ ] **BUG-02** — IDB VersionError handler must NOT delete the database. Show user error instead.
   - File: `src/app/stores/indexDb/indexedDbHelper.ts` lines 31–37
-- [ ] **BUG-03** — `calculatePositions` must return new objects instead of mutating input.
-  - File: `src/app/utils/calculatePosition.ts` lines 33, 49
-- [ ] **BUG-05** — DSQ/DNS toggles must sync `raceStatus` field.
-  - File: `src/app/race/[id]/schedule/Schedule.tsx` lines 562–578
+- [ ] **BUG-03** — `calculatePositions` must return new objects instead of mutating input —
+  **confirmed still open**, `rider.position_category = index + 1` still mutates directly
+  (`utils/calculatePosition.ts` L61).
+- [ ] **BUG-05** — DSQ/DNS toggles must sync `raceStatus` field — **confirmed still open**,
+  DSQ toggle sets `status` only (`race/[id]/schedule/Schedule.tsx` ~L706-728).
 
 ### High
 - [ ] **BUG-04** — Un-finish a rider: clear `timeArrive` and `elapsedTimeFromStart`.
 - [ ] **BUG-07** — CheckIn wave filter: match by `name + subCategory`, not just `name`.
 - [ ] **UX-04** — Add 5-second "Undo" toast after every lap click in heat page.
-- [ ] **BUG-13** — Add bib uniqueness validation when adding/editing riders.
+- [ ] **BUG-13** — Add bib uniqueness validation when adding/editing riders — **confirmed
+  still open**, no uniqueness check anywhere in `EditRiders.tsx`.
 
 ### Medium
 - [ ] **BUG-06** — Remove duplicate `activeTab` from `uiStore`, use only `appStore`. Fix Standing back button.
 - [ ] **BUG-08** — Replace `Date.now() + index` IDs with `crypto.randomUUID()` for categories.
 - [ ] **BUG-09** — Remove double IDB write per lap (delete `updateRider` call, keep `updateAllRiders`).
-- [ ] **BUG-10** — Standing page category filter modal: actually apply the selected category filter.
+- [x] **BUG-10** — Standing page category filter modal — **fixed**, confirmed by code read
+  (`selectCategory` now calls `setSelectedCategory(...)` before closing the modal).
 - [ ] **BUG-11** — `getNowWave` in Riders tab: use most-recently-started heuristic, not absolute diff.
 
 ---
@@ -158,6 +163,11 @@ Tables: `users`, `races`, `race_members`, `categories`, `riders`, `lap_details`
 
 ### Features
 - [ ] **Excel export** — race results to `.xlsx` for federation submission (see `memory/project_excel_export.md`)
+- [ ] **Full-app UI translation (i18n)** — infra (`react-i18next`, lazy-loaded
+  `public/locales/<lng>/common.json`, language switcher in `HeaderMain`) shipped
+  for the Scan Start List "Soon" strings only; the other ~150+ files/1000+
+  hardcoded UI strings still need `t()` calls, migrated incrementally file by
+  file, not in one pass — see `src/app/i18n/i18n.ts` for the pattern to follow.
 - [ ] **PDF results** — printable results sheet per category
 - [ ] **Public results URL** — shareable read-only standing page (Viewer role link)
 - [ ] **QR code check-in** — rider scans QR → auto-checks in
@@ -167,3 +177,25 @@ Tables: `users`, `races`, `race_members`, `categories`, `riders`, `lap_details`
 - [ ] **Animated position changes** in LiveBoard (UX-02)
 - [ ] **Long press** instead of double-tap for rider modal (UX-03 — 400–500ms)
 - [ ] **Collapsible finished section** in heat page (UX-08)
+- [ ] **Race Mode entry/exit confirmation** (UX-01) — toggling `isRaceMode` is instant today;
+  confirm before an accidental toggle exits race mode mid-race.
+- [ ] **Check-in "show unchecked only" filter** (UX-05) — for waves with 80+ riders.
+- [ ] **Sync status indicator** (UX-06) — IndexedDB is the source of truth during a race, not
+  the server; every tap/lap must save locally first, sync to server only when connectivity
+  returns. Show the user a clear state: "Saved locally" / "Waiting for sync" / "Synced." Don't
+  rely on Background Sync alone — WebKit can evict site data under storage pressure or long
+  disuse, so a live race's only copy must never sit local-only indefinitely. Verify real sync
+  behavior on an actual iPhone, not just Chrome DevTools' emulated offline mode.
+- [ ] **Quick category color change from RaceMode pill** (UX-07) — avoid the
+  Categories-tab round trip during live race setup.
+- [ ] **Race card loading skeleton** (UX-09) — main page's rider count flashes "0" before
+  the real IDB read resolves.
+- [ ] **Code-quality cleanup carried over from the old app review**: rename `orgenizer` →
+  `organizer` in `RaceProps` (breaking — touches every read/write site); remove the legacy
+  `getRidersOld` path now that `getRiders` is the only caller; `categoryStore`'s
+  `updateRiderColor` should call `updateAllRiders(...)` instead of writing
+  `useRiderStore.setState(...)` directly; replace `Categories.tsx`'s `window.confirm()` delete
+  with the existing `DeleteConfirmModal` pattern; decide whether category templates
+  (localStorage) should move into IDB now that they survive a wipe that riders don't (BUG-02);
+  `EditRiders.tsx`'s float rider IDs (`Date.now() + Math.random()`) work in IDB but are
+  non-standard — candidate for `crypto.randomUUID()` alongside the BUG-08 category-ID fix.

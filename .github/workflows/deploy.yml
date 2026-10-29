@@ -1,46 +1,203 @@
-name: Deploy to GitHub Pages
+name: Deploy production
 
+# main is the production branch. A push to main (a merged PR) builds what
+# changed and deploys it; every deploy waits for manual approval in its
+# GitHub environment ("production" for the API, "github-pages" for the app).
+# Run by hand ("Run workflow") to deploy one component or both.
+#
+#   Frontend → GitHub Pages (commissaire.us)
+#   Backend  → the Linux server (api.commissaire.us) as an immutable release,
+#              through the restricted deploy key (server/deploy/deploy-gate.sh):
+#              read-only schema check, atomic switch, PM2, health check,
+#              automatic rollback. Database migrations are never run here.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      frontend:
+        description: Deploy the frontend (GitHub Pages)
+        type: boolean
+        default: true
+      backend:
+        description: Deploy the backend (api.commissaire.us)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# One production deployment at a time; never cancel one halfway.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: production
+  cancel-in-progress: false
 
 jobs:
-  build:
+  # What to deploy: by hand → the inputs; on push → what the push changed.
+  # Backend = server/ or src/shared/ (bundled into the API); frontend = anything
+  # else except docs. Unknown history (first push, force push) → both.
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.pick.outputs.frontend }}
+      backend: ${{ steps.pick.outputs.backend }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          IN_FRONTEND: ${{ inputs.frontend }}
+          IN_BACKEND: ${{ inputs.backend }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            echo "frontend=$IN_FRONTEND" >> "$GITHUB_OUTPUT"
+            echo "backend=$IN_BACKEND" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! files=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null); then
+            echo "History unknown: deploying both."
+            echo "frontend=true" >> "$GITHUB_OUTPUT"; echo "backend=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "$files"
+          backend=false; frontend=false
+          if grep -qE '^(server/|src/shared/)' <<< "$files"; then backend=true; fi
+          if grep -vE '^(server/|docs/|_bmad/|_bmad-output/|[^/]+\.md$)' <<< "$files" | grep -q .; then frontend=true; fi
+          if grep -qE '^\.github/workflows/deploy\.yml$' <<< "$files"; then frontend=true; backend=true; fi
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+  # Required quality gates (typecheck, lint, tests, builds, Playwright, server,
+  # deploy gate), shared with pull requests: nothing deploys unless all pass.
+  quality:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  # ---- Backend ---------------------------------------------------------------
+  backend-build:
+    needs: [changes, quality]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      release: ${{ steps.pack.outputs.RELEASE_ID }}
+      sha256: ${{ steps.pack.outputs.SHA256 }}
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Pack the release (immutable archive + sha256)
+        id: pack
+        run: bash deploy/pack-release.sh "$GITHUB_SHA" "$RUNNER_TEMP/release" | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-release
+          path: ${{ runner.temp }}/release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Install dependencies
-        run: npm ci
+  backend-deploy:
+    needs: backend-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://api.commissaire.us/api/v1/health
+    env:
+      RELEASE: ${{ needs.backend-build.outputs.release }}
+      SHA256: ${{ needs.backend-build.outputs.sha256 }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      API_URL: ${{ vars.VITE_SERVER_URL || 'https://api.commissaire.us' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-release
+          path: release
+      - name: SSH (dedicated deploy key, pinned host key)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_KNOWN_HOSTS" && -n "$DEPLOY_HOST" && -n "$DEPLOY_USER" ]] || { echo "::error::Deploy secrets/variables are not configured"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+      - name: Verify the archive
+        run: echo "$SHA256  release/$RELEASE.tar.gz" | sha256sum -c -
+      - name: Upload (receive) and activate
+        run: |
+          ssh_gate() { ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "$@"; }
+          ssh_gate "receive $RELEASE $SHA256" < "release/$RELEASE.tar.gz"
+          ssh_gate "activate $RELEASE" < /dev/null
+      - name: Check through Nginx (health, release, Socket.IO)
+        run: |
+          rev=$(curl -fsS --retry 5 --retry-delay 2 "$API_URL/api/v1/health" | jq -r .release)
+          [[ "$rev" == "$GITHUB_SHA" ]] || { echo "::error::api.commissaire.us serves release $rev, expected $GITHUB_SHA"; exit 1; }
+          curl -fsS "$API_URL/socket.io/?EIO=4&transport=polling" | grep -q '"sid"' || { echo "::error::Socket.IO polling handshake failed"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' --http1.1 --max-time 5 \
+            -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+            "$API_URL/socket.io/?EIO=4&transport=websocket" || true)
+          if [[ "$code" == 101 ]]; then echo "WebSocket upgrade: OK"; else echo "::warning::WebSocket upgrade returned $code (Socket.IO falls back to polling). Nginx needs the Upgrade/Connection headers on /socket.io/ (docs/server/deployment.md)."; fi
 
+  # ---- Frontend --------------------------------------------------------------
+  frontend-build:
+    needs: [changes, quality]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Repository *variables* (Settings → Secrets and variables → Actions →
+      # Variables), not secrets: they end up in the shipped JS anyway. Unset
+      # VITE_SERVER_URL = the app stays local-only; unset Firebase = no analytics.
       - name: Build
         run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-pages-artifact@v3
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
+      # Only ./dist is ever published. This fails the deploy if source maps,
+      # markdown, agent files, tests or config leaked into the output —
+      # see scripts/verify-dist.mjs for the full rule set.
+      - name: Validate deployment artifact
+        run: npm run verify:dist
+      - name: List published files
+        run: find ./dist -type f | sort
+      - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: ./dist
 
-  deploy:
-    needs: build
+  # After the backend when both deploy (the app never talks to an older API);
+  # alone when only the frontend changed. Approved in "github-pages".
+  frontend-deploy:
+    needs: [changes, frontend-build, backend-deploy]
+    if: >-
+      always() && needs.frontend-build.result == 'success' &&
+      (needs.backend-deploy.result == 'success' || needs.backend-deploy.result == 'skipped')
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

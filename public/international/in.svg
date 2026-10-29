@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+  <rect width="300" height="66.7" fill="#ff9933"/>
+  <rect y="66.7" width="300" height="66.7" fill="#ffffff"/>
+  <rect y="133.3" width="300" height="66.7" fill="#138808"/>
+  <circle cx="150" cy="100" r="22" fill="none" stroke="#000080" stroke-width="2"/>
+  <circle cx="150" cy="100" r="3" fill="#000080"/>
+  <g stroke="#000080" stroke-width="1.5">
+    <line x1="150" y1="78" x2="150" y2="122"/>
+    <line x1="128" y1="100" x2="172" y2="100"/>
+    <line x1="134.4" y1="84.4" x2="165.6" y2="115.6"/>
+    <line x1="165.6" y1="84.4" x2="134.4" y2="115.6"/>
+    <line x1="141.4" y1="79.6" x2="158.6" y2="120.4"/>
+    <line x1="158.6" y1="79.6" x2="141.4" y2="120.4"/>
+    <line x1="130.4" y1="90.4" x2="169.6" y2="109.6"/>
+    <line x1="130.4" y1="109.6" x2="169.6" y2="90.4"/>
+    <line x1="150" y1="78" x2="150" y2="122" transform="rotate(15 150 100)"/>
+    <line x1="150" y1="78" x2="150" y2="122" transform="rotate(30 150 100)"/>
+    <line x1="150" y1="78" x2="150" y2="122" transform="rotate(45 150 100)"/>
+    <line x1="150" y1="78" x2="150" y2="122" transform="rotate(60 150 100)"/>
+    <line x1="150" y1="78" x2="150" y2="122" transform="rotate(75 150 100)"/>
+  </g>
+</svg>

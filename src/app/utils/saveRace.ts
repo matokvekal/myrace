@@ -1,11 +1,15 @@
-import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import useRaceStore from "@/stores/racesStore";
+import useCategoryStore from "@/stores/categoryStore";
+import { DEFAULT_MIN_LAP_SECONDS } from "./minLap";
 import { RaceProps } from "@/types/types";
 import { FormEvent } from "react";
-import { saveRidersFromCsv } from "./insertRidersCsv";
+import { saveRidersFromCsv, saveRidersFromRows } from "./insertRidersCsv";
 import { clearRaceState } from "@/utils/clearRaceState";
 import Images from "@/constants/Images";
 import { generateRaceId } from "@/services/RaceSync";
+import useRiderStore from "@/stores/ridersStore";
+import { logAnalyticsEvent } from "@/services/analytics/analyticsClient";
+import { AuditLogService } from "@/services/auditLog/auditLogService";
 
 const DEFAULT_IMAGES = [
   Images.bikeMountainSplash,
@@ -37,7 +41,9 @@ export const saveRace = async (
   status: string,
   imageUrl: string | null,
   file: File | null,
-  setAddNewwRace: (value: boolean) => void
+  setAddNewwRace: (value: boolean) => void,
+  autoColor: boolean = true,
+  raceType: "MTB" | "Gravel" = "MTB"
 ) => {
   event.preventDefault();
 
@@ -68,6 +74,7 @@ export const saveRace = async (
       heat: "1",
       status: "upcoming",
       type: "Competition",
+      raceType,
       level: "1",
       orgenizer: "Race Org",
       manager: "John Doe",
@@ -77,31 +84,77 @@ export const saveRace = async (
       createdAt: new Date(),
       lastUpdateAt: new Date(),
       isActive: true,
+      autoColor,
+      // New races: 3 minutes minimum between two counted passages (configurable in Race Settings).
+      minLapSeconds: DEFAULT_MIN_LAP_SECONDS,
       map: "",
       distance: 0,
     };
-    //save to db
-    const db = await initIndexedDB();
-    await db.add("races", newRace);
-    db.close();
-    //save to state
+    // Single writer: insertRace owns both the Zustand cache and the IDB row.
+    // (Previously this ALSO did db.add("races") here, then insertRace added the
+    // same id again → duplicate-key ConstraintError on every save.)
     const { insertRace } = useRaceStore.getState();
     await insertRace(newRace);
 
     if (file) {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        if (!event.target?.result) return;
-        const csvData = event.target.result as string;
-
-        try {
-          await saveRidersFromCsv(csvData, newRace.uuid);
-        } catch (error) {
-          console.error("Error saving riders at saveRidersFromCsv", error);
+      // Must finish BEFORE the create screen closes (BUGS.md #18). This used to
+      // fire a FileReader and return immediately, so opening the new race could
+      // race the import: `createCategoriesFromRiders` runs once, on mount, only
+      // when there are no categories yet — if it won that race you ended up with
+      // a race that had riders but no categories, and therefore no schedule and
+      // no way to start.
+      try {
+        // .xlsx is binary — read it with the real Excel parser, not file.text()
+        // (which mangles it). CSV keeps the text path. (BUGS.md — xlsx on Create
+        // Race used to silently import garbage.)
+        if (/\.xlsx?$/i.test(file.name)) {
+          const { parseXLSXFile } = await import("./xlsxParser");
+          const { headers, rows } = await parseXLSXFile(file);
+          await saveRidersFromRows([headers, ...rows], newRace.uuid);
+        } else {
+          await saveRidersFromCsv(await file.text(), newRace.uuid);
         }
-      };
-      reader.readAsText(file); // ✅ Read the file as text (CSV/XLSX)
+        // Categories first, independent of waves: every imported rider must
+        // belong to a created category. Zero categories = a failed import.
+        await useCategoryStore.getState().createCategoriesFromRiders(newRace.uuid);
+        const created = useCategoryStore.getState().categories.filter((c) => c.raceUuid === newRace.uuid);
+        const imported = useRiderStore.getState().riders.filter((r) => r.raceUuid === newRace.uuid);
+        if (imported.length > 0 && created.length === 0) {
+          throw new Error("No categories could be created from this file — check that a column is recognised as Category. The race was not saved.");
+        }
+      } catch (error) {
+        console.error("Error saving riders at saveRidersFromCsv", error);
+        // Never keep a half-created race: remove only what THIS save created
+        // (race first, so the lock no longer protects its riders — AGENTS.md).
+        try {
+          await useRaceStore.getState().deleteRace(newRace.uuid);
+          await useRiderStore.getState().deleteRidersByRace(newRace.uuid);
+        } catch (cleanupError) {
+          console.error("Could not roll back the new race", cleanupError);
+        }
+        throw error;
+      }
     }
+    logAnalyticsEvent("race_created", {
+      race_id: newRace.raceId,
+      rider_count: useRiderStore.getState().riders.length,
+    });
+    AuditLogService.log({
+      race: newRace,
+      action: "CREATE_RACE",
+      screen: "AddRace",
+      entityType: "race",
+      entityId: newRace.uuid,
+      details: { name: newRace.name, date: newRace.date, riderCount: useRiderStore.getState().riders.length },
+    });
+
+    // With a server: the new race is saved there too (PostgreSQL), now or on sign-in.
+    if (import.meta.env.VITE_SERVER_URL) {
+      void import("@/services/live/liveClient")
+        .then((m) => m.persistNewRace(newRace.uuid))
+        .catch((e) => console.warn("[live] could not queue the new race for the server", e));
+    }
+
     setAddNewwRace(false);
   } catch (error) {
 

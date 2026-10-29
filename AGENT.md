@@ -69,11 +69,13 @@ Router:
 
 - src/App.tsx
   - / -> HomePage
+  - /landing2 -> LandingV2 (alternate landing page)
   - /login -> LoginPage
   - /otp -> OtpPage
   - /loginerror -> LoginErrorPage
   - /main -> MainPage
   - /contact -> ContactPage
+  - /terms -> TermsPage (full T&C text; the acceptance gate itself renders inline via TermsGate, not this route)
   - /race/:id -> RacePage
   - /race/:id/heat/:heatId -> HeatPage
   - /race/:id/standing/:heatId -> StandingPage
@@ -103,17 +105,23 @@ Source:
 - src/vite-env.d.ts
 - src/app/
 
-Inside src/app:
+Inside src/app (folder map kept intentionally shallow here now that every
+directory has its own AGENT.md — see `src/app/AGENT.md` for the authoritative,
+maintained child list; this is just enough for orientation):
 
 - globals.css
 - page.tsx
 - not-found.tsx
+- assets/
 - config/
 - constants/
 - services/
 - stores/
+- styles/
 - types/
 - utils/
+- workers/
+- hooks/
 - components/
 - login/
 - otp/
@@ -121,31 +129,40 @@ Inside src/app:
 - main/
 - race/
 - contact/
-- splash/
+- legal/
+- terms/
+- landingV2/
 
-Race area:
+Race area (see `src/app/race/[id]/AGENT.md` and `src/app/race/components/AGENT.md`
+for the current, maintained child lists):
 
 - src/app/race/[id]/
   - page.tsx
   - schedule/
   - riders/
+  - categories/
   - results/
   - editRiders/
   - map/
   - info/
   - heat/[heatId]/
+  - heats/ (plural — distinct from heat/, see its own AGENT.md)
   - standing/[heatId]/
   - raceMode/
 - src/app/race/components/
   - addRider/
   - buttons/
   - categoryCard/
+  - categoryManager/
   - headerHeat/
   - headerRace/
   - heatCard/
   - modals/
   - raceInfo/
+  - racePhaseSwitcher/
   - riderCard/
+  - riderDetailModal/
+  - riderFlag/
   - standingCard/
 
 ---
@@ -532,13 +549,15 @@ Rebuild objective:
 
 ## 13) Known Technical Debt and Required Fixes
 
-1. API endpoint config includes malformed urls.
-2. Heat page timer placeholder needs real runtime timer logic.
-3. Services fetchRaces/fetchRiders are stubs.
-4. Large image assets should be optimized.
-5. Some legacy migration files remain and should be either documented as legacy or removed.
-6. Two CSV parsing styles exist; unify into one robust parser.
-7. Missing test coverage for lap click and ranking correctness.
+This list previously hand-duplicated bug/debt tracking that now lives
+elsewhere and drifted out of date (e.g. it listed "two CSV parsing styles" and
+"missing lap-click test coverage" as open long after both were resolved). Do
+not re-add a duplicate list here — check the live sources instead:
+
+- **Open bugs, file:line, fix suggestions:** `BUGS.md`
+- **Full fix history (what was found, verified, and fixed, and why):** `TEST.md`
+- **Formal business-rule catalog, each traced to file:line:** `docs/app-rules.md`
+- **Planned-phase work (roles, sockets, database, polish):** `docs/roadmap.md`
 
 ---
 

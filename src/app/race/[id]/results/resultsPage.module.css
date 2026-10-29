@@ -1,0 +1,6 @@
+.page {
+  min-height: calc(100vh - 52px); /* below the shared race top bar */
+  padding: 8px 12px 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}

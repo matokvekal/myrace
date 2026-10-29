@@ -7,15 +7,16 @@
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { isCloudConfigured } from "./cloudConfig";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 let client: SupabaseClient | null = null;
 
-export function isCloudConfigured(): boolean {
-   return Boolean(url && anonKey);
-}
+// Re-exported so existing cloud-feature imports keep working; the env-only check
+// itself lives in cloudConfig.ts (no Supabase SDK) — see BUGS.md #1.
+export { isCloudConfigured };
 
 export function getSupabase(): SupabaseClient | null {
    if (!isCloudConfigured()) return null;

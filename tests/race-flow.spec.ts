@@ -1,0 +1,105 @@
+import { test, expect } from "@playwright/test";
+import { loadDemoRace, selectWave, gotoRaceMode, openRaceView, finishWave } from "./helpers";
+
+/**
+ * End-to-end smoke of the core Commissaire flow:
+ *   load demo race (adds riders) → verify riders → verify schedule/waves
+ *   → enter Race mode → check-in riders → start a wave → finish → results.
+ *
+ * Each Playwright test gets a fresh browser context (empty IndexedDB), so the
+ * app always starts with no local races and offers the "Try Demo Race" button.
+ */
+
+const EXPECTED_RIDERS = 40;
+
+test.describe("Commissaire race flow", () => {
+  test("add riders, schedule, start & finish a wave, see results", async ({ page }) => {
+    // ── 1. Load demo race (adds 40 riders across 8 categories / 2 waves) ──────
+    await test.step("load demo race", async () => {
+      await loadDemoRace(page);
+      await expect(page.getByRole("button", { name: "Riders", exact: true })).toBeVisible();
+    });
+
+    // ── 2. Riders tab: verify riders were added ──────────────────────────────
+    await test.step("verify riders added", async () => {
+      await page.getByRole("button", { name: "Riders", exact: true }).click();
+      await expect(page.getByText(`Riders (${EXPECTED_RIDERS})`)).toBeVisible();
+    });
+
+    // ── 3. Edit Riders enters and exits edit mode ─────────────────────────────
+    await test.step("Edit Riders enters and exits edit mode", async () => {
+      // Edit Riders is an icon button in the Riders toolbar.
+      await page.getByRole("button", { name: "Edit Riders" }).click();
+      // EditRiders toolbar shows the "← Back" button (distinct from the
+      // header's "Back to main") + the search placeholder.
+      const backBtn = page.getByRole("button", { name: /← Back/ });
+      await expect(backBtn).toBeVisible();
+      await expect(page.getByPlaceholder(/Name or bib/i)).toBeVisible();
+      await backBtn.click();
+      // Back to the normal riders list
+      await expect(page.getByText(`Riders (${EXPECTED_RIDERS})`)).toBeVisible();
+    });
+
+    // ── 4. Schedule tab: verify waves exist ──────────────────────────────────
+    await test.step("verify schedule / waves", async () => {
+      await page.getByRole("button", { name: "Schedule", exact: true }).click();
+      // Demo has 2 waves; schedule should reference Wave text.
+      await expect(page.getByText(/Wave/i).first()).toBeVisible();
+    });
+
+    // ── 5. Enter Race mode ───────────────────────────────────────────────────
+    await test.step("enter Race mode", async () => {
+      // Phase switcher: "Create" = setup, "Race" = race mode, "Live" = live.
+      await gotoRaceMode(page, "Race");
+      // The wave bottom sheet: Check-In and Start controls
+      await expect(page.getByTestId("sheet-checkin")).toBeVisible();
+      await expect(page.getByTestId("sheet-start")).toBeVisible(); // the start screen sits in the sheet
+    });
+
+    // ── 5b. Close out wave 1 ─────────────────────────────────────────────────
+    // The demo seeds MID-RACE with wave 1 already checked in and on course, and
+    // the app allows only one wave running at a time — so wave 1 has to be
+    // signed off before wave 2 can take the line.
+    await test.step("finish the wave already on course", async () => {
+      await finishWave(page, 1); // card Finish → Live's FINISH confirmation
+      await gotoRaceMode(page, "Race");
+      await selectWave(page, 2);
+    });
+
+    // ── 6. Check-in all riders in the selected wave ──────────────────────────
+    await test.step("check in wave riders", async () => {
+      await openRaceView(page, "Check-In");
+      await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
+      const checkAll = page.getByRole("button", { name: /Check All/i });
+      await expect(checkAll).toBeVisible();
+      await checkAll.click();
+      // Once everyone is accounted for, the Check All button disappears.
+      await expect(checkAll).toHaveCount(0);
+    });
+
+    // ── 7. Start the first start group ───────────────────────────────────────
+    await test.step("start a wave", async () => {
+      await openRaceView(page, "Grid");
+      const startBtn = page.getByTestId("start-all").first();
+      await expect(startBtn).toBeVisible();
+      await startBtn.click();
+      // A started group flips to the RUNNING state.
+      await expect(page.getByText(/Started/).first()).toBeVisible();
+    });
+
+    // ── 8. Finish the running group ──────────────────────────────────────────
+    await test.step("finish the running group", async () => {
+      await page.getByTestId("wave-sheet").getByRole("button", { name: /Finish/i }).first().click();
+      await page.getByRole("button", { name: /^Yes/i }).click();
+      await expect(page.getByText(/Finished/).first()).toBeVisible();
+    });
+
+    // ── 9. Results screen renders ────────────────────────────────────────────
+    await test.step("view results", async () => {
+      // Results is its own race mode (race sidebar), no longer a Create tab.
+      await gotoRaceMode(page, "Results");
+      await expect(page.getByTestId("race-mode-indicator")).toHaveAttribute("data-mode", "results");
+      await expect(page.getByTestId("results-category").first()).toBeVisible();
+    });
+  });
+});
