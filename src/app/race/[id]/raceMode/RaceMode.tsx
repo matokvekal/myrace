@@ -11,7 +11,9 @@ import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import useUIStore from "@/stores/uiStore";
 import useRaceStore from "@/stores/racesStore";
 import WaveTimeline from "./WaveTimeline";
-import RaceSheet, { type SheetSize } from "./RaceSheet";
+import RaceSheet, { type SheetSize, type SheetView } from "./RaceSheet";
+import type { WaveAction } from "./WaveTimeline";
+import { useNavigate } from "react-router-dom";
 import { canViewScreen } from "@/services/live/liveBridge";
 
 interface Props {
@@ -31,9 +33,26 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   const setSelectedWave = useUIStore((s) => s.setSelectedWave);
   // Bottom sheet: closed on entry (full timeline); a wave tap opens it at half height.
   const [sheet, setSheet] = useState<SheetSize | null>(null);
+  const [sheetView, setSheetView] = useState<SheetView>("summary");
+  const navigate = useNavigate();
   const openWave = (w: number) => {
     setSelectedWave(w);
+    setSheetView("summary");
     setSheet((s) => s ?? "half");
+  };
+  // Card actions: Check-In / Start open the sheet; Live / Finish go to the Live screen
+  // (Finish opens its existing FINISH confirmation there).
+  const onWaveAction = (w: number, action: WaveAction) => {
+    setSelectedWave(w);
+    if (action === "checkin") {
+      setSheetView("checkin");
+      setSheet("full");
+    } else if (action === "start") {
+      setSheetView("summary");
+      setSheet((s) => s ?? "half");
+    } else {
+      navigate(`/race/${raceUuid}/heat/${w}${action === "finish" ? "?finish=1" : ""}`);
+    }
   };
 
   // Ensure the selected wave is valid for this race's schedule
@@ -100,6 +119,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           onSelect={openWave}
           date={raceDate}
           current={selectedWave}
+          onAction={onWaveAction}
         />
       </div>
 
@@ -113,6 +133,8 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           size={sheet}
           onSize={setSheet}
           onClose={() => setSheet(null)}
+          view={sheetView}
+          onView={setSheetView}
           renderStart={() =>
             canViewScreen(raceUuid, "start")
               ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} />

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Radio, SkipForward, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, Radio, SkipForward, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory, toMinutes, normalizeTime } from "../schedule/Schedule";
 import styles from "./waveTimeline.module.css";
 
 export type WaveState = "upcoming" | "running" | "finished";
+export type WaveAction = "checkin" | "start" | "live" | "finish";
 
 const OUT = ["DNF", "DSQ", "DNS"];
 
@@ -39,7 +40,7 @@ const hhmm = (min: number) => {
 };
 
 const PX_PER_MIN = 1.2; // 72 px per hour
-const CARD_MIN_PX = 66;
+const CARD_MIN_PX = 92; // room for the action row
 
 interface Item {
   wave: number;
@@ -62,6 +63,8 @@ interface Props {
   compact?: boolean;
   /** The app's current wave (shared selected wave), marked on its card even when no panel is open. */
   current?: number;
+  /** Check-In | Start | Live | Finish on each card. */
+  onAction?: (wave: number, action: WaveAction) => void;
 }
 
 /**
@@ -69,7 +72,7 @@ interface Props {
  * time axis, a live "now" line, Now / Next / Active jumps. Presentation only —
  * selecting a wave just sets the shared selected wave.
  */
-const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current }) => {
+const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current, onAction }) => {
   const [now, setNow] = useState(nowMinutes);
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000);
@@ -213,9 +216,16 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                 const s = waveStats(it.cats, riders);
                 const isSel = it.wave === selected;
                 return (
-                  <button
+                  <div
                     key={it.wave}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        onSelect(it.wave);
+                      }
+                    }}
                     className={`${styles.card} ${styles[`card_${it.state}`]} ${isSel ? styles.cardSel : ""}`}
                     style={{
                       top,
@@ -253,7 +263,29 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         </span>
                       )}
                     </span>
-                  </button>
+                    {onAction && !compact && (
+                      <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className={styles.act} onClick={() => onAction(it.wave, "checkin")} aria-label={`Check-In, wave ${it.wave}`} data-testid={`wave-act-checkin-${it.wave}`}>
+                          <ClipboardCheck size={13} /> Check-In
+                        </button>
+                        {it.cats.some((c) => c.status === "upcoming") && (
+                          <button type="button" className={styles.act} onClick={() => onAction(it.wave, "start")} aria-label={`Start, wave ${it.wave}`} data-testid={`wave-act-start-${it.wave}`}>
+                            <Flag size={13} /> Start
+                          </button>
+                        )}
+                        {it.state === "running" && (
+                          <>
+                            <button type="button" className={`${styles.act} ${styles.actLive}`} onClick={() => onAction(it.wave, "live")} aria-label={`Live, wave ${it.wave}`} data-testid={`wave-act-live-${it.wave}`}>
+                              <Radio size={13} /> Live
+                            </button>
+                            <button type="button" className={styles.act} onClick={() => onAction(it.wave, "finish")} aria-label={`Finish, wave ${it.wave}`} data-testid={`wave-act-finish-${it.wave}`}>
+                              <FlagTriangleRight size={13} /> Finish
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
                 );
               })}
             </div>

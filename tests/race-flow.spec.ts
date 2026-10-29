@@ -92,7 +92,7 @@ test.describe("Commissaire race flow", () => {
 
     // ── 8. Finish the running group ──────────────────────────────────────────
     await test.step("finish the running group", async () => {
-      await page.getByRole("button", { name: /Finish/i }).first().click();
+      await page.getByTestId("wave-sheet").getByRole("button", { name: /Finish/i }).first().click();
       await page.getByRole("button", { name: /^Yes/i }).click();
       await expect(page.getByText(/FINISHED/).first()).toBeVisible();
     });

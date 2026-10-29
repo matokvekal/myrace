@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { ArrowLeft, CheckCircle2, ChevronRight, Circle, ClipboardCheck, Radio, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory } from "../schedule/Schedule";
@@ -6,7 +6,7 @@ import type { WaveState } from "./WaveTimeline";
 import styles from "./raceSheet.module.css";
 
 export type SheetSize = "half" | "full";
-type View = "summary" | "checkin";
+export type SheetView = "summary" | "checkin";
 
 const OUT = ["DNS", "DNF", "DSQ"];
 const STATE_LABEL: Record<WaveState, string> = { upcoming: "Upcoming", running: "Racing", finished: "Completed" };
@@ -20,6 +20,8 @@ interface Props {
   size: SheetSize;
   onSize: (s: SheetSize) => void;
   onClose: () => void;
+  view: SheetView;
+  onView: (v: SheetView) => void;
   /** The existing start screen (start groups, countdown, start / finish): shown as is. */
   renderStart: () => React.ReactNode;
   /** The existing Check-In screen, opened from the summary. */
@@ -41,13 +43,8 @@ const actualStart = (cats: CategoryProps[], riders: RiderProps[]): string | null
  * height by default, full height for Check-In; drag handle, close, backdrop.
  */
 const RaceSheet: React.FC<Props> = ({
-  wave, state, startLabel, categories, riders, size, onSize, onClose, renderStart, renderCheckIn,
+  wave, state, startLabel, categories, riders, size, onSize, onClose, view, onView: setView, renderStart, renderCheckIn,
 }) => {
-  const [view, setView] = useState<View>("summary");
-
-  // A different wave returns to its summary (never touches race data).
-  useEffect(() => setView("summary"), [wave]);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import styles from "./heat.module.css";
 import { toast } from "react-toastify";
@@ -450,6 +450,8 @@ const Heat: React.FC = () => {
   // only THIS wave; recorded laps and times kept; riders still racing become
   // administrative finishers (no invented crossing time). Idempotent.
   const [showFinishWave, setShowFinishWave] = useState(false);
+  // Race timeline → Finish lands here with ?finish=1: open the same FINISH confirmation.
+  const [searchParams, setSearchParams] = useSearchParams();
   // RECAP MODE (useRecapMode, declared before useLapRecording): normal recording with a 6-minute duplicate check; ends after 30 s idle.
   useEffect(() => {
     if (!recap.active) return;
@@ -785,6 +787,15 @@ const Heat: React.FC = () => {
     }
     setShowMicPrompt(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get("finish") !== "1") return;
+    if (startedWaveCats.length > 0 && !waveAllFinished) setShowFinishWave(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("finish");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, startedWaveCats.length, waveAllFinished]);
 
   // One short message instead of an empty board, matched to the actual state.
   const waveRiderTotal = riders.filter(
