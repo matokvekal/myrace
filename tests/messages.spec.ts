@@ -18,7 +18,7 @@ async function openLiveDemo(page: Page) {
 }
 
 test.describe("In-app messages", () => {
-  test("a too-fast second lap tap shows the 'wait before next lap' message", async ({ page }) => {
+  test("a too-fast second lap shows the cooldown on the card and the 'wait' message for a typed bib", async ({ page }) => {
     await openLiveDemo(page);
     const bib = await racingBibWithLapsLeft(page, 3);
     const lapsBefore = (await card(page, bib).getAttribute("data-laps")) ?? "";
@@ -28,9 +28,12 @@ test.describe("In-app messages", () => {
     await tap(page, bib);
     await expect(card(page, bib)).toHaveAttribute("data-laps", new RegExp(`^${done + 1}/`));
 
-    // 30 s later the lap is refused, and the commissaire is told why.
+    // The card itself shows the cooldown (and ignores taps)…
+    await expect(card(page, bib)).toHaveAttribute("data-cooldown", "true");
+    // …while a too-early lap typed as a bib is refused, and the commissaire is told why.
     await page.clock.fastForward(30 * 1000);
-    await tap(page, bib);
+    await page.getByLabel("Bib").fill(String(bib));
+    await page.getByLabel("Bib").press("Enter");
     await page.clock.fastForward(500);
     await expect(page.getByText(/Wait \d+s before next lap/)).toBeVisible();
     await expect(card(page, bib)).toHaveAttribute("data-laps", new RegExp(`^${done + 1}/`));
@@ -42,7 +45,8 @@ test.describe("In-app messages", () => {
     await page.clock.fastForward(5 * 60 * 1000);
     await tap(page, bib);
     await page.clock.fastForward(30 * 1000);
-    await tap(page, bib);
+    await page.getByLabel("Bib").fill(String(bib));
+    await page.getByLabel("Bib").press("Enter");
     await page.clock.fastForward(500);
 
     const toast = page.getByText(/Wait \d+s before next lap/);

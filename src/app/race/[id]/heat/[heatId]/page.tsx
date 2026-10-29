@@ -1208,6 +1208,7 @@ const Heat: React.FC = () => {
                   raceEnded={isLeftOnTrack(rider)}
                   onClick={(at) => handleRiderClick(rider, "click", at)}
                   onDoubleClick={() => setContextRider(rider)}
+                  minLapMs={recap.active ? RECAP_MIN_LAP_SECONDS * 1000 : minLapMsFor(currentRace)}
                 />
               ))}
             </div>

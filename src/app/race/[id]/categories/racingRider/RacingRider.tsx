@@ -24,6 +24,8 @@ interface Props {
   /** A single tap, with the moment it happened (the card waits 300 ms to rule out a double-tap). */
   onClick: (tappedAt?: Date) => void;
   onDoubleClick: () => void;
+  /** The minimum lap interval in force (race setting, or RECAP's): the card locks for it after a lap. */
+  minLapMs?: number;
 }
 
 type Pt = { x: number; y: number };
@@ -105,7 +107,7 @@ function roundedRectPathD(w: number, h: number, r: number): string {
 const PACE_RING_CARD_RADIUS = 12;
 const PACE_RING_INSET = 0;
 
-const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick }) => {
+const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick, minLapMs }) => {
   const clickCountRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { skin } = useSkin();
@@ -216,6 +218,17 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
   // old 300ms mobile click delay). A separate touchend-based detector used to run in
   // parallel with this one — two independent state machines reacting to the same taps —
   // which could desync and swallow a double-tap on active (still-racing) riders.
+  // Minimum-lap cooldown, from the recorded arrival (persisted, so it survives a
+  // refresh): the same timeArrive + minimum the lap engine checks. While it runs a
+  // single tap does nothing (no "wait" message) and the card holds its pressed
+  // look (the :active style); double-tap (details) still works,
+  // and the engine keeps its own check for bib entry / voice.
+  const cooldownLeftMs =
+    minLapMs && rider.timeArrive && rider.raceStatus === "running"
+      ? new Date(rider.timeArrive).getTime() + minLapMs - now
+      : 0;
+  const coolingDown = cooldownLeftMs > 0;
+
   const handleClick = (e: React.MouseEvent) => {
     clickCountRef.current++;
 
@@ -224,7 +237,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       // Wait to see if a second click comes within 300ms
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = setTimeout(() => {
-        if (clickCountRef.current === 1) {
+        if (clickCountRef.current === 1 && !coolingDown) {
           onClick(tappedAt); // Single click
           setNow(Date.now()); // snap the "since arrive" clock to 0 right away, don't wait for the next tick
         }
@@ -256,6 +269,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       data-testid={`racing-rider-${rider.bibNumber}`}
       data-laps={`${rider.lapsCounter}/${rider.totalLaps}`}
       data-recorded={isRecorded ? "true" : undefined}
+      data-cooldown={coolingDown ? "true" : undefined}
       className={`${styles.rider} ${glowClass} ${isRecorded ? styles.recorded : ""} ${raceEnded ? styles.onTrack : ""}`}
       style={{ background: bgStyle, "--glow-color": color } as React.CSSProperties}
       onClick={handleClick}
