@@ -12,14 +12,19 @@ import styles from "./raceSidebar.module.css";
 
 export function useModeItems() {
   const { t } = useTranslation();
-  const { finalized } = useRaceModeNav();
+  const { finalized, mode } = useRaceModeNav();
   const all: { key: RaceMode; label: string; icon: React.ReactNode }[] = [
     { key: "setup", label: t("phase.setup", "Create"), icon: <Sliders aria-hidden="true" /> },
     { key: "race", label: t("phase.race", "Race"), icon: <Flag aria-hidden="true" /> },
     { key: "live", label: t("phase.live", "Live"), icon: <Radio aria-hidden="true" /> },
     { key: "results", label: t("phase.results", "Results"), icon: <Trophy aria-hidden="true" /> },
   ];
-  return finalized ? all.filter((i) => i.key === "setup" || i.key === "results") : all;
+  const available = finalized
+    ? all.filter((i) => i.key === "setup" || i.key === "results")
+    : all;
+  return mode === "setup" && !finalized
+    ? available.filter((i) => i.key !== "results")
+    : available;
 }
 
 const RaceSidebar: React.FC<{

@@ -134,12 +134,12 @@
 }
 
 /* Each tab gets its own casino colour — vivid, arcade-bright */
-.tabs .button:nth-child(1) { background: linear-gradient(180deg, #ff5040 0%, #c11a0a 100%); }
-.tabs .button:nth-child(2) { background: linear-gradient(180deg, #34a1ff 0%, #0b5ecc 100%); }
-.tabs .button:nth-child(3) { background: linear-gradient(180deg, #d24dff 0%, #8a10c9 100%); }
-.tabs .button:nth-child(4) { background: linear-gradient(180deg, #7ce83c 0%, #3fa60d 100%); }
-.tabs .button:nth-child(5) { background: linear-gradient(180deg, #ffa63d 0%, #cc6a0b 100%); }
-.tabs .button:nth-child(6) { background: linear-gradient(180deg, #3de0ff 0%, #0b9ecc 100%); }
+.tabs .button[data-tab="schedule"] { background: linear-gradient(180deg, #ff5040 0%, #c11a0a 100%); }
+.tabs .button[data-tab="categories"] { background: linear-gradient(180deg, #34a1ff 0%, #0b5ecc 100%); }
+.tabs .button[data-tab="riders"] { background: linear-gradient(180deg, #d24dff 0%, #8a10c9 100%); }
+.tabs .button[data-tab="results"] { background: linear-gradient(180deg, #7ce83c 0%, #3fa60d 100%); }
+.tabs .button[data-tab="map"] { background: linear-gradient(180deg, #ffa63d 0%, #cc6a0b 100%); }
+.tabs .button[data-tab="info"] { background: linear-gradient(180deg, #3de0ff 0%, #0b9ecc 100%); }
 
 /* Idle tabs stay readable (bright sun) — just a touch muted; the selected
    one is distinguished by its ring/halo/lift, not by darkening the rest */

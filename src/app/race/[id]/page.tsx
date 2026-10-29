@@ -26,8 +26,6 @@ import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { canForRace } from "@/services/cloud/permissions";
 import { isRaceFinalized } from "@/utils/raceLock";
 import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
-// Multi-user (only with a configured server): sharing, members, sync state.
-const TeamPanel = lazy(() => import("../../live/TeamPanel"));
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
 const LocalOnlyBadge = lazy(() => import("../../live/LocalOnlyBadge"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
@@ -39,8 +37,7 @@ const TABS = [
   "results",
   "map",
   // "cloud", // hidden for now
-  "info",
-  "team"
+  "info"
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -137,10 +134,13 @@ const Race: React.FC = () => {
   if (loading) return <div className={styles.loading}>Loading race...</div>;
   if (!race) return <div className={styles.loading}>Race not found.</div>;
 
-  // Shared race: only the screens this member may view (team is always there to show your own access).
-  const visibleTabs: readonly Tab[] = (finalized ? [...FINALIZED_TABS, "team" as Tab] : TABS).filter(
-    (tab) => (tab === "team" ? serverConfigured : canViewScreen(raceUuid, tab))
-  );
+  // Shared race: only the screens this member may view.
+  const availableTabs: readonly Tab[] = finalized
+    ? FINALIZED_TABS
+    : isRaceMode
+      ? TABS
+      : TABS.filter((tab) => tab !== "results");
+  const visibleTabs = availableTabs.filter((tab) => canViewScreen(raceUuid, tab));
   const activeTabSafe = (
     visibleTabs.includes(activeTab as Tab) ? activeTab : visibleTabs[0]
   ) as Tab;
@@ -199,6 +199,7 @@ const Race: React.FC = () => {
               {visibleTabs.map((tab) => (
                 <Button
                   key={tab}
+                  data-tab={tab}
                   variant={activeTabSafe === tab ? "primary" : "secondary"}
                   size="sm"
                   className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
@@ -237,11 +238,6 @@ const Race: React.FC = () => {
               {activeTabSafe === "map" && (
                 <Suspense fallback={<Loader />}>
                   <Map raceUuid={raceUuid} />
-                </Suspense>
-              )}
-              {activeTabSafe === "team" && (
-                <Suspense fallback={<Loader />}>
-                  <TeamPanel raceUuid={raceUuid} />
                 </Suspense>
               )}
               {/* Cloud tab hidden for now */}

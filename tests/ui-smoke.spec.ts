@@ -11,13 +11,20 @@ import { loadDemoRace, openTab, openLiveDemo, racingCard, finishedCard, gotoRace
  */
 
 test.describe("UI smoke", () => {
-  test("race sidebar lists All Races, then Create / Race / Live / Results", async ({ page }) => {
+  test("race sidebar hides Results from Create and keeps it available in Race", async ({ page }) => {
     await loadDemoRace(page);
     await page.getByTestId("race-menu-btn").click();
-    const ids = ["all", "setup", "race", "live", "results"];
+    const ids = ["all", "setup", "race", "live"];
     const labels = await Promise.all(ids.map((id) => page.getByTestId(`race-nav-${id}`).innerText()));
-    expect(labels.map((l) => l.trim())).toEqual(["All Races", "Create", "Race", "Live", "Results"]);
+    expect(labels.map((l) => l.trim())).toEqual(["All Races", "Create", "Race", "Live"]);
     await expect(page.getByTestId("race-nav-setup")).toHaveAttribute("aria-current", "page");
+    await page.getByTestId("race-nav-setup").click();
+    await expect(page.getByRole("button", { name: "Results", exact: true })).toHaveCount(0);
+
+    await page.getByTestId("race-menu-btn").click();
+    await page.getByTestId("race-nav-race").click();
+    await page.getByTestId("race-menu-btn").click();
+    await expect(page.getByTestId("race-nav-results")).toBeVisible();
   });
 
   test("Schedule: open a rider, edit the name, see it update", async ({ page }) => {
