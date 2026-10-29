@@ -34,8 +34,8 @@ type Pt = { x: number; y: number };
 // starting at top-center ("the start line") and walking clockwise. Used to
 // trace the pace ring directly on the card's actual edge. The card's height
 // is only a *minimum* (racingRider.module.css `.rider` uses min-height, not
-// height) and its border-radius differs by skin (16px classic, 12px gaming —
-// the ring only ever renders in gaming), so the geometry is computed from
+// height) and its border-radius differs by skin (16px classic, 12px gaming),
+// so the geometry is computed from
 // the card's real measured size, not assumed constants.
 function roundedRectGeometry(w: number, h: number, r: number) {
   const straightX = w / 2 - r;
@@ -104,7 +104,7 @@ function roundedRectPathD(w: number, h: number, r: number): string {
 // from offsetWidth/offsetHeight, which already includes the border), so it
 // reads as the card's own border lighting up rather than a frame drawn
 // inside it. Gaming-skin card radius is 12px; match it exactly.
-const PACE_RING_CARD_RADIUS = 12;
+const PACE_RING_CARD_RADIUS = { classic: 16, gaming: 12 };
 const PACE_RING_INSET = 0;
 
 const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick, minLapMs }) => {
@@ -115,23 +115,24 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
 
   // Measure the card's real rendered box (not the min-height default) so the
   // pace ring traces its actual edge instead of drifting off it when content
-  // pushes the card taller. Only observed in the gaming skin, where the ring
-  // can render at all.
+  // pushes the card taller. Both skins.
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardSize, setCardSize] = useState<{ w: number; h: number }>({ w: 76, h: 84 });
   useEffect(() => {
-    if (!isPro || !cardRef.current) return;
+    if (!cardRef.current) return;
     const el = cardRef.current;
     const ro = new ResizeObserver(() => {
       setCardSize({ w: el.offsetWidth, h: el.offsetHeight });
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [isPro]);
+  }, []);
 
-  const paceRingW = Math.max(cardSize.w - PACE_RING_INSET * 2, PACE_RING_CARD_RADIUS * 2 + 1);
-  const paceRingH = Math.max(cardSize.h - PACE_RING_INSET * 2, PACE_RING_CARD_RADIUS * 2 + 1);
-  const paceRingR = PACE_RING_CARD_RADIUS - PACE_RING_INSET;
+  const cardRadius = isPro ? PACE_RING_CARD_RADIUS.gaming : PACE_RING_CARD_RADIUS.classic;
+
+  const paceRingW = Math.max(cardSize.w - PACE_RING_INSET * 2, cardRadius * 2 + 1);
+  const paceRingH = Math.max(cardSize.h - PACE_RING_INSET * 2, cardRadius * 2 + 1);
+  const paceRingR = cardRadius - PACE_RING_INSET;
   const paceRingGeometry = useMemo(
     () => roundedRectGeometry(paceRingW, paceRingH, paceRingR),
     [paceRingW, paceRingH, paceRingR]
@@ -170,20 +171,20 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
     : null;
   const lastLapTime = lastLap?.lapTime ?? rider.elapsedLastLap ?? null;
 
-  // PRO-only pace border: how far into an "expected" lap (paced off the rider's own
+  // Pace border (both skins): how far into an "expected" lap (paced off the rider's own
   // last lap) they are right now, traced clockwise around the card's edge starting
   // top-center. Sampled on its own 10s tick — deliberately chunkier than the 1s
   // "since arrival" tick above, which keeps driving the text row untouched.
   const [paceNow, setPaceNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!isPro || !hasStarted) return;
+    if (!hasStarted) return;
     const t = setInterval(() => setPaceNow(Date.now()), 10000);
     return () => clearInterval(t);
-  }, [isPro, hasStarted]);
+  }, [hasStarted]);
 
   const lastLapMs = lastLap ? new Date(lastLap.endTime).getTime() - new Date(lastLap.startTime).getTime() : null;
   const paceSinceArriveMs = hasStarted && sinceArriveBaseline != null ? paceNow - sinceArriveBaseline : null;
-  const paceProgress = isPro && hasStarted && lastLapMs && lastLapMs > 0 && paceSinceArriveMs != null
+  const paceProgress = hasStarted && lastLapMs && lastLapMs > 0 && paceSinceArriveMs != null
     ? paceSinceArriveMs / lastLapMs
     : null;
   const paceOverdue = paceProgress != null && paceProgress >= 1;

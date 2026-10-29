@@ -293,10 +293,20 @@
    just position (user req). */
 .paceRing {
   position: absolute;
-  top: 0;
-  left: 0;
+  /* the ring is sized to the card's border box (offsetWidth/Height), so pull it
+     out over the card's own border to sit on the outer edge */
+  top: -1px;
+  left: -1px;
+  /* above the .recorded wash (z 1), so the ring stays visible while the card
+     waits for the board hold / sits out its minimum-lap cooldown */
+  z-index: 2;
   pointer-events: none;
   overflow: visible;
+}
+
+:root[data-skin="gaming"] .paceRing {
+  top: -2px;
+  left: -2px;
 }
 
 .paceRingPath {
