@@ -25,6 +25,7 @@ const HeatPage = lazy(() => import("./app/race/[id]/heat/[heatId]/page"));
 const StandingPage = lazy(() => import("./app/race/[id]/standing/[heatId]/page"));
 const ResultsPage = lazy(() => import("./app/race/[id]/results/ResultsPage"));
 const BoardPage = lazy(() => import("./app/race/[id]/board/BoardPage"));
+const TeamPage = lazy(() => import("./app/race/[id]/team/TeamPage"));
 // Loaded on demand like the routes, so the IndexedDB helper stays out of the
 // eager bundle. It reads the shared DB-health flag set by initIndexedDB().
 const DbUpdateNotice = lazy(() =>
@@ -92,6 +93,7 @@ export default function App() {
           <Route path="/race/:id/standing/:heatId" element={<StandingPage />} />
           <Route path="/race/:id/results" element={<ResultsPage />} />
           <Route path="/race/:id/board" element={<BoardPage />} />
+          {serverConfigured && <Route path="/race/:id/team" element={<TeamPage />} />}
           {serverConfigured && <Route path="/account" element={<LiveAccountPage />} />}
           {serverConfigured && <Route path="/invite/:token" element={<LiveInvitePage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
