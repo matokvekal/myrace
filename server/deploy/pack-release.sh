@@ -22,7 +22,8 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/server"
 cp -R "$server/dist" "$server/sql" "$server/package.json" "$server/package-lock.json" "$stage/server/"
 # Production dependencies only; no install scripts; no .bin symlinks (the gate refuses links).
-(cd "$stage/server" && npm ci --omit=dev --ignore-scripts --no-bin-links --no-audit --no-fund --loglevel=error)
+# Its output goes to stderr: stdout is GITHUB_OUTPUT, where "added N packages" is invalid.
+(cd "$stage/server" && npm ci --omit=dev --ignore-scripts --no-bin-links --no-audit --no-fund --loglevel=error) >&2
 printf '%s\n' "$sha" > "$stage/REVISION"
 
 if [[ -n "$(find "$stage" ! -type f ! -type d -print -quit)" ]]; then
