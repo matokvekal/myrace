@@ -80,7 +80,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/landing2" element={<LandingV2Page />} />
-          <Route path="/login" element={<LoginPage />} />
+          {/* One sign-in: the server account. Old /login links land there. */}
+          <Route path="/login" element={serverConfigured ? <Navigate to="/account" replace /> : <LoginPage />} />
           <Route path="/otp" element={<OtpPage />} />
           <Route path="/loginerror" element={<LoginErrorPage />} />
           <Route path="/main" element={<MainPage />} />

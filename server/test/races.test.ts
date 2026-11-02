@@ -5,7 +5,7 @@
  */
 import { createHash, createPublicKey, randomUUID, verify } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, api, auth, newUser, publishRace, snapshot, startServer, stopServer, type TestUser } from "./helpers";
+import { action, addMember, api, auth, newUser, publishRace, send, snapshot, startServer, stopServer, type TestUser } from "./helpers";
 
 let owner: TestUser, admin: TestUser, counter: TestUser, outsider: TestUser;
 
@@ -29,6 +29,33 @@ describe("publish", () => {
     }
     const mine = await api().get("/api/v1/races").set(auth(owner.token));
     expect(mine.body.races.map((x: any) => x.race.name)).not.toContain("Bad");
+  });
+
+  it("a race just created on a phone (no start list yet) is stored and can be opened from another browser", async () => {
+    // What Create Race sends for a race with no categories/riders yet.
+    const info = {
+      raceId: "20261102-mobile", owner: "1", name: "Mobile Race", location: "TBD", time: "08:00", date: "2026-11-02",
+      image: "images/bike.jpg", heat: "1", type: "Competition", raceType: "MTB", level: "1", orgenizer: "Race Org",
+      manager: "John Doe", phone: "000-000-0000", takanon: "", site: "", map: "", distance: 0, isActive: true,
+      autoColor: true, leaderFinishAll: null, minLapSeconds: 180,
+    };
+    const created = await api().post("/api/v1/races/publish").set(auth(owner.token)).send({ race: info, categories: [], riders: [] });
+    expect(created.status).toBe(201);
+    const raceUuid = created.body.race.uuid as string;
+
+    // Same account, second browser: a fresh sign-in sees the race and its (empty) start list.
+    const login = await api().post("/api/v1/auth/login").send({ email: owner.email, password: "password-123", deviceId: "browser-2" });
+    expect(login.status).toBe(200);
+    const other = { ...owner, token: login.body.accessToken as string };
+    const mine = await api().get("/api/v1/races").set(auth(other.token));
+    expect(mine.body.races.find((x: any) => x.race.uuid === raceUuid)?.race.name).toBe("Mobile Race");
+
+    // The start list arrives later as Actions and is visible there too.
+    const c = cat();
+    const [res] = await send(owner, raceUuid, action(raceUuid, "CategoryAdded", { category: c }));
+    expect(res.applied).toBe(true);
+    const snap = await snapshot(other, raceUuid);
+    expect(snap.categories.map((x: any) => x.name)).toEqual(["Elite"]);
   });
 
   it("publishing the same local race twice is refused (409); duplicate bibs are reported", async () => {

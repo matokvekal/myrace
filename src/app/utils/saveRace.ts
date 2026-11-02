@@ -10,6 +10,7 @@ import { generateRaceId } from "@/services/RaceSync";
 import useRiderStore from "@/stores/ridersStore";
 import { logAnalyticsEvent } from "@/services/analytics/analyticsClient";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
+import type { NewRaceStorage } from "@/services/live/liveClient";
 
 const DEFAULT_IMAGES = [
   Images.bikeMountainSplash,
@@ -44,7 +45,7 @@ export const saveRace = async (
   setAddNewwRace: (value: boolean) => void,
   autoColor: boolean = true,
   raceType: "MTB" | "Gravel" = "MTB"
-) => {
+): Promise<NewRaceStorage | null> => {
   event.preventDefault();
 
   try {
@@ -148,14 +149,20 @@ export const saveRace = async (
       details: { name: newRace.name, date: newRace.date, riderCount: useRiderStore.getState().riders.length },
     });
 
-    // With a server: the new race is saved there too (PostgreSQL), now or on sign-in.
+    // With a server: the new race is saved there too (PostgreSQL). Wait for the
+    // answer so the caller can say where the race really is; it stays on this
+    // device either way and keeps retrying in the background.
+    let storage: NewRaceStorage | null = null;
     if (import.meta.env.VITE_SERVER_URL) {
-      void import("@/services/live/liveClient")
-        .then((m) => m.persistNewRace(newRace.uuid))
-        .catch((e) => console.warn("[live] could not queue the new race for the server", e));
+      try {
+        storage = await (await import("@/services/live/liveClient")).persistNewRace(newRace.uuid);
+      } catch (e) {
+        storage = { stored: "device", reason: "failed", message: e instanceof Error ? e.message : String(e) };
+      }
     }
 
     setAddNewwRace(false);
+    return storage;
   } catch (error) {
 
     if (error instanceof Error) {

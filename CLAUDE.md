@@ -417,6 +417,22 @@ still open).
 - Limitation: viewers must be signed-in race members; there is no anonymous
   read-only feed on the server, so public mass viewing needs a backend change.
 
+### Sign-in and where a new race is saved
+- ONE sign-in system: the Commissaire server account (`/account`, `liveClient` session).
+  The side menu's Register / Login opens `/account`, Logout calls `auth.logout()` and keeps
+  every race on the device; `/login` redirects there. The old `/login`, `/otp`, `appStore`
+  sign-up and `services/Auth.ts` are dead code (not reachable with a server configured).
+- Create Race signed in: `saveRace` AWAITS `persistNewRace` (≤20 s) and the toast says
+  "saved to the server" ONLY after the server answered; otherwise "saved on this device
+  only. <reason>" and it keeps retrying (queue `commissaire.live.pendingPublish.v2`, per
+  account — never published under another account). New races go up without categories
+  (`publishRace(…, { allowEmpty: true })`); Team → Share still requires categories.
+- Created signed out, or older local races: never uploaded automatically. The race page
+  badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
+- `publishRace` runs once per race at a time (in-tab map + Web Locks across tabs): two
+  uploads of an empty race would create two server races.
+- `tests/race-persistence.spec.ts` needs a real API (`E2E_API_URL`); skipped otherwise.
+
 ### Terms & Conditions (landing-page acceptance)
 - Content lives in `legal/terms.ts` (the ONLY file to edit; it's a DRAFT, not
   lawyer-reviewed). Acceptance is persisted + versioned in

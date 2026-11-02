@@ -7,6 +7,7 @@ import { previewStartListFile, type StartListPreview } from "@/utils/startListPr
 import { compressImage } from "@/utils/compressImage";
 import useRaceStore from "@/stores/racesStore";
 import { ArrowLeft, ImagePlus } from "lucide-react";
+import { toast } from "react-toastify";
 
 interface Props {
   setAddNewwRace: (value: boolean) => void;
@@ -140,7 +141,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     if (importBlocked) return; // the start list must be previewed and confirmed first
     setLoading(true);
     try {
-      await saveRace(
+      const storage = await saveRace(
         event,
         raceName,
         startDate,
@@ -152,6 +153,9 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
         autoColor,
         raceType
       );
+      // Say where the race is: only a server answer counts as "saved to the server".
+      if (storage?.stored === "server") toast.success("Race saved to the server", { toastId: "race-storage" });
+      else if (storage) toast.warn(`Race saved on this device only. ${storage.message.replace(/\.$/, "")}.`, { toastId: "race-storage", autoClose: 10_000 });
     } catch (error) {
       console.error("Failed to save race:", error);
       setSaveError(error instanceof Error ? error.message : String(error));

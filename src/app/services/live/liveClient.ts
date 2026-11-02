@@ -68,6 +68,8 @@ interface LiveState {
   openRace: string | null;
   sync: Record<string, RaceSync>;
   access: Record<string, AccessSummary>;
+  /** New races still waiting to upload: the last error, by local race uuid. */
+  publishErrors: Record<string, string>;
 }
 
 export const useLiveStore = create<LiveState>(() => ({
@@ -78,6 +80,7 @@ export const useLiveStore = create<LiveState>(() => ({
   openRace: null,
   sync: {},
   access: {},
+  publishErrors: {},
 }));
 
 const syncOf = (local: string): RaceSync => useLiveStore.getState().sync[local] ?? { pending: 0, notApplied: [], revoked: false, lastSyncAt: null };
@@ -870,8 +873,31 @@ export async function openLiveRace(local: string | null): Promise<void> {
 // ---------------------------------------------------------------------------
 // Publish, My Races, join
 
-/** Shares a local race (before any wave started). The Device's ids become the shared ones. */
-export async function publishRace(local: string): Promise<string> {
+/**
+ * Shares a local race (before any wave started). The Device's ids become the shared ones.
+ * A new race (`allowEmpty`) may go up with no categories yet: they follow as Actions.
+ */
+export function publishRace(local: string, opts: { allowEmpty?: boolean } = {}): Promise<string> {
+  // One upload per race at a time — in this tab (the retry timer and "Save to server"
+  // can meet) and across tabs (Web Locks). The server cannot tell two uploads of an
+  // empty race apart, so a second one would create a duplicate race.
+  const running = publishingRaces.get(local);
+  if (running) return running;
+  const once = async () => {
+    const link = linkOf(local);
+    if (link && opts.allowEmpty) return link.serverRaceUuid; // another upload just finished
+    return publishRaceOnce(local, opts);
+  };
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  // (this TS lib types request() as Promise<Promise<T>>; .then flattens it)
+  const locked = locks ? locks.request(`commissaire.publish.${local}`, once).then((v) => v) : once();
+  const run = locked.finally(() => publishingRaces.delete(local));
+  publishingRaces.set(local, run);
+  return run;
+}
+const publishingRaces = new Map<string, Promise<string>>();
+
+async function publishRaceOnce(local: string, { allowEmpty = false }: { allowEmpty?: boolean }): Promise<string> {
   if (!session) throw new LiveApiError(401, "unauthorized", "Sign in to share a race");
   if (linkOf(local)) throw new LiveApiError(409, "already_published", "This race is already shared");
   if (local === DEMO_RACE_UUID) throw new LiveApiError(400, "demo_race", "The demo race can't be shared — create a race for your event");
@@ -882,7 +908,7 @@ export async function publishRace(local: string): Promise<string> {
   const cats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
   const riders = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
   if (cats.some((c) => c.status && c.status !== "upcoming")) throw new LiveApiError(409, "already_started", "Share the race before the first wave starts");
-  if (cats.length === 0) throw new LiveApiError(400, "no_categories", "Add categories before sharing the race");
+  if (cats.length === 0 && !allowEmpty) throw new LiveApiError(400, "no_categories", "Add categories before sharing the race");
   // Give every record its shared id, locally first (not through the bridge: the race is not linked yet).
   const catsWithUuid = cats.map((c) => ({ ...c, uuid: c.uuid ?? crypto.randomUUID() }));
   const ridersWithUuid = riders.map((r) => ({ ...r, uuid: r.uuid ?? crypto.randomUUID() }));
@@ -911,28 +937,91 @@ export async function publishRace(local: string): Promise<string> {
 // New races go to the server automatically
 
 /**
- * Races created on this Device that still have to be published. Only races
- * created after this was introduced are ever added (by Create Race), so
- * existing local races are never uploaded without the owner asking.
+ * Races created on this Device while signed in that still have to be published,
+ * with the account that created them. Only Create Race adds to it, so existing
+ * local races (and races created signed out) are never uploaded without the
+ * owner asking — they get "Save to server" on the race page instead. A queued
+ * race is only ever published under the account that created it.
+ *
+ * The older key (`commissaire.live.pendingPublish`, plain uuids, filled signed
+ * out too) is no longer read: those races are offered "Save to server".
  */
-export const PENDING_PUBLISH_KEY = "commissaire.live.pendingPublish";
-const readPending = (): string[] => {
+export const PENDING_PUBLISH_KEY = "commissaire.live.pendingPublish.v2";
+type PendingEntry = { local: string; userId: string };
+const readPendingEntries = (): PendingEntry[] => {
   try {
     const v = JSON.parse(localStorage.getItem(PENDING_PUBLISH_KEY) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+    return Array.isArray(v) ? v.filter((x) => typeof x?.local === "string" && typeof x?.userId === "string") : [];
   } catch {
     return [];
   }
 };
-const writePending = (list: string[]) => localStorage.setItem(PENDING_PUBLISH_KEY, JSON.stringify([...new Set(list)]));
+const writePendingEntries = (list: PendingEntry[]) =>
+  localStorage.setItem(PENDING_PUBLISH_KEY, JSON.stringify(list.filter((e, i) => list.findIndex((o) => o.local === e.local) === i)));
+const removePending = (local: string) => writePendingEntries(readPendingEntries().filter((e) => e.local !== local));
+/** The queued races of the signed-in account (uuids). */
+const readPending = (): string[] => (session ? readPendingEntries().filter((e) => e.userId === session!.user.id).map((e) => e.local) : []);
 export const isPendingPublish = (local: string) => readPending().includes(local);
 
-/** A new race persists to the server: now when signed in, otherwise as soon as the user signs in. */
-export async function persistNewRace(local: string): Promise<boolean> {
-  if (local === DEMO_RACE_UUID || linkOf(local)) return !!linkOf(local);
-  writePending([...readPending(), local]);
-  await publishPending();
-  return !!linkOf(local);
+/** Why a queued new race is not on the server yet (the last failed upload), shown on the race page. */
+const setPublishError = (local: string, message: string | null) =>
+  useLiveStore.setState((s) => {
+    const publishErrors = { ...s.publishErrors };
+    if (message) publishErrors[local] = message;
+    else delete publishErrors[local];
+    return { publishErrors };
+  });
+
+/** Where a new race is stored after Create Race. Only "server" means it is in the database. */
+export type NewRaceStorage =
+  | { stored: "server"; serverRaceUuid: string }
+  | { stored: "device"; reason: "signed_out" | "failed" | "timeout"; message: string };
+
+/**
+ * A new race persists to the server when the user is signed in (retried in the
+ * background after a failure). Signed out it stays on this device until the
+ * owner taps "Save to server" after signing in. Resolves with where the race
+ * actually is, never "server" unless the server answered with the created race.
+ */
+export async function persistNewRace(local: string, timeoutMs = 20_000): Promise<NewRaceStorage> {
+  const done = (): NewRaceStorage | null => {
+    const l = linkOf(local);
+    return l ? { stored: "server", serverRaceUuid: l.serverRaceUuid } : null;
+  };
+  if (local === DEMO_RACE_UUID) return { stored: "device", reason: "failed", message: "The demo race stays on this device" };
+  const linked = done();
+  if (linked) return linked;
+  if (!session) return { stored: "device", reason: "signed_out", message: "Sign in, then use Save to server on the race page" };
+  writePendingEntries([...readPendingEntries(), { local, userId: session.user.id }]);
+  const attempt = (async () => {
+    await publishPending();
+    // An upload already in progress may have started before this race was queued.
+    if (!done()) await publishPending();
+  })();
+  const timedOut = await Promise.race([attempt.then(() => false), new Promise<boolean>((r) => setTimeout(() => r(true), timeoutMs))]);
+  const now = done();
+  if (now) return now;
+  if (timedOut) return { stored: "device", reason: "timeout", message: "The server did not answer in time; still trying" };
+  if (!session) return { stored: "device", reason: "signed_out", message: "Your session ended. Sign in, then use Save to server on the race page" };
+  return { stored: "device", reason: "failed", message: useLiveStore.getState().publishErrors[local] ?? "The server did not save the race" };
+}
+
+/**
+ * "Save to server" on a local race (created signed out, or before this
+ * existed): the owner's explicit choice, so nothing is uploaded without it.
+ * The local race and its data stay as they are; it only becomes linked.
+ */
+export async function saveRaceToServer(local: string): Promise<string> {
+  try {
+    const serverRaceUuid = await publishRace(local, { allowEmpty: true });
+    removePending(local);
+    setPublishError(local, null);
+    return serverRaceUuid;
+  } catch (e) {
+    const message = e instanceof TypeError ? "No connection to the server" : e instanceof Error ? e.message : String(e);
+    setPublishError(local, message);
+    throw new Error(message);
+  }
 }
 
 let publishing: Promise<void> | null = null;
@@ -944,17 +1033,20 @@ export function publishPending(): Promise<void> {
     if (useRaceStore.getState().races.length === 0) await useRaceStore.getState().getRaces();
     for (const local of readPending()) {
       if (linkOf(local)) {
-        writePending(readPending().filter((x) => x !== local));
+        removePending(local);
         continue;
       }
       if (!useRaceStore.getState().races.some((r) => r.uuid === local)) continue; // not loaded here — keep it
       try {
-        await publishRace(local);
-        writePending(readPending().filter((x) => x !== local));
+        await publishRace(local, { allowEmpty: true });
+        removePending(local);
+        setPublishError(local, null);
       } catch (e) {
         // Offline / server down: retried by the sync timer. A race that started
         // before it could be published can no longer be (the owner is told on the race page).
-        console.warn("[live] new race not published yet", local, e instanceof Error ? e.message : e);
+        const message = e instanceof Error ? e.message : String(e);
+        setPublishError(local, e instanceof TypeError ? "No connection to the server" : message);
+        console.warn("[live] new race not published yet", local, message);
       }
     }
   })().finally(() => {

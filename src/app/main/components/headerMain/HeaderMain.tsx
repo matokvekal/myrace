@@ -4,8 +4,7 @@ import Images from "@/constants/Images";
 import Button from "@/components/ui/Button";
 import Version from "@/components/Version/Version";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useDataStore } from "@/stores/appStore";
-import Cookies from "js-cookie";
+import { accountsEnabled, useLiveAccount } from "../../../live/useLiveAccount";
 import { useTranslation } from "react-i18next";
 import {
   Bike, ChevronDown, Download, FileSpreadsheet, Globe, House, LifeBuoy, LogIn, LogOut,
@@ -45,16 +44,13 @@ function HeaderMain() {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { user, getUser } = useDataStore();
+  // The Commissaire server account (/account) is the only sign-in.
+  const { user, logout } = useLiveAccount();
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const { skin, setSkin } = useSkin();
   const raceSetupSummary = useRaceSetupSummary();
   const { hasNativePrompt, installed, promptInstall } = usePwaInstall();
-
-  useEffect(() => {
-    getUser();
-  }, []);
 
   const closeDrawer = () => {
     setDrawerOpen(false);
@@ -72,11 +68,10 @@ function HeaderMain() {
     return () => window.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
 
-  const handleLogout = () => {
-    Cookies.remove("token");
-    Cookies.remove("user");
-    useDataStore.setState({ user: null, token: null });
+  const handleLogout = async () => {
     setDrawerOpen(false);
+    await logout();
+    toast.info(t("nav.signedOut", "Signed out. Your races stay on this device."), { toastId: "signed-out" });
   };
 
   const handleInstall = async () => {
@@ -214,17 +209,17 @@ function HeaderMain() {
             <img src={Images.user} alt="" className={styles.avatarImg} />
             <div className={styles.accountText}>
               <div className={styles.avatarName} dir="auto">
-                {user ? (user.familyName || user.name) : t("nav.guest", "Guest")}
+                {user ? user.name : t("nav.guest", "Guest")}
               </div>
               <div className={styles.avatarSub} dir="auto">
-                {user ? (user.phone || t("nav.signedIn", "Signed in")) : t("nav.notSignedIn", "Not signed in")}
+                {user ? (user.email || t("nav.signedIn", "Signed in")) : t("nav.notSignedIn", "Not signed in")}
               </div>
             </div>
           </div>
           {/* Signed in: Logout stays with the account. Guests sign in from the footer. */}
           {user && (
             <div className={styles.accountActions}>
-              <button type="button" className={styles.accountAction} onClick={handleLogout}>
+              <button type="button" className={styles.accountAction} data-testid="menu-logout" onClick={() => void handleLogout()}>
                 <LogOut aria-hidden="true" />
                 <span>{t("nav.logout", "Logout")}</span>
               </button>
@@ -363,18 +358,19 @@ function HeaderMain() {
                 <Download className={styles.footerBtnTrail} aria-hidden="true" />
               </button>
             )}
-            {!user && (
+            {/* Sign in / register = the Commissaire server account (/account). No server, no accounts. */}
+            {accountsEnabled && !user && (
               <button
                 type="button"
                 className={styles.footerBtn}
+                data-testid="menu-login"
                 onClick={() => {
                   setDrawerOpen(false);
-                  navigate("/login");
+                  navigate("/account");
                 }}
               >
                 <LogIn aria-hidden="true" />
                 <span>{t("nav.registerLogin", "Register / Login")}</span>
-                <span className={styles.soonBadge}>{t("login.soon", "Soon")}</span>
               </button>
             )}
             <div className={styles.footerMeta}>

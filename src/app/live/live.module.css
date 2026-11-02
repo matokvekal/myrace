@@ -243,6 +243,22 @@
   background: var(--ok, #2a9d4b);
 }
 
+/* "Save to server" / "Sign in" inside the local-only badge */
+.syncAction {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.syncAction:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .dotWarn {
   background: #e0a100;
 }
