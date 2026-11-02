@@ -134,11 +134,11 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
 
   const confirmCancel = (action: RiderAction) => {
     setConfirmingId(null);
-    onCancel?.(action.id, `#${action.rider.bibNumber} ${action.rider.firstName} ${action.rider.lastName}`);
+    onCancel?.(action.id, `${action.rider.bibNumber} ${action.rider.firstName} ${action.rider.lastName}`);
   };
 
   const riderName = (rider: RiderProps) =>
-    `#${rider.bibNumber} ${rider.firstName} ${rider.lastName}`;
+    `${rider.bibNumber} ${rider.firstName} ${rider.lastName}`;
 
   // "Bib" view: one card per rider, bib ascending. The newest action for that rider
   // already carries the full cumulative lapsDetails history, so grouping is just "keep the latest".

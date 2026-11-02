@@ -146,7 +146,7 @@ function startBlockFor(page: Page, startTime: string): Locator {
 
 /** A rider's row on the Results tab. */
 function resultsRow(page: Page, bib: number): Locator {
-  return page.locator('[class*="row"]').filter({ hasText: `#${bib}` }).first();
+  return page.locator('[class*="row"]').filter({ has: page.getByTestId("bib").filter({ hasText: new RegExp(`^${bib}$`) }) }).first();
 }
 
 /** A category's row on the Schedule tab ("N riders · N laps" + the trophy button). */
@@ -300,13 +300,13 @@ test.describe("Full race day", () => {
 
       // Out-statuses are classified rather than ranked.
       for (const wave of [WAVE_1, WAVE_2]) {
-        await expect(page.getByText(`#${wave.dnsBib}`).first()).toBeVisible();
+        await expect(page.getByText(String(wave.dnsBib), { exact: true }).first()).toBeVisible();
         for (const [bib, status] of [
           [wave.dnfBib, "DNF"],
           [wave.dsqBib, "DSQ"],
         ] as const) {
           const row = page.locator('[class*="riderRow"], [class*="row"]')
-            .filter({ hasText: `#${bib}` })
+            .filter({ has: page.getByTestId("bib").filter({ hasText: new RegExp(`^${bib}$`) }) })
             .first();
           await expect(row).toContainText(status);
         }
@@ -321,7 +321,7 @@ test.describe("Full race day", () => {
       // never hidden, and the choice survives a reload via localStorage.
       const sampleBib = WAVE_1.categories[0].bibs[0];
       const sampleName = "Brooks";
-      await expect(page.getByText(`#${sampleBib}`).first()).toBeVisible();
+      await expect(page.getByText(String(sampleBib), { exact: true }).first()).toBeVisible();
 
       // The menu keeps an overlay open after a toggle, so close it each time.
       const toggleColumn = async (label: string) => {
@@ -331,8 +331,8 @@ test.describe("Full race day", () => {
         await expect(page.getByRole("menu")).toHaveCount(0);
       };
 
-      await toggleColumn("Bib #");
-      await expect(page.getByText(`#${sampleBib}`)).toHaveCount(0);
+      await toggleColumn("Bib");
+      await expect(page.getByTestId("results-category").getByTestId("bib")).toHaveCount(0);
       await expect(page.getByText(sampleName).first()).toBeVisible();
 
       // Persisted as the default for next time (localStorage, not just state).
@@ -343,8 +343,8 @@ test.describe("Full race day", () => {
       expect(JSON.parse(saved!)).not.toContain("bib");
 
       // Put it back so the later export assertions see a normal Results tab.
-      await toggleColumn("Bib #");
-      await expect(page.getByText(`#${sampleBib}`).first()).toBeVisible();
+      await toggleColumn("Bib");
+      await expect(page.getByText(String(sampleBib), { exact: true }).first()).toBeVisible();
 
       // Every finisher has a real elapsed time (BUGS.md #30 — these all used to
       // render "—" because timeStartRace was parsed with new Date()).
@@ -497,18 +497,6 @@ async function runWave(
     await expect(checkAll).toHaveCount(0);
 
     // One rider signs off before the start — DNS, so they never take the line.
-    // Uses the one-tap row action (BUGS.md #25) rather than the Status menu.
-    await page.getByRole("button", { name: `Mark #${plan.dnsBib} DNS` }).click();
-    await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
-
-    // Both controls drive the same field. The row's DNS button stays, pressed;
-    // tapping it again clears DNS (undo).
-    const dnsBtn = page.getByRole("button", { name: `Mark #${plan.dnsBib} DNS` });
-    await expect(dnsBtn).toHaveAttribute("aria-pressed", "true");
-    await dnsBtn.click();
-    await expect(page.getByTestId("checkin-dns-count")).toHaveCount(0); // no DNS → no DNS count shown
-
-    // Put them back out — this time through the Status menu, to prove both paths.
     await setStatusAtCheckIn(page, plan.dnsBib, "DNS");
     await expect(page.getByTestId("checkin-dns-count")).toHaveText(/1 DNS/);
 
@@ -519,7 +507,7 @@ async function runWave(
       for (const entry of opts.lateEntries) {
         await page.getByTestId(`add-rider-${entry.category}`).click();
         const modal = page.getByTestId("add-rider-modal");
-        await modal.getByPlaceholder("Bib # *").fill(String(entry.bib));
+        await modal.getByPlaceholder("Bib *").fill(String(entry.bib));
         await modal.getByPlaceholder("First name *").fill(entry.firstName);
         await modal.getByPlaceholder("Last name *").fill(entry.lastName);
         await modal.getByRole("button", { name: "Add Rider", exact: true }).click();

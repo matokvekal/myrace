@@ -47,7 +47,6 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("rider-category-header").first()).toBeVisible();
     const before = await page.getByTestId("rider-category-header").count();
 
-    await page.getByTestId("rider-tools-toggle").click(); // search sits behind the search icon
     const box = page.getByTestId("rider-search");
     await box.fill("1");
     const afterBib = await page.getByTestId("rider-category-header").count();
@@ -148,7 +147,7 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("results-category").first()).toBeVisible();
     await expect(page.getByTestId("results-cat-chip").first()).toBeVisible();
     // ranking rows carry bib, name and laps
-    await expect(page.getByTestId("results-category").first()).toContainText(/#\d+/);
+    await expect(page.getByTestId("results-category").first()).toContainText(/\d+/);
     await expect(page.getByTestId("results-category").first()).toContainText(/\d+\/\d+/);
 
     // jump to another category without leaving

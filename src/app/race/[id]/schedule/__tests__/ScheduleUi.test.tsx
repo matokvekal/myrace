@@ -59,8 +59,8 @@ describe("Schedule: rider rows", () => {
     await user.click(screen.getByRole("button", { name: /Dana Levi/ }));
     expect(screen.getByTestId("rider-modal-status")).toHaveTextContent("Active");
     expect(screen.getByText("Club X")).toBeInTheDocument();
-    expect(screen.getAllByText("#10").length).toBeGreaterThan(1); // list row + modal badge
-    expect(screen.getByText("Bib #")).toBeInTheDocument();
+    expect(screen.getAllByText("10").length).toBeGreaterThan(1); // list row + modal badge
+    expect(screen.getByText("Bib")).toBeInTheDocument();
     expect(screen.getByText("Wave")).toBeInTheDocument();
   });
 
@@ -83,7 +83,7 @@ describe("Schedule: rider rows", () => {
     // visible in the schedule right away
     const updated = await screen.findByRole("button", { name: /Dina Levi/ });
     expect(within(updated).getByText("DNF")).toBeInTheDocument();
-    expect(screen.getAllByText("#77").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("77").length).toBeGreaterThan(0);
 
     // persisted to IndexedDB and logged
     await waitFor(async () => {

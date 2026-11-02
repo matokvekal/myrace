@@ -29,7 +29,7 @@ async function importAndSnapshot(page: Page, name: string, file: string) {
   await expect(page.getByText("Riders (30)")).toBeVisible();
   const riderRows = await page
     .locator('[class*="dataRow"]')
-    .evaluateAll((els) => els.map((e) => (e as HTMLElement).innerText.replace(/\s+/g, " ").trim()));
+    .evaluateAll((els) => els.map((e) => `${(e as HTMLElement).dataset.category} ${(e as HTMLElement).innerText.replace(/\s+/g, " ").trim()}`));
 
   // Categories, with their derived laps + wave.
   await page.getByRole("button", { name: "Schedule", exact: true }).click();

@@ -191,7 +191,7 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
             />
           </div>
 
-          <div className={styles.bibBadge}>#{rider.bibNumber}</div>
+          <div className={styles.bibBadge}>{rider.bibNumber}</div>
 
           {editMode ? (
             <div className={styles.nameEdit}>
@@ -218,8 +218,8 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
         {/* Data grid */}
         <div className={styles.grid}>
 
-          <Field label="Bib #" editMode={editMode}
-            view={<strong>#{rider.bibNumber}</strong>}
+          <Field label="Bib" editMode={editMode}
+            view={<strong>{rider.bibNumber}</strong>}
             edit={<input className={styles.input} value={form.bibNumber} onChange={e => set("bibNumber", e.target.value)} type="number" />}
           />
 

@@ -81,15 +81,11 @@
     0 12px 24px rgba(99, 166, 252, 0.15);
 }
 
-/* ── CREATE section tabs: classic segmented bar (matches the Riders view control) ── */
+/* ── CREATE section tabs: plain text tabs, gold underline on the active one ── */
 .tabs {
   display: flex;
-  gap: 2px;
   margin-top: 12px;
-  padding: 2px;
-  border: 1px solid var(--border-card, #d9e7fb);
-  border-radius: 8px;
-  background: var(--bg-surface, #f5f8ff);
+  border-bottom: 1px solid #d3d5da;
   overflow-x: auto; /* last resort on very narrow phones — no wrap, no page overflow */
   scrollbar-width: none;
 }
@@ -100,57 +96,49 @@
 
 .button {
   flex: 1 0 auto;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  height: 42px;
+  padding: 0 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--text-muted, #8498ba);
-  font-size: 13px;
-  font-weight: 500;
+  color: #5b5e66;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.button svg {
-  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .button:hover {
-  color: var(--text-primary, #14243c);
+  color: #0a0a0b;
 }
 
 .button.activeTab {
-  background: var(--surface-1, #fff);
-  border-color: var(--brand, #63a6fc);
-  color: var(--brand-strong, #3f86e7);
-  font-weight: 600;
+  border-bottom-color: #c9a24a;
+  color: #0a0a0b;
 }
 
-/* Phones: icons over labels would crowd; keep labels, shrink spacing */
 @media (max-width: 420px) {
   .button {
-    padding: 0 8px;
-    gap: 4px;
-    font-size: 12px;
-  }
-
-  .button svg {
-    display: none;
+    padding: 0 6px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
   }
 }
 
 /* PRO skin: keep the bar flat */
 :root[data-skin="gaming"] .tabs .button:not(:disabled) {
   box-shadow: none !important;
-  border-radius: 6px !important;
-  text-transform: none;
-  letter-spacing: normal;
+  border-radius: 0 !important;
+  background: transparent;
+  color: #5b5e66;
+}
+
+:root[data-skin="gaming"] .tabs .button.activeTab:not(:disabled) {
+  color: #0a0a0b;
 }
 
 .tabContent {
@@ -173,6 +161,32 @@
   padding: 0 12px;
 }
 
+.emptyRace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  color: #5b5e66;
+  font-size: 14px;
+}
+
+.emptyRace p {
+  margin: 0;
+}
+
+.emptyRaceBtn {
+  min-height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 2px;
+  background: #1d3d78;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .loading {
   height: 100vh;
   width: 100%;
@@ -190,22 +204,21 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 12px;
   padding: 11px 14px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(224, 169, 44, 0.16), rgba(224, 169, 44, 0.07));
-  border: 1px solid rgba(224, 169, 44, 0.45);
-  color: #f2e3bd;
+  border-radius: 2px;
+  background: #1d3d78;
+  border-left: 3px solid #c9a24a;
+  color: rgba(255, 255, 255, 0.82);
   font-size: 13px;
   line-height: 1.45;
 }
 
 .finalBanner strong {
-  color: #ffd464;
+  color: #fff;
 }
 
 .finalBannerIcon {
-  font-size: 16px;
-  line-height: 1;
+  color: #c9a24a;
   flex-shrink: 0;
 }

@@ -166,6 +166,119 @@
 
 .takanonLink:hover { text-decoration: underline; }
 
+.rulesRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline-end: 12px;
+}
+
+.rulesAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  background: #fff;
+  color: #0a0a0b;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rulesForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.rulesForm .takanonInput {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  font-size: 16px;
+}
+
+.rulesBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  background: #fff;
+  color: #0a0a0b;
+  cursor: pointer;
+}
+
+.rulesError {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b3261e;
+  font-size: 12px;
+}
+
+/* El Niño event: the fixed start of the URL sits above the id field */
+.elNinoPrefix {
+  flex-basis: 100%;
+  color: #5b5e66;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rulesForm:has(.elNinoPrefix) .takanonInput {
+  flex-basis: 100%;
+}
+
+.qrOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.qrModal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+  padding: 12px;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.qrHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #0a0a0b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.qrVideo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #1d3d78;
+}
+
 .takanonEmpty {
   padding: 10px 14px;
   font-size: 12px;
@@ -555,9 +668,55 @@
 }
 
 .finishText {
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 13px;
   color: #555;
   line-height: 1.5;
+}
+
+.moreLead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.moreLeadText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moreBtn {
+  flex-shrink: 0;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: #a8761a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.moreDetails {
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .finishBody {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .finishText {
+    flex-basis: 100%;
+  }
+
+  .finishBtn {
+    margin-inline-start: auto;
+  }
 }
 
 .finishBtn {

@@ -17,6 +17,7 @@ import {
    AMBIGUOUS_ALIASES,
    AMBIGUOUS_ALIAS_CAP,
    SEED_ORDER_ALIASES,
+   OPT_IN_FIELDS,
    isIdColumnHeader
 } from '@/types/csv.types';
 import { fuzzyMatchScore, normalize, contains } from '@/utils/levenshtein';
@@ -352,12 +353,12 @@ export async function autoMapColumns(
       if (usedFields.has(candidate.field)) continue;
       if (claimed.has(candidate.columnIndex)) continue;
       claimed.set(candidate.columnIndex, candidate);
-      usedFields.add(candidate.field);
+      if (!OPT_IN_FIELDS.has(candidate.field)) usedFields.add(candidate.field);
    }
 
    return headers.map((header, i) => {
       const winner = claimed.get(i);
-      if (!winner) {
+      if (!winner || OPT_IN_FIELDS.has(winner.field)) {
          return {
             sourceColumn: header,
             targetField: null,

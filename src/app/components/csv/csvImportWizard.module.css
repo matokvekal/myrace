@@ -1,9 +1,7 @@
 .wizard {
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
   max-width: 95vw;
-  margin: 20px auto;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -21,16 +19,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 6px 8px 6px 14px;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .header h2 {
   margin: 0;
-  font-size: 20px;
-  color: #333;
+  font-size: 15px;
+  font-weight: 700;
+  color: #14243c;
   flex: 1;
   min-width: 0;
 }
@@ -38,92 +35,74 @@
 .closeButton {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 22px;
+  line-height: 1;
   cursor: pointer;
-  color: #999;
-  padding: 4px 8px;
+  color: #5b5e66;
+  padding: 6px 10px;
   flex-shrink: 0;
 }
 
 .closeButton:hover {
-  color: #333;
+  color: #14243c;
 }
 
+/* Steps: one slim line, so the work below gets the height */
 .progressBar {
   display: flex;
-  padding: 24px 20px;
-  background: #f8f9fa;
-  position: relative;
-  gap: 8px;
+  padding: 6px 14px 8px;
+  border-bottom: 1px solid #e4e5e8;
+  gap: 4px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-}
-
-.progressBar::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 20px;
-  right: 20px;
-  height: 2px;
-  background: #e0e0e0;
-  z-index: 0;
 }
 
 .step {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  position: relative;
-  z-index: 1;
+  min-width: 0;
 }
 
 .stepNumber {
-  width: 32px;
-  height: 32px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: white;
-  border: 2px solid #e0e0e0;
+  border: 1px solid #c4c6cc;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  color: #999;
-  font-size: 12px;
+  font-weight: 700;
+  color: #6b6f78;
+  font-size: 10px;
   flex-shrink: 0;
 }
 
-.step.active .stepNumber {
-  border-color: #4caf50;
-  background: #4caf50;
-  color: white;
-}
-
+.step.active .stepNumber,
 .step.completed .stepNumber {
-  border-color: #4caf50;
-  background: #4caf50;
+  border-color: #1d3d78;
+  background: #1d3d78;
   color: white;
 }
 
 .stepLabel {
-  font-size: 10px;
-  color: #666;
+  font-size: 11px;
+  color: #6b6f78;
   font-weight: 500;
-  text-align: center;
-  line-height: 1.2;
-  word-break: break-word;
-  padding: 0 4px;
+  white-space: nowrap;
 }
 
 .step.active .stepLabel {
-  color: #4caf50;
-  font-weight: 600;
+  color: #1d3d78;
+  font-weight: 700;
 }
 
 .content {
-  padding: 20px;
+  --wizard-pad: 10px;
+  padding: var(--wizard-pad);
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -131,61 +110,28 @@
 
 @media (min-width: 600px) {
   .header {
-    padding: 20px 28px;
+    padding: 8px 12px 8px 20px;
   }
 
   .header h2 {
-    font-size: 22px;
+    font-size: 17px;
   }
 
   .progressBar {
-    padding: 24px 40px;
-  }
-
-  .progressBar::before {
-    left: 40px;
-    right: 40px;
-  }
-
-  .content {
-    padding: 24px;
-  }
-}
-
-@media (min-width: 900px) {
-  .header {
-    padding: 24px 32px;
-  }
-
-  .header h2 {
-    font-size: 24px;
-  }
-
-  .progressBar {
-    padding: 32px 64px;
-  }
-
-  .progressBar::before {
-    left: 64px;
-    right: 64px;
-  }
-
-  .step {
-    min-width: auto;
-    gap: 8px;
+    padding: 8px 20px 10px;
   }
 
   .stepNumber {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
   }
 
   .stepLabel {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .content {
-    padding: 32px;
+    --wizard-pad: 20px;
   }
 }

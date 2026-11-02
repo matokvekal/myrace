@@ -768,10 +768,6 @@
   border-radius: 6px;
 }
 
-.orderSelect {
-  margin-inline-start: auto;
-}
-
 .switch {
   appearance: none;
   -webkit-appearance: none;

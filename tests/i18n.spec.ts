@@ -25,8 +25,8 @@ test.describe("i18n", () => {
     expect(resolved).toBe("Escanear inicio");
   });
 
-  test("Scan Start List is disabled with a Soon badge (empty Riders screen)", async ({ page }) => {
-    // A race with no riders: Riders shows the import actions, Scan among them.
+  test("Scan Start List is hidden (empty Riders screen)", async ({ page }) => {
+    // A race with no riders: Riders shows the import actions, without Scan.
     await page.goto("/main");
     await acceptTerms(page);
     await page.reload();
@@ -37,10 +37,8 @@ test.describe("i18n", () => {
     await page.getByText("Scan Check Race").first().click();
     await openTab(page, "Riders");
 
-    const scanItem = page.getByRole("button", { name: /Scan Start List/ });
-    await expect(scanItem).toBeVisible();
-    await expect(scanItem).toBeDisabled();
-    await expect(scanItem.getByText("Soon")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Import CSV" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Scan Start List/ })).toHaveCount(0);
   });
 
   test("switching language in the side menu updates visible UI text live", async ({ page }) => {

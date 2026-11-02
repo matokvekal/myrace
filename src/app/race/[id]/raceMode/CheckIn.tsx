@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import styles from "./checkIn.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
@@ -7,6 +8,7 @@ import StatusModal from "../../components/modals/StatusModal";
 import Icons from "@/constants/Icons";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
+import { logCheckInChange } from "@/stores/checkInChangesStore";
 import { riderInCategory } from "../schedule/Schedule";
 
 interface Props {
@@ -164,22 +166,18 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
     // the line, so they can't stay checked in. DNF / DSQ riders did start, so
     // their check-in stands; going back to a racing status never re-checks.
     const current = riders.find((r) => r.id === selectedRider.id) ?? selectedRider;
+    if (status === "DNS" && !canForRace(raceUuid, "MARK_DNS")) return;
     updateRider({ ...current, status, ...(status === "DNS" ? { checked: false } : {}) });
-  };
-
-  /**
-   * One-tap DNS straight from the row (BUGS.md #25). Toggles back to "standing"
-   * so it's undoable, and writes the same field the Status menu does.
-   */
-  const toggleDns = (rider: RiderProps) => {
-    if (!canForRace(raceUuid, "MARK_DNS")) return;
-    const nowDns = rider.status !== "DNS";
-    updateRider({
-      ...rider,
-      status: nowDns ? "DNS" : "standing",
-      // A DNS rider never takes the line, so they can't stay checked in.
-      checked: nowDns ? false : rider.checked,
-    });
+    if (status !== current.status) {
+      logCheckInChange(raceUuid, {
+        kind: "status",
+        wave: waveNum,
+        rider: current,
+        text: `${current.status} → ${status}`,
+        before: current.status,
+        after: status,
+      });
+    }
   };
 
   // ── Edit bib ──
@@ -211,6 +209,14 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
       return;
     }
     await updateRider({ ...rider, bibNumber: bib });
+    logCheckInChange(raceUuid, {
+      kind: "bib",
+      wave: waveNum,
+      rider: { ...rider, bibNumber: bib },
+      text: `Bib ${rider.bibNumber} → ${bib}`,
+      before: rider.bibNumber,
+      after: bib,
+    });
     void recordRaceEvent({
       raceUuid,
       riderId: rider.id,
@@ -293,47 +299,32 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           {showCat && <span className={styles.cat} dir="auto">{rider.category}</span>}
         </span>
         <div className={styles.rowActions}>
-          {isRaceActive && !hasStatus ? (
+          {!hasStatus && (isRaceActive ? (
             <span className={`${styles.actState} ${rider.checked ? styles.actIn : ""}`} title="Check-in locked">
               {rider.checked ? "✓ In" : "—"}
             </span>
-          ) : hasStatus && (rider.status !== "DNS" || isRaceActive) ? (
-            <button
-              className={`${styles.statusInlineBadge} ${statusClass}`}
-              onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}
-              title="Change status"
-            >
-              {rider.status}
-            </button>
           ) : (
-            <>
-              <button
-                className={`${styles.checkCircle} ${rider.checked ? styles.checkCircleOn : ""}`}
-                onClick={() => toggleCheck(rider)}
-                aria-pressed={!!rider.checked}
-                aria-label={rider.checked ? `Undo check-in #${rider.bibNumber}` : `Check in #${rider.bibNumber}`}
-                data-testid={`checkin-check-${rider.bibNumber}`}
-                title={rider.checked ? "Undo check-in" : "Check in"}
-              >
-                {rider.checked ? "✓" : ""}
-              </button>
-              <button
-                className={`${styles.actBtn} ${rider.status === "DNS" ? styles.actDns : ""}`}
-                onClick={() => toggleDns(rider)}
-                aria-pressed={rider.status === "DNS"}
-                aria-label={`Mark #${rider.bibNumber} DNS`}
-                title={rider.status === "DNS" ? "Undo DNS" : "Did not start"}
-              >
-                DNS
-              </button>
-            </>
-          )}
+            <button
+              className={`${styles.checkCircle} ${rider.checked ? styles.checkCircleOn : ""}`}
+              onClick={() => toggleCheck(rider)}
+              aria-pressed={!!rider.checked}
+              aria-label={rider.checked ? `Undo check-in #${rider.bibNumber}` : `Check in #${rider.bibNumber}`}
+              data-testid={`checkin-check-${rider.bibNumber}`}
+              title={rider.checked ? "Undo check-in" : "Check in"}
+            >
+              {rider.checked ? "✓" : ""}
+            </button>
+          ))}
+          {/* Everything but the check itself lives in this menu, so the name keeps the room */}
           <button
-            className={styles.moreBtn}
+            className={`${styles.statusBtn} ${statusClass}`}
             onClick={() => { setSelectedRider(rider); openModal("modalStatus"); }}
-            aria-label={`Status for #${rider.bibNumber}`}
-            title="Other status (DNF, DSQ…)"
-          >⋯</button>
+            aria-label={`${hasStatus ? `${rider.status}, status` : "Status"} for #${rider.bibNumber}`}
+            title="Change status"
+          >
+            {hasStatus ? rider.status : "Status"}
+            <ChevronDown size={13} aria-hidden="true" />
+          </button>
         </div>
       </div>
     );
@@ -516,7 +507,14 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
       {/* No riders yet: no toolbar or counts, just each category with its Add button */}
       <div className={styles.groupWrap}>{slotList.map(renderSlot)}</div>
 
-      {selectedRider && <StatusModal rider={selectedRider} onStatusChange={handleStatusChange} />}
+      {selectedRider && (
+        <StatusModal
+          rider={riders.find((r) => r.id === selectedRider.id) ?? selectedRider}
+          onStatusChange={handleStatusChange}
+          statuses={["DNS", "DSQ", "standing"]}
+          onEditBib={isRaceActive ? undefined : () => startEditBib(selectedRider)}
+        />
+      )}
     </div>
   );
 };

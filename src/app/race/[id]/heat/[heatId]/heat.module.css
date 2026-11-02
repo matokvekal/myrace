@@ -405,10 +405,13 @@
   100% { background-position: -125% 0; }
 }
 
+/* Room for what sticks out of a card (✓ badge, pace ring, flash glow): the
+   scrolling wrapper clips anything above or left of the first row. */
 .riderGrid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 10px 6px 4px;
 }
 
 /* Tablet/laptop (≥900px): pack cards explicitly rather than leaving density to

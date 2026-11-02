@@ -494,7 +494,7 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
             </div>
             {importPreview.slice(0, 6).map((row, i) => (
               <div key={i} className={styles.importRow}>
-                <span>#{row.bibNumber}</span>
+                <span>{row.bibNumber}</span>
                 <span>
                   {row.lastName} {row.firstName}
                 </span>
@@ -545,7 +545,7 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
           <div className={styles.row2}>
             <input
               className={styles.input}
-              placeholder="Bib # *"
+              placeholder="Bib *"
               type="number"
               value={form.bibNumber}
               onChange={(e) => setF("bibNumber", e.target.value)}
@@ -644,7 +644,7 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
             key={rider.id}
             className={`${styles.riderRow} ${editingId === rider.id ? styles.editing : ""}`}
           >
-            <span className={styles.bib}>#{rider.bibNumber}</span>
+            <span className={styles.bib}>{rider.bibNumber}</span>
             <div className={styles.riderInfo}>
               <span className={styles.riderName}>
                 {rider.lastName} {rider.firstName}

@@ -62,7 +62,7 @@ test.describe("Joker button", () => {
     await page.clock.fastForward(5 * 60 * 1000);
     await jokerCard(page, 1).click();
     await expect(page.getByText("Joker #1")).toBeVisible();
-    await page.getByPlaceholder("Bib #").fill(String(bib));
+    await page.getByPlaceholder("Enter bib").fill(String(bib));
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     // Joker is gone, the rider's lap count advanced exactly once.
@@ -103,7 +103,7 @@ test.describe("Joker button", () => {
     const before = await lapsOf(page, bib);
 
     await jokerCard(page, 1).click();
-    await page.getByPlaceholder("Bib #").fill(String(bib));
+    await page.getByPlaceholder("Enter bib").fill(String(bib));
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     // Blocked: modal stays open (still showing this Joker), nothing changed.

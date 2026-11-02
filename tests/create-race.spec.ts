@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { acceptTerms } from "./helpers";
+import { acceptTerms, gotoRaceMode, loadDemoRace } from "./helpers";
 
 /**
  * Creating a race with NO start list must still work — the import path is
@@ -31,5 +31,34 @@ test.describe("Create race", () => {
     // It opens cleanly with an empty field rather than erroring.
     await page.getByRole("button", { name: "Riders", exact: true }).click();
     await expect(page.getByText("No riders yet.")).toBeVisible();
+  });
+
+  test("a new race opens on Create even after another race was left in Race mode", async ({ page }) => {
+    await loadDemoRace(page);
+    await gotoRaceMode(page, "Race");
+
+    // Back to the list inside the app: a full page load would reset the in-memory mode.
+    const backdrop = page.getByTestId("sheet-backdrop");
+    if (await backdrop.isVisible().catch(() => false)) await backdrop.click({ position: { x: 5, y: 5 } });
+    await page.getByTestId("race-menu-btn").click();
+    await page.getByRole("button", { name: "All Races" }).click();
+    await page.waitForURL(/\/main/);
+
+    await page.getByRole("button", { name: /Create new race|^Add$/ }).first().click();
+    await page.getByPlaceholder("Race Name").fill("Second Race");
+    await page.getByPlaceholder("Location").fill("Nowhere");
+    await page.getByRole("button", { name: /Done|Saving/ }).click();
+    await page.getByText("Second Race").first().click();
+    await page.waitForURL(/\/race\/[^/]+$/);
+
+    await page.getByRole("button", { name: "Riders", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Import CSV" })).toBeVisible();
+
+    // Choosing Race on the empty race offers the way back to adding riders.
+    await page.getByTestId("race-menu-btn").click();
+    await page.getByTestId("race-nav-race").click();
+    await expect(page.getByTestId("race-mode-empty")).toBeVisible();
+    await page.getByTestId("race-mode-add-riders").click();
+    await expect(page.getByRole("button", { name: "Import CSV" })).toBeVisible();
   });
 });

@@ -67,7 +67,7 @@ const JokerResolveModal: React.FC<Props> = ({ joker, riders, onSave, onDelete, o
             maxLength={5}
             autoFocus
             className={styles.bibInput}
-            placeholder="Bib #"
+            placeholder="Enter bib"
             value={bib}
             onChange={(e) => setBib(e.target.value.replace(/\D/g, ""))}
             onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}

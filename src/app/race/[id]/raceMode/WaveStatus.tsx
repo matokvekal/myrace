@@ -127,7 +127,7 @@ const WaveStatus: React.FC<Props> = ({ raceUuid, categories }) => {
               className={styles.colorBar}
               style={{ background: cat?.color ?? rider.color ?? "#ccc" }}
             />
-            <span className={styles.bib}>#{rider.bibNumber}</span>
+            <span className={styles.bib}>{rider.bibNumber}</span>
             <span className={styles.name} dir="auto">
               {rider.lastName} {rider.firstName}
             </span>

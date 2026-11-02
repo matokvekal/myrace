@@ -624,104 +624,246 @@
   text-transform: none;
 }
 
-/* ═══ Compact wave cards (three tight rows) ═══ */
+/* ═══ Wave cards: header · starts with their categories · actions ═══
+   Row heights are fixed: cardHeight() in WaveTimeline.tsx adds them up to lay
+   out the time axis, so change both together. */
 .card {
-  gap: 1px;
-  padding: 3px 6px 4px;
+  --row-head: 24px;
+  --row-start: 28px;
+  --row-cat: 26px;
+  --row-actions: 34px;
+  inset-inline: 2px;
+  gap: 0;
+  padding: 8px 8px;
   line-height: 1.2;
 }
 
 .cardTop {
-  gap: 5px;
+  height: var(--row-head);
+  flex-shrink: 0;
+  gap: 6px;
 }
 
 .cardName {
-  font-size: 13px;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .cardTime {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .state {
+  flex-shrink: 0;
   padding: 0 6px;
   font-size: 10px;
 }
 
-/* Categories + riders + Check-In on ONE line; long lists ellipsize */
-.cardMeta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.cardStats {
+  flex-shrink: 1;
   min-width: 0;
-}
-
-.cardMeta .cardCats {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-}
-
-.cardMeta .cardStats {
-  flex-shrink: 0;
   gap: 5px;
+  color: #475569;
   font-size: 11px;
   white-space: nowrap;
+  overflow: hidden;
+}
+
+.cardStats b {
+  color: #15803d;
 }
 
 .ciTag {
+  flex-shrink: 0;
   font-size: 10px;
   padding: 0 5px;
 }
 
+.starts {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.startBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.startRow {
+  height: var(--row-start);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  border-top: 1px solid rgba(100, 116, 139, 0.3);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.startClock {
+  font-size: 13px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.catLine {
+  height: var(--row-cat);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-inline-start: 8px;
+  font-size: 13px;
+}
+
+.catLineName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catLineTime {
+  flex-shrink: 0;
+  color: #475569;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .actions {
-  gap: 3px;
-  margin-top: 1px;
+  height: var(--row-actions);
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: auto;
   padding-top: 0;
 }
 
 .act {
-  height: 22px;
-  padding: 0 6px;
-  font-size: 11px;
+  height: 28px;
+  padding: 0 9px;
+  font-size: 12px;
 }
 
-/* Incomplete Check-In close to the start: a light-red accent, not a red block */
-.cardWarn {
-  border-color: #fca5a5;
-  border-inline-start-color: #dc2626;
-  background: #fef2f2;
-}
 
 .ciWarn {
   background: #fee2e2;
   color: #b91c1c;
 }
 
-/* Finished wave: soft light-red diagonal stripes + red edge — clear, never loud */
-.card_finished {
-  border-color: #fecaca;
-  border-inline-start-color: #ef4444;
-  background-color: #fff5f5;
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(239, 68, 68, 0.13) 0 8px,
-    rgba(239, 68, 68, 0) 8px 16px
-  );
-  color: #475569;
+/* Cards stay quiet next to the hours: a faint tint says the wave's health.
+   Green = all good. Only a finished wave gets diagonal stripes. */
+.cardOk,
+.cardProblem {
+  border-color: #e2e8f0;
+  box-shadow: none;
+  color: #0b1f3f;
 }
 
-.card_finished .state_finished {
+.cardOk {
+  border-inline-start-color: #22c55e;
+  background-color: #f7fdf9;
+}
+
+.card_finished.cardOk {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(34, 197, 94, 0.12) 0 8px,
+    rgba(34, 197, 94, 0) 8px 16px
+  );
+}
+
+.card_finished .state_finished,
+.card_upcoming .state_upcoming {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* Red = not started, not finished, bib problem or Check-In not done */
+.cardProblem {
+  border-inline-start-color: #dc2626;
+  background-color: #fef7f7;
+}
+
+.stateProblem {
   background: #fee2e2;
   color: #b91c1c;
 }
 
-:global([data-theme="dark"]) .card_finished {
-  background-color: #2a1d22;
+/* Check-In button: red stripes until everyone is accounted for, then green */
+.actTodo {
+  border-color: #f87171;
+  background-color: #fff;
   background-image: repeating-linear-gradient(
     -45deg,
-    rgba(248, 113, 113, 0.16) 0 8px,
-    rgba(248, 113, 113, 0) 8px 16px
+    rgba(239, 68, 68, 0.2) 0 5px,
+    rgba(239, 68, 68, 0) 5px 10px
   );
-  color: #cbd5e1;
+  color: #b91c1c;
+}
+
+.actDone {
+  border-color: #4ade80;
+  background-color: #fff;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(34, 197, 94, 0.2) 0 5px,
+    rgba(34, 197, 94, 0) 5px 10px
+  );
+  color: #15803d;
+}
+
+.actChanges {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #b45309;
+  font-weight: 700;
+}
+
+/* Calendar day view: the hour sits on its line in a plain column beside the grid */
+.grid {
+  margin: 14px 0 0;
+}
+
+.tick {
+  inset-inline-start: 62px;
+  border-top: 1px solid #cbd5e1;
+}
+
+.tickHalf {
+  border-top: 1px solid #e5e9f0;
+  opacity: 1;
+}
+
+.tickLabel {
+  inset-inline-start: -62px;
+  width: 56px;
+  top: -11px;
+  padding: 0;
+  background: none;
+  color: #1d4ed8;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.tickHalf .tickLabel {
+  top: -9px;
+  color: #93b4ea;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lane {
+  inset-inline: 66px 6px;
+}
+
+.now {
+  inset-inline: 62px 0;
 }

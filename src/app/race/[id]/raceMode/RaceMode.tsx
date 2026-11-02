@@ -15,6 +15,11 @@ import RaceSheet, { type SheetSize, type SheetView } from "./RaceSheet";
 import type { WaveAction } from "./WaveTimeline";
 import { useNavigate } from "react-router-dom";
 import { canViewScreen } from "@/services/live/liveBridge";
+import { canForRace } from "@/services/cloud/permissions";
+import { useCheckInChanges, type CheckInChange } from "@/stores/checkInChangesStore";
+import CheckInChanges from "./CheckInChanges";
+
+const NO_CHANGES: CheckInChange[] = [];
 
 interface Props {
   raceUuid: string;
@@ -34,6 +39,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   // Bottom sheet: closed on entry (full timeline); a wave tap opens it at half height.
   const [sheet, setSheet] = useState<SheetSize | null>(null);
   const [sheetView, setSheetView] = useState<SheetView>("summary");
+  const [changesWave, setChangesWave] = useState<number | null>(null);
   const navigate = useNavigate();
   const openWave = (w: number) => {
     setSelectedWave(w);
@@ -58,9 +64,11 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   // (Finish opens its existing FINISH confirmation there).
   const onWaveAction = (w: number, action: WaveAction) => {
     setSelectedWave(w);
-    if (action === "checkin") {
+    if (action === "changes") {
+      setChangesWave(w);
+    } else if (action === "checkin") {
       setSheetView("checkin");
-      setSheet("half"); // Check-In opens at 50%; drag up to 70%
+      setSheet("half"); // Check-In opens at 70%; drag up to 95%
     } else if (action === "start") {
       setSheetView("summary");
       setSheet((s) => s ?? "half");
@@ -104,7 +112,21 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   const storeCategories = useCategoryStore((state) => state.categories);
   const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const raceRiders = useMemo(() => riders.filter((r) => r.raceUuid === raceUuid), [riders, raceUuid]);
-  const raceDate = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid)?.date);
+  const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
+  const raceDate = race?.date;
+  // The main commissaire's review of what changed on the start list
+  const allChanges = useCheckInChanges((s) => (s.raceUuid === raceUuid ? s.changes : NO_CHANGES));
+  const loadChanges = useCheckInChanges((s) => s.load);
+  React.useEffect(() => {
+    if (race) void loadChanges(race);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceUuid, !!race, loadChanges]);
+  const changeCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    if (!canForRace(raceUuid, "EDIT_RACE")) return counts;
+    allChanges.forEach((c) => counts.set(c.wave, (counts.get(c.wave) ?? 0) + 1));
+    return counts;
+  }, [allChanges, raceUuid]);
   const startLabel = (() => {
     const k = [...(schedule.get(selectedWave)?.keys() ?? [])].find((x) => x !== "TBD");
     return k ? normalizeTime(k) ?? k : "TBD";
@@ -137,8 +159,17 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           date={raceDate}
           current={selectedWave}
           onAction={onWaveAction}
+          changeCounts={changeCounts}
         />
       </div>
+
+      {changesWave != null && (
+        <CheckInChanges
+          wave={changesWave}
+          changes={allChanges.filter((c) => c.wave === changesWave)}
+          onClose={() => setChangesWave(null)}
+        />
+      )}
 
       {sheet && waveNums.includes(selectedWave) && (
         <RaceSheet

@@ -459,6 +459,13 @@ export const FIELD_KEYWORDS: FieldKeywords[] = [
 export const IGNORED_FIELDS = new Set<RiderFieldKey>(['subCategory']);
 
 /**
+ * Fields we try not to collect: never auto-mapped, not even from a learned
+ * mapping. A column detected as one stays unmapped rather than falling through
+ * to its next-best field. The user can still pick the field by hand.
+ */
+export const OPT_IN_FIELDS = new Set<RiderFieldKey>(['birthDate', 'uciNumber', 'bibColor', 'bibTextColor']);
+
+/**
  * Columns that hold government identity numbers (national ID / passport).
  *
  * Commissaire never collects, stores, synchronizes or exports these (PRD FR-45,

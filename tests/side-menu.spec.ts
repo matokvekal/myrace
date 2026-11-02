@@ -32,6 +32,10 @@ test.describe("Side menu", () => {
     await expect(select).toHaveValue("2000");
 
     await select.selectOption("5000");
+    const cover = page.getByRole("combobox", { name: "Card cover time" });
+    await expect(cover).toHaveValue("10000");
+    await expect(cover.locator("option")).toHaveText(["10 s (default)", "30 s", "2 min", "4 min"]);
+    await cover.selectOption("120000");
     await page.getByRole("button", { name: "Close menu" }).click();
 
     // Persisted in localStorage (`commissaire.boardHold`), so it survives the
@@ -40,5 +44,6 @@ test.describe("Side menu", () => {
     await page.getByRole("button", { name: "Open menu" }).click();
     await page.getByTestId("prefs-timing").click();
     await expect(page.getByRole("combobox", { name: "Board hold delay" })).toHaveValue("5000");
+    await expect(page.getByRole("combobox", { name: "Card cover time" })).toHaveValue("120000");
   });
 });

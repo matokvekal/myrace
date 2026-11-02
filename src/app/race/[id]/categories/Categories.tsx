@@ -26,32 +26,7 @@ interface CategoriesProps {
 // Built-in category bank — single source of truth (BUGS.md #5).
 const PREDEFINED_TEMPLATES = PREDEFINED_CATEGORY_TEMPLATES;
 
-type SortMode = "now" | "upload";
-const SORT_KEY = "categoriesSortMode";
-
-/** The uploaded file's order is the race schedule. Races imported before the
- *  order was recorded fall back to start time, then name. */
-const byUploadOrder = (a: CategoryProps, b: CategoryProps) =>
-  (a.importOrder ?? Infinity) - (b.importOrder ?? Infinity) ||
-  toMinutes(a.startTime) - toMinutes(b.startTime) ||
-  a.name.localeCompare(b.name);
-
 const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
-  const [sortMode, setSortMode] = useState<SortMode>(() => {
-    try {
-      return localStorage.getItem(SORT_KEY) === "upload" ? "upload" : "now";
-    } catch {
-      return "now";
-    }
-  });
-  const changeSortMode = (mode: SortMode) => {
-    setSortMode(mode);
-    try {
-      localStorage.setItem(SORT_KEY, mode);
-    } catch {
-      /* preference only */
-    }
-  };
   const [templates, setTemplates] = useState<CategoryTemplate[]>([]);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -355,7 +330,6 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
   });
 
   const orderedCategories = [...raceCategories].sort((a, b) => {
-    if (sortMode === "upload") return byUploadOrder(a, b);
     const aFinished = a.status === "finished" ? 1 : 0;
     const bFinished = b.status === "finished" ? 1 : 0;
     return aFinished - bFinished;
@@ -486,7 +460,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
 
   return (
     <div className={styles.container}>
-      {/* Actions: New Category · Add From (· order, once there is a table) */}
+      {/* Actions: New Category · Add From */}
       <div className={styles.catActions}>
         <button
           type="button"
@@ -506,18 +480,6 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
           <Plus size={14} /> Add From
           <span className={styles.libraryCount}>{available.length}</span>
         </button>
-        {raceCategories.length > 1 && (
-          <select
-            className={`${styles.ruleSelect} ${styles.orderSelect}`}
-            value={sortMode}
-            onChange={(e) => changeSortMode(e.target.value as SortMode)}
-            aria-label="Category order"
-            title="Now: finished categories last. Upload: the order of the uploaded file (the schedule)."
-          >
-            <option value="now">Order: now</option>
-            <option value="upload">Order: upload</option>
-          </select>
-        )}
       </div>
 
       {/* Library: hidden until "Add From"; closes after a pick */}
@@ -803,7 +765,7 @@ function CategoryRidersModal({
                     fontSize: 13
                   }}
                 >
-                  <span style={{ fontWeight: 800, color: "#4a8ee7", minWidth: 32 }}>#{r.bibNumber}</span>
+                  <span style={{ fontWeight: 800, color: "#4a8ee7", minWidth: 32 }}>{r.bibNumber}</span>
                   <span style={{ fontWeight: 600, color: "#1a304f", flex: 1 }}>{r.firstName} {r.lastName}</span>
                   {r.team && <span style={{ fontSize: 11, color: "#7a8aa8" }}>{r.team}</span>}
                 </div>

@@ -35,7 +35,7 @@ describe("Schedule → Finish Group", () => {
     // Finish Group is set on each schedule row; Reset All lives in Edit Schedule.
     const selA = screen.getByTestId("finish-group-row-1") as HTMLSelectElement;
     expect(selA.value).toBe(""); // None by default
-    expect([...selA.options].map((o) => o.text)).toEqual(["None", "Finish Group 1", "Finish Group 2", "Finish Group 3"]);
+    expect([...selA.options].map((o) => o.text)).toEqual(["None", "1", "2", "3"]);
 
     await user.selectOptions(selA, "1");
     await user.selectOptions(screen.getByTestId("finish-group-row-2"), "1");

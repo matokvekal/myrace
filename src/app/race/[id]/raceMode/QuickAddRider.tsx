@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import styles from "./quickAddRider.module.css";
 import { CategoryProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
+import { logCheckInChange } from "@/stores/checkInChangesStore";
 
 interface Props {
   raceUuid: string;
@@ -88,6 +89,12 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
     };
 
     await addNewRider(newRider);
+    logCheckInChange(raceUuid, {
+      kind: "added",
+      wave: newRider.heat,
+      rider: newRider,
+      text: `Added to ${newRider.category}`,
+    });
     onDone();
   };
 
@@ -97,7 +104,7 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
         <div className={styles.formTitle}>Add rider{fixedCategory ? ` to ${fixedCategory.name}` : ""}</div>
         <input
           className={styles.input}
-          placeholder="Bib # *"
+          placeholder="Bib *"
           type="number"
           inputMode="numeric"
           autoFocus
@@ -139,7 +146,7 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
         <input className={styles.input} placeholder="Last name *" value={form.lastName} onChange={(e) => set("lastName", e.target.value)} />
       </div>
       <div className={styles.row2}>
-        <input className={styles.input} placeholder="Bib # *" type="number" value={form.bibNumber} onChange={(e) => { set("bibNumber", e.target.value); setError(""); }} />
+        <input className={styles.input} placeholder="Bib *" type="number" value={form.bibNumber} onChange={(e) => { set("bibNumber", e.target.value); setError(""); }} />
         <input className={styles.input} placeholder="Chip number" value={form.chipNumber} onChange={(e) => set("chipNumber", e.target.value)} />
       </div>
       <input className={styles.input} placeholder="Club / team" value={form.team} onChange={(e) => set("team", e.target.value)} />

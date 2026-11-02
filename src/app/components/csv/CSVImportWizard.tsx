@@ -332,7 +332,6 @@ export default function CSVImportWizard({
           ) : (
             <UploadStep
               onFileUpload={(file, tpl) => handleFileUpload(file, tpl)}
-              onScanClick={() => setScanMode(true)}
             />
           ))}
         {currentStep === "mapping" && parseResult && (
@@ -352,7 +351,6 @@ export default function CSVImportWizard({
             mappings={columnMappings}
             onStartImport={handleStartImport}
             onBack={handleBack}
-            onClose={handleClose}
           />
         )}
         {currentStep === "importing" && importProgress && (

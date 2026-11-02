@@ -5,208 +5,161 @@
   padding-bottom: 32px;
 }
 
-/* ── Toolbar: Search | View | Sort | Import · Edit | Add Rider ── */
+/* Always-visible bar: search + gear */
 .topBar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap; /* wraps instead of overflowing on phones */
   gap: 8px;
-  padding: 8px;
-  background: var(--surface-1, #fff);
-  border: 1px solid var(--border-card, #d9e7fb);
-  border-radius: 10px;
 }
 
 .sortDropdown {
-  height: 36px;
+  width: 100%;
+  height: 40px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary, #14243c);
   background-color: var(--surface-1, #fff);
-  border: 1px solid var(--border-card, #d9e7fb);
-  border-radius: 8px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
   cursor: pointer;
 }
 
-/* View modes: classic segmented control */
+/* View modes: segmented control in the gear menu */
 .viewModeGroup {
-  display: inline-flex;
-  flex-shrink: 0;
-  padding: 2px;
+  display: flex;
   gap: 2px;
-  border: 1px solid var(--border-card, #d9e7fb);
-  border-radius: 8px;
-  background: var(--bg-surface, #f5f8ff);
+  padding: 2px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
 }
 
 .viewModeBtn {
-  width: 34px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted, #8498ba);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.viewModeBtn:hover {
-  color: var(--text-primary, #14243c);
-}
-
-.viewModeBtn.active {
-  background: var(--surface-1, #fff);
-  border-color: var(--brand, #63a6fc);
-  color: var(--brand-strong, #3f86e7);
-}
-
-/* Import · Edit · Add Rider — pushed to the inline end */
-.toolActions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-inline-start: auto;
-}
-
-.iconBtn {
-  width: 36px;
+  flex: 1 1 0;
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  border: 1px solid var(--border-card, #d9e7fb);
-  border-radius: 8px;
+  gap: 5px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 1px;
   background: transparent;
-  color: var(--text-primary, #14243c);
+  color: #5b5e66;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewModeBtn.active {
+  background: #1d3d78;
+  color: #fff;
+}
+
+.iconBtn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  background: #fff;
+  color: #0a0a0b;
   cursor: pointer;
 }
 
 .iconBtn:hover {
-  background: var(--bg-surface, #f5f8ff);
+  border-color: #0a0a0b;
 }
 
-.iconBtnActive {
-  border-color: var(--brand, #63a6fc);
-  color: var(--brand-strong, #3f86e7);
-  background: var(--bg-surface, #f5f8ff);
-}
-
-.addRiderBtn {
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  border: 1px solid var(--brand-strong, #3f86e7);
-  border-radius: 8px;
-  background: var(--brand-strong, #3f86e7);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.addRiderBtn:hover {
-  filter: brightness(1.06);
-}
-
-/* PRO skin: keep the toolbar flat */
-:root[data-skin="gaming"] .topBar button:not(:disabled) {
+/* PRO skin: keep the bar and gear menu flat */
+:root[data-skin="gaming"] .topBar button:not(:disabled),
+:root[data-skin="gaming"] .manageModal button:not(:disabled) {
   box-shadow: none !important;
-  border-radius: 6px !important;
+  border-radius: 2px !important;
   text-transform: none;
   letter-spacing: normal;
 }
 
-/* Import button */
-.importBtn {
-  font-size: 12px;
+/* Gear menu: occasional actions and view options */
+.manageModal {
+  width: 100%;
+  max-width: 400px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  margin: auto;
+  padding: 12px 16px 16px;
+  border-radius: 4px;
+  background: #fff;
+  color: #0a0a0b;
 }
 
-/* Delete button */
-.deleteBtn {
-  color: #c62828 !important;
-  border-color: #ffcdd2 !important;
-  background: #ffebee !important;
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.deleteBtn:hover {
-  background: #ffcdd2 !important;
-}
-
-.sortActive {
-  letter-spacing: 0.01em;
-}
-
-/* ── Filter bar (wave + delete) ── */
-.filterBar {
+.manageHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.waveFilterSection {
+.manageHead .iconBtn {
+  border-color: transparent;
+}
+
+.manageList {
+  margin-top: 4px;
+  border-top: 1px solid #e4e5e8;
+}
+
+.manageItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.waveLabel {
-  font-size: 12px;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 4px;
+  border: none;
+  border-bottom: 1px solid #e4e5e8;
+  background: none;
+  color: #0a0a0b;
+  font-size: 14px;
   font-weight: 600;
-  color: #3a5080;
-  margin: 0;
-}
-
-.waveDropdown {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
-  background: white;
-  color: #1a304f;
+  text-align: start;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.waveDropdown:hover {
-  border-color: #a8c5f8;
-  background: #f8fbff;
+.manageItem:hover {
+  background: #f3f4f6;
 }
 
-.waveDropdown:focus {
-  outline: none;
-  border-color: #63a6fc;
-  box-shadow: 0 0 0 2px rgba(99, 166, 252, 0.2);
+.manageDanger {
+  color: #b3261e;
 }
 
-/* Slanted navy count plate — kit language */
-.tabCount {
-  display: inline-block;
-  align-self: flex-start;
-  font-weight: 900;
-  font-style: italic;
-  font-size: 13px;
+.manageLabel {
+  display: block;
+  margin: 14px 0 6px;
+  color: #5b5e66;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #fff;
-  background: linear-gradient(180deg, #1d3d78, #122a54);
-  padding: 5px 16px;
-  border-radius: 6px;
-  transform: skewX(-8deg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 5px rgba(20, 40, 80, 0.25);
+}
+
+/* Rider count + collapse all */
+.tabCount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5b5e66;
 }
 
 .catGroup {
@@ -215,50 +168,31 @@
   gap: 4px;
 }
 
-/* ── Category separator row: glossy game band (matches schedule starts) ── */
+/* Category row inside a wave: light band, category colour on the edge */
 .catSeparator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  min-height: 36px;
+  padding: 2px 8px 2px 4px;
+  border-left: 4px solid #ddd;
+  border-bottom: 1px solid #e4e5e8;
+  background: #f3f4f6;
+  color: #0a0a0b;
   font-size: 13px;
-  font-weight: 900;
-  font-style: italic;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  padding: 8px 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
-    linear-gradient(135deg, #4a80cc, #31609f);
-  border: none;
-  border-radius: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 6px;
-}
-
-/* Category colour bar inside the separator band */
-.catSepDot {
-  width: 5px;
-  height: 18px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  font-weight: 700;
 }
 
 .catGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 2px 8px 2px 4px;
+  background: #f3f4f6;
+  color: #0a0a0b;
   font-size: 13px;
-  font-weight: 900;
-  font-style: italic;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  padding: 8px 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
-    linear-gradient(135deg, #4a80cc, #31609f);
-  border: none;
-  border-radius: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-weight: 700;
 }
 
 .empty {
@@ -284,50 +218,46 @@
 }
 
 .emptyImportBtn {
-  background: #667eea;
+  background: #1d3d78;
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 10px 24px;
+  border-radius: 2px;
+  padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
-/* ── Data table view: timing-sheet style — navy header, gold trim ── */
+/* Rider table: bib, name, status — the group headers carry wave and category */
 .dataTable {
   display: flex;
   flex-direction: column;
-  border: 1.5px solid #9dbbe0;
-  border-radius: 12px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
   overflow: hidden;
   font-size: 13px;
   background: #fff;
-  box-shadow: 0 3px 10px rgba(20, 40, 80, 0.1);
 }
 
 .dataTableHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
-  background: linear-gradient(90deg, #1d3d78, #122a54);
-  border-bottom: 2px solid #e0a92c;
-  font-size: 11px;
-  font-weight: 800;
-  color: #cfe0f5;
+  padding: 6px 12px;
+  border-bottom: 1px solid #d3d5da;
+  font-size: 10px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .dataRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
-  border-bottom: 1px solid #f0f4fc;
+  min-height: 40px;
+  padding: 4px 12px;
+  border-bottom: 1px solid #eeeff1;
   cursor: pointer;
-  transition: background 0.1s;
 }
 
 .dataRow:last-child {
@@ -335,23 +265,7 @@
 }
 
 .dataRow:hover {
-  background: #f7f9ff;
-}
-
-.colRow {
-  width: 28px;
-  flex-shrink: 0;
-  color: #b0bcd4;
-  font-size: 11px;
-  text-align: right;
-}
-
-.colDot {
-  width: 5px;
-  height: 18px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  background: #ddd;
+  background: #f7f7f8;
 }
 
 .colFlag {
@@ -375,9 +289,8 @@
   width: 48px;
   flex-shrink: 0;
   font-size: 14px;
-  font-weight: 900;
-  font-style: italic;
-  color: #10315e;
+  font-weight: 700;
+  color: #0a0a0b;
   font-variant-numeric: tabular-nums;
 }
 
@@ -386,63 +299,15 @@
 .colName {
   flex: 4;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
-  color: #10233f;
+  color: #0a0a0b;
   min-width: 0;
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.colCat {
-  flex: 2;
-  color: #3a5080;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Phone: drop the row counter and let the category wrap, so the name gets the room */
-@media (max-width: 600px) {
-  .colRow {
-    display: none;
-  }
-
-  .colCat {
-    flex: 1.5;
-    font-size: 12px;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    line-height: 1.2;
-  }
-}
-
-.subCatLabel {
-  font-size: 11px;
-  color: #8aa0c4;
-  font-weight: 400;
-}
-
-.colWave {
-  width: 45px;
-  flex-shrink: 0;
-  text-align: center;
-  color: #667eea;
-  font-weight: 600;
-}
-
-.colClub {
-  flex: 2;
-  color: #7a8faa;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
 }
 
 .colStatus {
@@ -454,12 +319,7 @@
 
 /* Row state highlights */
 .rowRunning {
-  background: rgba(62, 221, 164, 0.05);
-  border-left: 3px solid #3edda4;
-}
-
-.rowRunning:hover {
-  background: rgba(62, 221, 164, 0.09) !important;
+  box-shadow: inset 3px 0 0 #2fbf71;
 }
 
 .rowOut {
@@ -565,10 +425,11 @@
   align-items: center;
   gap: 8px;
   padding: 0 10px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--border-card, #d9e7fb);
-  color: var(--text-muted, #8498ba);
+  height: 40px;
+  border-radius: 2px;
+  border: 1px solid #d3d5da;
+  background: #fff;
+  color: #5b5e66;
 }
 .searchInput {
   flex: 1;
@@ -581,19 +442,20 @@
   font-size: 16px;
 }
 .searchClear { background: none; border: 0; color: inherit; cursor: pointer; display: inline-flex; padding: 4px; }
-.waveGroup { margin-bottom: 12px; }
+.waveGroup:not(:last-child) { border-bottom: 1px solid #1d3d78; }
 .waveGroupHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-weight: 900;
+  gap: 4px;
+  min-height: 38px;
+  padding: 2px 12px 2px 4px;
+  border-bottom: 1px solid #c9a24a;
+  background: #1d3d78;
+  color: #fff;
   font-size: 13px;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  background: rgba(99, 166, 252, 0.14);
-  border-radius: 8px;
-  margin: 8px 0 4px;
 }
 .groupCount { margin-inline-start: auto; font-size: 11px; font-weight: 700; opacity: 0.7; }
 .addRiderModal {
@@ -608,108 +470,72 @@
 }
 
 /* Collapse / expand rider groups (display only) */
-.groupBulk {
-  display: inline-flex;
-  gap: 6px;
-  margin-inline-start: 12px;
-  flex-wrap: wrap;
-}
 .groupBulkBtn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 4px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
   background: #fff;
-  font-size: 13px;
+  color: #0a0a0b;
   cursor: pointer;
-}
-.groupBulkBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 .groupToggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin-inline-end: 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
-/* Table header: white labels on the blue bar (column classes set dark text) */
+/* Header labels stay muted */
 .dataTableHeader span {
-  color: #fff;
+  color: #5b5e66;
+  font-size: 10px;
   font-weight: 700;
 }
 
-/* Collapse / expand all: compact icon buttons */
-.groupBulkBtn {
-  width: 30px;
-  height: 28px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* "+" on each category header (right-aligned, visible when collapsed) */
+/* Quiet add-rider icon on each category header */
 .catAddBtn {
-  margin-inline-start: auto;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid var(--brand-strong, #3f86e7);
-  border-radius: 6px;
-  background: var(--surface-1, #fff);
-  color: var(--brand-strong, #3f86e7);
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #5b5e66;
   cursor: pointer;
 }
 
 .catAddBtn:hover {
-  background: var(--brand-strong, #3f86e7);
-  color: #fff;
+  color: #0a0a0b;
 }
 
-:root[data-skin="gaming"] .catAddBtn:not(:disabled) {
+:root[data-skin="gaming"] .catAddBtn:not(:disabled),
+:root[data-skin="gaming"] .groupToggle:not(:disabled) {
   box-shadow: none !important;
-  border-radius: 6px !important;
+  border-radius: 2px !important;
 }
 
-/* Category header: count badge + Add rider together on the right */
+/* Category header: count right before the add icon */
 .catSeparator .groupCount,
 .catGroupHeader .groupCount {
   margin-inline-start: auto;
-  min-width: 24px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: #1d3d78;
-  color: #fff;
+  color: #5b5e66;
   font-size: 12px;
   font-weight: 700;
-  text-align: center;
   opacity: 1;
-}
-
-.catSeparator .catAddBtn,
-.catGroupHeader .catAddBtn {
-  margin-inline-start: 8px;
-}
-
-/* Expand/collapse: plain square icon, clearly not the Add rider button */
-.groupToggle {
-  border: none;
-  background: transparent;
-  color: var(--text-primary, #14243c);
 }

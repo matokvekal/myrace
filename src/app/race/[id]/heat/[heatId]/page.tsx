@@ -971,10 +971,10 @@ const Heat: React.FC = () => {
                 title="Redo the finish you just undid"
                 onClick={() => {
                   const a = redoableFinishes[0];
-                  if (redoFinish(a.id)) toast.success(`Finish restored: #${a.rider.bibNumber} ${a.rider.firstName} ${a.rider.lastName}`);
+                  if (redoFinish(a.id)) toast.success(`Finish restored: ${a.rider.bibNumber} ${a.rider.firstName} ${a.rider.lastName}`);
                 }}
               >
-                ↷ Redo finish #{redoableFinishes[0].rider.bibNumber}
+                ↷ Redo finish {redoableFinishes[0].rider.bibNumber}
               </button>
             )}
             <p className={styles.timerText}>{elapsedTime}</p>
@@ -1014,7 +1014,7 @@ const Heat: React.FC = () => {
                 pattern="[0-9]*"
                 maxLength={5}
                 className={styles.searchInput}
-                placeholder="#"
+                placeholder="Bib"
                 aria-label="Bib"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -1349,7 +1349,7 @@ const Heat: React.FC = () => {
             ) : (
               voiceLog.map((entry, i) => (
                 <div key={`${entry.time}-${i}`} className={styles.voiceLogRow}>
-                  <span className={styles.voiceLogBib}>#{entry.bib}</span>
+                  <span className={styles.voiceLogBib}>{entry.bib}</span>
                   <span className={styles.voiceLogTime}>
                     {new Date(entry.time).toLocaleTimeString('en-GB', { hour12: false })}
                   </span>

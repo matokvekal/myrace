@@ -661,15 +661,24 @@
   background: var(--bg-surface, #f5f8ff);
 }
 
-/* Check-In: 50% → at most 70% */
-.checkinFull {
+/* Check-In: opens at 70%, drags up to 95% */
+.checkinHalf {
   height: 70vh;
   height: 70dvh;
 }
 
+.checkinFull {
+  height: 95vh;
+  height: 95dvh;
+}
+
 @media (min-width: 960px) {
-  .checkinFull {
+  .checkinHalf {
     height: calc(70dvh - 12px);
+  }
+
+  .checkinFull {
+    height: calc(95dvh - 12px);
   }
 }
 

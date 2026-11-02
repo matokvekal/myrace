@@ -5,10 +5,13 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X, LayoutDashboard } from "lucide-react";
+import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X, LayoutDashboard, Users } from "lucide-react";
 import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
 import styles from "./raceSidebar.module.css";
+
+// Team (share the race, members, invitations) needs the Commissaire server.
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 export function useModeItems() {
   const { t } = useTranslation();
@@ -19,8 +22,9 @@ export function useModeItems() {
     { key: "live", label: t("phase.live", "Live"), icon: <Radio aria-hidden="true" /> },
     { key: "results", label: t("phase.results", "Results"), icon: <Trophy aria-hidden="true" /> },
     { key: "board", label: t("phase.board", "Board"), icon: <LayoutDashboard aria-hidden="true" /> },
+    ...(serverConfigured ? [{ key: "team" as const, label: t("live.teamTitle", "Team"), icon: <Users aria-hidden="true" /> }] : []),
   ];
-  if (finalized) return all.filter((i) => i.key === "setup" || i.key === "results" || i.key === "board");
+  if (finalized) return all.filter((i) => i.key === "setup" || i.key === "results" || i.key === "board" || i.key === "team");
   // Create has no results to show yet; Results stays reachable from Race / Live.
   return mode === "setup" ? all.filter((i) => i.key !== "results") : all;
 }

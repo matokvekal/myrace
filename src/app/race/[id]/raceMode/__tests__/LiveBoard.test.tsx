@@ -61,10 +61,10 @@ describe("Board: expandable category results", () => {
     const rows = within(list).getAllByTestId("board-result-row");
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent("P1");
-    expect(rows[0]).toHaveTextContent("#1");
+    expect(within(rows[0]).getByText("1")).toBeInTheDocument();
     expect(rows[1]).toHaveTextContent("P2");
     // DNF is listed, labelled, and has NO finishing position
-    expect(rows[2]).toHaveTextContent("#3");
+    expect(within(rows[2]).getByText("3")).toBeInTheDocument();
     expect(rows[2]).toHaveTextContent("DNF");
     expect(rows[2]).not.toHaveTextContent(/P\d/);
 

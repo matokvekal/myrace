@@ -342,24 +342,35 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     expect(within(block("Men Elite")).getByText("✓ 1/1")).toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Status for #8"));
-    await user.click(screen.getByText("DNS", { selector: "[class*='line']" }));
+    await user.click(screen.getByRole("button", { name: /^DNS/ }));
     await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DNS", checked: false }));
     expect(within(block("Men Elite")).getByText("✓ 0/1")).toBeInTheDocument();
 
-    await user.click(screen.getByLabelText("Status for #8"));
-    await user.click(screen.getByText("STANDING", { selector: "[class*='line']" }));
+    await user.click(screen.getByLabelText("DNS, status for #8"));
+    await user.click(within(screen.getByTestId("status-modal")).getByRole("button", { name: /^Standing/ }));
     await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "standing", checked: false }));
   });
 
-  it("DNF from the status menu keeps a checked-in rider checked in (they started)", async () => {
+  it("DSQ from the status menu keeps a checked-in rider checked in", async () => {
     const user = userEvent.setup();
     const r = makeRider({ category: "Men Elite", bibNumber: 9 });
     await useRiderStore.getState().insertRiders([r]);
     renderCheckIn([elite]);
     await user.click(within(screen.getByTestId("checkin-row-9")).getByTitle("Check in"));
     await user.click(screen.getByLabelText("Status for #9"));
-    await user.click(screen.getByText("DNF", { selector: "[class*='line']" }));
-    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DNF", checked: true }));
+    await user.click(screen.getByRole("button", { name: /^DSQ/ }));
+    await waitFor(async () => expect((await stored())[0]).toMatchObject({ status: "DSQ", checked: true }));
+  });
+
+  it("offers only the statuses Check-In needs, and no DNS button on the row", async () => {
+    const user = userEvent.setup();
+    seed([makeRider({ category: "Men Elite", bibNumber: 9 })]);
+    renderCheckIn([elite]);
+    expect(within(screen.getByTestId("checkin-row-9")).queryByText("DNS")).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText("Status for #9"));
+    const names = within(screen.getByTestId("status-modal")).getAllByRole("button").map((b) => b.textContent);
+    expect(names.join(" ")).toMatch(/DNS/);
+    expect(names.join(" ")).not.toMatch(/DNF|Running|Finished/);
   });
 
   it("Check All checks everyone except DNS / DNF / DSQ", async () => {
@@ -379,11 +390,12 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     });
   });
 
-  it("one-tap DNS un-checks the rider and is undoable", async () => {
+  it("DNS un-checks the rider", async () => {
     const user = userEvent.setup();
     seed([makeRider({ category: "Men Elite", bibNumber: 9, checked: true })]);
     renderCheckIn([elite]);
-    await user.click(screen.getByLabelText("Mark #9 DNS"));
+    await user.click(screen.getByLabelText("Status for #9"));
+    await user.click(screen.getByRole("button", { name: /^DNS/ }));
     expect(useRiderStore.getState().riders[0]).toMatchObject({ status: "DNS", checked: false });
     expect(screen.getByTestId("checkin-dns-count")).toHaveTextContent("1 DNS");
   });
@@ -419,7 +431,7 @@ describe("Check-In: check-in, DNS, search, filter", () => {
     seed([makeRider({ category: "Men Elite", bibNumber: 1 })]);
     renderCheckIn([makeCategory({ name: "Men Elite", status: "running" })]);
     expect(screen.getByText(/check-in locked/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Mark #1 DNS")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Check in #1")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Check All/ })).not.toBeInTheDocument();
   });
 

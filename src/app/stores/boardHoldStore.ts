@@ -42,9 +42,26 @@ export function formatBoardHold(ms: number): string {
   return `${ms / 1000} seconds`;
 }
 
+/**
+ * "Card cover" — how long a tapped card stays washed out, wherever it sits on
+ * the board. Separate from the hold: the hold decides when the card MOVES, this
+ * decides how long it reads as "just passed".
+ */
+export const CARD_COVER_OPTIONS = [10000, 30000, 120000, 240000] as const;
+
+export const DEFAULT_CARD_COVER_MS = 10000;
+
+export function normalizeCardCoverMs(ms: unknown): number {
+  return typeof ms === 'number' && (CARD_COVER_OPTIONS as readonly number[]).includes(ms)
+    ? ms
+    : DEFAULT_CARD_COVER_MS;
+}
+
 interface BoardHoldStore {
   holdMs: number;
   setHoldMs: (ms: number) => void;
+  coverMs: number;
+  setCoverMs: (ms: number) => void;
 }
 
 /**
@@ -57,12 +74,15 @@ export const useBoardHold = create<BoardHoldStore>()(
     (set) => ({
       holdMs: DEFAULT_BOARD_HOLD_MS,
       setHoldMs: (ms) => set({ holdMs: normalizeBoardHoldMs(ms) }),
+      coverMs: DEFAULT_CARD_COVER_MS,
+      setCoverMs: (ms) => set({ coverMs: normalizeCardCoverMs(ms) }),
     }),
     {
       name: 'commissaire.boardHold',
       merge: (persisted, current) => ({
         ...current,
         holdMs: normalizeBoardHoldMs((persisted as Partial<BoardHoldStore> | null)?.holdMs),
+        coverMs: normalizeCardCoverMs((persisted as Partial<BoardHoldStore> | null)?.coverMs),
       }),
     }
   )

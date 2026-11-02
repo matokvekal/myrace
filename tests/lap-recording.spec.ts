@@ -147,6 +147,25 @@ test.describe("Lap recording core", () => {
     expect(await boardOrder(page)).toEqual([...rest, bibA, bibB]);
   });
 
+  test("the cover outlasts the hold, for as long as the setting says", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("commissaire.boardHold", JSON.stringify({ state: { holdMs: 2000, coverMs: 30000 }, version: 0 }));
+    });
+    await openLiveDemo(page);
+    const bib = await racingBibWithLapsLeft(page, 2);
+    await page.clock.fastForward(5 * 60 * 1000);
+    await tap(page, bib);
+    await expect(card(page, bib)).toHaveAttribute("data-covered", "true");
+
+    // The hold ends and the card moves, still covered
+    await page.clock.fastForward(5_000);
+    await expect(card(page, bib)).not.toHaveAttribute("data-recorded", "true");
+    await expect(card(page, bib)).toHaveAttribute("data-covered", "true");
+
+    await page.clock.fastForward(30_000);
+    await expect(card(page, bib)).not.toHaveAttribute("data-covered", "true");
+  });
+
   test("undo inside the hold cancels the pending move and clears the ✓", async ({ page }) => {
     await openLiveDemo(page);
     const bib = await racingBibWithLapsLeft(page, 2);

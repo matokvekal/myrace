@@ -33,7 +33,7 @@ type GroupBy = "category" | "wave";
 // default and let commissaires opt into the denser view.
 type ResultField = "bib" | "laps" | "time" | "status" | "gap" | "speed";
 const RESULT_FIELDS: { key: ResultField; label: string }[] = [
-  { key: "bib", label: "Bib #" },
+  { key: "bib", label: "Bib" },
   { key: "laps", label: "Laps" },
   { key: "time", label: "Time" },
   { key: "status", label: "Status" },
@@ -303,7 +303,7 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
         {podiumMode && out.length > 0 && (
           <div className={styles.outSummary}>
             {out.map((r) => (
-              <span key={r.id} className={styles.outChip}>{r.status} #{r.bibNumber}</span>
+              <span key={r.id} className={styles.outChip}>{r.status} {r.bibNumber}</span>
             ))}
           </div>
         )}

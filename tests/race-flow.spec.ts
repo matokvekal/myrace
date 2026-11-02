@@ -28,7 +28,8 @@ test.describe("Commissaire race flow", () => {
 
     // ── 3. Edit Riders enters and exits edit mode ─────────────────────────────
     await test.step("Edit Riders enters and exits edit mode", async () => {
-      // Edit Riders is an icon button in the Riders toolbar.
+      // Edit Riders is in the gear menu of the Riders toolbar.
+      await page.getByTestId("rider-manage-btn").click();
       await page.getByRole("button", { name: "Edit Riders" }).click();
       // EditRiders toolbar shows the "← Back" button (distinct from the
       // header's "Back to main") + the search placeholder.

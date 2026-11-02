@@ -8,7 +8,7 @@ import React, { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Info } from "lucide-react";
 import { useJokerMode } from "@/hooks/useJokerMode";
-import { BOARD_HOLD_OPTIONS, useBoardHold } from "@/stores/boardHoldStore";
+import { BOARD_HOLD_OPTIONS, CARD_COVER_OPTIONS, DEFAULT_CARD_COVER_MS, useBoardHold } from "@/stores/boardHoldStore";
 import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { isIos, isStandalone } from "@/components/pwa/usePwaInstall";
 import styles from "./raceSetupSettings.module.css";
@@ -53,7 +53,7 @@ export default function RaceSetupSettings() {
   const { t } = useTranslation();
   const id = useId();
   const { jokerEnabled, toggleJokerEnabled } = useJokerMode();
-  const { holdMs, setHoldMs } = useBoardHold();
+  const { holdMs, setHoldMs, coverMs, setCoverMs } = useBoardHold();
   const { settings: voiceSettings, setLanguage: setVoiceLanguage, setAutoConfirm } = useVoiceSettingsStore();
   const seconds = (ms: number) => t("prefs.seconds", "{{n}} s", { n: ms / 1000 });
 
@@ -97,6 +97,29 @@ export default function RaceSetupSettings() {
           {BOARD_HOLD_OPTIONS.map((ms) => (
             <option key={ms} value={ms}>
               {seconds(ms)}{ms === DEFAULT_HOLD_MS ? ` (${t("prefs.default", "default")})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* Card cover — how long a tapped card stays washed out, even after it moved */}
+      <div className={styles.settingRow}>
+        <label className={styles.settingLabel} htmlFor={`${id}-cover`}>
+          {t("prefs.cardCover", "Card cover")}
+        </label>
+        <InfoTip label={t("prefs.aboutCardCover", "About card cover")}>
+          {t("prefs.cardCoverInfo", "How long a tapped card stays washed out, so you can see who just passed. The card keeps it after it drops to the bottom. Board hold still decides when it moves.")}
+        </InfoTip>
+        <select
+          id={`${id}-cover`}
+          className={`${styles.select} ${styles.selectSmall}`}
+          value={coverMs}
+          onChange={(e) => setCoverMs(Number(e.target.value))}
+          aria-label="Card cover time"
+        >
+          {CARD_COVER_OPTIONS.map((ms) => (
+            <option key={ms} value={ms}>
+              {ms < 60000 ? seconds(ms) : t("prefs.minutes", "{{n}} min", { n: ms / 60000 })}
+              {ms === DEFAULT_CARD_COVER_MS ? ` (${t("prefs.default", "default")})` : ''}
             </option>
           ))}
         </select>

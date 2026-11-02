@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, LayoutDashboard, Radio, SkipForward, Trophy, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, LayoutDashboard, Radio, SkipForward, Trophy, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory, toMinutes, normalizeTime } from "../schedule/Schedule";
+import { getCategoryBibIssues } from "@/utils/bibIssues";
+import { buildTimelineAxis, timelineRange } from "./timelineAxis";
+import { daysSinceRace, waveProblem } from "./waveHealth";
 import styles from "./waveTimeline.module.css";
 
 export type WaveState = "upcoming" | "running" | "finished";
-export type WaveAction = "checkin" | "start" | "live" | "finish" | "results" | "board";
+export type WaveAction = "checkin" | "changes" | "start" | "live" | "finish" | "results" | "board";
 
 const OUT = ["DNF", "DSQ", "DNS"];
 
@@ -39,8 +42,21 @@ const hhmm = (min: number) => {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 };
 
-const PX_PER_MIN = 1.2; // 72 px per hour
-const CARD_MIN_PX = 62; // three compact rows: title · categories + riders · actions
+const PX_PER_MIN = 2; // 120 px per hour
+const CARD_GAP_PX = 10;
+const COMPACT_CARD_PX = 62;
+// Card rows have these fixed heights in waveTimeline.module.css (--row-*), so the
+// axis knows each card's height before it renders.
+const CARD_PADDING_PX = 18; // padding + border
+const HEAD_ROW_PX = 24;
+const START_ROW_PX = 28;
+const CAT_ROW_PX = 26;
+const ACTIONS_ROW_PX = 34;
+
+interface WaveStart {
+  label: string;
+  cats: CategoryProps[];
+}
 
 interface Item {
   wave: number;
@@ -48,8 +64,18 @@ interface Item {
   start: number; // minutes since midnight
   end: number | null; // actual end (running → now, finished → finishedAt); null = unknown
   cats: CategoryProps[];
+  starts: WaveStart[];
   startLabel: string;
 }
+
+const cardHeight = (it: Item, compact: boolean, hasActions: boolean) =>
+  compact
+    ? COMPACT_CARD_PX
+    : CARD_PADDING_PX +
+      HEAD_ROW_PX +
+      it.starts.length * START_ROW_PX +
+      it.cats.length * CAT_ROW_PX +
+      (hasActions ? ACTIONS_ROW_PX : 0);
 
 interface Props {
   schedule: Map<number, Map<string, CategoryProps[]>>;
@@ -65,6 +91,8 @@ interface Props {
   current?: number;
   /** Check-In | Start | Live | Finish on each card. */
   onAction?: (wave: number, action: WaveAction) => void;
+  /** Check-In changes per wave, for the main commissaire. Empty = no warning button. */
+  changeCounts?: Map<number, number>;
 }
 
 /**
@@ -72,7 +100,7 @@ interface Props {
  * time axis, a live "now" line, Now / Next / Active jumps. Presentation only —
  * selecting a wave just sets the shared selected wave.
  */
-const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current, onAction }) => {
+const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current, onAction, changeCounts }) => {
   const [now, setNow] = useState(nowMinutes);
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000);
@@ -96,81 +124,66 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
           end = Math.max(d.getHours() * 60 + d.getMinutes(), start);
         }
       }
-      const item = { wave, state, start, end, cats, startLabel: firstKey ? normalizeTime(firstKey) ?? firstKey : "TBD" };
+      const starts = [...startMap.entries()].map(([label, startCats]) => ({ label, cats: startCats }));
+      const item = { wave, state, start, end, cats, starts, startLabel: firstKey ? normalizeTime(firstKey) ?? firstKey : "TBD" };
       (Number.isFinite(start) ? items : unscheduled).push(item);
     });
     items.sort((a, b) => a.start - b.start);
     return { items, unscheduled };
   }, [schedule, states, now]);
 
-  // Visible range: whole hours around the waves (and now, when it's close)
-  const range = useMemo(() => {
-    if (!items.length) return null;
-    const lo = Math.min(...items.map((i) => i.start));
-    const hi = Math.max(...items.map((i) => i.end ?? i.start + CARD_MIN_PX / PX_PER_MIN));
-    const nearNow = now >= lo - 120 && now <= hi + 120;
-    const from = Math.max(0, Math.floor((Math.min(lo, nearNow ? now : lo) - 30) / 60) * 60);
-    const to = Math.min(1440, Math.ceil((Math.max(hi, nearNow ? now : hi) + 30) / 60) * 60);
-    return { from, to };
-  }, [items, now]);
+  const range = useMemo(
+    () => (items.length ? timelineRange(items.map((i) => i.start), items.map((i) => i.end)) : null),
+    [items]
+  );
 
-  // Lay out cards; overlapping ones share the row side by side
+  const hasActions = !!onAction && !compact;
+  const axis = useMemo(
+    () =>
+      range &&
+      buildTimelineAxis(
+        items.map((it) => ({ start: it.start, height: cardHeight(it, compact, hasActions) })),
+        range,
+        PX_PER_MIN,
+        CARD_GAP_PX
+      ),
+    [items, range, compact, hasActions]
+  );
+
+  // A running or finished wave also fills its time on course, up to the next wave
   const laid = useMemo(() => {
-    if (!range) return [];
-    const boxes = items.map((it) => {
-      const top = (it.start - range.from) * PX_PER_MIN;
-      const h = Math.max(CARD_MIN_PX, ((it.end ?? it.start) - it.start) * PX_PER_MIN);
-      return { it, top, bottom: top + h, lane: 0, lanes: 1 };
+    if (!axis) return [];
+    return items.map((it, i) => {
+      const top = axis.tops[i];
+      const content = cardHeight(it, compact, hasActions);
+      const nextTop = axis.tops[i + 1] ?? axis.height;
+      const duration = it.end != null ? Math.min(axis.toY(it.end), nextTop - CARD_GAP_PX) - top : 0;
+      return { it, top, height: Math.max(content, duration) };
     });
-    let cluster: typeof boxes = [];
-    let clusterBottom = -Infinity;
-    const closeCluster = () => {
-      const lanes = Math.max(1, ...cluster.map((b) => b.lane + 1));
-      cluster.forEach((b) => (b.lanes = lanes));
-      cluster = [];
-    };
-    const laneBottoms: number[] = [];
-    for (const b of boxes) {
-      if (b.top >= clusterBottom) {
-        closeCluster();
-        laneBottoms.length = 0;
-        clusterBottom = -Infinity;
-      }
-      let lane = laneBottoms.findIndex((bt) => bt <= b.top);
-      if (lane === -1) lane = laneBottoms.length;
-      laneBottoms[lane] = b.bottom;
-      b.lane = lane;
-      cluster.push(b);
-      clusterBottom = Math.max(clusterBottom, b.bottom);
-    }
-    closeCluster();
-    return boxes;
-  }, [items, range]);
+  }, [items, axis, compact, hasActions]);
 
-  // Scroll once on open: the active wave, else the next one, else now
+  // Scroll once on open: the active wave, else the next one, else now.
+  // The first wave opens at the top, with the hour before it in view.
   const scrollRef = useRef<HTMLDivElement>(null);
   const didScroll = useRef(false);
-  const scrollToMinute = (min: number, smooth = true) => {
-    const el = scrollRef.current;
-    if (!el || !range) return;
-    el.scrollTo({ top: Math.max(0, (min - range.from) * PX_PER_MIN - 60), behavior: smooth ? "smooth" : "auto" });
-  };
   const activeWave = items.find((i) => i.state === "running");
   const nextWave = items.find((i) => i.state === "upcoming" && i.start >= now) ?? items.find((i) => i.state === "upcoming");
   useEffect(() => {
-    if (didScroll.current || !range) return;
+    if (didScroll.current || !axis) return;
     didScroll.current = true;
-    scrollToMinute((activeWave ?? nextWave)?.start ?? now, false);
+    const target = activeWave ?? nextWave;
+    const top = target === items[0] ? 0 : axis.toY(target?.start ?? now) - 60;
+    scrollRef.current?.scrollTo({ top: Math.max(0, top), behavior: "auto" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range]);
+  }, [axis]);
 
 
   if (!items.length && !unscheduled.length) {
     return <div className={styles.empty}>No waves configured</div>;
   }
 
-  const hours: number[] = [];
-  if (range) for (let m = range.from; m <= range.to; m += 30) hours.push(m);
+  const ticks: number[] = [];
+  if (range) for (let m = Math.ceil(range.from / 30) * 30; m <= range.to; m += 30) ticks.push(m);
   const showNow = range && now >= range.from && now <= range.to;
 
   return (
@@ -182,26 +195,39 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
         </span>
       </div>
 
-      {range && (
+      {range && axis && (
         <div className={styles.scroll} ref={scrollRef} data-testid="wave-timeline">
-          <div className={styles.grid} style={{ height: (range.to - range.from) * PX_PER_MIN + 8 }}>
-            {hours.map((m) => (
+          <div className={styles.grid} style={{ height: axis.height + 28 }}>
+            {ticks.map((m) => (
               <div
                 key={m}
                 className={`${styles.tick} ${m % 60 === 0 ? styles.tickHour : styles.tickHalf}`}
-                style={{ top: (m - range.from) * PX_PER_MIN }}
+                style={{ top: axis.toY(m) }}
               >
-                <span className={styles.tickLabel}>{m % 60 === 0 ? hhmm(m) : ""}</span>
+                <span className={styles.tickLabel}>{hhmm(m)}</span>
               </div>
             ))}
 
             <div className={styles.lane}>
-              {laid.map(({ it, top, bottom, lane, lanes }) => {
+              {laid.map(({ it, top, height }) => {
                 const s = waveStats(it.cats, riders);
                 const isSel = it.wave === selected;
                 // Check-In matters once the start is near (≤ 60 min) or due.
                 const missing = s.registered - s.accounted;
-                const ciWarn = it.state === "upcoming" && missing > 0 && it.start - now <= 60;
+                const days = daysSinceRace(date);
+                const ciWarn = it.state === "upcoming" && missing > 0;
+                const problem = waveProblem({
+                  state: it.state,
+                  start: it.start,
+                  now,
+                  daysSinceRace: days,
+                  missing,
+                  hasBibIssue: it.cats.some((c) => {
+                    const issues = getCategoryBibIssues(c, riders, c.raceUuid);
+                    return (c.status ?? "upcoming") === "upcoming" && issues.noBib + issues.dupBib > 0;
+                  }),
+                });
+                const stateLabel = problem ?? STATE_LABEL[it.state];
                 return (
                   <div
                     key={it.wave}
@@ -213,13 +239,9 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         onSelect(it.wave);
                       }
                     }}
-                    className={`${styles.card} ${styles[`card_${it.state}`]} ${ciWarn ? styles.cardWarn : ""} ${isSel ? styles.cardSel : ""}`}
-                    style={{
-                      top,
-                      height: bottom - top - 3,
-                      left: `calc(${(lane / lanes) * 100}% + 2px)`,
-                      width: `calc(${100 / lanes}% - 4px)`,
-                    }}
+                    className={`${styles.card} ${styles[`card_${it.state}`]} ${problem ? styles.cardProblem : styles.cardOk} ${isSel ? styles.cardSel : ""}`}
+                    data-problem={problem ?? undefined}
+                    style={{ top, height }}
                     onClick={() => onSelect(it.wave)}
                     aria-pressed={isSel}
                     data-testid={`timeline-wave-${it.wave}`}
@@ -230,32 +252,53 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                     <span className={styles.cardTop}>
                       <span className={styles.cardName}>{compact ? `W${it.wave}` : `Wave ${it.wave}`}</span>
                       <span className={styles.cardTime}>{it.startLabel}</span>
-                      <span className={`${styles.state} ${styles[`state_${it.state}`]}`} title={STATE_LABEL[it.state]}>
-                        <StateIcon s={it.state} /> <span className={styles.stateLabel}>{STATE_LABEL[it.state]}</span>
+                      <span className={styles.cardStats}>
+                        {it.state === "running" ? (
+                          <b>{s.onCourse}/{s.started} riding</b>
+                        ) : (
+                          <>{s.registered} riders</>
+                        )}
+                        {it.state === "upcoming" && s.registered > 0 && (
+                          <span
+                            className={`${styles.ciTag} ${s.accounted === s.registered ? styles.ciDone : ciWarn ? styles.ciWarn : s.accounted > 0 ? styles.ciPart : ""}`}
+                            title={`Check-In ${s.accounted} / ${s.registered}`}
+                            aria-label={`Check-In ${s.accounted} of ${s.registered}`}
+                          >
+                            {s.accounted === s.registered ? <CheckCircle2 size={12} /> : <ClipboardCheck size={12} />}
+                            {s.accounted}/{s.registered}
+                          </span>
+                        )}
+                      </span>
+                      <span className={`${styles.state} ${problem ? styles.stateProblem : styles[`state_${it.state}`]}`} title={stateLabel}>
+                        {problem ? <AlertTriangle size={13} /> : <StateIcon s={it.state} />} <span className={styles.stateLabel}>{stateLabel}</span>
                       </span>
                     </span>
-                    <span className={styles.cardMeta}>
-                    <span className={styles.cardCats} dir="auto">{it.cats.map((c) => c.name).join(" · ")}</span>
-                    <span className={styles.cardStats}>
-                      {it.state === "running" ? (
-                        <b>{s.onCourse} / {s.started} on course</b>
-                      ) : (
-                        <>{s.registered} riders</>
-                      )}
-                      {it.state === "upcoming" && s.registered > 0 && (
-                        <span
-                          className={`${styles.ciTag} ${s.accounted === s.registered ? styles.ciDone : ciWarn ? styles.ciWarn : s.accounted > 0 ? styles.ciPart : ""}`}
-                          title={`Check-In ${s.accounted} / ${s.registered}`}
-                          aria-label={`Check-In ${s.accounted} of ${s.registered}`}
-                        >
-                          {s.accounted === s.registered ? <CheckCircle2 size={12} /> : <ClipboardCheck size={12} />}
-                          {ciWarn ? `${missing} missing` : `${s.accounted}/${s.registered}`}
-                        </span>
-                      )}
-                    </span>
-                    </span>
-                    {onAction && !compact && (
+                    {!compact && (
+                      <span className={styles.starts}>
+                        {it.starts.map((st, si) => (
+                          <span key={st.label} className={styles.startBlock} data-testid={`timeline-start-${it.wave}-${si + 1}`}>
+                            <span className={styles.startRow}>
+                              <span className={styles.startName}>Start {si + 1}</span>
+                              <span className={styles.startClock}>{st.label}</span>
+                            </span>
+                            {st.cats.map((c) => (
+                              <span key={c.id} className={styles.catLine} title={c.name}>
+                                <span className={styles.catDot} style={{ background: c.color ?? "#9ca3af" }} />
+                                <span className={styles.catLineName} dir="auto">{c.name}{c.subCategory ? ` · ${c.subCategory}` : ""}</span>
+                                <span className={styles.catLineTime}>{normalizeTime(c.startTime) ?? "TBD"}</span>
+                              </span>
+                            ))}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                    {hasActions && onAction && (
                       <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
+                        {!!changeCounts?.get(it.wave) && (
+                          <button type="button" className={`${styles.act} ${styles.actChanges}`} onClick={() => onAction(it.wave, "changes")} aria-label={`${changeCounts.get(it.wave)} Check-In changes, wave ${it.wave}`} title="Check-In changes" data-testid={`wave-act-changes-${it.wave}`}>
+                            <AlertTriangle size={14} /> {changeCounts.get(it.wave)}
+                          </button>
+                        )}
                         {it.state === "finished" ? (
                           <>
                             <button type="button" className={styles.act} onClick={() => onAction(it.wave, "results")} aria-label={`Results, wave ${it.wave}`} data-testid={`wave-act-results-${it.wave}`}>
@@ -270,7 +313,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         {/* Before the start: Check-In; once everyone is accounted for, Start too.
                             After the start: Live / Finish (+ Start while a later group still waits). */}
                         {it.state === "upcoming" && (
-                          <button type="button" className={styles.act} onClick={() => onAction(it.wave, "checkin")} aria-label={`Check-In, wave ${it.wave}`} data-testid={`wave-act-checkin-${it.wave}`}>
+                          <button type="button" className={`${styles.act} ${missing > 0 ? styles.actTodo : styles.actDone}`} onClick={() => onAction(it.wave, "checkin")} aria-label={`Check-In, wave ${it.wave}`} data-testid={`wave-act-checkin-${it.wave}`}>
                             <ClipboardCheck size={13} /> Check-In
                           </button>
                         )}
@@ -299,7 +342,7 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
             </div>
 
             {showNow && (
-              <div className={styles.now} style={{ top: (now - range.from) * PX_PER_MIN }} aria-label={`Now ${hhmm(now)}`}>
+              <div className={styles.now} style={{ top: axis.toY(now) }} aria-label={`Now ${hhmm(now)}`}>
                 <span className={styles.nowLabel}>{hhmm(now)}</span>
               </div>
             )}

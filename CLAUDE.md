@@ -80,10 +80,10 @@ public/data/
 | `useCategoryStore` | Categories per race | Yes (IDB) |
 | `useRiderStore` | Riders per race | Yes (IDB) |
 | `useDataStore` | Auth + `activeTab` | No |
-| `useUIStore` | Modals + `isRaceMode` | No |
+| `useUIStore` | Modals + `raceModeRace` (the race in Race mode; per race, so a new race never opens on another race's mode) | No |
 
 ### Race Mode Flow
-1. `race/[id]/page.tsx` — tab container, switches to `<RaceMode>` when `isRaceMode` is true
+1. `race/[id]/page.tsx` — tab container, switches to `<RaceMode>` when `raceModeRace` is this race
 2. `RaceMode.tsx` — wave selector → sub-tabs: Start / CheckIn / Board
 3. `StartManager.tsx` — validates groups, starts heat, sets `timeStartRace` on all riders
 4. `heat/[heatId]/page.tsx` — live lap recording: `handleRiderClick` is core action
@@ -215,6 +215,14 @@ still open).
   titled "Live Settings") and the heat page must pick up the change without a
   remount.
 
+### Card cover (heat page)
+- How long a tapped card stays washed out: 10 s / 30 s / 2 min / 4 min, default 10 s
+  (`coverMs` in `boardHoldStore`, set in Race Setup). Separate from the board hold:
+  the hold decides when the card moves, the cover how long it looks "just passed".
+- Derived in `RacingRider` from `rider.timeArrive`, never stored, so reload and undo
+  just work. `data-recorded` still means only "waiting for the hold"; the cover is
+  `data-covered`, and the green ✓ stays with the hold.
+
 ### Joker button (heat page) — unidentified-rider taps
 - Opt-in via a side-menu checkbox (`useJokerMode`, localStorage
   `commissaire.jokerEnabled`, default off — `HeaderMain.tsx`). Off means the
@@ -289,6 +297,27 @@ still open).
 - Per race, `race.leaderFinishAll` (undefined = ON). Toggle on the Categories tab
   and in the live screen's Live Settings gear. Off = every rider rides full laps.
 
+### Race timeline (Race page)
+- `WaveTimeline` runs from 1 h before the first start to 2 h after the last. Each
+  card lists its starts and their categories, so its height comes from the row
+  counts (`cardHeight`, fixed `--row-*` heights in the CSS: change both together).
+- `raceMode/timelineAxis.ts` stretches the time axis where a card needs the room,
+  so waves never overlap. Place anything time-based with `axis.toY`, not a fixed
+  px-per-minute.
+- Card tint comes from `raceMode/waveHealth.ts`: light red when a wave hasn't
+  started or finished in time, has a bib problem, or its Check-In isn't done;
+  otherwise light green. DNF/DNS riders alone don't turn a wave red. Time checks
+  use the race date, so a future race isn't judged by today's clock.
+- Diagonal stripes only on the Check-In button (red until done, then green) and on
+  a finished wave's card (green).
+
+### Check-In changes report
+- Status changes and bib edits at Check-In, and riders added by hand, go through
+  `logCheckInChange` (`stores/checkInChangesStore.ts`) into the race's audit log.
+- The wave card shows a warning triangle with the count when there are changes
+  (needs `EDIT_RACE`); it opens `raceMode/CheckInChanges`. The log is per device
+  (OPFS), so changes made on another phone don't appear here.
+
 ### Bib warning before Start
 - `utils/bibIssues.ts` is the ONE bib check (missing bib / race-wide duplicate,
   DNS ignored). StartManager blocks on it; `race/components/bibWarning/BibWarning`
@@ -333,6 +362,13 @@ still open).
 - The Edit-Riders quick importer is CSV/TXT only (its own `parseCSV`, `accept=
   ".csv,.txt"`). The 4-step wizard (`CSVImportWizard`) handles xlsx via
   `parseXLSXFile`. All three share `rowToRider` / `autoMapColumns` (BUGS.md #20).
+
+### Import: fields we try not to collect
+- `OPT_IN_FIELDS` (`types/csv.types.ts`: birth date, UCI ID, bib colours) are never
+  auto-mapped, not even from a learned mapping, so Create Race never imports them
+  and the wizard lists them under Not imported until the user picks the field.
+- National ID / passport columns are stricter: `isIdColumnHeader` blocks them
+  entirely (PRD FR-45), no manual mapping either.
 
 ### Import: "Keep as info" columns
 - The mapping step offers a synthetic target `infoField` ("Keep as info") for any

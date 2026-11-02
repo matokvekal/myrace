@@ -40,7 +40,8 @@ const actualStart = (cats: CategoryProps[], riders: RiderProps[]): string | null
 /**
  * Race-day bottom sheet for one wave: a compact header, the Check-In summary,
  * and the existing start screen (StartManager) unchanged underneath. Half
- * height by default, full height for Check-In; drag handle, close, backdrop.
+ * height by default, Check-In opens at 70% and drags up to 95%; drag handle,
+ * close, backdrop.
  */
 const RaceSheet: React.FC<Props> = ({
   wave, state, startLabel, categories, riders, size, onSize, onClose, view, onView: setView, renderStart, renderCheckIn,
@@ -53,8 +54,8 @@ const RaceSheet: React.FC<Props> = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Snap heights (% of viewport): Check-In 50 → 70; start screen 50 → 90.
-  const snap = view === "checkin" ? { half: 50, full: 70 } : { half: 50, full: 90 };
+  // Snap heights (% of viewport): Check-In 70 → 95; start screen 50 → 90.
+  const snap = view === "checkin" ? { half: 70, full: 95 } : { half: 50, full: 90 };
   // Drag handle: the sheet follows the finger, then snaps (half / full / close).
   // Only the handle drags (pointer captured), so scrolling the list never moves the sheet.
   const drag = useRef<{ y: number; vh: number } | null>(null);
@@ -91,7 +92,7 @@ const RaceSheet: React.FC<Props> = ({
     <>
       <div className={styles.backdrop} onClick={onClose} data-testid="sheet-backdrop" aria-hidden="true" />
       <section
-        className={`${styles.sheet} ${size === "full" ? (view === "checkin" ? styles.checkinFull : styles.full) : styles.half} ${dragVh != null ? styles.dragging : ""}`}
+        className={`${styles.sheet} ${view === "checkin" ? (size === "full" ? styles.checkinFull : styles.checkinHalf) : size === "full" ? styles.full : styles.half} ${dragVh != null ? styles.dragging : ""}`}
         style={dragVh != null ? { height: `${dragVh}dvh` } : undefined}
         role="dialog"
         aria-label={`Wave ${wave}`}

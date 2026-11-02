@@ -54,8 +54,8 @@ describe("Results screen", () => {
     expect(waves.slice(0, 2)).toEqual(["Wave 1", "Wave 2"]);
     const blocks = screen.getAllByTestId("results-category");
     expect(blocks).toHaveLength(2);
-    const eliteRows = within(blocks[0]).getAllByText(/^#\d$/).map((e) => e.textContent);
-    expect(eliteRows.slice(0, 2)).toEqual(["#1", "#2"]); // ranked by place: Ann (40 min) before Bea (50 min)
+    const eliteRows = within(blocks[0]).getAllByText(/^(First Ann|Second Bea)$/).map((e) => e.textContent);
+    expect(eliteRows).toEqual(["First Ann", "Second Bea"]); // ranked by place: Ann (40 min) before Bea (50 min)
     expect(within(blocks[0]).getByText("First Ann")).toBeInTheDocument();
     expect(within(blocks[0]).getAllByText("3/3").length).toBeGreaterThan(0);
     expect(within(blocks[0]).getByText("00:40:00")).toBeInTheDocument();

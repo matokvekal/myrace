@@ -84,6 +84,8 @@ export interface RaceProps {
   phone: string;
   takanon: string;
   site: string;
+  /** El Niño event this race links to (the id only); unset links to El Niño's home page. */
+  elNinoEventId?: string | null;
   /** Event logo (data URL), shown on the Info page. */
   logo?: string | null;
   /** Organizer / federation logo (data URL), shown on the Info page. */

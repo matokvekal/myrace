@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import type {
   CSVParseResult,
   ColumnMapping,
@@ -16,7 +17,6 @@ interface PreviewStepProps {
   mappings: ColumnMapping[];
   onStartImport: (validation: ValidationResult) => void;
   onBack: () => void;
-  onClose?: () => void;
 }
 
 interface ParsedRider {
@@ -24,7 +24,7 @@ interface ParsedRider {
 }
 
 const FIELD_LABELS: Record<RiderFieldKey, string> = {
-  bibNumber: "Bib #",
+  bibNumber: "Bib",
   firstName: "First Name",
   middleName: "Middle Name",
   lastName: "Last Name",
@@ -60,8 +60,7 @@ export default function PreviewStep({
   parseResult,
   mappings,
   onStartImport,
-  onBack,
-  onClose
+  onBack
 }: PreviewStepProps) {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
@@ -197,35 +196,18 @@ export default function PreviewStep({
     <div className={styles.previewStep}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <button onClick={onBack} className={styles.backButtonTop}>← Back</button>
-          <h3>Preview & Validate</h3>
-        </div>
-        <div className={styles.headerRight}>
-          {validation && (
-            <div className={styles.validationSummary}>
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Total:</span>
-                <span className={styles.summaryValue}>{validation.summary.total}</span>
-              </div>
-              {validation.summary.errors > 0 && (
-                <div className={`${styles.summaryItem} ${styles.error}`}>
-                  <span className={styles.summaryLabel}>Errors:</span>
-                  <span className={styles.summaryValue}>{validation.summary.errors}</span>
-                </div>
-              )}
-              {validation.summary.warnings > 0 && (
-                <div className={`${styles.summaryItem} ${styles.warning}`}>
-                  <span className={styles.summaryLabel}>Warnings:</span>
-                  <span className={styles.summaryValue}>{validation.summary.warnings}</span>
-                </div>
-              )}
-            </div>
-          )}
-          {onClose && (
-            <button onClick={onClose} className={styles.closeButton} title="Close wizard">✕</button>
-          )}
-        </div>
+        <h3>Preview</h3>
+        {validation && (
+          <span className={styles.stat} data-testid="preview-summary">
+            {validation.summary.total} rows
+            {validation.summary.errors > 0 && (
+              <span className={styles.statError}> · {validation.summary.errors} errors</span>
+            )}
+            {validation.summary.warnings > 0 && (
+              <span className={styles.statWarning}> · {validation.summary.warnings} warnings</span>
+            )}
+          </span>
+        )}
       </div>
 
       {/* Tabs */}
@@ -314,7 +296,13 @@ export default function PreviewStep({
                                   className={`${styles.issue} ${styles[issue.severity]}`}
                                   title={issue.message}
                                 >
-                                  {issue.severity === "error" ? "❌" : issue.severity === "warning" ? "⚠️" : "ℹ️"}
+                                  {issue.severity === "error" ? (
+                                    <AlertCircle size={15} aria-label={issue.message} />
+                                  ) : issue.severity === "warning" ? (
+                                    <AlertTriangle size={15} aria-label={issue.message} />
+                                  ) : (
+                                    <Info size={15} aria-label={issue.message} />
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -381,17 +369,18 @@ export default function PreviewStep({
 
       {/* Actions */}
       <div className={styles.actions}>
-        <button onClick={onBack} className={styles.backButton}>← Back to Mapping</button>
+        <button onClick={onBack} className={styles.backButton}>Back</button>
         <button
           onClick={handleStartImport}
           className={styles.importButton}
+          data-testid="preview-import"
           disabled={
             !validation ||
             mappedFields.length === 0 ||
             (validation.summary.errors > 0 && validation.summary.errors === validation.summary.total)
           }
         >
-          Import {validation && validation.summary.total - validation.summary.errors} Riders →
+          Import {validation && validation.summary.total - validation.summary.errors} Riders
         </button>
       </div>
     </div>

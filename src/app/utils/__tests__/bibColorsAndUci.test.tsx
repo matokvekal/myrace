@@ -35,7 +35,7 @@ describe("bib colours", () => {
   it("BibBadge shows the bib in its colours, or plain when none are set", () => {
     const rider = { bibNumber: 42, bibColor: "red", bibTextColor: null, raceUuid: "r", category: "Elite", subCategory: null };
     render(<BibBadge rider={rider} category={null} />);
-    const bib = screen.getByText("#42");
+    const bib = screen.getByText("42");
     expect(bib).toHaveAttribute("data-bib-colored", "true");
     expect(bib).toHaveStyle({ background: "#E53935" });
   });

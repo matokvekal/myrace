@@ -309,7 +309,7 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
                     data-testid="board-result-row"
                   >
                     <span className={styles.pos}>{position != null ? `P${position}` : "—"}</span>
-                    <span className={styles.bib}>#{rider.bibNumber}</span>
+                    <span className={styles.bib}>{rider.bibNumber}</span>
                     <span className={styles.name} dir="auto">{rider.lastName} {rider.firstName}</span>
                     {label ? (
                       <span className={styles.outTag} data-status={label}>{label}</span>
@@ -335,7 +335,7 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
                     <span className={styles.pos}>
                       {showMedal ? MEDAL[i] : `P${i + 1}`}
                     </span>
-                    <span className={styles.bib}>#{rider.bibNumber}</span>
+                    <span className={styles.bib}>{rider.bibNumber}</span>
                     <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
                     <span className={styles.laps}>{rider.lapsCounter ?? 0}/{rider.totalLaps ?? "?"}</span>
                     {visibleFields.has("gap") && (
@@ -353,7 +353,7 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
             {podiumMode && outRiders.length > 0 && (
               <div className={styles.outSummary}>
                 {outRiders.map((r) => (
-                  <span key={r.id} className={styles.outChip}>{r.status} #{r.bibNumber}</span>
+                  <span key={r.id} className={styles.outChip}>{r.status} {r.bibNumber}</span>
                 ))}
               </div>
             )}

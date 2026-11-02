@@ -138,10 +138,11 @@ async function appendLine(race: RaceProps, line: string): Promise<void> {
   await writable.close();
 }
 
-function log(input: AuditLogInput): void {
+/** Resolves once the entry is written (or failed); callers may ignore it. */
+function log(input: AuditLogInput): Promise<void> {
   // This is the commissaire's own audit trail — a downloaded/view-only race
   // is someone else's race being viewed here, not one to keep a local log for.
-  if (input.race.viewOnly) return;
+  if (input.race.viewOnly) return Promise.resolve();
   const entry = buildEntry(input);
   const line = JSON.stringify(entry) + "\n";
   const key = input.race.uuid;
@@ -153,6 +154,7 @@ function log(input: AuditLogInput): void {
       console.warn("AuditLogService: failed to write entry", err);
     });
   writeQueues.set(key, queued);
+  return queued;
 }
 
 async function readEntries(race: RaceProps): Promise<AuditLogEntry[]> {

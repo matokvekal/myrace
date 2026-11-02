@@ -6,8 +6,9 @@ import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import useRaceStore from "@/stores/racesStore";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
+import { safeHttpUrl } from "@/utils/safeUrl";
 import { useAuthStore } from "@/stores/authStore";
-import { Edit2, Check, X, ExternalLink, Download, Upload, ShieldCheck, ScrollText, Flag, Lock, Calendar, Clock, MapPin, Route, Trophy, Bike, Building2, UserRound, Phone, Globe, ImagePlus, Trash2 } from "lucide-react";
+import { Edit2, Check, Plus, X, ExternalLink, Download, Upload, ShieldCheck, ScrollText, Flag, Lock, Calendar, Clock, MapPin, Route, Trophy, Bike, Building2, UserRound, Phone, Globe, ImagePlus, Trash2 } from "lucide-react";
 import { compressImage } from "@/utils/compressImage";
 import { resolveRaceImage } from "@/utils/resolveRaceImage";
 // xlsx (~430 kB) and its wrappers load on demand from the handlers below so they
@@ -19,6 +20,8 @@ import ExportCategoriesModal from "./ExportCategoriesModal";
 import MergeImportModal, { ImportMode } from "./MergeImportModal";
 import AuditLogViewer from "./AuditLogViewer";
 import FinishRaceModal from "./FinishRaceModal";
+import ElNinoLink from "./ElNinoLink";
+import MoreText from "./MoreText";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 import { CategoryProps } from "@/types/types";
 import { finalizeRace } from "@/utils/finalizeRace";
@@ -64,6 +67,9 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showFinishRace, setShowFinishRace] = useState(false);
+  const [editingRules, setEditingRules] = useState(false);
+  const [rulesDraft, setRulesDraft] = useState("");
+  const [rulesError, setRulesError] = useState(false);
   const [finalCheck, setFinalCheck] = useState<FinalizationCheck | null>(null);
   const updateRace = useRaceStore((s) => s.updateRace);
   const currentUser = useAuthStore((s) => s.currentUser);
@@ -395,6 +401,32 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
 
   const handleCancel = () => setEditMode(false);
 
+  const startEditRules = () => {
+    setRulesDraft(race.takanon ?? "");
+    setRulesError(false);
+    setEditingRules(true);
+  };
+
+  const saveRules = async () => {
+    const draft = rulesDraft.trim();
+    const takanon = draft ? safeHttpUrl(draft) : "";
+    if (takanon === null) {
+      setRulesError(true);
+      return;
+    }
+    await updateRace({ ...race, takanon });
+    AuditLogService.log({
+      race,
+      action: "EDIT_RACE",
+      screen: "Info",
+      entityType: "race",
+      entityId: race.uuid,
+      before: { takanon: race.takanon ?? "" },
+      after: { takanon },
+    });
+    setEditingRules(false);
+  };
+
   const set = (field: keyof EditForm, value: string | number | null) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -562,6 +594,8 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
               <InfoItem icon={<Trophy size={15} />} label="Level" value={race.level} />
             </section>
 
+            <ElNinoLink race={race} canEdit={!race.viewOnly && !finalized} />
+
             <section className={styles.evCard}>
               <h3 className={styles.evCardTitle}><MapPin size={15} /> Venue</h3>
               <InfoItem icon={<MapPin size={15} />} label="Location" value={race.location} />
@@ -591,18 +625,60 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
                 value={race.phone}
                 href={race.phone ? `tel:${race.phone.replace(/[^\d+]/g, "")}` : undefined}
               />
-              <InfoItem icon={<Globe size={15} />} label="Website" value={race.site} href={race.site || undefined} external />
+              <InfoItem icon={<Globe size={15} />} label="Website" value={race.site} href={safeHttpUrl(race.site) ?? undefined} external />
             </section>
 
             <section className={styles.evCard}>
               <h3 className={styles.evCardTitle}><ScrollText size={15} /> Rules / תקנון</h3>
-              {race.takanon ? (
-                <a href={race.takanon} target="_blank" rel="noopener noreferrer" className={styles.takanonLink}>
-                  <ExternalLink size={14} />
-                  View Rules Document
-                </a>
+              {editingRules ? (
+                <form
+                  className={styles.rulesForm}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveRules();
+                  }}
+                >
+                  <input
+                    className={styles.takanonInput}
+                    type="text"
+                    inputMode="url"
+                    dir="ltr"
+                    autoFocus
+                    placeholder="https://…"
+                    aria-label="Link to the race rules"
+                    aria-invalid={rulesError}
+                    value={rulesDraft}
+                    onChange={(e) => {
+                      setRulesDraft(e.target.value);
+                      setRulesError(false);
+                    }}
+                    data-testid="race-rules-input"
+                  />
+                  <button type="submit" className={styles.rulesBtn} aria-label="Save rules link" data-testid="race-rules-save">
+                    <Check size={15} />
+                  </button>
+                  <button type="button" className={styles.rulesBtn} aria-label="Cancel" onClick={() => setEditingRules(false)}>
+                    <X size={15} />
+                  </button>
+                  {rulesError && <div className={styles.rulesError} role="alert">Enter a valid web link.</div>}
+                </form>
               ) : (
-                <div className={styles.takanonEmpty}>No rules document yet.</div>
+                <div className={styles.rulesRow}>
+                  {safeHttpUrl(race.takanon) ? (
+                    <a href={safeHttpUrl(race.takanon)!} target="_blank" rel="noopener noreferrer" className={styles.takanonLink} data-testid="race-rules-link">
+                      <ExternalLink size={14} />
+                      View Rules Document
+                    </a>
+                  ) : (
+                    <div className={styles.takanonEmpty}>No rules document yet.</div>
+                  )}
+                  {!race.viewOnly && !finalized && (
+                    <button type="button" className={styles.rulesAction} onClick={startEditRules} data-testid="race-rules-edit">
+                      {safeHttpUrl(race.takanon) ? <Edit2 size={13} aria-hidden="true" /> : <Plus size={13} aria-hidden="true" />}
+                      {safeHttpUrl(race.takanon) ? "Edit link" : "Add link"}
+                    </button>
+                  )}
+                </div>
               )}
             </section>
 
@@ -621,9 +697,11 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
         <div className={styles.dataSectionTitle}>Data Transfer</div>
         <div className={styles.dataBody}>
           <div className={styles.dataText}>
-            {finalized
-              ? "Export the final results to Excel. The file carries the race's signature, so whoever receives it can verify nothing was changed."
-              : "Export race data (riders, categories, lap results) to Excel — all of it, or only your categories so the main commissaire can merge everyone's results after the race."}
+            <MoreText lead={finalized ? "Signed final results, in Excel." : "Move race data in and out of Excel."} testId="data-more">
+              {finalized
+                ? "Export the final results to Excel. The file carries the race's signature, so whoever receives it can verify nothing was changed."
+                : "Export race data (riders, categories, lap results) to Excel — all of it, or only your categories so the main commissaire can merge everyone's results after the race."}
+            </MoreText>
           </div>
           <div className={styles.dataButtons}>
             <button className={styles.exportBtn} onClick={() => setShowExportModal(true)}>
@@ -674,7 +752,7 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
               )}
               {verification.finalizedBy && (
                 <div className={styles.verifyMeta}>
-                  🔒 Final results — race closed by{" "}
+                  Final results — race closed by{" "}
                   <strong>{verification.finalizedBy}</strong>
                   {verification.finalizedAt
                     ? ` on ${new Date(verification.finalizedAt).toLocaleString()}`
@@ -706,8 +784,10 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
           <div className={styles.dataSectionTitle}>Audit</div>
           <div className={styles.dataBody}>
             <div className={styles.dataText}>
-              A local, read-only record of who did what on this race — race edits,
-              imports/exports, and more.
+              <MoreText lead="Who did what on this race." testId="audit-more">
+                A local, read-only record of who did what on this race — race edits,
+                imports/exports, and more.
+              </MoreText>
             </div>
             <div className={styles.dataButtons}>
               <button className={styles.importBtn} onClick={() => setShowAuditLog(true)}>
@@ -730,10 +810,11 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
           </div>
           <div className={styles.finishBody}>
             <div className={styles.finishText}>
-              Close the race and publish the final classification. Every rider gets
-              their final placing and total time, all categories are closed, and the
-              race becomes read-only and signed — no live timing, imports or edits
-              afterwards. This cannot be undone.
+              <MoreText lead="Closes the race. Can’t be undone." testId="finish-race-more">
+                Publishes the final classification. Every rider gets their final placing
+                and total time, all categories are closed, and the race becomes read-only
+                and signed — no live timing, imports or edits afterwards.
+              </MoreText>
             </div>
             <button
               className={styles.finishBtn}
@@ -808,8 +889,10 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
              read-only copy you can re-download, so no heavy confirm (BUGS.md #8). */
           <div className={styles.viewOnlyZone}>
             <div className={styles.viewOnlyText}>
-              This is a downloaded race, kept only to view results. Removing it
-              deletes the local copy — you can download it again anytime.
+              <MoreText lead="A downloaded copy, to view results." testId="view-only-more">
+                This is a downloaded race, kept only to view results. Removing it
+                deletes the local copy — you can download it again anytime.
+              </MoreText>
             </div>
             <button
               className={styles.removeDownloadBtn}
@@ -826,7 +909,7 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
                 await onDeleteRace();
               }}
             >
-              🗑 Remove downloaded race
+              <Trash2 size={14} aria-hidden="true" /> Remove downloaded race
             </button>
           </div>
         ) : (
@@ -834,10 +917,12 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
             <div className={styles.dangerTitle}>Danger Zone</div>
             <div className={styles.dangerBody}>
               <div className={styles.dangerText}>
-                Permanently delete this race, all its riders, and all categories. This cannot be undone.
+                <MoreText lead="Deletes the race. Can’t be undone." testId="delete-race-more">
+                  Permanently delete this race, all its riders, and all categories. This cannot be undone.
+                </MoreText>
               </div>
               <button className={styles.deleteRaceBtn} onClick={() => setShowDeleteRace(true)}>
-                🗑 Delete Race
+                <Trash2 size={14} aria-hidden="true" /> Delete Race
               </button>
             </div>
           </div>

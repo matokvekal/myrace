@@ -15,171 +15,85 @@
 /* ── Wave block: ONE clear unit — navy frame, tinted body; the inner
    start cards float inside it so the parent/child nesting is obvious ── */
 .wave {
-  background: linear-gradient(170deg, #eef4fc, #e2ecf9);
-  border-radius: 16px;
-  border: 4px solid #16305e;
+  background: #e9eaed;
+  border-radius: 4px;
+  border: 1px solid #1d3d78;
   overflow: hidden;
-  box-shadow: 0 12px 20px rgba(20, 40, 80, 0.12);
 }
 
-/* ── Dark navy wave header with gold trim — matches the leaderboard kit ── */
+/* ── Flat navy wave header with a gold hairline ── */
 .waveHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  background: linear-gradient(90deg, #1d3d78, #122a54);
-  border-bottom: 2px solid #e0a92c;
+  padding: 8px 12px;
+  background: #1d3d78;
+  border-bottom: 1px solid #c9a24a;
   color: #fff;
   position: relative;
 }
 
-/* Faint checkered-flag band at the right edge of every wave header */
-.waveHeader::before {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 34px;
-  background: repeating-conic-gradient(rgba(255, 255, 255, 0.9) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px;
-  opacity: 0.1;
-  pointer-events: none;
-}
-
 .waveLabel {
-  font-size: 15px;
-  font-weight: 900;
-  font-style: italic;
-  color: #00FF7F;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 .waveTime {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #bfd1ea;
-  flex: 1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
 }
 
 .liveBtn {
   min-height: 32px;
 }
 
-/* ── Started / finished waves "shine" ──────────────────────────────
-   A wave that has started or finished is locked; a moving sheen +
-   colored edge glow flags it. Green = started, gold = finished. */
-.waveHeader[data-wave-lock] {
-  position: relative;
-  overflow: hidden;
-}
-
+/* Started / finished waves: a coloured edge. Green = started, gold = finished. */
 .waveHeader[data-wave-lock="running"] {
-  --shine: rgba(62, 221, 164, 0.45);
-  box-shadow: inset 4px 0 0 #3edda4, 0 0 16px rgba(62, 221, 164, 0.28);
+  box-shadow: inset 3px 0 0 #2fbf71;
 }
 
 .waveHeader[data-wave-lock="finished"] {
-  --shine: rgba(255, 207, 64, 0.55);
-  box-shadow: inset 4px 0 0 #ffcf40, 0 0 16px rgba(255, 207, 64, 0.32);
-}
-
-.waveHeader[data-wave-lock]::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -60%;
-  width: 45%;
-  height: 100%;
-  background: linear-gradient(100deg, transparent, var(--shine, rgba(255, 255, 255, 0.3)), transparent);
-  transform: skewX(-20deg);
-  pointer-events: none;
-  animation: waveShine 3.8s ease-in-out infinite;
-}
-
-@keyframes waveShine {
-  0% { left: -60%; }
-  55%, 100% { left: 160%; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .waveHeader[data-wave-lock]::after { animation: none; }
+  box-shadow: inset 3px 0 0 #c9a24a;
 }
 
 /* Start group: an inset card INSIDE the wave — clearly a child of the wave */
 .startGroup {
-  margin: 10px;
-  border: 1.5px solid #9dbbe0;
-  border-left: 4px solid #e0a92c;
-  border-radius: 12px;
+  margin: 8px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
   overflow: hidden;
   background: var(--bg-card);
-  box-shadow: 0 3px 10px rgba(20, 40, 80, 0.12);
 }
 
-/* ── Medium blue start header: the middle tier between the navy wave
-   header and the white category rows — clear 3-level hierarchy ── */
+/* Mid-blue start header: the middle tier between the navy wave header and
+   the white category rows */
 .startHeader {
-  padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 900;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
   color: #fff;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
-    linear-gradient(135deg, #4a80cc, #31609f);
+  background: #3a5f9e;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 2px solid #e0a92c;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  transition: background 0.2s ease;
-}
-
-/* ── Green while the wave is running ── */
-.startHeader[data-wave-running="true"] {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(0, 0, 0, 0.12) 52%, rgba(0, 0, 0, 0.2) 100%),
-    linear-gradient(135deg, #2fa96e, #1f8653);
-  border-bottom-color: #7ce83c;
-  color: #fff;
-}
-
-/* ── Started / finished start-group "shine" (green / gold edge + sheen) ── */
-.startHeader[data-wave-lock] {
-  position: relative;
-  overflow: hidden;
 }
 
 .startHeader[data-wave-lock="running"] {
-  --shine: rgba(62, 221, 164, 0.5);
-  box-shadow: inset 4px 0 0 #24a877, inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: inset 3px 0 0 #2fbf71;
 }
 
 .startHeader[data-wave-lock="finished"] {
-  --shine: rgba(240, 160, 20, 0.5);
-  box-shadow: inset 4px 0 0 #c8860a, inset 0 -2px 0 rgba(0, 0, 0, 0.1);
-}
-
-.startHeader[data-wave-lock]::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -60%;
-  width: 45%;
-  height: 100%;
-  background: linear-gradient(100deg, transparent, var(--shine, rgba(255, 255, 255, 0.3)), transparent);
-  transform: skewX(-20deg);
-  pointer-events: none;
-  animation: waveShine 3.8s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .startHeader[data-wave-lock]::after { animation: none; }
+  box-shadow: inset 3px 0 0 #c9a24a;
 }
 
 .startInfo {
@@ -189,18 +103,11 @@
   gap: 10px;
 }
 
-/* Slanted white "START N" plate — like a timing-tower P-plate */
 .startLabel {
-  background: #fff;
-  color: #10315e;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 12px;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
-  padding: 5px 14px;
-  border-radius: 6px;
-  transform: skewX(-8deg);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+  letter-spacing: 0.1em;
   white-space: nowrap;
 }
 
@@ -210,50 +117,34 @@
   flex-shrink: 0;
 }
 
-/* Small pulsing LIVE chip next to the start clock */
+/* Small LIVE chip next to the start clock */
 .liveChipBtn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ff5252, #d92b2b);
+  padding: 4px 8px;
+  border: none;
+  border-radius: 2px;
+  background: #d92b2b;
   color: #fff;
   font-size: 11px;
-  font-weight: 900;
-  font-style: italic;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  box-shadow: 0 0 10px rgba(255, 60, 60, 0.5);
-  animation: liveChipPulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }
 
 .liveChipBtn:active {
-  transform: scale(0.94);
+  transform: scale(0.96);
 }
 
-@keyframes liveChipPulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(255, 60, 60, 0.55); }
-  50% { box-shadow: 0 0 3px rgba(255, 60, 60, 0.25); }
-}
-
-/* Start time: race-clock plate — dark panel, green digits, gold frame */
 .startTime {
-  font-weight: 900;
-  text-transform: none;
-  letter-spacing: 0.08em;
-  font-size: 17px;
-  color: #7ce83c;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 15px;
+  color: #fff;
   font-variant-numeric: tabular-nums;
-  font-family: "Courier New", monospace;
-  background: #10151f;
-  border: 1px solid #e0a92c;
-  border-radius: 6px;
-  padding: 3px 10px;
-  text-shadow: 0 0 8px rgba(124, 232, 60, 0.5);
 }
 
 /* Category row */
@@ -388,34 +279,27 @@
   flex-shrink: 0;
 }
 
-.standingsBtn {
-  min-height: 32px;
+.catActions .standingsBtn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 /* Wave/start stats */
-.waveStat {
-  font-size: 13px;
-  font-weight: 700;
-  color: #00FF7F;
-  background: rgba(62, 221, 164, 0.14);
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin-left: auto;
-  margin-right: 8px;
-}
-
-/* Finishers chip: sits at the right end of the header row */
+.waveStat,
 .startStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   color: #fff;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  padding: 2px 9px;
-  border-radius: 8px;
-  margin-left: auto;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
 }
 
 /* Lap progress bar */
@@ -433,7 +317,7 @@
 }
 
 .lapSegmentDone {
-  background: #e0a92c;
+  background: #c9a24a;
 }
 
 /* Inline standings */
@@ -573,15 +457,14 @@
   z-index: 50;
   width: 40px;
   height: 40px;
-  border-radius: 5px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 2px;
+  background: #1d3d78;
   border: none;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.45);
   transition: opacity 0.2s, transform 0.2s;
 }
 
@@ -1009,15 +892,13 @@
 
 @media (max-width: 640px) {
   .startHeader {
-    padding: 10px 12px;
-    font-size: 12px;
+    padding: 6px 8px;
     gap: 8px;
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .startInfo {
     width: 100%;
+    gap: 8px;
   }
 
   .startActions {
@@ -1025,21 +906,9 @@
     justify-content: flex-start;
   }
 
-  .startTime {
-    font-size: 16px;
-  }
-
   .container {
-    padding: 8px 8px 32px;
+    padding: 8px 0 32px;
     gap: 10px;
-  }
-
-  .wave {
-    border-radius: 12px;
-  }
-
-  .catName {
-    max-width: 120px;
   }
 }
 
@@ -1303,13 +1172,16 @@ button.standingName {
   font-weight: 800;
 }
 .waveActionBtn {
-  min-height: 32px;
-  padding: 4px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 2px;
+  background: transparent;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   cursor: pointer;
 }
 .waveActionBtn:disabled {
@@ -1365,28 +1237,91 @@ button.standingName {
   min-height: 36px;
 }
 
-/* Phones: the category's actions (Finish Group, colour, standings) move to their
-   own line under the name, so nothing is squeezed or pushed off-screen. */
+/* Phones: two tight lines instead of a tall stack.
+   Line 1: chevron, colour, name, colour + riders icons.
+   Line 2 (under the name): riders, laps, status, Finish Group.
+   The wrappers dissolve so their children can share one wrapping flex row. */
 @media (max-width: 640px) {
+  .startGroup {
+    margin: 6px 4px;
+  }
   .categoryRow {
     flex-wrap: wrap;
+    gap: 4px 6px;
+    padding: 6px 8px;
   }
-  .catInfo {
-    min-width: 0;
-    flex: 1 1 60%;
-  }
+  .catInfo,
   .catActions {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    padding-inline-start: 22px;
+    display: contents;
+  }
+  .expandIcon,
+  .colorDotBtn {
+    order: 0;
+  }
+  .catName {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+  .catActions .editColorBtn,
+  .catActions .standingsBtn {
+    order: 2;
+  }
+  /* Forces everything after it onto line 2 */
+  .categoryRow::after {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .catMeta,
+  .lapsEditor,
+  .categoryRow > .statusBadge {
+    order: 4;
+    align-self: center;
+  }
+  .catInfo > .catMeta:nth-child(2) {
+    margin-inline-start: 20px;
+  }
+  .categoryRow > .statusBadge {
+    padding: 2px 5px;
+    font-size: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  /* Wave header: same one-line density as the start header below it */
+  .waveHeader {
+    gap: 6px;
+    padding: 6px 8px;
   }
   .fgRow {
-    flex: 1 1 auto;
+    order: 5;
+    gap: 4px;
+    margin-inline: auto 0;
+    flex-wrap: nowrap;
+  }
+  .fgCaption {
+    width: min-content;
+    font-size: 9px;
+    line-height: 1;
+    text-align: end;
   }
   .fgSelect {
-    flex: 1 1 140px;
-    min-width: 140px;
+    min-height: 28px;
+    max-width: 76px;
+    padding: 0 2px;
+    font-size: 12px;
+  }
+  .fgSuggested {
+    display: none;
+  }
+}
+
+/* Smallest phones: the select alone (it keeps its aria-label and tooltip) */
+@media (max-width: 349px) {
+  .fgCaption {
+    display: none;
   }
 }
 

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { CategoryProps } from "@/types/types";
 import {
   Radio,
-  Trophy,
+  Flag,
   Edit2,
   Plus,
   Trash2,
@@ -607,7 +607,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                     aria-label={`Wave ${wave.number} start time`}
                   />
                 </label>
-                {locked && <span className={styles.lockTag} data-wave-lock={waveLock}>🔒 {waveLock === "finished" ? "Finished" : "Started"}</span>}
+                {locked && <span className={styles.lockTag} data-wave-lock={waveLock}><Lock size={11} aria-hidden="true" /> {waveLock === "finished" ? "Finished" : "Started"}</span>}
                 <button
                   type="button"
                   className={`${styles.wvIcon} ${styles.wvDanger}`}
@@ -817,7 +817,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
               </span>
               {firstTime !== "TBD" && <span className={styles.waveTime}>{firstTime}</span>}
               {waveRiders.length > 0 && (
-                <span className={styles.waveStat} title="Finishers">🏁 {waveFinished}/{waveRiders.length}</span>
+                <span className={styles.waveStat} title="Finishers"><Flag size={12} aria-hidden="true" /> {waveFinished}/{waveRiders.length}</span>
               )}
             </div>
 
@@ -852,7 +852,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                         </button>
                       )}
                       {startRiders.length > 0 && (
-                        <span className={styles.startStat} title="Finishers">🏁 {startFinished}/{startRiders.length}</span>
+                        <span className={styles.startStat} title="Finishers"><Flag size={12} aria-hidden="true" /> {startFinished}/{startRiders.length}</span>
                       )}
                     </div>
                   </div>
@@ -958,7 +958,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                     onChange={(e) => void setFinishGroup(cat, e.target.value)}
                                   >
                                     {finishGroupOptions(categories.filter((c) => c.raceUuid === raceUuid)).map((v) => (
-                                      <option key={v} value={v}>{finishGroupLabel(v)}</option>
+                                      <option key={v} value={v}>{v || "None"}</option>
                                     ))}
                                   </select>
                                   {suggested && <span className={styles.fgSuggested} data-testid={`finish-group-row-suggested-${cat.id}`}>Suggested</span>}
@@ -985,11 +985,13 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                               variant="secondary"
                               size="sm"
                               className={styles.standingsBtn}
+                              aria-label={`Riders of ${cat.name}`}
+                              title="Riders"
                               onClick={() =>
                                 navigate(`/race/${raceUuid}/standing/${waveNum}?category=${encodeURIComponent(cat.name)}`)
                               }
                             >
-                              <Trophy size={12} />
+                              <Users size={14} />
                             </Button>
                           </div>
                         </div>
@@ -1027,7 +1029,7 @@ const Schedule: React.FC<Props> = ({ raceUuid, categories }) => {
                                     style={{ background: rider.color ?? cat.color ?? "#ccc" }}
                                   />
                                   <span className={styles.standingPos}>{isOut ? "—" : idx + 1}</span>
-                                  <span className={styles.standingBib}>#{rider.bibNumber}</span>
+                                  <span className={styles.standingBib}>{rider.bibNumber}</span>
                                   <button
                                     type="button"
                                     className={styles.standingName}

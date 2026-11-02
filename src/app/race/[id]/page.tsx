@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
-import { CalendarClock, Info as InfoIcon, Map as MapIcon, Tags, Users, type LucideIcon } from "lucide-react";
+import { Lock } from "lucide-react";
 import styles from "./race.module.css";
 import HeaderRace from "../components/headerRace/HeaderRace";
 import Loader from "@/components/Loader";
@@ -40,14 +40,6 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number];
 
-const TAB_ICONS: Record<Tab, LucideIcon> = {
-  schedule: CalendarClock,
-  categories: Tags,
-  riders: Users,
-  map: MapIcon,
-  info: InfoIcon,
-};
-
 /**
  * Tabs a FINALIZED race still shows. Schedule and Categories are setup tools
  * for a race that hasn't happened yet — on a closed race they'd offer edits
@@ -73,8 +65,9 @@ const Race: React.FC = () => {
   const categories = useCategoryStore((s) => s.categories);
   const filteredCategories = categories.filter((c) => c.raceUuid === raceUuid);
 
-  const isRaceMode = useUIStore((s) => s.isRaceMode);
-  const setRaceMode = useUIStore((s) => s.setRaceMode);
+  const isRaceMode = useUIStore((s) => s.raceModeRace === raceUuid);
+  const setRaceModeRace = useUIStore((s) => s.setRaceModeRace);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const { activeTab, setActiveTab } = useDataStore();
   // Shared race: re-render when this member's access changes (screens appear/disappear at once).
   const [, setAccessTick] = useState(0);
@@ -119,6 +112,7 @@ const Race: React.FC = () => {
     if (!loading && race) {
       getCategories(raceUuid).then((cats) => {
         if (!cats.length) createCategoriesFromRiders(raceUuid);
+        setCategoriesLoaded(true);
       });
     }
   }, [loading, race, raceUuid, getCategories, createCategoriesFromRiders]);
@@ -130,8 +124,8 @@ const Race: React.FC = () => {
   // state that survives navigation, so a race finalized while it was on drops
   // back to Setup rather than rendering a start grid that can't start anything.
   useEffect(() => {
-    if (finalized && isRaceMode) setRaceMode(false);
-  }, [finalized, isRaceMode, setRaceMode]);
+    if (finalized && isRaceMode) setRaceModeRace(null);
+  }, [finalized, isRaceMode, setRaceModeRace]);
 
   // Editing riders is impossible once finalized — leave the editor if it's open.
   useEffect(() => {
@@ -176,12 +170,40 @@ const Race: React.FC = () => {
 
       <div className={styles.bottom}>
         {isRaceMode && !finalized ? (
-          <RaceMode raceUuid={raceUuid} categories={filteredCategories.filter((c) => !c.ignored)} />
+          categoriesLoaded && filteredCategories.length === 0 ? (
+            // Nothing to run yet, and Race mode has no tabs: point at where riders are added.
+            <div className={styles.emptyRace} data-testid="race-mode-empty">
+              <p>This race has no riders yet.</p>
+              <button
+                type="button"
+                className={styles.emptyRaceBtn}
+                data-testid="race-mode-add-riders"
+                onClick={() => { setActiveTab("riders"); setRaceModeRace(null); }}
+              >
+                Add riders
+              </button>
+            </div>
+          ) : (
+            <RaceMode raceUuid={raceUuid} categories={filteredCategories.filter((c) => !c.ignored)} />
+          )
         ) : (
           <>
+            <div className={styles.tabs} role="group" aria-label="Create sections">
+              {visibleTabs.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
+                  aria-pressed={activeTabSafe === tab}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
             {finalized && (
               <div className={styles.finalBanner} data-testid="race-final-banner">
-                <span className={styles.finalBannerIcon} aria-hidden="true">🔒</span>
+                <Lock size={16} className={styles.finalBannerIcon} aria-hidden="true" />
                 <span>
                   <strong>Final results.</strong> This race was closed on{" "}
                   {new Date(race.finalized!.at).toLocaleDateString()} — results can be
@@ -199,24 +221,6 @@ const Race: React.FC = () => {
                 <LocalOnlyBadge raceUuid={raceUuid} />
               </Suspense>
             )}
-            <div className={styles.tabs} role="group" aria-label="Create sections">
-              {visibleTabs.map((tab) => {
-                const Icon = TAB_ICONS[tab];
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={`${styles.button} ${activeTabSafe === tab ? styles.activeTab : ""}`}
-                    aria-pressed={activeTabSafe === tab}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    <Icon size={15} aria-hidden="true" />
-                    <span>{tab.charAt(0).toUpperCase() + tab.slice(1)}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             <div className={styles.tabContent}>
               {activeTabSafe === "schedule" && (
                 <Schedule raceUuid={raceUuid} categories={filteredCategories} />

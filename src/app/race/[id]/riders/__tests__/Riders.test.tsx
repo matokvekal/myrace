@@ -52,7 +52,6 @@ describe("Riders: search", () => {
   it("finds across all waves by first/last/full name or bib, case-insensitive and partial", async () => {
     const user = userEvent.setup();
     setup();
-    await user.click(screen.getByTestId("rider-tools-toggle")); // search sits behind the search icon
     const box = screen.getByTestId("rider-search");
 
     await user.type(box, "dan");
@@ -61,7 +60,7 @@ describe("Riders: search", () => {
 
     await user.clear(box);
     await user.type(box, "BAR");
-    expect(screen.getByText(/Bar Noa/)).toBeInTheDocument(); // wave 2, found while wave filter is "all"
+    expect(screen.getByText(/Bar Noa/)).toBeInTheDocument(); // wave 2
 
     await user.clear(box);
     await user.type(box, "21");
@@ -85,11 +84,11 @@ describe("Riders: Add Rider", () => {
     // duplicate bib is refused by the shared validation
     await user.type(within(modal).getByPlaceholderText("First name *"), "Lior");
     await user.type(within(modal).getByPlaceholderText("Last name *"), "Katz");
-    await user.type(within(modal).getByPlaceholderText("Bib # *"), "11");
+    await user.type(within(modal).getByPlaceholderText("Bib *"), "11");
     await user.click(within(modal).getByRole("button", { name: "Add Rider" }));
     expect(within(modal).getByText(/already used/i)).toBeInTheDocument();
 
-    const bib = within(modal).getByPlaceholderText("Bib # *");
+    const bib = within(modal).getByPlaceholderText("Bib *");
     await user.clear(bib);
     await user.type(bib, "99");
     await user.click(within(modal).getByRole("button", { name: "Add Rider" }));
@@ -106,9 +105,45 @@ describe("Riders: Add Rider", () => {
     });
   });
 
-  it("is hidden on a read-only (finalized) race", () => {
+  it("is hidden on a read-only (finalized) race; the gear keeps only the view options", async () => {
+    const user = userEvent.setup();
     useRiderStore.setState({ riders, lastFetchedRaceUuid: RACE });
     render(<Riders raceUuid={RACE} categories={cats} readOnly />);
+    await user.click(screen.getByTestId("rider-manage-btn"));
     expect(screen.queryByTestId("add-rider-btn")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Delete All/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Table/ })).toBeInTheDocument();
+  });
+});
+
+describe("Riders: see vs. do", () => {
+  it("keeps search and the list on screen, and one-time actions behind the gear", async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.getByTestId("rider-search")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument(); // no wave dropdown
+    for (const name of [/Import CSV/, /Delete All/, /^Add rider$/]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+
+    await user.click(screen.getByTestId("rider-manage-btn"));
+    const modal = screen.getByTestId("rider-manage-modal");
+    expect(within(modal).getByRole("button", { name: /Import CSV/ })).toBeInTheDocument();
+    expect(within(modal).getByRole("button", { name: /Delete All/ })).toBeInTheDocument();
+    await user.click(within(modal).getByTestId("add-rider-btn"));
+    expect(screen.queryByTestId("rider-manage-modal")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-rider-modal")).toBeInTheDocument();
+  });
+
+  it("collapses a whole wave from its header, and says when a search finds nothing", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: "Collapse Wave 2" }));
+    expect(screen.queryByText(/Bar Noa/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Levi Dana/)).toBeInTheDocument();
+
+    await user.type(screen.getByTestId("rider-search"), "zzz");
+    expect(screen.getByText(/No riders match/)).toBeInTheDocument();
+    expect(screen.queryByText("No riders yet.")).not.toBeInTheDocument();
   });
 });

@@ -194,7 +194,7 @@ test("two commissaires run one shared race live, both ways, within their waves",
     await B.page.goto(`/race/${sharedUuid}/heat/1`);
     await B.page.getByRole("button", { name: "Unknown Rider" }).click();
     await B.page.locator('[data-testid="joker-card-1"]').click();
-    await B.page.getByPlaceholder("Bib #").fill("304");
+    await B.page.getByPlaceholder("Bib").fill("304");
     await B.page.getByRole("button", { name: "Save", exact: true }).click();
     await expect.poll(() => lapsOn(A.page, 304), { timeout: 15_000 }).toBe(1);
   });

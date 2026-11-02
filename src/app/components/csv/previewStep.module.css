@@ -1,10 +1,9 @@
+/* Fills the wizard: the table scrolls, the Import button never leaves the screen */
 .previewStep {
   max-width: 100%;
   display: flex;
   flex-direction: column;
-  max-height: 90vh;
-  overflow-y: auto;
-  overflow-x: auto;
+  height: 100%;
 }
 
 /* ── Tabs ── */
@@ -42,14 +41,14 @@
 }
 
 .tabActive {
-  color: #667eea;
-  border-bottom-color: #667eea;
+  color: #1d3d78;
+  border-bottom-color: #1d3d78;
   font-weight: 600;
 }
 
 .tabBadge {
-  background: #e8eaf6;
-  color: #5c6bc0;
+  background: #eef2f9;
+  color: #1d3d78;
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 10px;
@@ -57,7 +56,7 @@
 }
 
 .tabActive .tabBadge {
-  background: #667eea;
+  background: #1d3d78;
   color: white;
 }
 
@@ -78,7 +77,7 @@
 
 .mappedBadge {
   font-size: 11px;
-  color: #667eea;
+  color: #1d3d78;
   font-weight: 500;
   margin-top: 2px;
 }
@@ -105,102 +104,35 @@
 
 .header {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-  gap: 8px;
-  flex-shrink: 0;
-  border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.headerLeft {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.headerRight {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 4px 12px;
+  margin-bottom: 8px;
 }
 
 .header h3 {
   margin: 0;
-  font-size: 18px;
+  color: #14243c;
+  font-size: 17px;
+  font-weight: 700;
 }
 
-.closeButton {
-  background: none;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 20px;
-  color: #999;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  min-width: 32px;
-  min-height: 32px;
-}
-
-.closeButton:hover {
-  background: #fee;
-  border-color: #ccc;
-  color: #d32f2f;
-}
-
-.backButtonTop {
-  background: none;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 5px 12px;
+.stat {
+  color: #5b5e66;
   font-size: 13px;
-  color: #555;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
+  font-variant-numeric: tabular-nums;
 }
 
-.backButtonTop:hover {
-  background: #f5f5f5;
-}
-
-.validationSummary {
-  display: flex;
-  gap: 16px;
-}
-
-.summaryItem {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  background: #f5f5f5;
-}
-
-.summaryItem.error {
-  background: #ffebee;
-  color: #c62828;
-}
-
-.summaryItem.warning {
-  background: #fff3e0;
-  color: #e65100;
-}
-
-.summaryLabel {
+.statError {
+  color: #b3261e;
   font-weight: 600;
-  margin-right: 4px;
+}
+
+.statWarning {
+  color: #a35a00;
+  font-weight: 600;
 }
 
 .errorAlert {
@@ -235,9 +167,8 @@
   border-radius: 8px;
   overflow-x: auto;
   overflow-y: auto;
-  flex: 1;
-  margin-bottom: 20px;
-  min-height: 200px;
+  flex: 1 1 0;
+  min-height: 180px;
 }
 
 .previewTable table {
@@ -293,8 +224,20 @@
 }
 
 .issue {
-  font-size: 16px;
+  display: inline-flex;
   cursor: help;
+}
+
+.issue.error {
+  color: #b3261e;
+}
+
+.issue.warning {
+  color: #a35a00;
+}
+
+.issue.info {
+  color: #1d3d78;
 }
 
 .issuesPanel {
@@ -340,48 +283,43 @@
   margin-top: 8px;
 }
 
+/* Same bar as the mapping step: on the scroll area's edge, covering its padding */
 .actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 8px;
   position: sticky;
-  bottom: 0;
-  background: white;
-  border-top: 1px solid #e8e8e8;
-  margin-top: 20px;
-  padding-top: 12px;
-  padding-bottom: 4px;
+  bottom: calc(-1 * var(--wizard-pad, 0px));
   z-index: 5;
-  flex-wrap: wrap;
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: calc(-1 * var(--wizard-pad, 0px));
+  padding: 8px 0 max(8px, var(--wizard-pad, 0px));
+  background: #fff;
 }
 
 .backButton,
 .importButton {
-  padding: 10px 20px;
-  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 2px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  border: none;
-  transition: all 0.2s;
 }
 
 .backButton {
-  background: #f5f5f5;
-  color: #666;
-}
-
-.backButton:hover {
-  background: #e0e0e0;
+  border: 1px solid #d3d5da;
+  background: #fff;
+  color: #3a3d44;
 }
 
 .importButton {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.importButton:hover:not(:disabled) {
-  transform: translateY(-2px);
+  flex: 1;
+  max-width: 280px;
+  background: #1d3d78;
+  color: #fff;
 }
 
 .importButton:disabled {
@@ -405,16 +343,6 @@
     padding: 1px 4px;
   }
 
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .headerRight {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
   .previewTable th,
   .previewTable td {
     padding: 8px;
@@ -428,26 +356,5 @@
 
   .issuesCol {
     width: 60px;
-  }
-
-  .validationSummary {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .summaryItem {
-    font-size: 12px;
-    padding: 4px 8px;
-  }
-
-  .actions {
-    gap: 6px;
-  }
-
-  .backButton,
-  .importButton {
-    padding: 8px 16px;
-    font-size: 13px;
-    flex: 1;
   }
 }

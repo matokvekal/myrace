@@ -81,6 +81,7 @@ export interface SharedRace {
   phone: string;
   takanon: string;
   site: string;
+  elNinoEventId?: string | null;
   map: string;
   distance: number;
   isActive: boolean;
@@ -228,7 +229,7 @@ export const raceSettings = (race: Pick<SharedRace, "leaderFinishAll" | "autoCol
 /** Race fields a `RaceEdited` Action may change (info, maps, wave colours). */
 export const RACE_INFO_FIELDS = [
   "raceId", "owner", "name", "location", "time", "date", "image", "heat", "type", "raceType", "level",
-  "orgenizer", "manager", "phone", "takanon", "site", "map", "distance", "isActive",
+  "orgenizer", "manager", "phone", "takanon", "site", "elNinoEventId", "map", "distance", "isActive",
   "waveColors", "mapCenter", "mapZoom", "trackPoints", "mapMarkers", "tracks",
 ] as const satisfies readonly (keyof SharedRace)[];
 export type RaceInfoField = (typeof RACE_INFO_FIELDS)[number];

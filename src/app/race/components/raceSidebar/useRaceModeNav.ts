@@ -9,7 +9,7 @@ import useCategoryStore from "@/stores/categoryStore";
 import { getDefaultLiveWave } from "../../[id]/schedule/Schedule";
 import { useRaceFinalized } from "@/utils/raceLock";
 
-export type RaceMode = "setup" | "race" | "live" | "results" | "board";
+export type RaceMode = "setup" | "race" | "live" | "results" | "board" | "team";
 
 export function useRaceModeNav() {
   const navigate = useNavigate();
@@ -20,23 +20,25 @@ export function useRaceModeNav() {
   const path = useLocation().pathname.replace(/\/+$/, "");
   const onResultsRoute = path.endsWith("/results");
   const onBoardRoute = path.endsWith("/board");
+  const onTeamRoute = path.endsWith("/team");
+  const offRacePage = onLiveRoute || onResultsRoute || onBoardRoute || onTeamRoute;
 
-  const isRaceMode = useUIStore((s) => s.isRaceMode);
-  const setRaceMode = useUIStore((s) => s.setRaceMode);
+  const isRaceMode = useUIStore((s) => s.raceModeRace === raceUuid);
+  const setRaceModeRace = useUIStore((s) => s.setRaceModeRace);
   const selectedWave = useUIStore((s) => s.selectedWave);
   const categories = useCategoryStore((s) => s.categories);
   // A finished race has no Race or Live mode left (see utils/raceLock.ts).
   const finalized = useRaceFinalized(raceUuid);
 
-  const mode: RaceMode = onResultsRoute ? "results" : onBoardRoute ? "board" : onLiveRoute ? "live" : isRaceMode ? "race" : "setup";
+  const mode: RaceMode = onResultsRoute ? "results" : onBoardRoute ? "board" : onTeamRoute ? "team" : onLiveRoute ? "live" : isRaceMode ? "race" : "setup";
 
   const goSetup = () => {
-    if (onLiveRoute || onResultsRoute || onBoardRoute) navigate(`/race/${raceUuid}`);
-    setRaceMode(false);
+    if (offRacePage) navigate(`/race/${raceUuid}`);
+    setRaceModeRace(null);
   };
   const goRace = () => {
-    if (onLiveRoute || onResultsRoute || onBoardRoute) navigate(`/race/${raceUuid}`);
-    setRaceMode(true);
+    if (offRacePage) navigate(`/race/${raceUuid}`);
+    setRaceModeRace(raceUuid);
   };
   // Opens whichever wave is actually live right now, never the Race screen's
   // `selectedWave` (that tracks whatever wave the commissaire was last
@@ -56,6 +58,9 @@ export function useRaceModeNav() {
   const goBoard = () => {
     if (!onBoardRoute) navigate(`/race/${raceUuid}/board`);
   };
+  const goTeam = () => {
+    if (!onTeamRoute) navigate(`/race/${raceUuid}/team`);
+  };
   const goAllRaces = () => navigate("/main");
 
   const go: Record<RaceMode, () => void> = {
@@ -64,6 +69,7 @@ export function useRaceModeNav() {
     live: goLive,
     results: goResults,
     board: goBoard,
+    team: goTeam,
   };
 
   return { raceUuid, mode, finalized, go, goAllRaces };

@@ -46,7 +46,7 @@ const RiderLiveModal: React.FC<Props> = ({
         {/* ── Header ── */}
         <div className={styles.header} style={{ borderTopColor: catColor }}>
           <div className={styles.headerLeft}>
-            <span className={styles.bib}>#{rider.bibNumber}</span>
+            <span className={styles.bib}>{rider.bibNumber}</span>
             <div className={styles.identity}>
               <span className={styles.name}>
                 {rider.lastName} {rider.firstName}

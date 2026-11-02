@@ -16,6 +16,7 @@ test.describe("CSV upload", () => {
 
     await test.step("open Edit Riders", async () => {
       await openTab(page, "Riders");
+      await page.getByTestId("rider-manage-btn").click();
       await page.getByRole("button", { name: "Edit Riders" }).click();
       await expect(page.getByPlaceholder(/Name or bib/i)).toBeVisible();
       await expect(page.getByText(`${DEMO_RIDER_COUNT} riders`)).toBeVisible();
@@ -39,7 +40,7 @@ test.describe("CSV upload", () => {
       // filter on the floor and left the assertion looking at an unfiltered list.
       await expect(async () => {
         await page.getByPlaceholder(/Name or bib/i).fill("901");
-        await expect(page.getByText("#901").first()).toBeVisible({ timeout: 2_000 });
+        await expect(page.getByText("901", { exact: true }).first()).toBeVisible({ timeout: 2_000 });
         await expect(page.getByText(/McTestface/i).first()).toBeVisible({ timeout: 2_000 });
       }).toPass({ timeout: 20_000 });
     });

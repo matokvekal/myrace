@@ -4,6 +4,7 @@ import styles from "./racingRider.module.css";
 import { RiderProps } from "@/types/types";
 import { formatTime, parseClockTimeMs } from "@/utils/timeUtils";
 import { useSkin } from "@/hooks/useSkin";
+import { useBoardHold } from "@/stores/boardHoldStore";
 import { Bell } from "lucide-react";
 import { toPhaseRider } from "@/utils/linkedGroups";
 import { riderPhase, NO_GROUP_PHASE, type RiderPhase } from "../../../../../shared/race/finishPhases";
@@ -230,6 +231,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       : 0;
   const coolingDown = cooldownLeftMs > 0;
 
+  // Card cover: also from the recorded arrival, so it survives a refresh and an
+  // undo clears it. Keeps showing after the board hold has dropped the card.
+  const coverMs = useBoardHold((s) => s.coverMs);
+  const covered =
+    !!rider.timeArrive && rider.raceStatus === "running" && now - new Date(rider.timeArrive).getTime() < coverMs;
+
   const handleClick = (e: React.MouseEvent) => {
     clickCountRef.current++;
 
@@ -271,7 +278,8 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       data-laps={`${rider.lapsCounter}/${rider.totalLaps}`}
       data-recorded={isRecorded ? "true" : undefined}
       data-cooldown={coolingDown ? "true" : undefined}
-      className={`${styles.rider} ${glowClass} ${isRecorded ? styles.recorded : ""} ${raceEnded ? styles.onTrack : ""}`}
+      data-covered={covered ? "true" : undefined}
+      className={`${styles.rider} ${glowClass} ${isRecorded || covered ? styles.recorded : ""} ${raceEnded ? styles.onTrack : ""}`}
       style={{ background: bgStyle, "--glow-color": color } as React.CSSProperties}
       onClick={handleClick}
       onDoubleClick={(e) => { e.preventDefault(); }}
@@ -334,7 +342,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
           <div className={styles.flagPole} />
         </div>
       )}
-      <div className={styles.bib}><BibBadge rider={rider} prefix="" /></div>
+      <div className={styles.bib}><BibBadge rider={rider} /></div>
       <div className={styles.laps}>
         <span className={styles.lapsLabel}>finish:</span>
         {rider.lapsCounter}/{rider.totalLaps}

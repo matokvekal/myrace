@@ -29,18 +29,10 @@ describe("Riders → collapse and expand groups", () => {
     render(<Riders raceUuid={RACE} categories={cats} />);
     expect(shown(/Levi Dana/)).toBe(true);
     expect(shown(/Bar Noa/)).toBe(true);
-    // Both global buttons are always shown.
-    expect(screen.getByTestId("collapse-all")).toBeTruthy();
-    expect(screen.getByTestId("expand-all")).toBeTruthy();
-
     // One group by its −; the other stays open.
     await user.click(screen.getByRole("button", { name: "Collapse Elite" }));
     expect(shown(/Levi Dana/)).toBe(false);
     expect(shown(/Bar Noa/)).toBe(true);
-
-    // Expand All overrides the individual choice.
-    await user.click(screen.getByTestId("expand-all"));
-    expect(shown(/Levi Dana/)).toBe(true);
 
     // Collapse All closes every group, whatever its state; headers and counts stay.
     await user.click(screen.getByTestId("collapse-all"));
@@ -52,6 +44,12 @@ describe("Riders → collapse and expand groups", () => {
     await user.click(screen.getByRole("button", { name: "Expand Juniors" }));
     expect(shown(/Bar Noa/)).toBe(true);
     expect(shown(/Levi Dana/)).toBe(false);
+
+    // Everything closed again: the one toggle becomes Expand All, overriding individual choices.
+    await user.click(screen.getByRole("button", { name: "Collapse Juniors" }));
+    await user.click(screen.getByTestId("expand-all"));
+    expect(shown(/Levi Dana/)).toBe(true);
+    expect(shown(/Bar Noa/)).toBe(true);
 
     // Display only: rider data untouched.
     expect(useRiderStore.getState().riders).toEqual(riders);

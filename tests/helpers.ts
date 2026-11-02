@@ -215,8 +215,6 @@ export async function setStatusAtCheckIn(
 ): Promise<void> {
   const row = checkInRow(page, bib);
   await row.getByRole("button", { name: "Status" }).click();
-  // Scoped to the modal — the row itself also carries a one-tap DNS button, so
-  // a bare getByText("DNS") is ambiguous.
   const modal = page.locator('[class*="modalbottom"]').first();
   await expect(modal).toBeVisible();
   await modal.getByText(status, { exact: true }).click();

@@ -55,7 +55,7 @@ const RaceTopBar: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           </div>
           {nav.finalized && nav.mode === "setup" ? (
             <span className={`${styles.modeChip} ${styles.modeFinal}`} data-testid="phase-final">
-              🔒 {t("phase.final", "Final results")}
+              {t("phase.final", "Final results")}
             </span>
           ) : (
             current && (

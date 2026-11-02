@@ -21,7 +21,7 @@ function groupByRow(issues: ValidationIssue[]): Map<number, ValidationIssue[]> {
 }
 
 const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
-  bibNumber: "Bib #",
+  bibNumber: "Bib",
   firstName: "First Name",
   middleName: "Middle Name",
   lastName: "Last Name",

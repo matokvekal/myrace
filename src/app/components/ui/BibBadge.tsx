@@ -12,12 +12,10 @@ export default function BibBadge({
   rider,
   category,
   className,
-  prefix = "#",
 }: {
   rider: BibRider;
   category?: Pick<CategoryProps, "bibColor" | "bibTextColor"> | null;
   className?: string;
-  prefix?: string;
 }) {
   const stored = useCategoryStore((s) =>
     category !== undefined
@@ -27,7 +25,7 @@ export default function BibBadge({
         ) ?? null
   );
   const colors = resolveBibColors(rider, category !== undefined ? category : stored);
-  const label = rider.bibNumber ? `${prefix}${rider.bibNumber}` : "—";
+  const label = rider.bibNumber ? String(rider.bibNumber) : "—";
   if (!colors) return <span className={className} data-testid="bib">{label}</span>;
   return (
     <span
