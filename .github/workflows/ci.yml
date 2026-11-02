@@ -51,11 +51,11 @@ jobs:
       - name: Production build
         run: npm run build
 
-      # The live (multi-user) code path, as production builds it for GitHub Pages.
+      # The live (multi-user) code path, as production builds it: API on the same domain.
       - name: Production build with the API configured
         run: npm run build
         env:
-          VITE_SERVER_URL: https://api.commissaire.us
+          VITE_SERVER_URL: /
 
   # The multi-user server (server/, its own package): typecheck, build, and its
   # integration tests against an in-process PostgreSQL (PGlite) — no database

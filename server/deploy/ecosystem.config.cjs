@@ -1,6 +1,7 @@
-// PM2 app for the Commissaire API. Installed root-owned at
-// /opt/commissaire-api/bin/ecosystem.config.cjs and started only by
-// deploy-gate.sh, as the commissaire user (its own PM2 daemon, apart from El Niño's).
+// PM2 app for the Commissaire API: "server-commissaire" on 127.0.0.1:5000 (PORT
+// in .env), in the server's shared PM2 daemon. Only ever start/restart it by
+// name (`pm2 restart server-commissaire`), never `pm2 ... all`: other apps
+// share the daemon. Installed root-owned at /opt/commissaire-api/bin/.
 // Settings come from /opt/commissaire-api/shared/.env (server/.env in each release links to it).
 const fs = require("node:fs");
 const path = require("node:path");
@@ -17,7 +18,7 @@ try {
 module.exports = {
   apps: [
     {
-      name: "commissaire-api-live",
+      name: "server-commissaire",
       cwd: path.join(current, "server"),
       script: "dist/server.js",
       interpreter: process.env.COMMISSAIRE_NODE_BIN || "node",

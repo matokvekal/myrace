@@ -1,17 +1,64 @@
-# Production deployment: API next to PostgreSQL
+# Production deployment: one domain, one Linux server
 
-Target layout (not deployed yet; CI/CD below is implemented on
-`feature/m2-server`, not active until merged to `main` and configured):
+Production layout (final, 2026-11-02):
 
 ```
-Browser ── https://commissaire.us ──────────► GitHub Pages (React PWA, unchanged)
-   │
-   └──── https://api.commissaire.us ──► Nginx :443 ──► Node API 127.0.0.1:4000 ──► PostgreSQL 127.0.0.1:5432
-                                       (same Linux server, beside El Niño)          (Commissaire's own database)
+Browser ── https://commissaire.us ──► Nginx :443 ─┬─ /            → static app  /var/www/commissaire
+                                     (same server  ├─ /api/        → PM2 "server-commissaire" 127.0.0.1:5000
+                                      as El Niño)  └─ /socket.io/  → same process (WebSocket upgrade)
+                                                                       └─► PostgreSQL 127.0.0.1:5432, database "commissaire"
 ```
 
-Nothing here changes El Niño: not its database, role, service, or Nginx files.
-Commissaire gets its own Nginx file, its own service, its own `.env`.
+- The app is built with `VITE_SERVER_URL=/`: it calls `/api/v1` and
+  `/socket.io` on its own origin. No `api.` subdomain, no GitHub Pages.
+- PM2: the server's **shared** daemon (user `elnino`). Commissaire is only ever
+  the process `server-commissaire`; restart it by name, never `pm2 ... all`.
+- Nothing here changes El Niño: not its database, role, processes, or Nginx files.
+- Releases are installed **by hand** for now (below). The `deploy.yml` workflow
+  only builds, tests and packs the two archives; it publishes nothing.
+
+> The sections further down (deploy gate, `/opt/commissaire-api`, the
+> `commissaire` user's own PM2 daemon, `api.commissaire.us`) describe the
+> automated design. Its names and port now match production (`server-commissaire`,
+> 5000), but it is not installed; use the manual steps until it is.
+
+## Manual release (current process)
+
+Every push to `main` (or "Run workflow" on `deploy.yml`) produces two artifacts
+on the run page, each with its SHA-256 in the run summary:
+
+| Artifact | File | Contents |
+|---|---|---|
+| `web-release` | `web-<UTC time>-<commit>.tar.gz` | `REVISION`, `web/` = the built app (`dist/`) |
+| `backend-release` | `<UTC time>-<commit>.tar.gz` | `REVISION`, `server/{dist,sql,node_modules,package*.json}` (production deps only, no `.env`) |
+
+Both can also be packed locally: `npm run build` with `VITE_SERVER_URL=/`, then
+`server/deploy/pack-web-release.sh <sha> dist <out>`; and in `server/`
+`npm ci && npm run build && deploy/pack-release.sh <sha> <out>`.
+
+On the server, as the admin:
+
+1. **Check** each archive: `sha256sum -c` against the published SHA-256.
+2. **Back up** the current app: `cp -a /var/www/commissaire /var/www/commissaire.bak-<date>`,
+   and note the API's current release folder.
+3. **Database**: run `node dist/db/migrate-cli.js --check` from the new
+   release's `server/` (read-only). If it lists missing SQL files, apply exactly
+   those from `server/sql/` by hand, in order, then check again. Never run
+   `000-create-database.sql` on an existing database.
+4. **API**: unpack to a new release folder, link `server/.env` to the shared
+   production `.env` (template: `server/deploy/production.env.example`), point
+   PM2's `server-commissaire` at it (`server/deploy/ecosystem.config.cjs`; it reads
+   `REVISION` into `COMMISSAIRE_RELEASE`) and `pm2 restart server-commissaire`.
+   `curl -s http://127.0.0.1:5000/api/v1/health` must report the new commit.
+5. **App**: copy `web/` over `/var/www/commissaire` (`cp -a web/. /var/www/commissaire/`).
+   Keep the old `assets/` files: pages still open on the old version load them.
+6. **Verify**: `https://commissaire.us/` serves the new `index.html`,
+   `https://commissaire.us/api/v1/health` reports the commit, and
+   `https://commissaire.us/socket.io/?EIO=4&transport=polling` returns a `sid`.
+
+Rollback: restore `/var/www/commissaire` from the backup, and point PM2 back at
+the previous API release folder, then `pm2 restart server-commissaire`.
+Releases change no schema or data, so the database needs no rollback.
 
 Database `commissaire`, login role `commissaire_app` (the database 001–008 were run on).
 
@@ -81,11 +128,14 @@ otherwise. Each release's `server/.env` is a symlink to it, created by the gate
 (a release archive containing `server/.env` is refused). The API finds it next
 to `server/package.json`, from `dist/server.js` as from `tsx`.
 
+Full template: `server/deploy/production.env.example`. **Comments must sit on
+their own line**: the API's `.env` reader keeps a trailing `# ...` as part of
+the value, so the annotated lines below are for reading, not for copying.
+
 ```
 NODE_ENV=production
 HOST=127.0.0.1                 # only Nginx reaches the API
-PORT=4000                      # any free port; check that El Niño and the existing
-                               # "commissaire-api" PM2 process don't use it
+PORT=5000                      # production: PM2 "server-commissaire"
 DATABASE_URL=postgresql://commissaire_app:<url-encoded password>@127.0.0.1:5432/commissaire
                                # no sslmode: loopback
 DB_POOL_MAX=10
@@ -124,7 +174,7 @@ server never runs npm or git for a deployment.
 ```
 /opt/commissaire-api/           root:commissaire 1775 (sticky: commissaire cannot rename bin/)
   bin/deploy-gate.sh            root:root 0755  the only command the deploy key can run
-  bin/ecosystem.config.cjs      root:root 0644  PM2 app "commissaire-api-live"
+  bin/ecosystem.config.cjs      root:root 0644  PM2 app "server-commissaire"
   bin/gate.conf                 root:root 0644  optional: NODE_BIN, PM2_BIN, HEALTH_URL
   shared/.env                   commissaire 0600
   releases/<UTC time>-<commit>/ read-only: REVISION, server/{dist,sql,node_modules,package*.json}, server/.env → shared/.env
@@ -139,13 +189,13 @@ server never runs npm or git for a deployment.
 | Command | What it does |
 |---|---|
 | `receive <id> <sha256>` | Archive on stdin, at most 200 MB. Checks the SHA-256, that every path is `REVISION` or `server/...` (relative, no `..`, printable), that it holds only regular files and directories (no links or devices), that `REVISION` matches the id, the required files, and no `server/.env`. Extracts to `releases/<id>`, links `.env`, makes it read-only. An existing release is never overwritten. |
-| `activate <id>` | Node ≥ 20 and `shared/.env` (600, owned by `commissaire`) checked; **read-only schema check** (`node dist/db/migrate-cli.js --check`: files recorded, 17 tables, no foreign keys; never migrates) — on failure nothing changes; `current` switched atomically; PM2 restarts only `commissaire-api-live`; health must report `{"ok":true,"release":"<commit>"}` within 30 s. On failure: **automatic rollback** to the previous release (health-checked). On success: `previous` updated, `pm2 save`, keeps the 5 newest releases (never current or previous). |
+| `activate <id>` | Node ≥ 20 and `shared/.env` (600, owned by `commissaire`) checked; **read-only schema check** (`node dist/db/migrate-cli.js --check`: files recorded, 17 tables, no foreign keys; never migrates) — on failure nothing changes; `current` switched atomically; PM2 restarts only `server-commissaire`; health must report `{"ok":true,"release":"<commit>"}` within 30 s. On failure: **automatic rollback** to the previous release (health-checked). On success: `previous` updated, `pm2 save`, keeps the 5 newest releases (never current or previous). |
 | `rollback [id]` | Back to `previous` (or the named release), schema-checked and health-checked; restores the release it left if that fails. |
 | `status` | Current, previous, releases kept, health. |
 
 PM2 runs under the `commissaire` user's own daemon (`~commissaire/.pm2`), so
 El Niño's `pm2 restart all`, `pm2 kill` or `pm2 save` never touch Commissaire,
-and the reverse. The gate only ever names `commissaire-api-live`; never use
+and the reverse. The gate only ever names `server-commissaire`; never use
 `pm2 ... all`. Don't reuse, stop or delete the old `commissaire-api` process
 until you know what it is. One process only (Socket.IO rooms are in memory).
 
@@ -229,7 +279,7 @@ with a symlink in `sites-enabled/`. It doesn't touch El Niño's server blocks.
 
 ```nginx
 upstream commissaire_api {
-    server 127.0.0.1:4000;
+    server 127.0.0.1:5000;
     keepalive 16;
 }
 

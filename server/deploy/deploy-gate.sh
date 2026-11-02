@@ -18,14 +18,14 @@ set -euo pipefail
 umask 022
 
 BASE="${COMMISSAIRE_DEPLOY_BASE:-/opt/commissaire-api}"
-APP=commissaire-api-live
+APP=server-commissaire                   # PM2 process name (shared daemon: only ever this one)
 KEEP=5                                   # releases kept (current and previous always kept)
 MAX_BYTES=$((200 * 1024 * 1024))         # archive size limit
 ID_RE='^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$'
 SHA_RE='^[0-9a-f]{64}$'
 NODE_BIN=node
 PM2_BIN=pm2
-HEALTH_URL=http://127.0.0.1:4000/api/v1/health
+HEALTH_URL=http://127.0.0.1:5000/api/v1/health
 # shellcheck source=/dev/null
 [[ -f "$BASE/bin/gate.conf" ]] && . "$BASE/bin/gate.conf"
 export COMMISSAIRE_DEPLOY_BASE="$BASE" COMMISSAIRE_NODE_BIN="$NODE_BIN"

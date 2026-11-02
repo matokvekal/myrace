@@ -85,6 +85,7 @@ export interface RaceProps {
   takanon: string;
   site: string;
   /** El Niño event this race links to (the id only); unset links to El Niño's home page. */
+  // Device-local: not in the shared race model (no server column yet).
   elNinoEventId?: string | null;
   /** Event logo (data URL), shown on the Info page. */
   logo?: string | null;

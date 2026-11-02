@@ -31,14 +31,14 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://api.commissaire.us/api/v1/health
+      url: https://commissaire.us/api/v1/health
     env:
       ACTION: ${{ inputs.action }}
       TARGET: ${{ inputs.release }}
       DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
       DEPLOY_USER: ${{ vars.DEPLOY_USER }}
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
-      API_URL: ${{ vars.VITE_SERVER_URL || 'https://api.commissaire.us' }}
+      API_URL: https://commissaire.us
     steps:
       - name: Validate input
         run: |

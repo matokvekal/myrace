@@ -247,7 +247,7 @@ const RACE_BASIC_FIELDS = [
   "autoColor", "leaderFinishAll", "minLapSeconds",
 ] as const satisfies readonly (keyof SharedRace)[];
 const RACE_INFO_DETAIL_FIELDS = [
-  "owner", "time", "image", "heat", "type", "level", "orgenizer", "manager", "phone", "takanon", "site", "elNinoEventId", "distance",
+  "owner", "time", "image", "heat", "type", "level", "orgenizer", "manager", "phone", "takanon", "site", "distance",
 ] as const satisfies readonly (keyof SharedRace)[];
 const RACE_MAP_FIELDS = ["map", "mapCenter", "mapZoom", "trackPoints", "mapMarkers", "tracks"] as const satisfies readonly (keyof SharedRace)[];
 
