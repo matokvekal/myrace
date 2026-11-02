@@ -191,12 +191,14 @@ test.describe("Waves, leaderboard, winners & finisher times", () => {
 
     // Narrow to wave 2 — Elite Men (wave 1) drops out, a Masters 50+ block stays.
     // (Match the visible category block, not the hidden filter <option>.)
-    await page.getByRole("button", { name: "Wave 2", exact: true }).click();
+    // The wave filter lives in the sort/filter menu.
+    await page.getByTestId("results-filter-btn").click();
+    await page.getByTestId("results-wave-2").click();
     await expect(resultsCategory(page, "Elite Men")).toHaveCount(0);
     await expect(resultsCategory(page, "50+")).toBeVisible();
 
     // Back to wave 1 — Elite Men returns.
-    await page.getByRole("button", { name: "Wave 1", exact: true }).click();
+    await page.getByTestId("results-wave-1").click();
     await expect(resultsCategory(page, "Elite Men")).toBeVisible();
   });
 });

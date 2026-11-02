@@ -5,12 +5,14 @@ import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import Results from "./Results";
 import RaceTopBar from "../../components/raceSidebar/RaceTopBar";
+import { useLiveRaceRoom } from "@/services/live/liveRaceRoom";
 import styles from "./resultsPage.module.css";
 
 /**
  * Dedicated Results screen, reached from the race sidebar. It is the existing
  * Results component — same ranking and column picker — opened full-screen,
- * grouped Wave → Category, with a chip bar to jump between categories.
+ * grouped Wave → Category; sort and category in one filter menu. A shared race
+ * joins its live room so results follow the race without polling.
  */
 const ResultsPage: React.FC = () => {
   const params = useParams();
@@ -20,6 +22,7 @@ const ResultsPage: React.FC = () => {
   const getRaces = useRaceStore((s) => s.getRaces);
   const getCategories = useCategoryStore((s) => s.getCategories);
   const getRiders = useRiderStore((s) => s.getRiders);
+  useLiveRaceRoom(raceUuid);
 
   // Direct loads (reload / shared link) must hydrate the stores themselves.
   useEffect(() => {
@@ -35,7 +38,7 @@ const ResultsPage: React.FC = () => {
     <>
       <RaceTopBar />
       <div className={styles.page}>
-        <Results raceUuid={raceUuid} defaultGroupBy="wave" quickNav defaultWave={waveParam > 0 ? waveParam : undefined} />
+        <Results raceUuid={raceUuid} defaultGroupBy="wave" defaultWave={waveParam > 0 ? waveParam : undefined} />
       </div>
     </>
   );

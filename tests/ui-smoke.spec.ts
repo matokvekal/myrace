@@ -145,14 +145,20 @@ test.describe("UI smoke", () => {
     await expect(page).toHaveURL(/\/results$/);
     await expect(page.getByText(/^Wave 1$/).first()).toBeVisible();
     await expect(page.getByTestId("results-category").first()).toBeVisible();
-    await expect(page.getByTestId("results-cat-chip").first()).toBeVisible();
     // ranking rows carry bib, name and laps
     await expect(page.getByTestId("results-category").first()).toContainText(/\d+/);
     await expect(page.getByTestId("results-category").first()).toContainText(/\d+\/\d+/);
 
-    // jump to another category without leaving
-    const chips = page.getByTestId("results-cat-chip");
-    if ((await chips.count()) > 1) await chips.nth(1).click();
+    // one category, from the sort/filter menu, without leaving
+    await page.getByTestId("results-filter-btn").click();
+    const second = page.getByTestId("results-cat-option").nth(1);
+    const name = (await second.textContent())!.trim();
+    await second.click();
+    await expect(page.getByTestId("results-category")).toHaveCount(1);
+    await expect(page.getByTestId("results-category")).toContainText(name);
+    await page.getByTestId("results-cat-all").click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("results-filter-menu")).toHaveCount(0);
     await expect(page).toHaveURL(/\/results$/);
 
     await gotoRaceMode(page, "Live");

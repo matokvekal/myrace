@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BibBadge from "@/components/ui/BibBadge";
 import styles from "./results.module.css";
-import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
 import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { isAdministrativeFinish } from "@/utils/waveFinish";
@@ -10,7 +9,8 @@ import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import RiderLapTable from "./RiderLapTable";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
-import { Trophy, SlidersHorizontal } from "lucide-react";
+import { Trophy, SlidersHorizontal, ListFilter, Check, RefreshCw } from "lucide-react";
+import { refreshRaceData } from "@/services/live/liveRaceRoom";
 import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
 import { parseClockTime } from "@/utils/timeUtils";
 
@@ -18,13 +18,18 @@ interface Props {
   raceUuid: string;
   /** Initial grouping — the dedicated Results screen opens grouped Wave → Category. */
   defaultGroupBy?: GroupBy;
-  /** Dedicated screen: adds a chip bar to jump between categories without leaving. */
-  quickNav?: boolean;
   /** Open with the wave filter preset (e.g. from a completed wave on the Race timeline). */
   defaultWave?: number;
 }
 
 type SortKey = "place" | "name" | "bib" | "time";
+// Place is the default ranking; the others reorder rows inside each category.
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "place", label: "Place" },
+  { key: "time", label: "Time" },
+  { key: "name", label: "Name" },
+  { key: "bib", label: "Bib" },
+];
 type GroupBy = "category" | "wave";
 
 // Columns the user can show/hide on Results (BUGS.md #8). Position and Name are
@@ -96,7 +101,7 @@ function riderElapsed(rider: RiderProps): number {
   return ms >= 0 ? ms : Infinity;
 }
 
-const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quickNav = false, defaultWave }) => {
+const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defaultWave }) => {
   const { riders, getRiders } = useRiderStore();
   const { categories } = useCategoryStore();
   const [sortBy, setSortBy] = useState<SortKey>("place");
@@ -108,8 +113,26 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [visibleFields, setVisibleFields] = useState<Set<ResultField>>(loadVisibleFields);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshRaceData(raceUuid);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
+
+  useEffect(() => {
+    if (!showFilterMenu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowFilterMenu(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showFilterMenu]);
 
   // Persist the chosen columns as the default for next time (BUGS.md #8).
   useEffect(() => {
@@ -175,17 +198,36 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
       return 0;
     });
 
-  const filteredCatKeys = useMemo(() => {
-    let keys = allCatKeys;
-    if (waveFilter !== "all") keys = keys.filter((k) => catWaveMap.get(k) === waveFilter);
-    if (filterCategory !== "all") keys = keys.filter((k) => k === filterCategory);
-    return keys;
-  }, [allCatKeys, waveFilter, filterCategory, catWaveMap]);
+  // Categories offered in the filter: those of the chosen wave.
+  const waveCatKeys = useMemo(
+    () => (waveFilter === "all" ? allCatKeys : allCatKeys.filter((k) => catWaveMap.get(k) === waveFilter)),
+    [allCatKeys, waveFilter, catWaveMap]
+  );
+  const filteredCatKeys = useMemo(
+    () => (filterCategory === "all" ? waveCatKeys : waveCatKeys.filter((k) => k === filterCategory)),
+    [waveCatKeys, filterCategory]
+  );
+  const pickWave = (w: "all" | number) => {
+    setWaveFilter(w);
+    // A category outside the new wave would leave the page empty.
+    if (filterCategory !== "all" && w !== "all" && catWaveMap.get(filterCategory) !== w) setFilterCategory("all");
+  };
+  const filtersActive = sortBy !== "place" || filterCategory !== "all" || waveFilter !== "all";
+  const catLabel = (k: string) => {
+    const ident = catIdents.get(k);
+    return ident ? `${ident.name}${ident.sub ? ` · ${ident.sub}` : ""}` : k;
+  };
+  const catColor = (k: string) => {
+    const ident = catIdents.get(k);
+    return raceCategories.find((c) => ident && c.name === ident.name && (c.subCategory ?? null) === ident.sub)?.color ?? "#ccc";
+  };
 
   const getPodiumSize = (catKey: string): 3 | 5 => podiumSizes[catKey] ?? 3;
 
   const togglePodiumSize = (catKey: string) =>
     setPodiumSizes((prev) => ({ ...prev, [catKey]: prev[catKey] === 5 ? 3 : 5 }));
+
+  const hasFields = (["laps", "time", "gap", "speed", "status"] as ResultField[]).some((f) => visibleFields.has(f));
 
   const renderCategory = (catKey: string) => {
     const ident = catIdents.get(catKey);
@@ -262,39 +304,47 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
               className={`${styles.row} ${isActive ? styles.active : ""} ${isOut ? styles.out : ""} ${podiumRowClass}`}
               onClick={() => setSelectedRider(rider)}
             >
-              <span className={`${styles.pos} ${podiumMode && sortBy === "place" && !isOut && idx < 3 ? styles[`pos${idx + 1}`] : ""}`}>
-                {showMedal ? MEDAL[idx] : posLabel}
-              </span>
-              {visibleFields.has("bib") && <BibBadge className={styles.bib} rider={rider} />}
-              {isAdministrativeFinish(rider) && (
-                <span className={styles.adminFinish} data-testid="admin-finish" title="Finished administratively when the wave was closed: no finish-line time was recorded">
-                  Admin finish
+              {/* Who: position, bib and the full name (wraps, never cut) */}
+              <div className={styles.ident}>
+                <span className={`${styles.pos} ${podiumMode && sortBy === "place" && !isOut && idx < 3 ? styles[`pos${idx + 1}`] : ""}`}>
+                  {showMedal ? MEDAL[idx] : posLabel}
                 </span>
-              )}
-              <span className={styles.name}>{rider.lastName} {rider.firstName}</span>
-              {visibleFields.has("laps") && <span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span>}
-              {visibleFields.has("time") && (
-                <span className={styles.time}>
-                  {el && el !== Infinity ? fmtTime(el) : "—"}
-                </span>
-              )}
-              {visibleFields.has("gap") && (
-                <span className={styles.gap}>{isOut ? "—" : fmtGap(leader, rider)}</span>
-              )}
-              {visibleFields.has("speed") && (
-                <span className={styles.speed}>{riderSpeedKph(rider)}</span>
-              )}
-              {visibleFields.has("status") && (() => {
-                const info = getRiderStatusInfo(rider);
-                return (
-                  <span
-                    className={styles.statusChip}
-                    style={{ background: `${info.color}1f`, color: info.color }}
-                  >
-                    {info.label}
+                {visibleFields.has("bib") && <BibBadge className={styles.bib} rider={rider} />}
+                <span className={styles.name} dir="auto">{rider.lastName} {rider.firstName}</span>
+                {isAdministrativeFinish(rider) && (
+                  <span className={styles.adminFinish} data-testid="admin-finish" title="Finished administratively when the wave was closed: no finish-line time was recorded">
+                    Admin finish
                   </span>
-                );
-              })()}
+                )}
+              </div>
+              {/* Every chosen field, labelled; they wrap onto more lines when the width runs out */}
+              {hasFields && (
+                <div className={styles.fields}>
+                  {visibleFields.has("laps") && (
+                    <span className={styles.field}><span className={styles.fieldLabel}>Laps</span><span className={styles.laps}>{rider.lapsCounter}/{rider.totalLaps}</span></span>
+                  )}
+                  {visibleFields.has("time") && (
+                    <span className={styles.field}><span className={styles.fieldLabel}>Time</span><span className={styles.time}>{el && el !== Infinity ? fmtTime(el) : "—"}</span></span>
+                  )}
+                  {visibleFields.has("gap") && (
+                    <span className={styles.field}><span className={styles.fieldLabel}>Gap</span><span className={styles.gap}>{isOut ? "—" : fmtGap(leader, rider)}</span></span>
+                  )}
+                  {visibleFields.has("speed") && (
+                    <span className={styles.field}><span className={styles.fieldLabel}>Speed</span><span className={styles.speed}>{riderSpeedKph(rider)}</span></span>
+                  )}
+                  {visibleFields.has("status") && (() => {
+                    const info = getRiderStatusInfo(rider);
+                    return (
+                      <span
+                        className={styles.statusChip}
+                        style={{ background: `${info.color}1f`, color: info.color }}
+                      >
+                        {info.label}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
             </React.Fragment>
           );
@@ -311,84 +361,76 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
     );
   };
 
-  const jumpTo = (catKey: string) => {
-    setFilterCategory("all");
-    // let the (possibly filtered-out) block render before scrolling to it
-    setTimeout(() => document.getElementById(`results-cat-${catKey}`)?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 0);
-  };
+  const option = (selected: boolean, label: React.ReactNode, onPick: () => void, testId?: string) => (
+    <button type="button" className={styles.optItem} aria-pressed={selected} onClick={onPick} data-testid={testId}>
+      <span className={styles.optCheck}>{selected && <Check size={16} aria-hidden="true" />}</span>
+      {label}
+    </button>
+  );
 
   return (
     <div className={styles.container}>
-      {quickNav && filteredCatKeys.length > 1 && (
-        <div className={styles.catChips} data-testid="results-cat-chips">
-          {filteredCatKeys.map((k) => {
-            const ident = catIdents.get(k);
-            if (!ident) return null;
-            const meta = raceCategories.find((c) => c.name === ident.name && (c.subCategory ?? null) === ident.sub);
-            return (
-              <button key={k} type="button" className={styles.catChip} data-testid="results-cat-chip" onClick={() => jumpTo(k)}>
-                <span className={styles.dot} style={{ background: meta?.color ?? "#ccc" }} />
-                {ident.name}{ident.sub ? ` · ${ident.sub}` : ""}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {waveNums.length > 1 && (
-        <div className={styles.wavePills}>
-          <button
-            className={`${styles.wavePill} ${waveFilter === "all" ? styles.wavePillActive : ""}`}
-            onClick={() => setWaveFilter("all")}
-          >All</button>
-          {waveNums.map((w) => (
-            <button
-              key={w}
-              className={`${styles.wavePill} ${waveFilter === w ? styles.wavePillActive : ""}`}
-              onClick={() => setWaveFilter(w)}
-            >Wave {w}</button>
-          ))}
-        </div>
-      )}
-
       <div className={styles.toolbar}>
         <div className={styles.toolRow}>
-          <select
-            className={styles.select}
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="all">All categories</option>
-            {allCatKeys.map((k) => {
-              const ident = catIdents.get(k);
-              const label = ident ? `${ident.name}${ident.sub ? ` · ${ident.sub}` : ""}` : k;
-              return <option key={k} value={k}>{label}</option>;
-            })}
-          </select>
+          {/* Sort + category (+ wave) in one place, closed by default */}
+          <div className={styles.fieldMenuWrap}>
+            <button
+              type="button"
+              className={`${styles.iconBtn} ${filtersActive ? styles.iconBtnOn : ""}`}
+              onClick={() => setShowFilterMenu((v) => !v)}
+              aria-haspopup="dialog"
+              aria-expanded={showFilterMenu}
+              aria-label="Sort and filter"
+              title="Sort and filter"
+              data-testid="results-filter-btn"
+            >
+              <ListFilter size={18} aria-hidden="true" />
+              {filtersActive && <span className={styles.iconDot} aria-hidden="true" />}
+            </button>
+            {showFilterMenu && (
+              <>
+                <div className={styles.fieldMenuOverlay} onClick={() => setShowFilterMenu(false)} />
+                <div className={styles.filterMenu} role="dialog" aria-label="Sort and filter" data-testid="results-filter-menu">
+                  <div className={styles.fieldMenuTitle}>Sort by</div>
+                  {SORTS.map((s) => option(sortBy === s.key, s.label, () => setSortBy(s.key), `results-sort-${s.key}`))}
+                  {waveNums.length > 1 && (
+                    <>
+                      <div className={`${styles.fieldMenuTitle} ${styles.menuSection}`}>Wave</div>
+                      {option(waveFilter === "all", "All waves", () => pickWave("all"), "results-wave-all")}
+                      {waveNums.map((w) => (
+                        <React.Fragment key={w}>{option(waveFilter === w, `Wave ${w}`, () => pickWave(w), `results-wave-${w}`)}</React.Fragment>
+                      ))}
+                    </>
+                  )}
+                  <div className={`${styles.fieldMenuTitle} ${styles.menuSection}`}>Categories</div>
+                  {option(filterCategory === "all", "All categories", () => setFilterCategory("all"), "results-cat-all")}
+                  {waveCatKeys.map((k) => (
+                    <React.Fragment key={k}>
+                      {option(
+                        filterCategory === k,
+                        <><span className={styles.dot} style={{ background: catColor(k) }} /><span dir="auto">{catLabel(k)}</span></>,
+                        () => setFilterCategory(k),
+                        "results-cat-option"
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <div className={styles.groupBtns}>
             <button
+              type="button"
               className={`${styles.groupBtn} ${groupBy === "category" ? styles.groupBtnActive : ""}`}
+              aria-pressed={groupBy === "category"}
               onClick={() => setGroupBy("category")}
             >Cat</button>
             <button
+              type="button"
               className={`${styles.groupBtn} ${groupBy === "wave" ? styles.groupBtnActive : ""}`}
+              aria-pressed={groupBy === "wave"}
               onClick={() => setGroupBy("wave")}
             >Wave</button>
-          </div>
-        </div>
-
-        <div className={styles.toolRow}>
-          <div className={styles.sortBtns}>
-            {(["place", "name", "bib", "time"] as SortKey[]).map((k) => (
-              <Button
-                key={k}
-                variant={sortBy === k ? "primary" : "secondary"}
-                size="sm"
-                className={`${styles.sortBtn} ${sortBy === k ? styles.active : ""}`}
-                onClick={() => setSortBy(k)}
-              >
-                {k === "place" ? "Place" : k === "name" ? "Name" : k === "bib" ? "Bib" : "Time"}
-              </Button>
-            ))}
           </div>
           <div className={styles.rightTools}>
             {/* Column picker — persisted so it's the default next time (BUGS.md #8) */}
@@ -399,8 +441,9 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
                 aria-haspopup="menu"
                 aria-expanded={showFieldMenu}
                 title="Choose columns"
+                aria-label="Columns"
               >
-                <SlidersHorizontal size={15} /> Columns
+                <SlidersHorizontal size={15} aria-hidden="true" /> <span className={styles.btnLabel}>Columns</span>
               </button>
               {showFieldMenu && (
                 <>
@@ -425,8 +468,22 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", quick
             <button
               className={`${styles.podiumToggle} ${podiumMode ? styles.podiumToggleOn : ""}`}
               onClick={() => setPodiumMode((v) => !v)}
+              aria-label="Podium"
+              aria-pressed={podiumMode}
+              title="Podium"
             >
-              <Trophy size={15} /> Podium
+              <Trophy size={15} aria-hidden="true" /> <span className={styles.btnLabel}>Podium</span>
+            </button>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={refresh}
+              disabled={refreshing}
+              aria-label="Refresh"
+              title="Refresh"
+              data-testid="results-refresh"
+            >
+              <RefreshCw size={16} aria-hidden="true" className={refreshing ? styles.spin : undefined} />
             </button>
           </div>
         </div>

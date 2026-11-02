@@ -50,8 +50,8 @@ beforeEach(() => {
 describe("Results screen", () => {
   it("groups by Wave then Category, with rank, bib, name, laps, time and status", () => {
     renderPage();
-    const waves = screen.getAllByText(/^Wave \d$/).map((e) => e.textContent);
-    expect(waves.slice(0, 2)).toEqual(["Wave 1", "Wave 2"]);
+    const waves = [...document.querySelectorAll(".waveGroupHeader")].map((e) => e.textContent);
+    expect(waves).toEqual(["Wave 1", "Wave 2"]);
     const blocks = screen.getAllByTestId("results-category");
     expect(blocks).toHaveLength(2);
     const eliteRows = within(blocks[0]).getAllByText(/^(First Ann|Second Bea)$/).map((e) => e.textContent);
@@ -71,20 +71,39 @@ describe("Results screen", () => {
     expect(text.indexOf("Bea")).toBeLessThan(text.indexOf("Not classified"));
     for (const n of ["Dnf", "Dns", "Dsq"]) expect(text.indexOf("Not classified")).toBeLessThan(text.indexOf(n));
     // positions 1 and 2 only belong to ranked riders; out riders show a dash
-    const dnfRow = within(elite).getByText("Dnf Cid").closest("div")!;
+    const dnfRow = within(elite).getByText("Dnf Cid").closest(".row")!;
     expect(dnfRow).toHaveTextContent("—");
     expect(dnfRow).toHaveTextContent("DNF");
   });
 
-  it("category chips jump to a category without leaving the screen", async () => {
+  it("sorts and filters categories from one closed-by-default menu, independently", async () => {
     const user = userEvent.setup();
     renderPage();
-    const chips = screen.getAllByTestId("results-cat-chip");
-    expect(chips.map((c) => c.textContent)).toEqual(["Elite", "Juniors"]);
-    (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
-    await user.click(chips[1]);
-    await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
+    expect(screen.queryByTestId("results-filter-menu")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("results-filter-btn"));
+    const menu = screen.getByTestId("results-filter-menu");
+    expect(within(menu).getByTestId("results-sort-place")).toHaveAttribute("aria-pressed", "true");
+    expect(within(menu).getByTestId("results-cat-all")).toHaveAttribute("aria-pressed", "true");
+    expect(within(menu).getAllByTestId("results-cat-option").map((c) => c.textContent)).toEqual(["Elite", "Juniors"]);
+
+    await user.click(within(menu).getAllByTestId("results-cat-option")[1]);
+    expect(screen.getAllByTestId("results-category")).toHaveLength(1);
+    expect(screen.getByTestId("results-category")).toHaveTextContent("Juniors");
+    await user.click(within(menu).getByTestId("results-sort-name"));
+    expect(within(menu).getByTestId("results-sort-name")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByTestId("results-category")).toHaveLength(1); // the category stays chosen
+
+    await user.click(within(menu).getByTestId("results-cat-all"));
+    expect(screen.getAllByTestId("results-category")).toHaveLength(2);
     expect(screen.getByTestId("race-mode-indicator")).toHaveAttribute("data-mode", "results");
+  });
+
+  it("shows every chosen field, labelled, on the rider's card", () => {
+    localStorage.setItem("resultsVisibleFields", JSON.stringify(["bib", "laps", "time", "status", "gap", "speed"]));
+    renderPage();
+    const row = within(screen.getAllByTestId("results-category")[0]).getByText("Second Bea").closest(".row")!;
+    for (const label of ["Laps", "Time", "Gap", "Speed"]) expect(row).toHaveTextContent(label);
   });
 
   it("updates when race data changes", async () => {
