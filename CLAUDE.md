@@ -431,6 +431,14 @@ still open).
   badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
 - `publishRace` runs once per race at a time (in-tab map + Web Locks across tabs): two
   uploads of an empty race would create two server races.
+- Start-list import into a SHARED race (wizard): `importIntoSharedRace` sends ONE
+  `RidersImported` with the riders AND the missing categories, waits for the server, and
+  only then catches the race up — nothing is written locally before. `importCheck.ts`
+  runs the server's rules first (duplicate bib, bib already in race, no category, field
+  limits) and names the rows; keep it in step with `newRider` (its test checks).
+  Categories are built by `utils/categoriesFromRiders.ts` for local and shared races
+  alike; the store's category builders still skip shared races. Other importers go
+  through the bridge, which applies the same check and adds the categories to the Action.
 - `tests/race-persistence.spec.ts` needs a real API (`E2E_API_URL`); skipped otherwise.
 
 ### Terms & Conditions (landing-page acceptance)

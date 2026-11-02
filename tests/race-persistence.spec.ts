@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import path from "path";
 import { acceptTerms } from "./helpers";
 
 /**
@@ -109,6 +110,77 @@ test("signed in, server unreachable: says device only with the reason, then uplo
   await expect(page.getByText("Race saved to the server")).toBeVisible();
   await expect(badge).toHaveCount(0);
   expect(await serverRaces(email)).toEqual(["Down Race"]);
+});
+
+const START_LIST = path.resolve(__dirname, "fixtures", "riders-import.csv"); // bibs 901–903, category "E2E Test Cat"
+
+async function importFile(page: Page, file: string | { name: string; mimeType: string; buffer: Buffer }) {
+  const empty = page.getByRole("button", { name: "Import CSV" });
+  await expect(empty.or(page.getByTestId("rider-manage-btn")).first()).toBeVisible();
+  if (await empty.isVisible().catch(() => false)) await empty.click();
+  else {
+    await page.getByTestId("rider-manage-btn").click();
+    await page.getByRole("button", { name: "Import CSV" }).click();
+  }
+  await page.locator('input[type="file"][accept=".csv,.xlsx,.xls"]').setInputFiles(file);
+  await page.getByRole("button", { name: "Continue to Preview" }).click();
+  await page.getByTestId("preview-import").click();
+}
+
+async function snapshotOf(email: string) {
+  const login = await (await fetch(`${API}/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password: PASSWORD }) })).json();
+  const auth = { authorization: `Bearer ${login.accessToken}` };
+  const { races } = await (await fetch(`${API}/races`, { headers: auth })).json();
+  return (await fetch(`${API}/races/${races[0].race.uuid}/snapshot`, { headers: auth })).json();
+}
+
+test("signed in: a start list imported into the new race goes to the server with its categories, once", async ({ page, browser }) => {
+  const email = `import.${Date.now()}@x.test`;
+  await page.goto("/main");
+  await acceptTerms(page);
+  await page.goto("/account");
+  await register(page, email);
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await createRace(page, "Import Race");
+  await expect(page.getByText("Race saved to the server")).toBeVisible();
+  await page.getByText("Import Race").last().click(); // the race card (first is the shared-races list)
+  await expect(page).toHaveURL(/\/race\//);
+
+  await importFile(page, START_LIST);
+  // Riders closes the wizard once the server confirmed; the list shows riders + category.
+  await expect(page.getByText("McTestface Testy")).toBeVisible();
+  await expect(page.getByText("E2E Test Cat").first()).toBeVisible();
+  await expect(page.getByText(/Not applied/)).toHaveCount(0);
+  let snap = await snapshotOf(email);
+  expect(snap.riders.map((r: { bibNumber: number }) => r.bibNumber).sort()).toEqual([901, 902, 903]);
+  expect(snap.categories.map((c: { name: string }) => c.name)).toEqual(["E2E Test Cat"]);
+
+  // The same file again, and a file with a duplicate bib: refused by row, nothing added anywhere.
+  await importFile(page, START_LIST);
+  await expect(page.getByTestId("import-refused")).toContainText("Row 1: bib 901 is already in this race"); // rows numbered as in the import preview
+  await page.getByRole("button", { name: "Close" }).click();
+  await importFile(page, { name: "dup.csv", mimeType: "text/csv", buffer: Buffer.from("bib,first name,last name,category,heat\n950,A,One,Juniors,2\n950,B,Two,Juniors,2\n") });
+  await expect(page.getByTestId("import-refused")).toContainText("Bib 950 appears on rows 1, 2");
+  await page.getByRole("button", { name: "Close" }).click();
+  snap = await snapshotOf(email);
+  expect(snap.riders).toHaveLength(3);
+  expect(snap.categories).toHaveLength(1);
+  await expect(page.getByText("Riders (3)")).toBeVisible();
+
+  // A second browser sees the riders and the category.
+  const ctx = await browser.newContext();
+  const other = await ctx.newPage();
+  await other.goto("/main");
+  await acceptTerms(other);
+  await other.goto("/account");
+  await other.getByPlaceholder("Email").fill(email);
+  await other.getByPlaceholder(/Password/).fill(PASSWORD);
+  await other.getByRole("button", { name: "Sign in" }).click();
+  await other.getByRole("button", { name: "Open" }).click();
+  await expect(other.getByText("McTestface").first()).toBeVisible();
+  await other.getByRole("button", { name: "Categories", exact: true }).click();
+  await expect(other.getByText("E2E Test Cat").first()).toBeVisible();
+  await ctx.close();
 });
 
 test("side menu: Register / Login opens /account; Logout signs out and keeps local races", async ({ page }) => {

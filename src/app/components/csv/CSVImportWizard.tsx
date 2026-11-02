@@ -13,7 +13,8 @@ import { parseCSVFile } from "@/utils/csvParser";
 // parseXLSXFile pulls in xlsx (~430 kB) — loaded only when an Excel file is
 // actually uploaded (BUGS.md #1). CSV uploads never touch it.
 import { autoMapColumns } from "@/services/csvMapper";
-import { buildHeatNameMap, filterImportRows, rowToRider } from "@/services/riderRowMapper";
+import { buildHeatNameMap, filterImportRows, importSkipReason, rowToRider } from "@/services/riderRowMapper";
+import { isLiveRace } from "@/services/live/liveBridge";
 import { touchTemplate } from "@/services/templateStorage";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
@@ -53,6 +54,8 @@ export default function CSVImportWizard({
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [skippedIssues, setSkippedIssues] = useState<import("@/types/csv.types").ValidationIssue[]>([]);
+  // A shared race's import that was refused as a whole (nothing imported), with the rows to fix.
+  const [refusal, setRefusal] = useState<{ message: string; problems: string[] } | null>(null);
   const [suggestedName, setSuggestedName] = useState("");
   const [showMultiDayDialog, setShowMultiDayDialog] = useState(false);
   const [multiDayValues, setMultiDayValues] = useState<string[]>([]);
@@ -208,6 +211,7 @@ export default function CSVImportWizard({
   const handleStartImport = async (validation: ValidationResult) => {
     if (!parseResult) return;
     setCurrentStep("importing");
+    setRefusal(null);
 
     const errorIssues = validation.issues.filter((i) => i.severity === "error");
     const errorRowIndices = new Set(
@@ -240,8 +244,27 @@ export default function CSVImportWizard({
       const riders = validRows.map((row, i) =>
         rowToRider(row, columnMappings, raceUuid, i, heatNameToNumber, clubDictionary)
       );
-      await insertRiders(riders);
-      await rebuildCategoriesFromRiders(raceUuid);
+      if (isLiveRace(raceUuid)) {
+        // Shared race: riders AND categories go to the server in one Action, and
+        // nothing is saved here until the server confirmed it (no half import).
+        const headerRow = parseResult.detection.headerRow;
+        const rowNumbers = parseResult.rows
+          .map((row, i) => ({ row, i }))
+          .filter(({ row, i }) => !errorRowIndices.has(i) && !importSkipReason(row, parseResult.headers, columnMappings))
+          .map(({ i }) => i + headerRow + 1);
+        const live = await import("@/services/live/liveClient");
+        try {
+          await live.importIntoSharedRace(raceUuid, riders, rowNumbers);
+        } catch (err) {
+          if (!(err instanceof live.ImportRefused)) throw err;
+          setRefusal({ message: err.message, problems: err.problems.map((p) => p.message) });
+          setImportProgress({ total: totalInFile, processed: totalInFile, successful: 0, failed: totalInFile, status: "error" });
+          return;
+        }
+      } else {
+        await insertRiders(riders);
+        await rebuildCategoriesFromRiders(raceUuid);
+      }
       setImportProgress({
         total: totalInFile,
         processed: totalInFile,
@@ -272,6 +295,7 @@ export default function CSVImportWizard({
     setColumnMappings([]);
     setImportProgress(null);
     setSkippedIssues([]);
+    setRefusal(null);
     setSuggestedName("");
     setShowMultiDayDialog(false);
     setMultiDayValues([]);
@@ -357,6 +381,7 @@ export default function CSVImportWizard({
           <ImportProgressStep
             progress={importProgress}
             skippedIssues={skippedIssues}
+            refusal={refusal}
             onClose={handleClose}
           />
         )}

@@ -26,6 +26,8 @@ import { authorizeAction, type EffectiveAccess, type MemberPermissions } from ".
 import { PROTOCOL_VERSION, type RaceAction } from "../../../shared/race/actions";
 import type { MemberRole } from "../../../shared/race/roles";
 import { RACE_INFO_FIELDS, RIDER_IDENTITY_FIELDS, type RaceState, type SharedCategory, type SharedRace, type SharedRider } from "../../../shared/race/state";
+import { buildCategoriesFromRiders, riderCategoryKey } from "@/utils/categoriesFromRiders";
+import { describeProblems, importProblems, type ImportProblem } from "./importCheck";
 import { applyingRemote, LIVE_ACCESS_EVENT, LIVE_LINKS_KEY, readLinks, setLiveBridge, type LiveBridge, type LiveLink } from "./liveBridge";
 
 const SERVER = String(import.meta.env.VITE_SERVER_URL ?? "").replace(/\/$/, "");
@@ -528,10 +530,25 @@ const bridge: LiveBridge = {
     const local = (after[0] ?? before[0])?.raceUuid;
     if (!local || !linkOf(local)) return true;
     const actions: RaceAction[] = [];
+    let newCategories: CategoryProps[] = [];
+    if (kind === "import") {
+      // The server refuses the whole import for one bad rider: refuse it here, by row, before any write.
+      const problems = importProblems(after, [], useRiderStore.getState().riders.filter((r) => r.raceUuid === local));
+      if (problems.length) {
+        toast.error(describeProblems(problems), { toastId: "import-refused", autoClose: false });
+        return false;
+      }
+      // The categories the riders need go in the same Action (the store's category builders skip shared races).
+      const race = useRaceStore.getState().races.find((r) => r.uuid === local);
+      const have = new Set(useCategoryStore.getState().categories.filter((c) => c.raceUuid === local).map((c) => riderCategoryKey({ category: c.name, subCategory: c.subCategory })));
+      newCategories = buildCategoriesFromRiders(after, local, race?.autoColor !== false)
+        .filter((c) => !have.has(riderCategoryKey({ category: c.name, subCategory: c.subCategory })))
+        .map((c) => ({ ...c, uuid: crypto.randomUUID() }));
+    }
     if (kind === "add" || kind === "import") {
       for (const r of after) r.uuid ??= crypto.randomUUID();
       if (kind === "add") actions.push(...after.map((r) => draft(local, "RiderAdded", { rider: toNewRider(r) })));
-      else actions.push(draft(local, "RidersImported", { riders: after.map(toNewRider), categories: [] }));
+      else actions.push(draft(local, "RidersImported", { riders: after.map(toNewRider), categories: newCategories.map(toNewCategory) }));
     } else if (kind === "delete") {
       for (const r of before) if (r.uuid) actions.push(draft(local, "RiderDeleted", { riderUuid: r.uuid }));
     } else {
@@ -558,6 +575,8 @@ const bridge: LiveBridge = {
     if (!actions.length) return true;
     if (!allowed(local, actions, kind === "add" || kind === "import" ? after : [])) return false;
     for (const a of actions) void dispatchAction(local, a.type, a.payload as Record<string, unknown>);
+    // Locally too, as the server will create them (not sent again: they are in the Action).
+    if (newCategories.length) void applyingRemote(() => useCategoryStore.getState().upsertCategories(newCategories));
     return true;
   },
 
@@ -1053,6 +1072,76 @@ export function publishPending(): Promise<void> {
     publishing = null;
   });
   return publishing;
+}
+
+// ---------------------------------------------------------------------------
+// Start-list import into a shared race
+
+/** The import was refused before anything was written or sent; `problems` name the rows. */
+export class ImportRefused extends Error {
+  constructor(readonly problems: ImportProblem[], message = describeProblems(problems)) {
+    super(message);
+  }
+}
+
+/** Last import sent per race: a retry of the same file reuses its actionId (the server answers it once). */
+const lastImport = new Map<string, { fingerprint: string; actionId: string }>();
+
+/**
+ * Imports a start list into a SHARED race as ONE `RidersImported` Action that
+ * carries the riders AND the categories they need (only the missing ones), and
+ * waits for the server. Nothing is written on this device until the server
+ * applied it; then the race is caught up, so riders and categories arrive here
+ * exactly as every other device gets them. A refusal names the rows.
+ */
+export async function importIntoSharedRace(local: string, riders: RiderProps[], rowNumbers: number[]): Promise<{ riders: number; categories: number }> {
+  const link = linkOf(local);
+  if (!link) throw new Error("Not a shared race");
+  if (!session) throw new ImportRefused([], "Nothing was imported. Sign in to import into this race.");
+
+  const fingerprint = JSON.stringify(riders.map((r) => [r.bibNumber, r.firstName, r.lastName, r.category, r.heat]));
+  const retry = lastImport.get(local)?.fingerprint === fingerprint ? lastImport.get(local)!.actionId : null;
+
+  await flush(local); // earlier changes first, in order
+  await catchUp(local); // check against what the server has now
+  const existingRiders = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
+  if (!retry) {
+    const problems = importProblems(riders, rowNumbers, existingRiders);
+    if (problems.length) throw new ImportRefused(problems);
+  }
+
+  const withUuid = riders.map((r) => ({ ...r, uuid: r.uuid ?? crypto.randomUUID() }));
+  const race = useRaceStore.getState().races.find((r) => r.uuid === local);
+  const haveCategory = new Set(useCategoryStore.getState().categories.filter((c) => c.raceUuid === local).map((c) => riderCategoryKey({ category: c.name, subCategory: c.subCategory })));
+  const categories = buildCategoriesFromRiders(withUuid, local, race?.autoColor !== false)
+    .filter((c) => !haveCategory.has(riderCategoryKey({ category: c.name, subCategory: c.subCategory })))
+    .map((c) => ({ ...c, uuid: crypto.randomUUID() }));
+
+  const actionId = retry ?? crypto.randomUUID();
+  lastImport.set(local, { fingerprint, actionId });
+  const action = {
+    actionId, raceUuid: link.serverRaceUuid, type: "RidersImported",
+    payload: { riders: withUuid.map(toNewRider), categories: categories.map(toNewCategory) },
+    deviceTime: localIso(Date.now()), clockOffsetMs, deviceId: deviceId(), protocolVersion: PROTOCOL_VERSION,
+  } as RaceAction;
+
+  let result: { applied: boolean; reason: string | null } | undefined;
+  try {
+    ({ results: [result] } = await api<{ results: { applied: boolean; reason: string | null }[] }>("POST", `/races/${link.serverRaceUuid}/actions`, { actions: [action] }));
+  } catch (e) {
+    if (e instanceof LiveApiError && e.status === 426) useLiveStore.setState({ needsUpdate: true });
+    // Unanswered: it may or may not have arrived. A retry of the same file reuses this actionId.
+    const why = e instanceof TypeError ? "No connection to the server" : e instanceof Error ? e.message : String(e);
+    throw new ImportRefused([], `Nothing was imported. ${why}. Try again.`);
+  }
+  if (!result?.applied) {
+    lastImport.delete(local);
+    const why = REASON_TEXT[result?.reason ?? ""] ?? result?.reason ?? "refused";
+    throw new ImportRefused([], `Nothing was imported. The server refused the import (${why}).`);
+  }
+  lastImport.delete(local);
+  await catchUp(local);
+  return { riders: withUuid.length, categories: categories.length };
 }
 
 export interface MyRace {

@@ -3,9 +3,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { CategoryProps, RiderProps, RaceProps } from "@/types/types";
-import { assignCategoryColors } from "@/utils/colorAssignment";
 import categoryStorageAdapter from "./indexDb/categoryStorageAdapter";
-import { COLORS } from "@/constants/index";
+import { buildCategoriesFromRiders, riderCategoryKey } from "@/utils/categoriesFromRiders";
 import useRiderStore from "./ridersStore";
 import { isRaceUuidFinalized } from "@/utils/raceLock";
 import { isApplyingRemote, isLiveRace, liveBridge } from "@/services/live/liveBridge";
@@ -76,115 +75,26 @@ const useCategoryStore = create<CategoryState>()(
         // Never for a shared race (matrix row 47): its categories come from Actions.
         if (isLiveRace(raceUuid)) return;
         try {
-          const normTime = (t: string | null | undefined): string | null => {
-            if (!t) return null;
-            const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (!m) return null;
-            const hhmm = `${m[1].padStart(2, "0")}:${m[2]}`;
-            // Keep non-zero seconds: 08:22:30 is its own start, not 08:22
-            return m[3] && m[3] !== "00" ? `${hhmm}:${m[3]}` : hhmm;
-          };
-
           const db = await initIndexedDB();
-          let riders: RiderProps[] = await db.getAll("riders");
+          const riders: RiderProps[] = (await db.getAll("riders")).filter((r: RiderProps) => r.raceUuid === raceUuid);
+          const race = (await db.getAll("races")).find((r: RaceProps) => r.uuid === raceUuid);
+          const newCategories = buildCategoriesFromRiders(riders, raceUuid, race?.autoColor !== false);
 
-          // Remember the order categories first appear in the uploaded file (rider ids
-          // ascend with row order) before the name sort below discards it.
-          const fileOrder = new Map<string, number>();
-          [...riders]
-            .filter((rider) => rider.raceUuid === raceUuid && rider.category)
-            .sort((a, b) => a.id - b.id)
-            .forEach((rider) => {
-              const key = rider.subCategory ? `${rider.category}::${rider.subCategory}` : rider.category;
-              if (!fileOrder.has(key)) fileOrder.set(key, fileOrder.size);
-            });
+          // Riders take their category colour (after the final assignment).
+          const colorOf = new Map(newCategories.map((c) => [c.subCategory ? `${c.name}::${c.subCategory}` : c.name, c.color]));
+          const riderUpdates = riders.filter((r) => r.category && colorOf.has(riderCategoryKey(r))).map((r) => ({ ...r, color: colorOf.get(riderCategoryKey(r))! }));
 
-          // Filter riders by raceUuid and sort them
-          riders = riders
-            .filter((rider) => rider.raceUuid === raceUuid)
-            .sort((a, b) => {
-              const categoryOrder = a.category.localeCompare(b.category);
-              if (categoryOrder !== 0) return categoryOrder;
-              const timeA = a.timeStartRace ? new Date(a.timeStartRace) : new Date(0);
-              const timeB = b.timeStartRace ? new Date(b.timeStartRace) : new Date(0);
-              return timeA.getTime() - timeB.getTime();
-            });
-
-          const categoryMap: Record<string, CategoryProps> = {};
-          const riderUpdates: RiderProps[] = [];
-
-          riders.forEach((rider) => {
-            if (!rider.category) return; // Ensure rider has a category
-
-            // Create unique key for category + subCategory combination
-            const categoryKey = rider.subCategory
-              ? `${rider.category}::${rider.subCategory}`
-              : rider.category;
-
-            if (!categoryMap[categoryKey]) {
-              const colorIndex = Object.keys(categoryMap).length % COLORS.length;
-              categoryMap[categoryKey] = {
-                id: Date.now() + Object.keys(categoryMap).length,
-                raceUuid,
-                name: rider.category,
-                subCategory: rider.subCategory || null,
-                laps: rider.totalLaps || 0,
-                lapsCounter: 0,
-                riders: 0, // ✅ Always initialize to 0
-                startTime: normTime(rider.timeStartRace),
-                isConnected: false,
-                // Provisional — replaced below once every start time is known
-                color: COLORS[colorIndex].code,
-                heat: rider.heat || null,
-                importOrder: fileOrder.get(categoryKey),
-                status: "upcoming",
-              };
-            }
-            categoryMap[categoryKey].riders = (categoryMap[categoryKey]?.riders ?? 0) + 1;
-          });
-
-          // Colours are assigned only once ALL categories and their start times
-          // are known — waves that can be on course together must look distinct,
-          // which can't be decided while still discovering them (BUGS.md #6).
-          // Skipped when the organizer turned Auto color off for this race.
-          const race = (await db.getAll("races")).find(
-            (r: RaceProps) => r.uuid === raceUuid
-          );
-          if (race?.autoColor !== false) {
-            const palette = assignCategoryColors(Object.values(categoryMap));
-            for (const cat of Object.values(categoryMap)) {
-              const assigned = palette.get(`${cat.name}::${cat.subCategory ?? ""}`);
-              if (assigned) cat.color = assigned;
-            }
-          }
-
-          // ✅ Ensure riders get the correct color (after final assignment)
-          riders.forEach((rider) => {
-            if (!rider.category) return;
-            const categoryKey = rider.subCategory
-              ? `${rider.category}::${rider.subCategory}`
-              : rider.category;
-            const cat = categoryMap[categoryKey];
-            if (cat) riderUpdates.push({ ...rider, color: cat.color });
-          });
-
-          // ✅ Store updated categories in Zustand and IndexedDB
-          const newCategories = Object.values(categoryMap);
+          // Store the categories in Zustand and IndexedDB
           set((state) => ({ categories: [...state.categories, ...newCategories] }));
-
           const tx = db.transaction("categories", "readwrite");
           const store = tx.objectStore("categories");
-
           for (const category of newCategories) {
             await store.put(category);
           }
           await tx.done;
 
-          // ✅ Update all riders with the correct category color
           await useRiderStore.getState().updateAllRiders(riderUpdates);
-
           db.close();
-
         } catch (error) {
           console.error("Error creating categories from riders:", error);
         }
