@@ -121,10 +121,9 @@ export async function openTab(page: Page, name: string): Promise<void> {
 
 /** Pick a wave in race mode: its card on the race-day timeline. */
 export async function selectWave(page: Page, wave: number): Promise<void> {
-  // The Board screen picks its wave from a dropdown.
-  const boardWave = page.getByTestId("board-wave");
-  if (await boardWave.isVisible().catch(() => false)) {
-    await boardWave.selectOption(String(wave));
+  // The Board lists every wave (no wave filter): bring that wave's section into view.
+  if (new URL(page.url()).pathname.endsWith("/board")) {
+    await page.getByTestId(`board-wave-${wave}`).scrollIntoViewIfNeeded();
     return;
   }
   // An open bottom sheet dims the timeline: tap outside to close it first.

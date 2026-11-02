@@ -7,12 +7,15 @@ import calculatePositions from "@/utils/calculatePosition";
 import { parseClockTime } from "@/utils/timeUtils";
 import { riderInCategory, withCategoryLaps, buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
 import { buildCategoryResults } from "@/utils/boardResults";
-import { Trophy, Flag, Zap, SlidersHorizontal, Plus, Minus } from "lucide-react";
+import { Trophy, Flag, Zap, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { refreshRaceData } from "@/services/live/liveRaceRoom";
 
 interface Props {
   raceUuid: string;
   waveNum: number;
   categories: CategoryProps[];
+  /** Opened for one wave (e.g. from its card): scroll to it once the board is there. */
+  scrollOnOpen?: boolean;
 }
 
 const MEDAL = ["🥇", "🥈", "🥉"];
@@ -76,7 +79,7 @@ function riderSpeedKph(rider: RiderProps): string {
   return kph != null ? `${kph.toFixed(1)} km/h` : "—";
 }
 
-const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
+const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories, scrollOnOpen = false }) => {
   const { riders, getRiders } = useRiderStore();
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
   const [filterCat, setFilterCat] = useState("all");
@@ -85,6 +88,16 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
   const [visibleFields, setVisibleFields] = useState<Set<BoardField>>(loadVisibleFields);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshRaceData(raceUuid);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const toggleExpanded = (id: number) =>
     setExpandedCats((prev) => {
       const next = new Set(prev);
@@ -93,17 +106,19 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
       return next;
     });
 
-  // Picking a wave in the top bar never filters the board - it just brings that
-  // wave's section into view. Skipped on first mount so opening the Board
-  // does not jump the page.
+  // A wave never filters the board - it just brings that wave's section into
+  // view. Not on first mount (opening the Board must not jump the page), unless
+  // the board was opened for that wave.
   const firstWaveRender = useRef(true);
+  const hasSections = categories.length > 0;
   useEffect(() => {
+    if (!hasSections) return;
     if (firstWaveRender.current) {
       firstWaveRender.current = false;
-      return;
+      if (!scrollOnOpen) return;
     }
     document.getElementById(`board-wave-${waveNum}`)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, [waveNum]);
+  }, [waveNum, hasSections, scrollOnOpen]);
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
 
@@ -190,8 +205,9 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
             aria-haspopup="menu"
             aria-expanded={showFieldMenu}
             title="Choose columns"
+            aria-label="Columns"
           >
-            <SlidersHorizontal size={15} /> Columns
+            <SlidersHorizontal size={15} aria-hidden="true" /> <span className={styles.btnLabel}>Columns</span>
           </button>
           {showFieldMenu && (
             <>
@@ -215,8 +231,22 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
         <button
           className={`${styles.podiumToggle} ${podiumMode ? styles.podiumToggleOn : ""}`}
           onClick={() => setPodiumMode((v) => !v)}
+          aria-label="Podium"
+          aria-pressed={podiumMode}
+          title="Podium"
         >
-          <Trophy size={15} /> Podium
+          <Trophy size={15} aria-hidden="true" /> <span className={styles.btnLabel}>Podium</span>
+        </button>
+        <button
+          type="button"
+          className={styles.refreshBtn}
+          onClick={refresh}
+          disabled={refreshing}
+          aria-label="Refresh"
+          title="Refresh"
+          data-testid="board-refresh"
+        >
+          <RefreshCw size={16} aria-hidden="true" className={refreshing ? styles.spin : undefined} />
         </button>
       </div>
 
@@ -262,16 +292,6 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
                 {allDone && <span className={styles.flagIcon}><Flag size={13} /></span>}
                 {cat.name}
               </span>
-              <button
-                type="button"
-                className={styles.expandBtn}
-                data-testid={`board-expand-${cat.id}`}
-                aria-expanded={expandedCats.has(cat.id)}
-                aria-label={`${expandedCats.has(cat.id) ? "Collapse" : "Expand"} ${cat.name} results`}
-                onClick={() => toggleExpanded(cat.id)}
-              >
-                {expandedCats.has(cat.id) ? <Minus size={14} /> : <Plus size={14} />}
-              </button>
               {podiumMode && (
                 <button
                   className={`${styles.podiumSizeBtn} ${podSize === 5 ? styles.podiumSize5 : ""}`}
@@ -348,6 +368,18 @@ const LiveBoard: React.FC<Props> = ({ raceUuid, waveNum, categories }) => {
                   </div>
                 );
               })
+            )}
+
+            {catRiders.length + catOut.length > 0 && (
+              <button
+                type="button"
+                className={styles.expandBtn}
+                data-testid={`board-expand-${cat.id}`}
+                aria-expanded={expandedCats.has(cat.id)}
+                onClick={() => toggleExpanded(cat.id)}
+              >
+                {expandedCats.has(cat.id) ? "Top 5" : `All results (${catRiders.length + catOut.length})`}
+              </button>
             )}
 
             {podiumMode && outRiders.length > 0 && (

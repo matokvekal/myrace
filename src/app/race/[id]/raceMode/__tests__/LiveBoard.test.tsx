@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import LiveBoard from "../LiveBoard";
 import useRiderStore from "@/stores/ridersStore";
+import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { makeCategory, makeRider } from "@/test/factories";
 
 const RACE = "race-1";
@@ -49,11 +50,28 @@ describe("Board: always the complete board", () => {
   });
 });
 
+describe("Board: refresh", () => {
+  it("re-reads this device's copy of a local race, with no network request", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    expect(screen.queryByText("Late Zed")).not.toBeInTheDocument();
+    const db = await initIndexedDB();
+    for (const r of [...riders, makeRider({ category: "Elite", bibNumber: 9, firstName: "Zed", lastName: "Late", raceStatus: "running", lapsCounter: 2, timeStartRace: new Date().toISOString() })]) {
+      await db.put("riders", { ...r, raceUuid: RACE });
+    }
+    db.close();
+    await user.click(screen.getByTestId("board-refresh"));
+    await user.click(screen.getByTestId(`board-expand-${w1a.id}`));
+    expect(await screen.findByText("Late Zed")).toBeInTheDocument();
+  });
+});
+
 describe("Board: expandable category results", () => {
-  it("+ expands the full list with positions, DNF without one; clicking again collapses", async () => {
+  it("'All results' expands the full list with positions, DNF without one; 'Top 5' collapses", async () => {
     const user = userEvent.setup();
     renderBoard();
     const btn = screen.getByTestId(`board-expand-${w1a.id}`);
+    expect(btn).toHaveTextContent("All results (3)");
     expect(screen.queryByTestId(`board-results-${w1a.id}`)).not.toBeInTheDocument();
 
     await user.click(btn);
@@ -68,6 +86,7 @@ describe("Board: expandable category results", () => {
     expect(rows[2]).toHaveTextContent("DNF");
     expect(rows[2]).not.toHaveTextContent(/P\d/);
 
+    expect(btn).toHaveTextContent("Top 5");
     await user.click(btn);
     expect(screen.queryByTestId(`board-results-${w1a.id}`)).not.toBeInTheDocument();
   });

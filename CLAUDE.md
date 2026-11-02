@@ -393,9 +393,29 @@ still open).
   behind a confirm. It's view-only — results stay in the Results tab.
 
 ### Results column picker
-- The Results toolbar has a "Columns" menu; Bib/Laps/Time/Status toggle, Place and
-  Name always show. Choice persists in localStorage (`resultsVisibleFields`). Rows
-  are flexbox so hiding a column reflows and gives the name room.
+- The Results toolbar has a "Columns" menu; Bib/Laps/Time/Gap/Speed/Status toggle,
+  Place and Name always show. Choice persists in localStorage (`resultsVisibleFields`).
+- Each row is a card: position, bib and full name (wraps, never cut), then every
+  chosen field, labelled. Layout is decided per category block by a container
+  query (`results-cat`): narrow → fields under the name, wrapping; ≥600px → one
+  line, fields in aligned min-width columns. Never hide a chosen field.
+- Sort (Place default, Time, Name, Bib), Wave and Category live in ONE closed-by-
+  default menu (filter icon, `results-filter-btn`); no chip bar, no permanent pills.
+
+### Board & Results: live refresh (client only)
+- Both read the local stores; a shared race's changes arrive over the app's ONE
+  Socket.IO connection (`race:changes`). `useLiveRaceRoom` (`services/live/
+  liveRaceRoom.ts`) joins the race's room on direct loads too.
+- `catchUp` is deduplicated per race (one in flight + one follow-up). The HTTP
+  fallback runs only while the socket is down, the tab is visible and the race can
+  still change (not finalized / not all categories finished). Returning to a tab
+  catches up only if the socket missed something.
+- Refresh button (`board-refresh`, `results-refresh`): shared race → catch-up since
+  the last applied seq; local race → re-read IndexedDB, no network.
+- Board: no wave filter (every wave; `?wave=N` only scrolls to it); "All results (N)"
+  / "Top 5" replaces the old +/- per category.
+- Limitation: viewers must be signed-in race members; there is no anonymous
+  read-only feed on the server, so public mass viewing needs a backend change.
 
 ### Terms & Conditions (landing-page acceptance)
 - Content lives in `legal/terms.ts` (the ONLY file to edit; it's a DRAFT, not

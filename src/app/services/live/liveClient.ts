@@ -417,7 +417,7 @@ export async function flush(local: string): Promise<void> {
     const left = await outboxList(local);
     pendingRiders.set(local, new Set(left.map((e) => (e.action.payload as { riderUuid?: string }).riderUuid).filter((u): u is string => !!u)));
     setSync(local, { pending: left.length, lastSyncAt: Date.now() });
-    if (left.length === 0 && !socket?.connected && useLiveStore.getState().openRace === local) await catchUp(local);
+    if (left.length === 0 && fallbackNeeded(local)) await catchUp(local);
   } finally {
     flushing.delete(local);
   }
@@ -695,8 +695,52 @@ async function adoptOfficial(local: string) {
   }
 }
 
-/** Everything since the last applied sequence (or a fresh snapshot when far behind). */
-export async function catchUp(local: string): Promise<void> {
+/**
+ * Everything since the last applied sequence (or a fresh snapshot when far behind).
+ * One request per race at a time: calls made while one runs share ONE follow-up
+ * (a burst of gap messages or Refresh taps costs two requests, not one each).
+ */
+const catchUpRuns = new Map<string, Promise<void>>();
+const catchUpAgain = new Set<string>();
+export function catchUp(local: string): Promise<void> {
+  const running = catchUpRuns.get(local);
+  if (running) {
+    catchUpAgain.add(local);
+    return running;
+  }
+  const run = (async () => {
+    try {
+      do {
+        catchUpAgain.delete(local);
+        await catchUpOnce(local);
+      } while (catchUpAgain.has(local));
+    } finally {
+      catchUpRuns.delete(local);
+    }
+  })();
+  catchUpRuns.set(local, run);
+  return run;
+}
+
+/** Nothing more can happen in this race: finalized, or every category finished. */
+function raceComplete(local: string): boolean {
+  if (useRaceStore.getState().races.find((r) => r.uuid === local)?.finalized) return true;
+  const cats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local && !c.ignored);
+  return cats.length > 0 && cats.every((c) => c.status === "finished");
+}
+
+/** Without the live socket, fall back to HTTP only when someone is looking and the race can still change. */
+const fallbackNeeded = (local: string) =>
+  !socket?.connected && document.visibilityState === "visible" && useLiveStore.getState().openRace === local && !raceComplete(local);
+
+/** Manual Refresh: what changed since the last applied sequence (one request, deduplicated). */
+export async function refreshRace(local: string): Promise<boolean> {
+  if (!linkOf(local) || !session) return false;
+  await catchUp(local);
+  return true;
+}
+
+async function catchUpOnce(local: string): Promise<void> {
   const link = linkOf(local);
   if (!link || !session) return;
   try {
@@ -1032,6 +1076,11 @@ export function startLive() {
     void flushAll();
   });
   window.addEventListener("offline", () => useLiveStore.setState({ online: false }));
+  // Back on a hidden tab: catch up only if the live socket missed something meanwhile.
+  document.addEventListener("visibilitychange", () => {
+    const open = useLiveStore.getState().openRace;
+    if (open && linkOf(open) && fallbackNeeded(open)) void catchUp(open);
+  });
   setInterval(() => {
     void flushAll();
     void publishPending();
