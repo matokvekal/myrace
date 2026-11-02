@@ -151,5 +151,11 @@ export const canViewScreen = (localRaceUuid: string, screen: string): boolean =>
   return !a || !!a.screens[screen]?.view;
 };
 
+/** May the member do `op` on this screen's records? Always true for local races and before access is known. */
+export const canOnScreen = (localRaceUuid: string, screen: string, op: "create" | "update" | "delete"): boolean => {
+  const a = readLiveAccess(localRaceUuid);
+  return !a || !!a.screens[screen]?.[op];
+};
+
 /** Synchronous id for an Action the caller wants to remember (e.g. a lap it can undo later). */
 export const newActionId = (): string => globalThis.crypto.randomUUID();

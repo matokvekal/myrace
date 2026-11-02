@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, UserRoundPlus } from "lucide-react";
 import styles from "./checkIn.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
 import useUIStore from "@/stores/uiStore";
 import StatusModal from "../../components/modals/StatusModal";
+import QuickAddRider, { canAddRider } from "./QuickAddRider";
 import Icons from "@/constants/Icons";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
@@ -114,6 +116,24 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   const isRaceActive = categories.some(
     (c) => c.status === "running" || c.status === "finished"
   );
+
+  // A late entry seen at Check-In: same form and rules as CREATE > Riders.
+  // `undefined` = closed, `null` = open with the category picker.
+  const [addFor, setAddFor] = useState<CategoryProps | null | undefined>(undefined);
+  const canAdd = !isRaceActive && canAddRider(raceUuid);
+  const addBtn = (cat: CategoryProps | null, label: string) =>
+    canAdd ? (
+      <button
+        type="button"
+        className={styles.catAddBtn}
+        aria-label={label}
+        title={label}
+        data-testid={cat ? `checkin-add-${cat.name}` : "checkin-add-rider"}
+        onClick={() => setAddFor(cat)}
+      >
+        <UserRoundPlus size={16} aria-hidden="true" />
+      </button>
+    ) : null;
 
   const toggleCheck = (rider: RiderProps) => {
     if (!canForRace(raceUuid, "CHECKIN_RIDER")) return;
@@ -373,8 +393,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
       <div className={styles.cardGrid}>{list.map(renderCard)}</div>
     );
 
-  // Riders are added and managed in CREATE > Riders, not here.
-
   const renderCategoryBlock = (cat: CategoryProps) => {
     const key = catKey(cat);
     const all = waveRiders.filter((r) => riderInCategory(r, cat));
@@ -387,6 +405,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           <span className={styles.catGroupName} dir="auto">{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
           <span className={styles.catGroupCount}>✓ {all.filter((r) => r.checked).length}/{all.length}</span>
           {dns > 0 && <span className={styles.catDnsCount}>{dns} DNS</span>}
+          {addBtn(cat, `Add rider to ${cat.name}`)}
         </div>
         {shown.length > 0 ? (
           renderRiders(shown)
@@ -408,6 +427,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
             Wave {waveNum}{time && time !== "TBD" ? ` · ${time}` : ""}
           </span>
           <span className={styles.waveCount}>✓ {slotChecked}/{slotRiders.length}</span>
+          {sortScope !== "category" && addBtn(null, "Add rider")}
         </header>
         {sortScope === "category" ? (
           <div className={styles.waveBody}>{visibleCats.map(renderCategoryBlock)}</div>
@@ -515,6 +535,23 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           onEditBib={isRaceActive ? undefined : () => startEditBib(selectedRider)}
         />
       )}
+
+      {addFor !== undefined &&
+        createPortal(
+          <div className={styles.addOverlay} onClick={() => setAddFor(undefined)}>
+            <div className={styles.addModal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} data-testid="checkin-add-modal">
+              <QuickAddRider
+                raceUuid={raceUuid}
+                waveNum={waveNum}
+                categories={categories}
+                fixedCategory={addFor ?? undefined}
+                essential
+                onDone={() => setAddFor(undefined)}
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

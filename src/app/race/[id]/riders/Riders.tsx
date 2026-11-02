@@ -15,7 +15,7 @@ import CSVImportWizard from "@/components/csv/CSVImportWizard";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey } from "../schedule/Schedule";
-import QuickAddRider from "../raceMode/QuickAddRider";
+import QuickAddRider, { canAddRider } from "../raceMode/QuickAddRider";
 import { matchesRiderSearch, groupRidersByWaveAndCategory } from "@/utils/riderList";
 
 interface ManageHeatProps {
@@ -65,6 +65,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   // Category the Add Rider form was opened from (preset, picker hidden); null = pick one.
   const [addFor, setAddFor] = useState<CategoryProps | null>(null);
   const openAddRider = (cat: CategoryProps | null) => { setAddFor(cat); setShowAddRider(true); };
+  const canAdd = !readOnly && canAddRider(raceUuid);
   // Occasional actions (add, import, edit, delete) and view options live behind the gear.
   const [manageOpen, setManageOpen] = useState(false);
   const [importMode, setImportMode] = useState<"file" | "scan">("file");
@@ -197,7 +198,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
 
   /** "+" on a category header: add a rider straight into that category. */
   const catAddBtn = (cat: CategoryProps | undefined, name: string) =>
-    readOnly ? null : (
+    !canAdd ? null : (
       <button
         type="button"
         className={styles.catAddBtn}
@@ -401,7 +402,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
       ) : (
         <div className={styles.emptyState}>
           <p className={styles.empty}>No riders yet.</p>
-          {!readOnly && (
+          {canAdd && (
             <div className={styles.emptyActions}>
               <button
                 className={styles.emptyImportBtn}
@@ -440,9 +441,11 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
 
             {!readOnly && (
               <div className={styles.manageList}>
-                <button type="button" className={styles.manageItem} data-testid="add-rider-btn" onClick={fromManage(() => openAddRider(null))}>
-                  <Plus size={16} aria-hidden="true" /> Add rider
-                </button>
+                {canAdd && (
+                  <button type="button" className={styles.manageItem} data-testid="add-rider-btn" onClick={fromManage(() => openAddRider(null))}>
+                    <Plus size={16} aria-hidden="true" /> Add rider
+                  </button>
+                )}
                 <button type="button" className={styles.manageItem} onClick={fromManage(() => { setImportMode("file"); setShowImportWizard(true); })}>
                   <Upload size={16} aria-hidden="true" /> Import CSV
                 </button>

@@ -5,7 +5,7 @@ import { checkInRow, gotoRaceMode, loadDemoRace, setStatusAtCheckIn } from "./he
 test.describe("Check-In on a narrow phone", () => {
   test.use({ viewport: { width: 360, height: 800 } });
 
-  test("sheet heights, full names, status menu and the commissaire's report", async ({ page }) => {
+  test("sheet heights, full names, status menu, late entry and the commissaire's report", async ({ page }) => {
     await loadDemoRace(page);
     await gotoRaceMode(page, "Race");
     if (await page.getByTestId("wave-sheet").isVisible().catch(() => false)) {
@@ -53,15 +53,30 @@ test.describe("Check-In on a narrow phone", () => {
     await page.getByRole("button", { name: "Save bib" }).click();
     await expect(checkInRow(page, 777)).toBeVisible();
 
+    // A late entry, added from the category's icon (same form as CREATE > Riders)
+    const addIcon = page.locator('[data-testid^="checkin-add-"]').first();
+    const category = (await addIcon.getAttribute("data-testid"))!.replace("checkin-add-", "");
+    await addIcon.click();
+    const add = page.getByTestId("checkin-add-modal");
+    await expect(add).toContainText(`Add rider to ${category}`);
+    await page.screenshot({ path: test.info().outputPath("add-rider.png") });
+    await add.getByPlaceholder("Bib *").fill("778");
+    await add.getByPlaceholder("First name *").fill("Late");
+    await add.getByPlaceholder("Last name *").fill("Entry");
+    await add.getByRole("button", { name: "Add Rider" }).click();
+    await expect(add).toHaveCount(0);
+    await expect(checkInRow(page, 778)).toBeVisible();
+
     await page.getByTestId("sheet-backdrop").click({ position: { x: 5, y: 5 } }).catch(() => {});
     await page.getByRole("button", { name: "Close", exact: true }).click().catch(() => {});
 
     // The main commissaire sees both, from the warning button by Check-In
     await page.getByTestId("wave-act-changes-2").click();
     const report = page.getByTestId("checkin-changes");
-    await expect(report.getByTestId("checkin-change")).toHaveCount(2);
+    await expect(report.getByTestId("checkin-change")).toHaveCount(3);
     await expect(report).toContainText(`standing → DNS`);
     await expect(report).toContainText(`Bib ${bib + 1} → 777`);
+    await expect(report).toContainText(`Added to ${category}`);
     await page.screenshot({ path: test.info().outputPath("report.png") });
   });
 });

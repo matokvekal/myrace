@@ -3,6 +3,17 @@ import styles from "./quickAddRider.module.css";
 import { CategoryProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
 import { logCheckInChange } from "@/stores/checkInChangesStore";
+import { canForRace } from "@/services/cloud/permissions";
+import { canOnScreen } from "@/services/live/liveBridge";
+
+/**
+ * The ONE rule for who may add a rider, on every screen that offers it
+ * (CREATE > Riders, Check-In). The save itself goes through the rider store,
+ * which sends a shared race's rider to the server first and refuses what the
+ * member's role does not allow.
+ */
+export const canAddRider = (raceUuid: string): boolean =>
+  canForRace(raceUuid, "ADD_RIDER") && canOnScreen(raceUuid, "riders", "create");
 
 interface Props {
   raceUuid: string;
@@ -89,6 +100,11 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
     };
 
     await addNewRider(newRider);
+    // The store refuses silently (finished race, or a role without rider access).
+    if (!useRiderStore.getState().riders.some((r) => r.id === newRider.id)) {
+      setError("You can't add riders to this race");
+      return;
+    }
     logCheckInChange(raceUuid, {
       kind: "added",
       wave: newRider.heat,

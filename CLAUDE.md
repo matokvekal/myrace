@@ -315,6 +315,11 @@ still open).
 ### Check-In changes report
 - Status changes and bib edits at Check-In, and riders added by hand, go through
   `logCheckInChange` (`stores/checkInChangesStore.ts`) into the race's audit log.
+- Late entries: each Check-In category has the same add-rider icon and form as
+  CREATE > Riders (`QuickAddRider`), until the wave starts. Who may add is ONE rule,
+  `canAddRider` (`ADD_RIDER` + the role's `riders.create`), used by both screens;
+  the save goes through `addNewRider`, which sends a shared race's rider to the
+  server first and refuses what the role doesn't allow.
 - The wave card shows a warning triangle with the count when there are changes
   (needs `EDIT_RACE`); it opens `raceMode/CheckInChanges`. The log is per device
   (OPFS), so changes made on another phone don't appear here.

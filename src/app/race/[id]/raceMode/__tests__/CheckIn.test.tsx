@@ -104,11 +104,11 @@ describe("Check-In: wave → category structure", () => {
     expect(screen.getByTestId("checkin-row-1")).toBeInTheDocument();
   });
 
-  it("still shows an empty category, without an add button (riders are added in CREATE > Riders)", () => {
+  it("still shows an empty category, with its add-rider icon", () => {
     seed([makeRider({ category: "Men Elite" })]);
     renderCheckIn();
     expect(within(block("Juniors")).getByText("No riders yet")).toBeInTheDocument();
-    expect(screen.queryByTestId("checkin-add-Juniors")).not.toBeInTheDocument();
+    expect(within(block("Juniors")).getByTestId("checkin-add-Juniors")).toBeInTheDocument();
   });
 
   it("falls back to a single block when no slot map is given", () => {
@@ -128,12 +128,48 @@ describe("Check-In: wave → category structure", () => {
   });
 });
 
-describe("Check-In: no add-rider action", () => {
-  it("offers no Add rider: riders are added and managed in CREATE > Riders", () => {
+describe("Check-In: add a late entry", () => {
+  it("adds a rider to that category with the CREATE > Riders form, saved and checked in", async () => {
+    const user = userEvent.setup();
+    seed([]);
+    renderCheckIn();
+    await user.click(screen.getByTestId("checkin-add-Juniors"));
+    const modal = screen.getByTestId("checkin-add-modal");
+    expect(within(modal).getByText("Add rider to Juniors")).toBeInTheDocument();
+    await user.type(within(modal).getByPlaceholderText("Bib *"), "77");
+    await user.type(within(modal).getByPlaceholderText("First name *"), "Late");
+    await user.type(within(modal).getByPlaceholderText("Last name *"), "Entry");
+    await user.click(within(modal).getByRole("button", { name: "Add Rider" }));
+    await waitFor(() => expect(screen.queryByTestId("checkin-add-modal")).not.toBeInTheDocument());
+    expect(within(block("Juniors")).getByTestId("checkin-row-77")).toBeInTheDocument();
+    const saved = (await stored()).find((r) => r.bibNumber === 77)!;
+    expect(saved).toMatchObject({ raceUuid: RACE, category: "Juniors", heat: 1, checked: true });
+  });
+
+  it("refuses a bib that is already taken", async () => {
+    const user = userEvent.setup();
+    seed([makeRider({ category: "Men Elite", bibNumber: 5, lastName: "Taken", firstName: "T" })]);
+    renderCheckIn();
+    await user.click(screen.getByTestId("checkin-add-Juniors"));
+    const modal = screen.getByTestId("checkin-add-modal");
+    await user.type(within(modal).getByPlaceholderText("Bib *"), "5");
+    await user.type(within(modal).getByPlaceholderText("First name *"), "X");
+    await user.type(within(modal).getByPlaceholderText("Last name *"), "Y");
+    await user.click(within(modal).getByRole("button", { name: "Add Rider" }));
+    expect(within(modal).getByText(/Bib 5 already used/)).toBeInTheDocument();
+  });
+
+  it("is hidden for a role that may not add riders (same rule as CREATE > Riders)", () => {
+    canForRace.mockImplementation((_race: string, perm: string) => perm !== "ADD_RIDER");
     seed([]);
     renderCheckIn();
     expect(screen.queryByTestId(/^checkin-add-/)).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("First name *")).not.toBeInTheDocument();
+  });
+
+  it("is hidden once the wave has started", () => {
+    seed([]);
+    renderCheckIn([{ ...elite, status: "running" }, masters, juniors]);
+    expect(screen.queryByTestId(/^checkin-add-/)).not.toBeInTheDocument();
   });
 });
 
