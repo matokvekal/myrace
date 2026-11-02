@@ -38,5 +38,7 @@ describe("Schedule rows → Finish Group and group colour", () => {
     await user.click(screen.getByTestId("color-whole-finish-group"));
     await user.click(screen.getByTestId("swatch-1E88E5"));
     await waitFor(() => expect([cat(1).color, cat(2).color, cat(3).color]).toEqual(["#1E88E5", "#1E88E5", "#FB8C00"]));
+    // The save closes the picker last; let it, or it lands after the test environment is gone.
+    await waitFor(() => expect(screen.queryByTestId("color-whole-finish-group")).not.toBeInTheDocument());
   });
 });
