@@ -12,7 +12,7 @@ import { racingCard, gotoRaceMode, openRaceView, selectWave } from "./helpers";
  *   them; A taps — B sees them. Joker on B lands on A. Undo on B is undone on A.
  *   B never sees wave 2. Offline taps on B arrive after reconnect.
  *
- * Opt-in (needs the API): start `server` (npm run db:dev + npm run dev), run the
+ * Opt-in (needs the API): start `server` (npm run dev, connected to the cloud database), run the
  * app with VITE_SERVER_URL=http://127.0.0.1:4000, then MULTIUSER_E2E=1 npx playwright test multiuser.
  */
 test.skip(!process.env.MULTIUSER_E2E, "needs a running Commissaire server (MULTIUSER_E2E=1)");

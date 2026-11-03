@@ -57,11 +57,9 @@ jobs:
         env:
           VITE_SERVER_URL: /
 
-  # The multi-user server (server/, its own package): typecheck, build, and its
-  # integration tests against an in-process PostgreSQL (PGlite) — no database
-  # service or secrets needed. The tests include the real dist/server.js and
-  # dist/db/migrate-cli.js bundles (test/dist-smoke.test.ts), and the deploy
-  # gate is exercised end to end with real release archives.
+  # The multi-user server (server/, its own package): typecheck, unit tests, build
+  # and shellcheck of the deploy scripts. Cloud PostgreSQL only: no database here,
+  # and tests never connect to the cloud database.
   server:
     name: Server typecheck, tests, build, deploy gate
     runs-on: ubuntu-latest
@@ -83,17 +81,14 @@ jobs:
       - name: TypeScript (server + shared race model)
         run: npm run typecheck
 
-      - name: Integration tests (Vitest + PGlite, incl. the built bundles)
+      - name: Unit tests (Vitest; no database — cloud PostgreSQL only)
         run: npm test
 
       - name: Build
         run: npm run build
 
       - name: Deploy scripts (shellcheck)
-        run: shellcheck deploy/*.sh deploy/test/*.sh
-
-      - name: Deploy gate end to end (receive, activate, automatic rollback, rollback)
-        run: bash deploy/test/gate-e2e.sh
+        run: shellcheck deploy/*.sh
 
   # Slower gate: real browser, full user flows. Runs in parallel with `quality`.
   # Also the "local-race regression" gate (Epic 1, Story 1.1): the whole suite runs

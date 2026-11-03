@@ -1,18 +1,14 @@
 /**
- * Applies server/sql/NNN-*.sql in order, each in its own transaction, skipping
- * versions already in schema_migrations. 000-create-database.sql (run by hand
- * by a superuser) and verify.sql are never run here.
- *
- * Only the local PGlite dev database is ever migrated by code (`npm run db:dev`,
- * the test setup, and the API when autoMigrateAllowed()). A cloud/external
- * database is migrated by hand with psql; code only reads schema_migrations
- * and names the files still missing (missingMigrations).
+ * Schema checks for the cloud PostgreSQL database. Code never migrates it: the
+ * files in server/sql (NNN-*.sql, applied in order, each in its own transaction)
+ * are run by hand with psql. Code only reads schema_migrations, names the files
+ * still missing (missingMigrations) and checks the required tables (checkSchema).
+ * 000-create-database.sql (superuser, by hand) and verify.sql are never counted.
  *
  * Command line: src/db/migrate-cli.ts (`npm run migrate`, `npm run check:schema`).
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import type pg from "pg";
 import { serverRoot } from "../lib/paths.js";
 
 const SQL_DIR = join(serverRoot(import.meta.url), "sql") + "/";
@@ -22,32 +18,7 @@ export const migrationFiles = () =>
     .filter((f) => /^\d{3}-.+\.sql$/.test(f) && !f.startsWith("000-"))
     .sort();
 
-/** Runs pending migrations with any client that can execute multi-statement SQL. */
-export async function migrate(exec: (sql: string) => Promise<unknown>, applied: () => Promise<Set<string>>): Promise<string[]> {
-  const done = await applied();
-  const ran: string[] = [];
-  for (const file of migrationFiles()) {
-    const version = file.replace(/\.sql$/, "");
-    if (done.has(version)) continue;
-    await exec(`BEGIN;\n${readFileSync(SQL_DIR + file, "utf8")}\nCOMMIT;`);
-    ran.push(version);
-  }
-  return ran;
-}
-
-export async function migratePool(pool: pg.Pool): Promise<string[]> {
-  return migrate(
-    (sql) => pool.query(sql),
-    async () => {
-      const exists = await pool.query("SELECT to_regclass('public.schema_migrations') AS t");
-      if (!exists.rows[0].t) return new Set();
-      const rows = await pool.query("SELECT version FROM schema_migrations");
-      return new Set(rows.rows.map((r: { version: string }) => r.version));
-    },
-  );
-}
-
-/** Anything that runs a query and returns rows: a pg Pool, or PGlite in tests. */
+/** Anything that runs a query and returns rows (a pg Pool). */
 export interface Queryable {
   query(text: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
 }

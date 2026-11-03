@@ -34,6 +34,14 @@ function loadDotEnv(path = envFilePath()) {
 }
 loadDotEnv();
 
+const isLoopbackDb = (url: string): boolean => {
+  try {
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+};
+
 const bool = z
   .string()
   .optional()
@@ -51,9 +59,6 @@ const schema = z.object({
   HOST: z.string().optional().transform((v) => v || undefined),
   // DATABASE_URL is primary; COMMISSAIRE_DATABASE_URL is the older name, still read (see parse()).
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  // Only the local PGlite dev database (`npm run db:dev`) may be migrated by the API, and only
-  // when this is set AND the host is loopback. Any other database is checked, never migrated.
-  DEV_PGLITE: bool,
   // TLS to a non-local database is always verified (src/db/tls.ts). For a private or
   // self-signed server certificate, give the CA (or that certificate) to trust, as PEM
   // text ("\n" escapes allowed) or a file path, and the certificate's name when the URL
@@ -90,17 +95,18 @@ export function parseEnv(vars: NodeJS.ProcessEnv = process.env): Env {
   if (env.NODE_ENV === "production" && env.MAIL_TRANSPORT === "smtp" && !env.SMTP_URL) {
     throw new Error("Invalid server configuration — SMTP_URL is required when MAIL_TRANSPORT=smtp");
   }
-  // The production database may be on loopback (same server), so loopback alone never allows migrating it.
-  if (env.NODE_ENV === "production" && env.DEV_PGLITE) {
-    throw new Error("Invalid server configuration — DEV_PGLITE is for the local PGlite dev database only; remove it in production");
+  // Cloud PostgreSQL only: local development connects to the cloud database (verified TLS).
+  // Only production may use loopback, because there the API and PostgreSQL share one server.
+  if (env.NODE_ENV === "development" && isLoopbackDb(env.DATABASE_URL)) {
+    throw new Error("Invalid server configuration — DATABASE_URL points to a local database; Commissaire uses the cloud PostgreSQL database only (see docs/server/database.md)");
   }
-  // Tests create users and races: never against a real database. They use the in-memory
-  // database of test/global-setup.ts, which also skips server/.env (it may hold production's URL).
+  // Tests must never write to the cloud database: they never read server/.env (it holds the
+  // cloud URL) and refuse any non-loopback database.
   if (env.NODE_ENV === "test") {
     if (vars.COMMISSAIRE_SKIP_DOTENV !== "1") {
       throw new Error("Invalid server configuration — tests must not read server/.env (run them with vitest)");
     }
-    if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(env.DATABASE_URL).hostname)) {
+    if (!isLoopbackDb(env.DATABASE_URL)) {
       throw new Error("Invalid server configuration — tests run only against a local database");
     }
   }

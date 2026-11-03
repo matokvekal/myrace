@@ -139,7 +139,7 @@ applies them to a cloud/external database.
    owner `commissaire_live`; with a provider-created database the owner differs).
 4. Put the connection string in `server/.env` as
    `DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME` (password URL-encoded),
-   remove `DEV_PGLITE`, and set `DB_POOL_MAX` to about 10. `COMMISSAIRE_DATABASE_URL`
+   and set `DB_POOL_MAX` to about 10. `COMMISSAIRE_DATABASE_URL`
    is still read as a fallback. The value in `server/.env` wins over a `DATABASE_URL`
    inherited from the shell.
 5. **TLS** (`src/db/tls.ts`). A non-local database always uses TLS with full
@@ -211,5 +211,6 @@ harmless and left as applied.
   schema test fails on `REFERENCES`/`FOREIGN KEY` after 005). Index new
   relationship columns instead, and keep the relation in the API.
 - New indexes: `CREATE INDEX IF NOT EXISTS`; schema changes stay additive.
-- Only the local PGlite dev database (`npm run db:dev`, `DEV_PGLITE=true`, loopback
-  host) and the test setup are migrated by code.
+- No database is ever migrated by code: every migration is run by hand with psql.
+  Commissaire uses the cloud PostgreSQL database only — there is no local dev
+  database and no fallback; in development a loopback `DATABASE_URL` stops the API.

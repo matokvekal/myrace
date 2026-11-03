@@ -2,17 +2,16 @@
  * Command line for the schema (kept out of migrate.ts so the dist/server.js
  * bundle never contains it):
  *
- *   npm run migrate        Migrates the local PGlite dev database only
- *                          (autoMigrateAllowed); on any other database it lists
- *                          the files not applied and exits 1 if there are any.
+ *   npm run migrate        Read-only: lists the migration files not applied yet
+ *                          (run them by hand with psql, in order); exit 1 if any.
  *   npm run check:schema   (node dist/db/migrate-cli.js --check) Read-only, on any
  *                          database: migration files recorded, required tables
  *                          present, no foreign keys. Exit 1 on any problem.
  *                          Never migrates, whatever the settings. Deployments
  *                          run it before switching to a new release.
  */
-import { checkSchema, migratePool, missingMigrations } from "./migrate.js";
-import { autoMigrateAllowed, closePool, pool } from "./pool.js";
+import { checkSchema, missingMigrations } from "./migrate.js";
+import { closePool, pool } from "./pool.js";
 
 const check = process.argv.includes("--check");
 
@@ -28,9 +27,6 @@ try {
       console.error(`Schema check failed:\n  ${problems.join("\n  ")}`);
       process.exitCode = 1;
     } else console.log("Schema check passed.");
-  } else if (autoMigrateAllowed()) {
-    const ran = await migratePool(pool);
-    console.log(ran.length ? `Applied: ${ran.join(", ")}` : "Database is up to date.");
   } else {
     const missing = await missingMigrations(pool);
     if (missing.length) {

@@ -5,7 +5,7 @@ import { acceptTerms } from "./helpers";
 /**
  * Create Race persistence and sign-in against a REAL Commissaire API (not run in CI).
  * Needs the app served with VITE_SERVER_URL=<api origin> and E2E_API_URL=<same origin>,
- * e.g. a local API on a throwaway database (server/test/support/pg-server.ts).
+ * e.g. the local API connected to the cloud database (it creates real test accounts and races).
  */
 const API_ORIGIN = process.env.E2E_API_URL;
 const API = `${API_ORIGIN}/api/v1`;

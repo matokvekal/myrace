@@ -75,8 +75,7 @@ The API connects to `127.0.0.1`, never to the public database host name.
     URL asks for it with `sslmode=require`, `verify-ca` or `verify-full`.
   - Any other host always uses TLS with full certificate verification
     (`docs/server/database.md`, Setup step 5).
-  - In production, `DEV_PGLITE` stops the API at start, so a loopback database
-    is never migrated by code. Migrations stay manual.
+  - The API never migrates any database. Migrations stay manual (psql).
   - Tests use their own in-memory database and refuse to read `server/.env`
     or to use a non-local URL. Still, do not run the test suite on the
     production server.
@@ -139,7 +138,7 @@ PORT=5000                      # production: PM2 "server-commissaire"
 DATABASE_URL=postgresql://commissaire_app:<url-encoded password>@127.0.0.1:5432/commissaire
                                # no sslmode: loopback
 DB_POOL_MAX=10
-# Do NOT set DEV_PGLITE. Not needed on loopback: DATABASE_CA_CERT, DATABASE_CA_CERT_FILE,
+# Not needed on loopback: DATABASE_CA_CERT, DATABASE_CA_CERT_FILE,
 # DATABASE_TLS_SERVERNAME.
 
 JWT_ACCESS_SECRET=<openssl rand -base64 48>

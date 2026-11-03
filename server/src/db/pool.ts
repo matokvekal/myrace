@@ -58,5 +58,3 @@ export async function tx<T>(fn: (t: Db) => Promise<T>): Promise<T> {
 
 export const closePool = () => pool.end();
 
-/** The API may run migrations only on the local PGlite dev database: DEV_PGLITE=true and a loopback host. */
-export const autoMigrateAllowed = () => env.DEV_PGLITE && isLocal(env.DATABASE_URL);

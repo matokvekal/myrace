@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { checkServerIdentity, type ConnectionOptions } from "node:tls";
 
-/** Loopback hosts: the local PGlite dev database and the test database. */
+/** Loopback hosts: production, where the API and PostgreSQL share one server (no TLS needed). */
 export const isLocal = (url: string) => {
   try {
     return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(url).hostname);

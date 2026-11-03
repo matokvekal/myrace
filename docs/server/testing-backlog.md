@@ -7,7 +7,7 @@ stabilization phase. Add to it whenever something is deferred.
 
 | Suite | Result |
 |---|---|
-| Server integration (vitest + supertest + socket.io-client, PGlite PostgreSQL 17) | 44/44 |
+| Server integration (vitest + supertest + socket.io-client, PGlite PostgreSQL 17) | 44/44 — **removed 2026-11-03** with PGlite (cloud PostgreSQL only; tests must not write to the cloud DB) |
 | Shared model + engine unit tests | 91/91 |
 | App unit tests (incl. live laps + store bridge) | 354/354 |
 | Playwright, local-only app (CI mode) | 60/60 |
@@ -35,8 +35,8 @@ Bugs found and fixed:
 - Client: store writes on a shared race made before the live client's dynamic
   import resolved were applied locally only. The bridge seam now defers them and
   replays them when the bridge is installed (new records get their uuid at once).
-- Server: the API applied migrations by itself on any database. Now only the local
-  PGlite dev database (`DEV_PGLITE=true` + loopback) is migrated; any other database
+- Server: the API applied migrations by itself on any database. Since 2026-11-03 no
+  database is migrated by code (PGlite removed); the database
   is checked and the API refuses to start, naming the missing files.
 - Test-only: CheckIn "saves a new bib" flake (read "✓ Saved" one render early);
   the bridge test leaked a restricted access between tests.
@@ -55,8 +55,6 @@ files before running it against a long-running server.
   to today's date, so a wave started just before midnight shows "—" as a total
   time after midnight (tests/waves-leaderboard.spec.ts failed once at 00:15).
   Shared races also store the wave start as an instant (`categories.startedAt`).
-- PGlite's socket adapter serves one connection at a time, so local dev uses
-  `DB_POOL_MAX=1`; concurrency is only exercised against real PostgreSQL.
 - `timeStartRace` on the server is the starting Device's local clock
   ("HH:MM:SS" from its ISO offset); lap times use the race clock (UTC ms).
 - Laps are re-derived per rider from that rider's marks; first-finish-all-finish
@@ -73,7 +71,7 @@ files before running it against a long-running server.
 
 ## Deferred test cases
 
-Server (vitest + supertest against PGlite):
+Server (needs a separate, disposable PostgreSQL test database — never the cloud one):
 - Migrations 001–005 apply and verify.sql checks pass (the scratchpad script → `server/test/`).
 - Auth: register, login, wrong password, Google with a mocked verifier (new user,
   existing verified email links, unverified password account taken over), email

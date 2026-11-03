@@ -11,7 +11,7 @@ import { racingCard, gotoRaceMode, openRaceView, selectWave } from "./helpers";
  * laps are recorded until riders finish → every step is in PostgreSQL → after a
  * reload the browser still shows it all.
  *
- * Opt-in (needs the API and its database): run the server (PGlite dev DB), run
+ * Opt-in (needs the API and its database): run the server (cloud database), run
  * the app with VITE_SERVER_URL=http://localhost:4000, then
  *   MULTIUSER_E2E=1 E2E_PG_URL=postgresql://... npx playwright test new-race-persistence
  * The database is only READ by this test.
