@@ -34,6 +34,7 @@ rm -rf "$server/dist"
 [[ -f "$server/dist/server.js" && -f "$server/dist/db/migrate-cli.js" ]] || { echo "server build produced no dist/server.js" >&2; exit 1; }
 missing=0
 while IFS= read -r marker; do
+  marker="${marker%$'\r'}"  # a Windows (CRLF) checkout must not make every marker "missing"
   [[ -z "$marker" || "$marker" == \#* ]] && continue
   grep -qF -- "$marker" "$server/dist/server.js" || { echo "compiled server is missing: $marker" >&2; missing=1; }
 done < "$server/deploy/release-markers.txt"

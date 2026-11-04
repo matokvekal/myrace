@@ -28,6 +28,7 @@ newest_src=$(git -C "$repo" log -1 --format=%ct -- src public index.html)
 [[ $(stat -c %Y "$dist/index.html") -ge $newest_src ]] || { echo "dist/ is older than the last source commit: rebuild it" >&2; exit 1; }
 missing=0
 while IFS= read -r marker; do
+  marker="${marker%$'\r'}"  # a Windows (CRLF) checkout must not make every marker "missing"
   [[ -z "$marker" || "$marker" == \#* ]] && continue
   grep -rqF -- "$marker" "$dist/assets" || { echo "built app is missing: $marker" >&2; missing=1; }
 done < "$repo/server/deploy/web-release-markers.txt"
