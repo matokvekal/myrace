@@ -1,0 +1,15 @@
+# Strings that MUST be in the compiled server bundle (dist/server.js) of a release.
+# pack-release.sh rebuilds dist from source and refuses to pack when one is missing,
+# so a stale build can never ship again. Add a line for every new route or rule.
+/api/v1/public
+/:raceUuid/share-link
+/:raceUuid/publication
+commissaire:share-link:v1
+polling_closed
+race_deleted
+race_hidden
+WRITES_OWNER_ONLY
+projectPublicState
+guestPollingEndsAt
+planFinalization
+already_official

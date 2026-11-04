@@ -1,0 +1,8 @@
+# Strings that MUST be in the built web app (dist/assets/*.js) of a release.
+# pack-web-release.sh refuses to pack when one is missing. Add a line per new feature.
+api/v1/public
+share-race-publish
+share-page
+signin-reason-guest
+finish-race-onroad
+race_deleted

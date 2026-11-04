@@ -266,16 +266,18 @@ const Race: React.FC = () => {
                     // race lifts the finalized lock so the Zustand-cache
                     // cleanup below isn't rejected for a finished race.
                     if (isLiveRace(raceUuid)) {
-                      // Shared race: the owner deletes it for everyone; others just remove their copy.
+                      // Shared race (server keeps every row): the owner deleting an ACTIVE race
+                      // removes it for everyone; a finished race, or a member's delete, only
+                      // hides it for this user. Offline, the delete is queued; the copy goes now.
                       const live = await import("@/services/live/liveClient");
-                      if (live.accessFor(raceUuid)?.isOwner) {
-                        try {
-                          await live.team.deleteRace(raceUuid);
-                        } catch {
-                          /* offline or already gone: the local copy still goes */
-                        }
+                      try {
+                        await live.deleteSharedRace(raceUuid);
+                      } catch (e) {
+                        alert(`Could not delete the race: ${e instanceof Error ? e.message : String(e)}`);
+                        return;
                       }
-                      live.detachRace(raceUuid);
+                      navigate("/main");
+                      return;
                     }
                     await deleteRace(raceUuid);
                     await deleteRidersByRace(raceUuid);

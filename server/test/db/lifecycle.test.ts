@@ -18,6 +18,9 @@ let race: RaceFixture;
 const sockets: import("socket.io-client").Socket[] = [];
 
 beforeAll(async () => {
+  // Multi-user roles (future scope): this suite exercises member writes, which the
+  // current phase turns off (races/access.ts WRITES_OWNER_ONLY).
+  process.env.COMMISSAIRE_MEMBER_WRITES = "1";
   await startServer();
   [owner, counter, starter, checker, spectator] = await Promise.all(["Owner", "Counter", "Starter", "Checker", "Spectator"].map((n) => newUser(n)));
   race = await publishRace(owner, 3, 3, 3);
@@ -26,6 +29,7 @@ beforeAll(async () => {
   await addMember(owner, race.raceUuid, checker, ["checkin"]);
   await addMember(owner, race.raceUuid, spectator, [], { screens: { live: { view: true }, results: { view: true } }, waves: [3] });
 });
+afterAll(() => { delete process.env.COMMISSAIRE_MEMBER_WRITES; });
 afterAll(async () => {
   sockets.forEach((s) => s.close());
   await stopServer();

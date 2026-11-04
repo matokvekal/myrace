@@ -1,5 +1,5 @@
 /**
- * Guest (no account) read-only access to ONE race through its share link
+ * Guest (no account) read-only access to ONE PUBLISHED race through its share link
  * (/share/<token>). Nothing here writes, and nothing here accepts a race uuid:
  * only a token signed by this server (shareToken.ts). Responses carry public data
  * only (`projectPublicState`: race info, categories/schedule, riders' names, bibs
@@ -34,7 +34,9 @@ const linkNotFound = () => new ApiError(404, "not_found", "This race link is not
 
 async function stateOf(token: string): Promise<RaceState> {
   const uuid = raceUuidFromShareToken(token);
-  const state = uuid ? await loadState(db, uuid) : null;
+  // Only explicitly PUBLISHED, not deleted races are public (migration 010). Unpublish → 404 at once.
+  const visible = uuid ? await db.one(`SELECT 1 FROM races WHERE uuid = $1 AND "publishedAt" IS NOT NULL AND "deletedAt" IS NULL`, [uuid]) : null;
+  const state = visible ? await loadState(db, uuid!) : null;
   if (!state) throw linkNotFound();
   return state;
 }

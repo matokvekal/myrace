@@ -17,7 +17,7 @@ import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
 import { accessSummary, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
 import { shareTokenFor } from "../public/shareToken.js";
 import { processActions } from "./actions.js";
-import { deleteRaceRows, insertRace, loadState } from "./repo.js";
+import { insertRace, loadState } from "./repo.js";
 import { newCategory, newRider } from "./schemas.js";
 
 export const racesRouter = Router();
@@ -120,22 +120,34 @@ racesRouter.post("/publish", route(async (req, res) => {
   res.status(201).json({ race: state.race, duplicateBibs: bibs.length !== new Set(bibs).size });
 }));
 
-/** GET /races — My Races: owned and joined, with my access in each. */
+/**
+ * GET /races — My Races: owned and joined, with my access in each. Soft-deleted
+ * races and races I hid are left out and listed in `removed`, so my devices
+ * delete their copies (and an offline device never brings one back).
+ */
 racesRouter.get("/", route(async (req, res) => {
   const userId = authed(req).userId;
-  const rows = await db.query<{ uuid: string }>(
-    `SELECT r.uuid FROM races r LEFT JOIN race_members m ON m."raceUuid" = r.uuid AND m."userId" = $1 AND m."revokedAt" IS NULL
+  const rows = await db.query<{ uuid: string; deletedAt: Date | null; hidden: boolean; publishedAt: Date | null }>(
+    `SELECT r.uuid, r."deletedAt", r."publishedAt", (h."userId" IS NOT NULL) AS hidden
+     FROM races r
+     LEFT JOIN race_members m ON m."raceUuid" = r.uuid AND m."userId" = $1 AND m."revokedAt" IS NULL
+     LEFT JOIN race_hidden h ON h."raceUuid" = r.uuid AND h."userId" = $1
      WHERE r."ownerUserId" = $1 OR m.id IS NOT NULL ORDER BY r."lastUpdateAt" DESC`,
     [userId],
   );
   const out = [];
-  for (const { uuid } of rows) {
-    const m = await loadMembership(db, uuid, userId);
-    const state = await loadState(db, uuid);
+  const removed: string[] = [];
+  for (const row of rows) {
+    if (row.deletedAt || row.hidden) {
+      removed.push(row.uuid);
+      continue;
+    }
+    const m = await loadMembership(db, row.uuid, userId).catch(() => null);
+    const state = await loadState(db, row.uuid);
     if (!m || m.revoked || !state) continue;
-    out.push({ race: projectRace(m.access, state.race), access: accessSummary(m) });
+    out.push({ race: projectRace(m.access, state.race), access: accessSummary(m), published: m.isOwner ? row.publishedAt !== null : undefined });
   }
-  res.json({ races: out });
+  res.json({ races: out, removed });
 }));
 
 /** GET /races/join/:code — the race behind a join code, for its members only. */
@@ -279,14 +291,27 @@ racesRouter.post("/:raceUuid/join-code", route(async (req, res) => {
 }));
 
 /**
- * GET /races/:raceUuid/share-link — the race's public, read-only link token (owner
- * only). Stable: the same race always gets the same token. Opening it needs no
- * account and grants read access to that race's public data only.
+ * GET /races/:raceUuid/share-link — the race's public, read-only link token and
+ * whether the race is published (owner only). Stable: the same race always gets the
+ * same token. The link works ONLY while the race is published.
  */
 racesRouter.get("/:raceUuid/share-link", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
   requireOwner(m);
-  res.json({ token: shareTokenFor(m.raceUuid) });
+  const r = await db.one<{ publishedAt: Date | null }>(`SELECT "publishedAt" FROM races WHERE uuid = $1`, [m.raceUuid]);
+  res.json({ token: shareTokenFor(m.raceUuid), published: !!r?.publishedAt, publishedAt: r?.publishedAt ?? null });
+}));
+
+/** PUT /races/:raceUuid/publication { published } — publish / unpublish (owner only). Unpublish revokes public access at once. */
+racesRouter.put("/:raceUuid/publication", route(async (req, res) => {
+  const { published } = z.object({ published: z.boolean() }).parse(req.body);
+  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
+  requireOwner(m);
+  const r = await db.one<{ publishedAt: Date | null }>(
+    `UPDATE races SET "publishedAt" = CASE WHEN $2::boolean THEN COALESCE("publishedAt", now()) ELSE NULL END WHERE uuid = $1 RETURNING "publishedAt"`,
+    [m.raceUuid, published],
+  );
+  res.json({ token: shareTokenFor(m.raceUuid), published: !!r?.publishedAt, publishedAt: r?.publishedAt ?? null });
 }));
 
 /** POST /races/:raceUuid/transfer — hand ownership to another active member (owner only). */
@@ -311,11 +336,24 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
   res.json({ ownerUserId: target });
 }));
 
-/** DELETE /races/:raceUuid — owner only; removes the race and every row of it, in one transaction. */
+/**
+ * DELETE /races/:raceUuid — never removes rows (race history stays in PostgreSQL):
+ *  - the owner deleting an ACTIVE race soft-deletes it for everyone (deletedAt; it is
+ *    also unpublished, and every device holding it is told to remove its copy);
+ *  - a FINISHED race, or any race deleted by a member who is not the owner, is only
+ *    hidden from the requesting user's lists (race_hidden); everyone else keeps it.
+ * Answers { deleted: "race" | "hidden" }.
+ */
 racesRouter.delete("/:raceUuid", route(async (req, res) => {
-  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
-  requireOwner(m);
-  if (!(await tx((d) => deleteRaceRows(d, m.raceUuid)))) throw raceNotFound();
-  await closeRace(m.raceUuid);
-  res.status(204).end();
+  const userId = authed(req).userId;
+  const m = await requireMember(db, raceUuidOf(req), userId);
+  const race = await db.one<{ status: string | null }>(`SELECT status FROM races WHERE uuid = $1`, [m.raceUuid]);
+  if (!race) throw raceNotFound();
+  if (m.isOwner && race.status !== "finished") {
+    await db.query(`UPDATE races SET "deletedAt" = now(), "deletedBy" = $2, "publishedAt" = NULL WHERE uuid = $1 AND "deletedAt" IS NULL`, [m.raceUuid, userId]);
+    await closeRace(m.raceUuid);
+    return res.json({ deleted: "race" });
+  }
+  await db.query(`INSERT INTO race_hidden ("userId", "raceUuid") VALUES ($1, $2) ON CONFLICT DO NOTHING`, [userId, m.raceUuid]);
+  res.json({ deleted: "hidden" });
 }));

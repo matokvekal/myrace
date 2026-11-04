@@ -1,6 +1,6 @@
 # Commissaire — App Overview for Agents
 
-**Last Updated:** 2026-07-25  
+**Last Updated:** 2026-11-04 (see HANDOFF.md for the current state of work)  
 **Tech Stack:** React + Vite + React Router v6, TypeScript, Zustand, IndexedDB (`idb`)
 
 > Note: uses `[id]` folder names and `layout.tsx` but is NOT Next.js — routing is React Router v6.
@@ -484,8 +484,8 @@ still open).
   (explanation shown). Signed in → `syncMyRaces()` (download unlinked server races, catch up linked ones —
   matched by server uuid, no duplicates) behind `CreateRaceGate` (error + Retry), THEN the form. `saveRace` keeps
   a new race only once the server has it: refused / no connection → `discardUnsavedNewRace` + error, form stays
-  (Done = retry); only a slow server (timeout) keeps it queued. Browsing needs no account; a build without a
-  server still creates local races. A normal sign-in lands on All Races and syncs once per session in the
+  (Done = retry); only a slow server (timeout) keeps it queued. Browsing needs an account (guests only open shared links); a build
+  without a server still creates local races. A normal sign-in lands on All Races and syncs once per session in the
   background; `SharedRacesSection` lists only server races not yet on this device.
 - Older local races (created before this): never uploaded automatically. The race page
   badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
@@ -501,6 +501,55 @@ still open).
   through the bridge, which applies the same check and adds the categories to the Action.
 - `tests/race-persistence.spec.ts` and `tests/cloud-sync.spec.ts` (PC ↔ phone sync) need a real API (`E2E_API_URL`); skipped otherwise.
 - Dead-code check: `npx knip` (2026-11-04 cleanup removed 33 unreferenced files and 13 unused deps). Shared-code exports look unused to knip only because `server/` is outside its scan.
+
+### Race Access Rules (current phase, 2026-11-04)
+- **Owner only writes.** `server/src/races/access.ts` `WRITES_OWNER_ONLY()` (env
+  `COMMISSAIRE_MEMBER_WRITES=1` turns role-based member writes back on — only the
+  multi-user DB suite uses it). Non-owner members get read-only access (`phaseAccess`),
+  so the app hides write controls and the server refuses each of their Actions. Live
+  (`heat/[heatId]`) requires `canOnScreen(race, "live", "update")`. Roles/multi-user
+  management are FUTURE scope — don't build them.
+- **Guests (signed out, server builds):** `live/AccountOnly.tsx` guards `/main` and every
+  `/race/*` route → `/account?reason=guest&next=…`. A guest reads ONE race only through
+  its share link `/share/:token` (`app/share/SharePage.tsx`, standalone: plain fetches of
+  `/api/v1/public/*`, no session, no socket, no IndexedDB). Tabs: Info, Riders,
+  Categories, Schedule, Board, Results.
+- **Share links:** `server/src/public/shareToken.ts` — `base64url(uuid).HMAC` (stable,
+  no table; `SHARE_LINK_SECRET`, default derived from `JWT_ACCESS_SECRET` — changing it
+  breaks every link). A link opens ONLY a **published**, not deleted race
+  (`races."publishedAt"`); unpublish → 404 at once. Owner: `GET /races/:uuid/share-link`,
+  `PUT /races/:uuid/publication {published}`; UI `live/ShareRace.tsx` (Publish/Unpublish,
+  Copy, Share). Public data = `projectPublicState` (no join code, owner id, phone,
+  comments, check-in, IDs).
+- **Guest polling:** `shared/race/guestPolling.ts` is the ONE rule (client stops, server
+  answers 410 `polling_closed`): open until the race is finished or 24 h after its
+  scheduled start (race date + earliest of race/category start time, Asia/Jerusalem;
+  dates `YYYY-MM-DD` or `DD/MM/YYYY`). Every 10 s, paused while the tab is hidden.
+- **My Races** lists only the signed-in account's races (+ never-uploaded ones):
+  `raceVisibleToAccount` / `commissaire.live.accountRaces.<userId>`.
+
+### Race deletion (never hard delete)
+- `DELETE /races/:uuid` never removes rows. Owner + ACTIVE race → soft delete
+  (`deletedAt`, also unpublished); everyone gets `410 race_deleted` (from
+  `loadMembership`), the socket `race:revoked {deleted:true}`, and `GET /races` lists it
+  in `removed` → devices call `removeDeletedRace` (link, outbox, local data). FINISHED
+  race, or any member's delete → hidden for that user only (`race_hidden`).
+- Client: `liveClient.deleteSharedRace` — offline deletes are queued
+  (`commissaire.live.pendingDeletes.<userId>`) and sync never re-downloads them; queued
+  Actions of a deleted race are dropped (an offline device can't restore it).
+- Migration `server/sql/010-race-deletion-publishing.sql` (additive). The API refuses to
+  start until it is applied (`REQUIRED_TABLES` has `race_hidden`).
+
+### Releases: never ship a stale build
+- 0.1.12 shipped an OLD `server/dist` (pack-release copied whatever was there). Now
+  `server/deploy/pack-release.sh` requires HEAD == <sha> and a clean `server/` +
+  `src/shared/`, deletes `dist/`, rebuilds, and refuses to pack unless every line of
+  `server/deploy/release-markers.txt` is in `dist/server.js`. `pack-web-release.sh`
+  checks HEAD, a clean tree, dist newer than the last source commit and
+  `web-release-markers.txt`. Add a marker line for every new route/feature.
+- Build the web app from PowerShell with `$env:VITE_SERVER_URL='/'` (Git Bash rewrites `/`).
+- Never edit a published release; fixes go in a new version. Deploys are done by the
+  Linux production agent from a GitHub release — never from this machine.
 
 ### Terms & Conditions (landing-page acceptance)
 - Content lives in `legal/terms.ts` (the ONLY file to edit; it's a DRAFT, not

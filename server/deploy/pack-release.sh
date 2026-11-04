@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Packs the built server into an immutable release archive for deploy-gate.sh.
-# Run in CI after `npm ci && npm run build` in server/.
+# Run in CI after `npm ci` in server/ (dev dependencies are needed to build).
+# It REBUILDS dist/ from the committed source itself (never packs an old build),
+# refuses a working tree that differs from <sha> in server/ or src/shared/, and
+# checks the bundle for every line of deploy/release-markers.txt.
 #
 #   server/deploy/pack-release.sh <commit sha, 40 hex> <output dir>
 #
@@ -14,7 +17,27 @@ out=${2:-}
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: pack-release.sh <40-hex commit sha> <output dir>" >&2; exit 1; }
 [[ -n "$out" ]] || { echo "usage: pack-release.sh <40-hex commit sha> <output dir>" >&2; exit 1; }
 server=$(cd "$(dirname "$0")/.." && pwd)
-[[ -f "$server/dist/server.js" && -f "$server/dist/db/migrate-cli.js" ]] || { echo "build the server first (npm run build)" >&2; exit 1; }
+repo=$(cd "$server/.." && pwd)
+
+# The source must be exactly <sha>: REVISION has to describe what is inside.
+head=$(git -C "$repo" rev-parse HEAD)
+[[ "$head" == "$sha" ]] || { echo "HEAD is $head, not $sha: check out the release commit first" >&2; exit 1; }
+if [[ -n "$(git -C "$repo" status --porcelain -- server src/shared)" ]]; then
+  echo "uncommitted changes in server/ or src/shared/ — commit them or stash them first:" >&2
+  git -C "$repo" status --short -- server src/shared >&2
+  exit 1
+fi
+
+# Clean build from that source (a stale dist/ shipped once: 0.1.12).
+rm -rf "$server/dist"
+(cd "$server" && npm run build) >&2
+[[ -f "$server/dist/server.js" && -f "$server/dist/db/migrate-cli.js" ]] || { echo "server build produced no dist/server.js" >&2; exit 1; }
+missing=0
+while IFS= read -r marker; do
+  [[ -z "$marker" || "$marker" == \#* ]] && continue
+  grep -qF -- "$marker" "$server/dist/server.js" || { echo "compiled server is missing: $marker" >&2; missing=1; }
+done < "$server/deploy/release-markers.txt"
+[[ $missing -eq 0 ]] || exit 1
 
 id="$(date -u +%Y%m%dT%H%M%SZ)-${sha:0:12}"
 stage=$(mktemp -d)

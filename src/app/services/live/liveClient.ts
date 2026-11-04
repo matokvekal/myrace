@@ -283,12 +283,96 @@ export function raceVisibleToAccount(local: string): boolean {
   return mine === null || mine.includes(link.serverRaceUuid);
 }
 
-/** The race's public read-only share link (owner only). Stable: the same race always gets the same link. */
-export async function shareLink(local: string): Promise<string> {
+export interface ShareInfo {
+  url: string;
+  published: boolean;
+}
+const shareUrl = (token: string) => `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/share/${token}`;
+
+/** The race's public read-only share link and whether it is published (owner only). The link works only while published. */
+export async function shareLink(local: string): Promise<ShareInfo> {
   const link = readLinks()[local];
   if (!link) throw new LiveApiError(400, "not_shared", "Save this race to the server first, then share it.");
-  const { token } = await api<{ token: string }>("GET", `/races/${link.serverRaceUuid}/share-link`);
-  return `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/share/${token}`;
+  const r = await api<{ token: string; published: boolean }>("GET", `/races/${link.serverRaceUuid}/share-link`);
+  return { url: shareUrl(r.token), published: r.published };
+}
+
+/** Publish / unpublish the race (owner only). Unpublishing revokes public access at once. */
+export async function setRacePublished(local: string, published: boolean): Promise<ShareInfo> {
+  const link = readLinks()[local];
+  if (!link) throw new LiveApiError(400, "not_shared", "Save this race to the server first.");
+  const r = await api<{ token: string; published: boolean }>("PUT", `/races/${link.serverRaceUuid}/publication`, { published });
+  return { url: shareUrl(r.token), published: r.published };
+}
+
+// ---------------------------------------------------------------------------
+// Deleting a shared race. The server never removes rows: the owner's delete of an
+// active race soft-deletes it for everyone; a finished race (or a member's delete)
+// is hidden for this user only. Offline, the delete is queued and the local copy
+// goes at once; sync never re-downloads a race with a queued delete.
+
+const PENDING_DELETES_KEY = () => `commissaire.live.pendingDeletes.${session?.user.id ?? "anon"}`;
+function readPendingDeletes(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_DELETES_KEY()) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+const writePendingDeletes = (list: string[]) => localStorage.setItem(PENDING_DELETES_KEY(), JSON.stringify([...new Set(list)]));
+
+const isRaceDeleted = (err: unknown) => err instanceof LiveApiError && err.status === 410 && err.code === "race_deleted";
+
+/** Remove a deleted (or hidden) shared race from this device: link, queued Actions, access cache and local data. */
+export async function removeDeletedRace(local: string): Promise<void> {
+  const queued = await outboxList(local);
+  await outboxDelete(queued.map((e) => e.actionId));
+  detachRace(local);
+  localStorage.removeItem(ACCESS_KEY(local));
+  const cats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
+  // Not linked any more, so the sync bridge sends nothing for these deletes. Race first (lifts a finalized lock).
+  await useRaceStore.getState().deleteRace(local);
+  for (const c of cats) await useCategoryStore.getState().deleteCategory(c.id);
+  await useRiderStore.getState().deleteRidersByRace(local);
+}
+
+/** Delete (owner, active race) or hide (finished race / member) a shared race; works offline (queued). */
+export async function deleteSharedRace(local: string): Promise<"race" | "hidden" | "queued"> {
+  const link = readLinks()[local];
+  if (!link) return "hidden";
+  let outcome: "race" | "hidden" | "queued";
+  try {
+    const r = await api<{ deleted: "race" | "hidden" }>("DELETE", `/races/${link.serverRaceUuid}`);
+    outcome = r.deleted;
+  } catch (err) {
+    if (isRaceDeleted(err) || (err instanceof LiveApiError && err.status === 404)) outcome = "race";
+    else if (err instanceof LiveApiError && err.status === 0) {
+      writePendingDeletes([...readPendingDeletes(), link.serverRaceUuid]);
+      outcome = "queued";
+    } else throw err;
+  }
+  await removeDeletedRace(local);
+  return outcome;
+}
+
+let flushingDeletes: Promise<void> | null = null;
+function flushPendingDeletes(): Promise<void> {
+  if (!session) return Promise.resolve();
+  flushingDeletes ??= (async () => {
+    try {
+      for (const serverUuid of readPendingDeletes()) {
+        try {
+          await api("DELETE", `/races/${serverUuid}`);
+        } catch (err) {
+          if (err instanceof LiveApiError && err.status === 0) return; // still offline: keep the queue
+        }
+        writePendingDeletes(readPendingDeletes().filter((u) => u !== serverUuid));
+      }
+    } finally {
+      flushingDeletes = null;
+    }
+  })();
+  return flushingDeletes;
 }
 export const localUuidOf = (serverRaceUuid: string): string | null =>
   Object.entries(readLinks()).find(([, l]) => l.serverRaceUuid === serverRaceUuid)?.[0] ?? null;
@@ -468,6 +552,10 @@ export async function flush(local: string): Promise<void> {
       } catch (err) {
         if (err instanceof LiveApiError && err.status === 426) useLiveStore.setState({ needsUpdate: true });
         if (err instanceof LiveApiError && err.status === 404) setSync(local, { revoked: true });
+        if (isRaceDeleted(err)) {
+          await removeDeletedRace(local); // deleted by its owner: nothing queued here can bring it back
+          return;
+        }
         break; // keep everything queued; retry later
       }
       const done: string[] = [];
@@ -847,6 +935,7 @@ async function catchUpOnce(local: string): Promise<void> {
     await api("POST", `/races/${link.serverRaceUuid}/sync`, { deviceId: deviceId(), lastSeq: linkOf(local)!.lastSeq, pendingCount: syncOf(local).pending });
   } catch (err) {
     if (err instanceof LiveApiError && err.status === 404) setSync(local, { revoked: true });
+    if (isRaceDeleted(err)) await removeDeletedRace(local);
   }
 }
 
@@ -945,7 +1034,8 @@ function ensureSocket(): Socket | null {
     const local = localUuidOf(msg.raceUuid);
     if (!local) return;
     setSync(local, { revoked: true });
-    toast.warn(msg.deleted ? "The owner deleted this shared race." : "Your access to this shared race was removed.", { toastId: `revoked-${local}` });
+    toast.warn(msg.deleted ? "The owner deleted this race." : "Your access to this shared race was removed.", { toastId: `revoked-${local}` });
+    if (msg.deleted) void removeDeletedRace(local);
   });
   return socket;
 }
@@ -956,6 +1046,7 @@ async function joinRoom(local: string) {
   const r = (await socket.emitWithAck("join", { raceUuid: link.serverRaceUuid })) as { ok: boolean; lastSeq?: number; access?: AccessSummary; error?: string };
   if (!r.ok) {
     setSync(local, { revoked: true });
+    if (r.error === "race_deleted") await removeDeletedRace(local);
     return;
   }
   if (r.access) cacheAccess(local, r.access);
@@ -1241,8 +1332,11 @@ export interface MyRace {
 }
 
 export async function myRaces(): Promise<MyRace[]> {
-  const r = await api<{ races: { race: Partial<SharedRace>; access: AccessSummary }[] }>("GET", "/races");
-  return r.races.map((x) => ({ ...x, localRaceUuid: localUuidOf(x.race.uuid!) }));
+  return (await myRacesWithRemoved()).races;
+}
+async function myRacesWithRemoved(): Promise<{ races: MyRace[]; removed: string[] }> {
+  const r = await api<{ races: { race: Partial<SharedRace>; access: AccessSummary }[]; removed?: string[] }>("GET", "/races");
+  return { races: r.races.map((x) => ({ ...x, localRaceUuid: localUuidOf(x.race.uuid!) })), removed: r.removed ?? [] };
 }
 
 /** Downloads a shared race onto this Device (or refreshes it) and returns its local uuid. */
@@ -1344,6 +1438,7 @@ export function startLive() {
   setLiveBridge(bridge);
   window.addEventListener("online", () => {
     useLiveStore.setState({ online: true });
+    void flushPendingDeletes();
     void flushAll();
   });
   window.addEventListener("offline", () => useLiveStore.setState({ online: false }));
@@ -1355,6 +1450,7 @@ export function startLive() {
   setInterval(() => {
     void flushAll();
     void publishPending();
+    void flushPendingDeletes();
   }, 15_000);
   if (session) {
     void auth.me().catch(() => {});
@@ -1375,7 +1471,15 @@ export function startLive() {
  */
 export async function syncMyRaces(): Promise<{ downloaded: number; updated: number }> {
   if (!session) throw new LiveApiError(401, "signed_out", "Sign in first");
-  const list = await myRaces();
+  await flushPendingDeletes();
+  const { races: all, removed } = await myRacesWithRemoved();
+  // Deleted by the owner, or hidden by me: remove this device's copy (never re-download it).
+  for (const serverUuid of removed) {
+    const local = localUuidOf(serverUuid);
+    if (local) await removeDeletedRace(local);
+  }
+  const pendingDel = new Set(readPendingDeletes());
+  const list = all.filter((r) => !pendingDel.has(r.race.uuid ?? ""));
   rememberAccountRaces(list.map((r) => r.race.uuid).filter((u): u is string => !!u));
   let downloaded = 0;
   let updated = 0;

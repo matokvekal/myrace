@@ -40,6 +40,7 @@ export const REQUIRED_TABLES = [
   "invitations", "race_members", "contact_groups", "contacts", "contact_group_members",
   "race_events", "race_snapshots", "sync_cursors", "official_versions",
   "user_preferences", // 009
+  "race_hidden", // 010
 ];
 
 /**

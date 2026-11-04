@@ -25,7 +25,7 @@ const rowsOf = async (raceUuid: string) => {
   return out;
 };
 
-describe("race delete without database cascades", () => {
+describe("race delete keeps every row (no cascades, no hard delete)", () => {
   it("the list of race tables matches every table with a raceUuid column", async () => {
     const tables = await db.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'raceUuid' ORDER BY 1`,
@@ -33,7 +33,7 @@ describe("race delete without database cascades", () => {
     expect(tables.map((t) => t.table_name).sort()).toEqual([...RACE_TABLES].sort());
   });
 
-  it("removes every row of the race in every table, and nothing of another race", async () => {
+  it("deleting a finished race hides it for that user only and keeps every row", async () => {
     const a = await publishRace(owner, 2, 2, 2);
     const b = await publishRace(owner, 1, 2, 2);
     await addMember(owner, a.raceUuid, counter, ["counter"]);
@@ -41,7 +41,7 @@ describe("race delete without database cascades", () => {
     const pendingLink = await api().post(`/api/v1/races/${a.raceUuid}/invitations`).set(auth(owner.token)).send({ link: true, roles: ["viewer"], sendEmail: false });
     const r1 = a.riders.find((r) => r.heat === 1)!;
     await send(owner, a.raceUuid, action(a.raceUuid, "WaveStarted", { heat: 1 }));
-    await send(counter, a.raceUuid, action(a.raceUuid, "AddLap", { riderUuid: r1.uuid }, { at: new Date(Date.now() + 90_000).toISOString() }));
+    await send(owner, a.raceUuid, action(a.raceUuid, "AddLap", { riderUuid: r1.uuid }, { at: new Date(Date.now() + 90_000).toISOString() }));
     await api().post(`/api/v1/races/${a.raceUuid}/sync`).set(auth(counter.token)).send({ deviceId: "phone-1", lastSeq: 1, pendingCount: 0 });
     expect((await api().post(`/api/v1/races/${a.raceUuid}/finalize`).set(auth(owner.token))).status).toBe(201);
 
@@ -49,14 +49,19 @@ describe("race delete without database cascades", () => {
     for (const t of RACE_TABLES) expect(before[t], t).toBeGreaterThan(0); // every table really had rows
     const bBefore = await rowsOf(b.raceUuid);
 
-    expect((await api().delete(`/api/v1/races/${a.raceUuid}`).set(auth(owner.token))).status).toBe(204);
-    expect(Object.values(await rowsOf(a.raceUuid)).every((n) => n === 0)).toBe(true);
+    // Race deletion never removes rows (migration 010): a FINISHED race is only hidden
+    // for the user who deletes it — every row stays, the counter still sees it.
+    const del = await api().delete(`/api/v1/races/${a.raceUuid}`).set(auth(owner.token));
+    expect(del.status).toBe(200);
+    expect(del.body.deleted).toBe("hidden");
+    expect(await rowsOf(a.raceUuid)).toEqual(before);
     expect(await rowsOf(b.raceUuid)).toEqual(bBefore);
-
-    // An invitation link of the deleted race is gone with it.
-    const token = pendingLink.body.invitations[0].url.split("/invite/")[1];
-    expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(other.token))).status).toBe(404);
-    expect((await api().delete(`/api/v1/races/${a.raceUuid}`).set(auth(owner.token))).status).toBe(404);
+    const mine = await api().get("/api/v1/races").set(auth(owner.token));
+    expect(mine.body.removed).toContain(a.raceUuid);
+    expect(mine.body.races.map((x: any) => x.race.uuid)).not.toContain(a.raceUuid);
+    const theirs = await api().get("/api/v1/races").set(auth(counter.token));
+    expect(theirs.body.races.map((x: any) => x.race.uuid)).toContain(a.raceUuid);
+    void pendingLink;
   });
 });
 

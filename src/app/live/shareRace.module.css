@@ -88,3 +88,21 @@
 .secondary:disabled { opacity: 0.5; cursor: default; }
 .note { margin: 12px 0 0; font-size: 0.78rem; color: var(--text-muted); }
 .error { margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(211, 51, 51, 0.1); color: #b42318; font-size: 0.9rem; }
+.publishRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-surface-3);
+  text-align: start;
+}
+.publishRow .primary,
+.publishRow .secondary { flex: 0 0 auto; min-height: 38px; padding: 0 14px; }
+.statusOn,
+.statusOff { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+.statusOn { color: #1f7a33; }
+.statusOff { color: var(--text-secondary); }
+:global([data-theme="dark"]) .statusOn { color: #6ee08a; }

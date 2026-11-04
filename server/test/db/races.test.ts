@@ -109,17 +109,32 @@ describe("ownership and delete", () => {
     const ok = await transfer(owner, admin.id);
     expect(ok.status).toBe(200);
     expect(ok.body.ownerUserId).toBe(admin.id);
-    // The new owner can delete; the old owner (now admin) cannot.
-    expect((await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(owner.token))).status).toBe(403);
+    // The old owner (now a member) can no longer delete it for everyone, only hide it for themselves.
+    const r = await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(owner.token));
+    expect(r.status).toBe(200);
+    expect(r.body.deleted).toBe('hidden');
     expect((await snapshot(owner, race.raceUuid)).race.uuid).toBe(race.raceUuid);
   });
 
-  it("delete is owner-only and removes the race for every member", async () => {
+  it("the owner deleting an active race soft-deletes it for every member (410), keeping its rows; a member only hides it", async () => {
     const race = await publishRace(owner, 1, 2, 2);
     await addMember(owner, race.raceUuid, admin, ["admin"]);
-    expect((await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(admin.token))).status).toBe(403);
-    expect((await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(owner.token))).status).toBe(204);
-    for (const u of [owner, admin]) expect((await api().get(`/api/v1/races/${race.raceUuid}/snapshot`).set(auth(u.token))).status).toBe(404);
+    const hide = await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(admin.token));
+    expect(hide.status).toBe(200);
+    expect(hide.body.deleted).toBe("hidden"); // a member's delete hides it for them only
+    expect((await snapshot(owner, race.raceUuid)).race.uuid).toBe(race.raceUuid);
+    const del = await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(owner.token));
+    expect(del.status).toBe(200);
+    expect(del.body.deleted).toBe("race");
+    for (const u of [owner, admin]) {
+      const r = await api().get(`/api/v1/races/${race.raceUuid}/snapshot`).set(auth(u.token));
+      expect(r.status).toBe(410);
+      expect(r.body.error.code).toBe("race_deleted");
+    }
+    // An offline device delivering queued actions can't bring it back.
+    const late = await api().post(`/api/v1/races/${race.raceUuid}/actions`).set(auth(owner.token)).send({ actions: [action(race.raceUuid, "WaveStarted", { heat: 1 })] });
+    expect(late.status).toBe(410);
+    expect((await api().get("/api/v1/races").set(auth(owner.token))).body.removed).toContain(race.raceUuid);
   });
 });
 

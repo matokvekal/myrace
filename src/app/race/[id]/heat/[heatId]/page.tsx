@@ -42,7 +42,7 @@ import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
 import { liveFilterOptions } from "./liveFilter";
 import FinishWaveModal from "./FinishWaveModal";
 import { Bike, List, ChevronDown, Flag } from "lucide-react";
-import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
+import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 // Shared races: the sync state where it matters most (offline / waiting to send).
 const SyncBadge = lazy(() => import("../../../../live/SyncBadge"));
@@ -130,10 +130,11 @@ const Heat: React.FC = () => {
     if (currentRace?.finalized) navigate(`/race/${raceUuid}`, { replace: true });
   }, [currentRace?.finalized, navigate, raceUuid]);
 
-  // Shared race: join its live room, and leave the screen if this member may not view Live.
+  // Shared race: join its live room. Live is race MANAGEMENT: only a member who may record
+  // on it (the owner, in this phase) stays here; others follow the race on Board/Results.
   useEffect(() => {
     if (!isLiveRace(raceUuid)) return;
-    if (!canViewScreen(raceUuid, "live")) {
+    if (!canOnScreen(raceUuid, "live", "update")) {
       navigate(`/race/${raceUuid}`, { replace: true });
       return;
     }

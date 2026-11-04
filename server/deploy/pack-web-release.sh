@@ -16,6 +16,23 @@ usage() { echo "usage: pack-web-release.sh <40-hex commit sha> <dist dir> <outpu
 [[ "$sha" =~ ^[0-9a-f]{40}$ && -n "$dist" && -n "$out" ]] || usage
 [[ -f "$dist/index.html" && -d "$dist/assets" ]] || { echo "build the app first (npm run build)" >&2; exit 1; }
 
+# The build must be of <sha> and contain every feature marker (no stale dist/).
+repo=$(cd "$(dirname "$0")/../.." && pwd)
+head=$(git -C "$repo" rev-parse HEAD)
+[[ "$head" == "$sha" ]] || { echo "HEAD is $head, not $sha: build the release commit" >&2; exit 1; }
+if [[ -n "$(git -C "$repo" status --porcelain -- src public index.html vite.config.ts package.json)" ]]; then
+  echo "uncommitted app changes — the build would not match $sha" >&2
+  exit 1
+fi
+newest_src=$(git -C "$repo" log -1 --format=%ct -- src public index.html)
+[[ $(stat -c %Y "$dist/index.html") -ge $newest_src ]] || { echo "dist/ is older than the last source commit: rebuild it" >&2; exit 1; }
+missing=0
+while IFS= read -r marker; do
+  [[ -z "$marker" || "$marker" == \#* ]] && continue
+  grep -rqF -- "$marker" "$dist/assets" || { echo "built app is missing: $marker" >&2; missing=1; }
+done < "$repo/server/deploy/web-release-markers.txt"
+[[ $missing -eq 0 ]] || exit 1
+
 id="$(date -u +%Y%m%dT%H%M%SZ)-${sha:0:12}"
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT

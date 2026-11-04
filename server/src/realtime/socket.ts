@@ -50,7 +50,12 @@ export function attachRealtime(http: HttpServer): Server {
   ns.on("connection", (socket) => {
     socket.on("join", async (msg: { raceUuid?: string }, ack?: (r: unknown) => void) => {
       const raceUuid = String(msg?.raceUuid ?? "");
-      const m = await loadMembership(db, raceUuid, dataOf(socket).userId).catch(() => null);
+      let deleted = false;
+      const m = await loadMembership(db, raceUuid, dataOf(socket).userId).catch((e: { code?: string }) => {
+        deleted = e?.code === "race_deleted";
+        return null;
+      });
+      if (deleted) return ack?.({ ok: false, error: "race_deleted" });
       if (!m || m.revoked || !canSeeAnything(m.access)) return ack?.({ ok: false, error: "not_member" });
       dataOf(socket).races.set(raceUuid, m);
       await socket.join(room(raceUuid));
@@ -126,7 +131,7 @@ export async function publishChanges(state: RaceState, ch: CommittedChanges): Pr
 export async function refreshMemberSockets(raceUuid: string, userId: string): Promise<void> {
   if (!io) return;
   const sockets = await io.of("/race").in(room(raceUuid)).fetchSockets();
-  const m = await loadMembership(db, raceUuid, userId);
+  const m = await loadMembership(db, raceUuid, userId).catch(() => null);
   for (const s of sockets) {
     const data = s.data as SocketData;
     if (data.userId !== userId) continue;
