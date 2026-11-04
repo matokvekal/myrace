@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { auth, LiveApiError, type CodeSent } from "@/services/live/liveClient";
 import styles from "./live.module.css";
 import own from "./SignInForm.module.css";
+import { afterAuthTarget } from "./authRedirect";
 
 /**
  * Signed-out account screen: Sign in, New account, and Forgot password.
@@ -167,7 +168,9 @@ export default function SignInForm({ next }: { next: string | null }) {
     try {
       await fn();
       if (onDone) onDone();
-      else if (next) navigate(next);
+      // Signed in (login, new account, Google, password reset): straight to All Races
+      // (or a safe ?next= page). Only reached on success — a failure throws above.
+      else navigate(afterAuthTarget(next), { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

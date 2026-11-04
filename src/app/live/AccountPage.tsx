@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { auth, invitations, myRaces, openSharedRace, useLiveStore, type MyRace } from "@/services/live/liveClient";
 import styles from "./live.module.css";
 import SignInForm from "./SignInForm";
+import { afterAuthTarget, ALL_RACES } from "./authRedirect";
 
 /** Sign in / register for shared races, and the signed-in user's invitations and shared races. */
 export default function AccountPage() {
@@ -31,7 +32,9 @@ function SignedIn({ next }: { next: string | null }) {
     }
   };
   useEffect(() => {
-    if (next) navigate(next);
+    // A ?next= page (sign-in asked for by a race / invite) wins; opening /account
+    // while signed in just shows the account — no redirect, so no loop.
+    if (next) navigate(afterAuthTarget(next), { replace: true });
     else void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -49,6 +52,10 @@ function SignedIn({ next }: { next: string | null }) {
       <div className={styles.inner}>
         <button className={styles.link} onClick={() => navigate("/main")}>← {t("live.back", "Back")}</button>
         <div className={styles.card}>
+          {/* Always here: the way on if the automatic move to All Races didn't happen. */}
+          <button className={styles.button} onClick={() => navigate(ALL_RACES)} data-testid="go-all-races">
+            {t("live.goAllRaces", "Go to All Races")}
+          </button>
           <div className={styles.spread}>
             <div>
               <h1 className={styles.title} dir="auto">{user.name}</h1>
