@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { invitations, myRaces, openSharedRace, useLiveStore, type MyRace } from "@/services/live/liveClient";
+import { invitations, localUuidOf, myRaces, openSharedRace, useLiveStore, type MyRace } from "@/services/live/liveClient";
+import useRaceStore from "@/stores/racesStore";
 import styles from "./live.module.css";
 
 /** Main screen: shared races (My Races) and pending invitations, or a sign-in prompt. */
@@ -11,6 +12,13 @@ export default function SharedRacesSection() {
   const user = useLiveStore((s) => s.user);
   const [races, setRaces] = useState<MyRace[]>([]);
   const [pending, setPending] = useState(0);
+  // Races already on this device are in the race list below — listing them here too
+  // looked like duplicates. Re-checked as the account sync brings races in.
+  const localUuids = useRaceStore((s) => s.races.map((r) => r.uuid).join("|"));
+  const notHere = races.filter((r) => {
+    const local = localUuidOf(r.race.uuid!);
+    return !local || !localUuids.split("|").includes(local);
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -39,9 +47,11 @@ export default function SharedRacesSection() {
       </div>
       {races.length === 0 ? (
         <p className={styles.muted}>{t("live.noRaces", "No shared races yet. Open a race → Team → Share to start one.")}</p>
+      ) : notHere.length === 0 ? (
+        <p className={styles.muted} data-testid="shared-races-synced">{t("live.allSynced", "All {{n}} of your account's races are on this device.", { n: races.length })}</p>
       ) : (
         <ul className={styles.list}>
-          {races.map((r) => (
+          {notHere.map((r) => (
             <li key={r.race.uuid} className={styles.item}>
               <div className={styles.spread}>
                 <strong dir="auto">{r.race.name}</strong>

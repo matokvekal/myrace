@@ -1314,3 +1314,48 @@ export function startLive() {
     void publishPending();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Create Race (signed in): sync first, server-only new races
+
+/**
+ * Brings every server race of the signed-in account onto this device before a
+ * new race is created: races not here yet are downloaded and linked; races
+ * already here (linked) are caught up — matched by server uuid, so nothing is
+ * downloaded twice and local queued changes are kept. Throws when the list
+ * can't be fetched or a race can't be downloaded.
+ */
+export async function syncMyRaces(): Promise<{ downloaded: number; updated: number }> {
+  if (!session) throw new LiveApiError(401, "signed_out", "Sign in first");
+  const list = await myRaces();
+  let downloaded = 0;
+  let updated = 0;
+  for (const r of list) {
+    const serverRaceUuid = r.race.uuid;
+    if (!serverRaceUuid) continue;
+    const local = localUuidOf(serverRaceUuid);
+    if (local) {
+      await catchUp(local);
+      updated++;
+    } else {
+      await openSharedRace(serverRaceUuid);
+      downloaded++;
+    }
+  }
+  return { downloaded, updated };
+}
+
+/**
+ * A new race the server did not take: remove it from this device and from the
+ * upload queue, so no local-only race is left behind (Create Race needs the cloud).
+ */
+export async function discardUnsavedNewRace(local: string): Promise<void> {
+  if (linkOf(local)) return; // it did reach the server after all: keep it
+  removePending(local);
+  // Not linked, so the sync bridge sends nothing for these deletes. Race before
+  // riders (deleting the race lifts any lock for the cleanup — see CLAUDE.md).
+  const cats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
+  for (const c of cats) await useCategoryStore.getState().deleteCategory(c.id);
+  await useRaceStore.getState().deleteRace(local);
+  await useRiderStore.getState().deleteRidersByRace(local);
+}

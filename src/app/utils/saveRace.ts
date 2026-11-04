@@ -49,6 +49,11 @@ export const saveRace = async (
 ): Promise<NewRaceStorage | null> => {
   event.preventDefault();
 
+  // Creating a race needs an account when this build has a server (races live in the cloud).
+  if (import.meta.env.VITE_SERVER_URL && !(await import("@/services/live/liveClient")).isSignedIn()) {
+    throw new Error("Sign in to create a race — races are saved to your account in the cloud.");
+  }
+
   try {
     clearRaceState();
 
@@ -150,15 +155,22 @@ export const saveRace = async (
       details: { name: newRace.name, date: newRace.date, riderCount: useRiderStore.getState().riders.length },
     });
 
-    // With a server: the new race is saved there too (PostgreSQL). Wait for the
-    // answer so the caller can say where the race really is; it stays on this
-    // device either way and keeps retrying in the background.
+    // With a server, a new race exists only once PostgreSQL has it, linked to the
+    // signed-in owner. A refusal / no connection removes the local copy again and
+    // the form stays open (Done = retry), so no local-only race is created. Only a
+    // server that is slow to answer keeps the race (the upload may still land; the
+    // queue finishes it — never sent twice, see publishRace).
     let storage: NewRaceStorage | null = null;
     if (import.meta.env.VITE_SERVER_URL) {
+      const live = await import("@/services/live/liveClient");
       try {
-        storage = await (await import("@/services/live/liveClient")).persistNewRace(newRace.uuid);
+        storage = await live.persistNewRace(newRace.uuid, 60_000);
       } catch (e) {
         storage = { stored: "device", reason: "failed", message: e instanceof Error ? e.message : String(e) };
+      }
+      if (storage.stored !== "server" && storage.reason !== "timeout") {
+        await live.discardUnsavedNewRace(newRace.uuid);
+        throw new Error(`The race was not saved to the server: ${storage.message.replace(/\.$/, "")}. Nothing was kept on this device — check the connection and press Done to try again.`);
       }
     }
 

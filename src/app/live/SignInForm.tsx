@@ -128,7 +128,7 @@ function PasswordInput(props: {
   );
 }
 
-export default function SignInForm({ next }: { next: string | null }) {
+export default function SignInForm({ next, reason = null }: { next: string | null; reason?: string | null }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("signin");
@@ -245,9 +245,15 @@ export default function SignInForm({ next }: { next: string | null }) {
           {mode !== "forgot" ? (
             <>
               <h1 className={styles.title}>{mode === "signin" ? t("live.welcomeBack", "Sign in") : t("live.createTitle", "Create your account")}</h1>
-              <p className={styles.muted}>
-                {t("live.signInWhy", "An account lets your team run the same race on several phones. Local races keep working without one.")}
-              </p>
+              {reason === "create" ? (
+                <p className={own.reasonBox} data-testid="signin-reason-create" dir="auto">
+                  {t("live.reasonCreate", "Sign in or create a free account to create a race. Your races are saved to your account in the cloud, so your team can run them too. Browsing races needs no account.")}
+                </p>
+              ) : (
+                <p className={styles.muted}>
+                  {t("live.signInWhy", "An account lets your team run the same race on several phones. Local races keep working without one.")}
+                </p>
+              )}
 
               <div className={own.segmented} role="tablist">
                 <button type="button" role="tab" aria-selected={mode === "signin"} className={mode === "signin" ? own.segOn : own.seg} onClick={() => switchMode("signin")}>

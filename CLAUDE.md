@@ -475,7 +475,14 @@ still open).
   isn't counted. `/auth/password-reset/confirm` sets the new password, marks the email
   verified and signs out other devices. Production with `MAIL_TRANSPORT=log` answers 503
   instead of pretending the email was sent.
-- Created signed out, or older local races: never uploaded automatically. The race page
+- **Creating a race needs an account** (server builds): Create Race signed out → `/account?reason=create&next=/main?create=1`
+  (explanation shown). Signed in → `syncMyRaces()` (download unlinked server races, catch up linked ones —
+  matched by server uuid, no duplicates) behind `CreateRaceGate` (error + Retry), THEN the form. `saveRace` keeps
+  a new race only once the server has it: refused / no connection → `discardUnsavedNewRace` + error, form stays
+  (Done = retry); only a slow server (timeout) keeps it queued. Browsing needs no account; a build without a
+  server still creates local races. A normal sign-in lands on All Races and syncs once per session in the
+  background; `SharedRacesSection` lists only server races not yet on this device.
+- Older local races (created before this): never uploaded automatically. The race page
   badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
 - `publishRace` runs once per race at a time (in-tab map + Web Locks across tabs): two
   uploads of an empty race would create two server races.

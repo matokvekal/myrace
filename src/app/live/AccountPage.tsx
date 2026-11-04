@@ -12,7 +12,7 @@ export default function AccountPage() {
   const next = params.get("next");
   const user = useLiveStore((s) => s.user);
   if (user) return <SignedIn next={next} />;
-  return <SignInForm next={next} />;
+  return <SignInForm next={next} reason={params.get("reason")} />;
 }
 
 function SignedIn({ next }: { next: string | null }) {

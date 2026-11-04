@@ -1,5 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import CreateRaceGate, { type GateState } from "./components/createRaceGate/CreateRaceGate";
 import { useTranslation } from "react-i18next";
 import styles from "./main.module.css";
 import AddRace from "./addRace/AddRace";
@@ -54,6 +55,50 @@ const MainPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [addNewRace, setAddNewRace] = useState(false);
+  // Create Race needs an account (races live in the cloud): signed out → sign in
+  // first; signed in → this account's races are synced, THEN the form opens.
+  const [gate, setGate] = useState<GateState>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const syncThenCreate = async () => {
+    const live = await import("@/services/live/liveClient");
+    setGate({ kind: "syncing" });
+    try {
+      await live.syncMyRaces();
+      setGate(null);
+      setAddNewRace(true);
+    } catch (e) {
+      setGate({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  const requestCreate = async () => {
+    if (!serverConfigured) return setAddNewRace(true); // a build without a server: local app
+    const live = await import("@/services/live/liveClient");
+    if (!live.isSignedIn()) {
+      navigate(`/account?reason=create&next=${encodeURIComponent("/main?create=1")}`);
+      return;
+    }
+    await syncThenCreate();
+  };
+  // Back from sign-in with ?create=1: continue to Create Race (only when signed in — no loop).
+  useEffect(() => {
+    if (!serverConfigured) return;
+    const wantsCreate = searchParams.get("create") === "1";
+    void import("@/services/live/liveClient").then((live) => {
+      if (wantsCreate) {
+        setSearchParams((p) => { p.delete("create"); return p; }, { replace: true });
+        if (live.isSignedIn()) void syncThenCreate();
+        return;
+      }
+      // A normal sign-in: bring this account's races in once per session, in the background.
+      const uid = live.useLiveStore.getState().user?.id;
+      if (!uid) return;
+      const key = `commissaire.racesSynced.${uid}`;
+      try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* private mode */ }
+      void live.syncMyRaces().catch(() => {
+        try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+      });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [showDownload, setShowDownload] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
@@ -152,6 +197,7 @@ const MainPage = () => {
   return (
     <div className={styles.main}>
       <HeaderMain />
+      <CreateRaceGate state={gate} onRetry={() => void syncThenCreate()} onCancel={() => setGate(null)} />
       {serverConfigured && (
         <Suspense fallback={null}>
           <div style={{ padding: "8px 16px 0" }}>
@@ -165,7 +211,7 @@ const MainPage = () => {
           {/* invited users land here with no local races yet */}
           <CloudRacesSection />
           <EmptyRaces
-            onCreateRace={() => setAddNewRace(true)}
+            onCreateRace={() => void requestCreate()}
             onLoadDemo={handleLoadDemo}
             loadingDemo={loadingDemo}
           />
@@ -183,7 +229,7 @@ const MainPage = () => {
                 variant="success"
                 size="md"
                 className={styles.addBtn}
-                onClick={() => setAddNewRace(true)}
+                onClick={() => void requestCreate()}
               >
                 <Plus width={15} height={15} />
                 {t("main.add", "Add")}
@@ -287,7 +333,7 @@ const MainPage = () => {
                 <button className={styles.seeAllBtn} onClick={() => setShowAll(true)}>
                   {t("main.seeAll", "See All")}
                 </button>
-                <button className={styles.addTileBtn} onClick={() => setAddNewRace(true)}>
+                <button className={styles.addTileBtn} onClick={() => void requestCreate()}>
                   <Plus width={13} height={13} />
                   {t("main.add", "Add")}
                 </button>

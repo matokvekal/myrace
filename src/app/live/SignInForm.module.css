@@ -180,3 +180,15 @@
     color: #ff8a80;
   }
 }
+
+.reasonBox {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #1e3a8a;
+  font-size: 14px;
+  line-height: 1.45;
+}
+:global([data-theme="dark"]) .reasonBox { background: #1e1b4b; border-color: #3730a3; color: #c7d2fe; }

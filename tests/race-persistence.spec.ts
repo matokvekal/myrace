@@ -40,7 +40,7 @@ test("signed in: Create Race waits for the server, and the race opens in a secon
   await acceptTerms(page);
   await page.goto("/account");
   await register(page, email);
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page).toHaveURL(/\/main/, { timeout: 20_000 }); // signed in → All Races
 
   await createRace(page, "Phone Race");
   await expect(page.getByText("Race saved to the server")).toBeVisible();
@@ -55,62 +55,82 @@ test("signed in: Create Race waits for the server, and the race opens in a secon
   await other.getByPlaceholder("Email").fill(email);
   await other.getByPlaceholder(/Password/).fill(PASSWORD);
   await other.getByRole("button", { name: "Sign in" }).click();
-  await expect(other.getByText("Phone Race")).toBeVisible();
-  await other.getByRole("button", { name: "Open" }).click();
+  // Signed in → All Races; the account's races are synced in, listed once.
+  await expect(other.getByTestId("shared-races-synced")).toBeVisible({ timeout: 30_000 });
+  await expect(other.getByText("Phone Race")).toHaveCount(1);
+  await other.getByText("Phone Race").click();
   await expect(other).toHaveURL(/\/race\//);
   await expect(other.getByText("Phone Race").first()).toBeVisible();
   await ctx.close();
 });
 
-test("signed out: local only, nothing uploads on sign-in, 'Save to server' does", async ({ page }) => {
+test("signed out: browsing works; Create Race asks to sign in, syncs the account's races, then opens the form", async ({ page }) => {
   const email = `later.${Date.now()}@x.test`;
   await page.goto("/main");
   await acceptTerms(page);
-  await createRace(page, "Offline Race");
-  await expect(page.getByText(/Race saved on this device only/)).toBeVisible();
-
-  await page.getByText("Offline Race").first().click();
-  const badge = page.getByTestId("local-only-badge");
-  await expect(badge).toHaveAttribute("data-state", "signed-out");
-  await page.getByTestId("local-only-signin").click();
-  await expect(page).toHaveURL(/\/account\?next=/);
+  await page.goto("/main");
+  await expect(page.getByRole("button", { name: /Try Demo Race/i })).toBeVisible(); // public browsing, no account
+  await page.getByRole("button", { name: /Create new race|Add/ }).first().click();
+  await expect(page).toHaveURL(/\/account\?reason=create&next=/);
+  await expect(page.getByTestId("signin-reason-create")).toContainText("to create a race");
   await register(page, email);
-
-  // Back on the race, signed in: still local — no automatic upload.
-  await expect(page).toHaveURL(/\/race\//);
-  await expect(badge).toHaveAttribute("data-state", "local");
-  await page.waitForTimeout(2000);
-  expect(await serverRaces(email)).toEqual([]);
-
-  await page.getByTestId("local-only-save").click();
+  // Straight on to Create Race, after the account's races were synced.
+  await expect(page.getByPlaceholder("Race Name")).toBeVisible({ timeout: 20_000 });
+  await page.getByPlaceholder("Race Name").fill("After Login Race");
+  await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByText("Race saved to the server")).toBeVisible();
-  await expect(badge).toHaveCount(0);
-  expect(await serverRaces(email)).toEqual(["Offline Race"]);
+  expect(await serverRaces(email)).toEqual(["After Login Race"]);
 });
 
-test("signed in, server unreachable: says device only with the reason, then uploads when it is back", async ({ page }) => {
+test("signed in, server unreachable: no local-only race is kept; Done again saves it once", async ({ page }) => {
   const email = `down.${Date.now()}@x.test`;
   await page.goto("/main");
   await acceptTerms(page);
   await page.goto("/account");
   await register(page, email);
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page).toHaveURL(/\/main$/);
 
   await page.route("**/api/v1/races/publish", (r) => r.abort("connectionrefused"));
   await createRace(page, "Down Race");
-  await expect(page.getByText("Race saved on this device only. No connection to the server.")).toBeVisible();
+  await expect(page.getByTestId("save-error")).toContainText("not saved to the server");
+  await expect(page.getByPlaceholder("Race Name")).toHaveValue("Down Race"); // the form stays, with its input
   expect(await serverRaces(email)).toEqual([]);
 
-  await page.getByText("Down Race").first().click();
-  const badge = page.getByTestId("local-only-badge");
-  await expect(badge).toHaveAttribute("data-state", "failed");
-  await expect(badge).toContainText("No connection to the server");
-
   await page.unroute("**/api/v1/races/publish");
-  await page.getByTestId("local-only-save").click();
+  await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByText("Race saved to the server")).toBeVisible();
-  await expect(badge).toHaveCount(0);
   expect(await serverRaces(email)).toEqual(["Down Race"]);
+  await expect(page.getByText("Down Race")).toHaveCount(1); // exactly one, no leftover local copy
+});
+
+test("Create Race: when the account's races can't be synced, a clear error with Retry — and no race", async ({ page }) => {
+  const email = `sync.${Date.now()}@x.test`;
+  await page.goto("/main");
+  await acceptTerms(page);
+  await page.goto("/account");
+  await register(page, email);
+  await expect(page).toHaveURL(/\/main$/);
+  await page.route("**/api/v1/races", (r) => (r.request().method() === "GET" ? r.fulfill({ status: 503, body: "down" }) : r.continue()));
+  await page.getByRole("button", { name: /Create new race|Add/ }).first().click();
+  await expect(page.getByTestId("create-race-gate")).toHaveAttribute("data-state", "error");
+  await expect(page.getByPlaceholder("Race Name")).toHaveCount(0);
+  await page.unroute("**/api/v1/races");
+  await page.getByTestId("create-race-gate-retry").click();
+  await expect(page.getByPlaceholder("Race Name")).toBeVisible({ timeout: 20_000 });
+});
+
+test("phone: Create Race signed out → sign in → form (mobile size)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  const email = `phone.${Date.now()}@x.test`;
+  await page.goto("/main");
+  await acceptTerms(page);
+  await page.goto("/main");
+  await page.getByRole("button", { name: /Create new race|Add/ }).first().click();
+  await expect(page.getByTestId("signin-reason-create")).toBeVisible();
+  await register(page, email);
+  await expect(page.getByPlaceholder("Race Name")).toBeVisible({ timeout: 20_000 });
+  await ctx.close();
 });
 
 const START_LIST = path.resolve(__dirname, "fixtures", "riders-import.csv"); // bibs 901–903, category "E2E Test Cat"
@@ -141,10 +161,10 @@ test("signed in: a start list imported into the new race goes to the server with
   await acceptTerms(page);
   await page.goto("/account");
   await register(page, email);
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page).toHaveURL(/\/main/, { timeout: 20_000 }); // signed in → All Races
   await createRace(page, "Import Race");
   await expect(page.getByText("Race saved to the server")).toBeVisible();
-  await page.getByText("Import Race").last().click(); // the race card (first is the shared-races list)
+  await page.getByText("Import Race").first().click();
   await expect(page).toHaveURL(/\/race\//);
 
   await importFile(page, START_LIST);
@@ -177,7 +197,8 @@ test("signed in: a start list imported into the new race goes to the server with
   await other.getByPlaceholder("Email").fill(email);
   await other.getByPlaceholder(/Password/).fill(PASSWORD);
   await other.getByRole("button", { name: "Sign in" }).click();
-  await other.getByRole("button", { name: "Open" }).click();
+  await expect(other.getByTestId("shared-races-synced")).toBeVisible({ timeout: 30_000 }); // synced in at sign-in, listed once
+  await other.getByText("Import Race").first().click();
   await expect(other.getByText("McTestface").first()).toBeVisible();
   await other.getByRole("button", { name: "Categories", exact: true }).click();
   await expect(other.getByText("E2E Test Cat").first()).toBeVisible();
@@ -187,12 +208,15 @@ test("signed in: a start list imported into the new race goes to the server with
 test("side menu: Register / Login opens /account; Logout signs out and keeps local races", async ({ page }) => {
   await page.goto("/main");
   await acceptTerms(page);
-  await createRace(page, "Kept Race");
+  // A race on this device (the demo: creating one now needs an account).
+  await page.getByRole("button", { name: /Try Demo Race/i }).click();
+  await page.waitForURL(/\/race\//);
+  await page.goto("/main");
   await page.locator("#main-menu-button").click();
   await page.getByTestId("menu-login").click();
   await expect(page).toHaveURL(/\/account$/);
   await register(page, `menu.${Date.now()}@x.test`, "Menu User");
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page).toHaveURL(/\/main/, { timeout: 20_000 }); // signed in → All Races
 
   await page.goto("/main");
   await page.locator("#main-menu-button").click();
@@ -202,5 +226,5 @@ test("side menu: Register / Login opens /account; Logout signs out and keeps loc
   await page.locator("#main-menu-button").click();
   await expect(page.getByTestId("menu-login")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByText("Kept Race").first()).toBeVisible();
+  await expect(page.getByText("Demo Race").first()).toBeVisible();
 });

@@ -86,7 +86,7 @@ async function signIn(page: Page) {
   await page.getByPlaceholder("Email").fill(EMAIL);
   await page.getByPlaceholder(/Password/).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible({ timeout: 20_000 });
+  await expect(page).toHaveURL(/\/main/, { timeout: 20_000 }); // signed in → All Races
 }
 
 /** Open the test race from the account's shared races (same path a second phone takes). */
@@ -121,7 +121,7 @@ test("PC creates, phone runs the race, both stay in sync; logout + cleared stora
     await pc.page.getByPlaceholder("Password (8+ characters)").fill(PASSWORD);
     await pc.page.getByPlaceholder("Repeat password").fill(PASSWORD);
     await pc.page.getByRole("button", { name: "Create account" }).click();
-    await expect(pc.page.getByRole("button", { name: "Sign out" })).toBeVisible({ timeout: 20_000 });
+    await expect(pc.page).toHaveURL(/\/main/, { timeout: 20_000 }); // signed in → All Races
 
     await pc.page.goto("/main");
     await pc.page.getByRole("button", { name: /Create new race|Add/ }).first().click();
