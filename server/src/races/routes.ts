@@ -15,6 +15,7 @@ import { deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
 import { accessSummary, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
+import { shareTokenFor } from "../public/shareToken.js";
 import { processActions } from "./actions.js";
 import { deleteRaceRows, insertRace, loadState } from "./repo.js";
 import { newCategory, newRider } from "./schemas.js";
@@ -200,6 +201,8 @@ racesRouter.get("/:raceUuid/changes", route(async (req, res) => {
 /** POST /races/:raceUuid/actions — a batch of Actions (≤ 100), in the Device's local order. */
 racesRouter.post("/:raceUuid/actions", route(async (req, res) => {
   const body = z.object({ actions: z.array(z.unknown()).min(1).max(100) }).parse(req.body);
+  // Only the owner changes a race (this phase): a member's access is read-only (races/access.ts
+  // phaseAccess), so processActions refuses each of their Actions as "forbidden".
   const results = await processActions(raceUuidOf(req), authed(req).userId, body.actions);
   res.json({ results });
 }));
@@ -269,9 +272,21 @@ racesRouter.get("/:raceUuid/devices", route(async (req, res) => {
 /** POST /races/:raceUuid/join-code — a new join code (the old one stops working). */
 racesRouter.post("/:raceUuid/join-code", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "update"]);
+  requireOwner(m);
   const code = randomCode(8);
   await db.query(`UPDATE races SET "joinCode" = $2 WHERE uuid = $1`, [m.raceUuid, code]);
   res.json({ joinCode: code });
+}));
+
+/**
+ * GET /races/:raceUuid/share-link — the race's public, read-only link token (owner
+ * only). Stable: the same race always gets the same token. Opening it needs no
+ * account and grants read access to that race's public data only.
+ */
+racesRouter.get("/:raceUuid/share-link", route(async (req, res) => {
+  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
+  requireOwner(m);
+  res.json({ token: shareTokenFor(m.raceUuid) });
 }));
 
 /** POST /races/:raceUuid/transfer — hand ownership to another active member (owner only). */

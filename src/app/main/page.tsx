@@ -107,7 +107,23 @@ const MainPage = () => {
   const [riderCounts, setRiderCounts] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const [loadingDemo, setLoadingDemo] = useState(false);
-  const { races, getRaces, updateRace, deleteRace } = useRaceStore();
+  const { races: deviceRaces, getRaces, updateRace, deleteRace } = useRaceStore();
+  // Race Access Rules: list only the signed-in account's races (a device can be
+  // shared by accounts) plus races never uploaded. Local builds list everything.
+  const [visibleToAccount, setVisibleToAccount] = useState<{ fn: (uuid: string) => boolean } | null>(null);
+  useEffect(() => {
+    if (!serverConfigured) return;
+    let unsub = () => {};
+    void import("@/services/live/liveClient").then((live) => {
+      const refresh = () => setVisibleToAccount({ fn: live.raceVisibleToAccount });
+      refresh();
+      unsub = live.useLiveStore.subscribe((s, prev) => {
+        if (s.accountRacesVersion !== prev.accountRacesVersion || s.user?.id !== prev.user?.id) refresh();
+      });
+    });
+    return () => unsub();
+  }, []);
+  const races = !serverConfigured ? deviceRaces : visibleToAccount ? deviceRaces.filter((r) => visibleToAccount.fn(r.uuid)) : [];
   const deleteRidersByRace = useRiderStore((s) => s.deleteRidersByRace);
 
   useEffect(() => {

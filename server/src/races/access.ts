@@ -48,8 +48,17 @@ export async function loadMembership(d: Db, raceUuid: string, userId: string): P
     roles,
     permissions,
     revoked,
-    access: revoked ? noAccess() : effectiveAccess({ isOwner, roles, permissions }),
+    access: revoked ? noAccess() : phaseAccess(effectiveAccess({ isOwner, roles, permissions }), isOwner),
   };
+}
+
+/** This phase: a member who is not the owner may view what their role shows, never write. */
+function phaseAccess(a: EffectiveAccess, isOwner: boolean): EffectiveAccess {
+  if (isOwner || !WRITES_OWNER_ONLY) return a;
+  const screens = Object.fromEntries(
+    SCREENS.map((s) => [s, { view: a.screens[s].view, create: false, update: false, delete: false }]),
+  ) as EffectiveAccess["screens"];
+  return { ...a, screens };
 }
 
 export const noAccess = (): EffectiveAccess => ({
@@ -66,6 +75,20 @@ export async function requireMember(d: Db, raceUuid: string, userId: string, nee
   const m = await loadMembership(d, raceUuid, userId);
   if (!m || m.revoked || !canSeeAnything(m.access)) throw raceNotFound();
   if (need && !m.access.screens[need[0]][need[1]]) throw new ApiError(403, "forbidden", "Your role in this race does not allow this");
+  return m;
+}
+
+/**
+ * Current phase (Race Access Rules): ONLY the race owner changes a race. Members
+ * keep read access; roles that write (start, counter, check-in, admin members) are
+ * future scope. Flip this when multi-user management is implemented.
+ */
+export const WRITES_OWNER_ONLY = true;
+
+/** Requires a membership allowed to change race data (the owner in this phase). */
+export async function requireWriter(d: Db, raceUuid: string, userId: string): Promise<Membership> {
+  const m = await requireMember(d, raceUuid, userId);
+  if (WRITES_OWNER_ONLY) requireOwner(m);
   return m;
 }
 

@@ -27,6 +27,7 @@ import { isRaceFinalized } from "@/utils/raceLock";
 import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
 // Multi-user (only with a configured server): sharing, members, sync state.
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
+const ShareRace = lazy(() => import("../../live/ShareRace"));
 const LocalOnlyBadge = lazy(() => import("../../live/LocalOnlyBadge"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
@@ -214,6 +215,7 @@ const Race: React.FC = () => {
             {live && (
               <Suspense fallback={null}>
                 <SyncBadge raceUuid={raceUuid} />
+                <ShareRace raceUuid={raceUuid} raceName={race.name} />
               </Suspense>
             )}
             {serverConfigured && !live && raceUuid !== DEMO_RACE_UUID && (

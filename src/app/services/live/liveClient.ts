@@ -33,7 +33,7 @@ import { applyingRemote, LIVE_ACCESS_EVENT, LIVE_LINKS_KEY, readLinks, setLiveBr
 
 const SERVER = String(import.meta.env.VITE_SERVER_URL ?? "").replace(/\/$/, "");
 const API = `${SERVER}/api/v1`;
-const SESSION_KEY = "commissaire.live.session";
+import { SESSION_EVENT, SESSION_KEY } from "../../live/sessionPresence";
 const ACCESS_KEY = (local: string) => `commissaire.live.access.${local}`;
 const DEVICE_KEY = "commissaire.live.deviceId";
 
@@ -73,6 +73,8 @@ interface LiveState {
   access: Record<string, AccessSummary>;
   /** New races still waiting to upload: the last error, by local race uuid. */
   publishErrors: Record<string, string>;
+  /** Bumped when the signed-in account's race list changes (My Races filter). */
+  accountRacesVersion: number;
 }
 
 export const useLiveStore = create<LiveState>(() => ({
@@ -84,6 +86,7 @@ export const useLiveStore = create<LiveState>(() => ({
   sync: {},
   access: {},
   publishErrors: {},
+  accountRacesVersion: 0,
 }));
 
 const syncOf = (local: string): RaceSync => useLiveStore.getState().sync[local] ?? { pending: 0, notApplied: [], revoked: false, lastSyncAt: null };
@@ -113,6 +116,7 @@ function saveSession(s: Session | null) {
   if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
   else localStorage.removeItem(SESSION_KEY);
   useLiveStore.setState({ user: s?.user ?? null });
+  window.dispatchEvent(new Event(SESSION_EVENT)); // route guards (live/sessionPresence.ts)
 }
 
 export class LiveApiError extends Error {
@@ -238,9 +242,53 @@ const writeLinks = (links: Record<string, LiveLink>) => localStorage.setItem(LIV
 const linkOf = (local: string): LiveLink | undefined => readLinks()[local];
 function setLink(local: string, patch: Partial<LiveLink> & { serverRaceUuid?: string }) {
   const links = readLinks();
+  const isNew = !links[local];
   const cur = links[local] ?? { serverRaceUuid: patch.serverRaceUuid!, lastSeq: 0, linkedAt: new Date().toISOString() };
   links[local] = { ...cur, ...patch };
   writeLinks(links);
+  // A race linked while signed in is one of this account's races (created, published or downloaded).
+  const known = accountRaces();
+  if (isNew && session && known) rememberAccountRaces([...known, links[local].serverRaceUuid]);
+}
+
+// ---------------------------------------------------------------------------
+// Which races on this device belong to the signed-in account. A device can be
+// used by several accounts: My Races lists only this account's server races
+// (plus races that were never uploaded). Learned from GET /races and from every
+// race this account links; unknown (never synced here) = show them all.
+
+const ACCOUNT_RACES_KEY = (userId: string) => `commissaire.live.accountRaces.${userId}`;
+function accountRaces(): string[] | null {
+  const uid = session?.user.id;
+  if (!uid) return null;
+  try {
+    return JSON.parse(localStorage.getItem(ACCOUNT_RACES_KEY(uid)) ?? "null") as string[] | null;
+  } catch {
+    return null;
+  }
+}
+function rememberAccountRaces(serverUuids: string[]) {
+  const uid = session?.user.id;
+  if (!uid) return;
+  localStorage.setItem(ACCOUNT_RACES_KEY(uid), JSON.stringify([...new Set(serverUuids)]));
+  useLiveStore.setState((s) => ({ accountRacesVersion: s.accountRacesVersion + 1 }));
+}
+
+/** May this local race be listed for the signed-in account? Signed out: no race is listed. */
+export function raceVisibleToAccount(local: string): boolean {
+  if (!session) return false;
+  const link = readLinks()[local];
+  if (!link) return true; // only on this device (never uploaded)
+  const mine = accountRaces();
+  return mine === null || mine.includes(link.serverRaceUuid);
+}
+
+/** The race's public read-only share link (owner only). Stable: the same race always gets the same link. */
+export async function shareLink(local: string): Promise<string> {
+  const link = readLinks()[local];
+  if (!link) throw new LiveApiError(400, "not_shared", "Save this race to the server first, then share it.");
+  const { token } = await api<{ token: string }>("GET", `/races/${link.serverRaceUuid}/share-link`);
+  return `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/share/${token}`;
 }
 export const localUuidOf = (serverRaceUuid: string): string | null =>
   Object.entries(readLinks()).find(([, l]) => l.serverRaceUuid === serverRaceUuid)?.[0] ?? null;
@@ -1328,6 +1376,7 @@ export function startLive() {
 export async function syncMyRaces(): Promise<{ downloaded: number; updated: number }> {
   if (!session) throw new LiveApiError(401, "signed_out", "Sign in first");
   const list = await myRaces();
+  rememberAccountRaces(list.map((r) => r.race.uuid).filter((u): u is string => !!u));
   let downloaded = 0;
   let updated = 0;
   for (const r of list) {

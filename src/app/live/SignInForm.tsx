@@ -247,11 +247,15 @@ export default function SignInForm({ next, reason = null }: { next: string | nul
               <h1 className={styles.title}>{mode === "signin" ? t("live.welcomeBack", "Sign in") : t("live.createTitle", "Create your account")}</h1>
               {reason === "create" ? (
                 <p className={own.reasonBox} data-testid="signin-reason-create" dir="auto">
-                  {t("live.reasonCreate", "Sign in or create a free account to create a race. Your races are saved to your account in the cloud, so your team can run them too. Browsing races needs no account.")}
+                  {t("live.reasonCreate", "Sign in or create a free account to create a race. Your races are saved to your account in the cloud.")}
+                </p>
+              ) : reason === "guest" ? (
+                <p className={own.reasonBox} data-testid="signin-reason-guest" dir="auto">
+                  {t("live.reasonGuest", "Sign in to see and manage your races. Got a race link from an organizer? Open it to follow that race — no account needed.")}
                 </p>
               ) : (
                 <p className={styles.muted}>
-                  {t("live.signInWhy", "An account lets your team run the same race on several phones. Local races keep working without one.")}
+                  {t("live.signInWhy", "Sign in to see and manage your races on any device.")}
                 </p>
               )}
 

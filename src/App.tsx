@@ -7,6 +7,7 @@ import { InstallPrompt } from "./app/components/pwa/InstallPrompt";
 import { UpdatePrompt } from "./app/components/pwa/UpdatePrompt";
 import { isCloudConfigured } from "./app/services/cloud/cloudConfig";
 import { initAnalytics } from "./app/services/analytics/analyticsClient";
+import AccountOnly from "./app/live/AccountOnly";
 
 // Route-level code splitting (BUGS.md #1). The landing page (`/`) stays eager as
 // the first paint; every other screen — especially the heavy Race/Heat views that
@@ -37,6 +38,8 @@ const AppToasts = lazy(() => import("./app/components/toast/AppToasts"));
 // Multi-user screens: only reachable when a Commissaire server is configured.
 const LiveAccountPage = lazy(() => import("./app/live/AccountPage"));
 const LiveInvitePage = lazy(() => import("./app/live/InvitePage"));
+// Guests: one race, read-only, through its share link (Race Access Rules).
+const SharePage = lazy(() => import("./app/share/SharePage"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 export default function App() {
@@ -84,19 +87,20 @@ export default function App() {
           <Route path="/login" element={serverConfigured ? <Navigate to="/account" replace /> : <LoginPage />} />
           <Route path="/otp" element={<OtpPage />} />
           <Route path="/loginerror" element={<LoginErrorPage />} />
-          <Route path="/main" element={<MainPage />} />
+          <Route path="/main" element={<AccountOnly><MainPage /></AccountOnly>} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/race" element={<Navigate to="/main" replace />} />
-          <Route path="/race/:id" element={<RacePage />} />
-          <Route path="/race/:id/heat/:heatId" element={<HeatPage />} />
-          <Route path="/race/:id/standing/:heatId" element={<StandingPage />} />
-          <Route path="/race/:id/results" element={<ResultsPage />} />
-          <Route path="/race/:id/board" element={<BoardPage />} />
-          {serverConfigured && <Route path="/race/:id/team" element={<TeamPage />} />}
+          <Route path="/race/:id" element={<AccountOnly><RacePage /></AccountOnly>} />
+          <Route path="/race/:id/heat/:heatId" element={<AccountOnly><HeatPage /></AccountOnly>} />
+          <Route path="/race/:id/standing/:heatId" element={<AccountOnly><StandingPage /></AccountOnly>} />
+          <Route path="/race/:id/results" element={<AccountOnly><ResultsPage /></AccountOnly>} />
+          <Route path="/race/:id/board" element={<AccountOnly><BoardPage /></AccountOnly>} />
+          {serverConfigured && <Route path="/race/:id/team" element={<AccountOnly><TeamPage /></AccountOnly>} />}
           {serverConfigured && <Route path="/account" element={<LiveAccountPage />} />}
           {serverConfigured && <Route path="/invite/:token" element={<LiveInvitePage />} />}
+          {serverConfigured && <Route path="/share/:token" element={<SharePage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

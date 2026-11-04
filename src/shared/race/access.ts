@@ -422,3 +422,41 @@ export function authorizeAction(access: EffectiveAccess, action: RaceAction, sta
       return access.isOwner ? OK : forbidden;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Guests (no account, opened through a race's share link): read-only, public data only.
+
+/** Race fields a guest may read: race information, never the join code, owner id or contact phone. */
+const RACE_PUBLIC_FIELDS = [
+  ...RACE_BASIC_FIELDS,
+  "owner", "time", "image", "heat", "type", "level", "orgenizer", "site", "distance", "takanon", "waveColors",
+  ...RACE_MAP_FIELDS,
+] as const satisfies readonly (keyof SharedRace)[];
+
+const pick = <T extends object>(src: T, fields: readonly (keyof T)[]): Partial<T> => {
+  const out: Partial<T> = {};
+  for (const f of fields) out[f] = src[f];
+  return out;
+};
+
+/**
+ * What a guest receives of a race: race information, categories (with schedule and
+ * start times) and riders' names, bibs and results. Never participant details
+ * (check-in, comments, IDs, points), never members or management data. Ignored
+ * waves stay hidden.
+ */
+export function projectPublicState(state: RaceState): {
+  race: Partial<SharedRace>;
+  categories: SharedCategory[];
+  riders: Partial<SharedRider>[];
+} {
+  const categories = Object.values(state.categories).filter((c) => !c.ignored);
+  const visible = new Set(categories.map((c) => `${c.name}::${c.subCategory ?? ""}`));
+  return {
+    race: pick(state.race, RACE_PUBLIC_FIELDS),
+    categories,
+    riders: Object.values(state.riders)
+      .filter((r) => visible.has(`${r.category}::${r.subCategory ?? ""}`))
+      .map((r) => pick(r, [...RIDER_PUBLIC_FIELDS, ...RIDER_RESULT_FIELDS])),
+  };
+}

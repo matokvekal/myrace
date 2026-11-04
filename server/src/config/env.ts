@@ -80,6 +80,9 @@ const schema = z.object({
   SMS_ENABLED: bool,
   SMS_PROVIDER: z.enum(["log"]).default("log"),
   RESULTS_SIGNING_KEY: z.string().optional().default(""),
+  // Signs race share links (/share/<token>). Unset: derived from JWT_ACCESS_SECRET, so
+  // links stay stable without new configuration. Changing it invalidates every link.
+  SHARE_LINK_SECRET: z.string().optional().default(""),
   RESULTS_SIGNING_KEY_ID: z.string().default("dev"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });

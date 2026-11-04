@@ -10,6 +10,7 @@ import { directoryRouter } from "./directory/routes.js";
 import { ApiError, logger } from "./lib/core.js";
 import { invitationsRouter, membersRouter, myInvitationsRouter } from "./members/routes.js";
 import { preferencesRouter } from "./preferences/routes.js";
+import { publicRouter } from "./public/routes.js";
 import { racesRouter } from "./races/routes.js";
 import { resultsRouter } from "./results/routes.js";
 
@@ -31,6 +32,8 @@ export function createApp() {
   app.get("/api/v1/time", (_req, res) => res.json({ now: Date.now() }));
 
   app.use("/api/v1/auth", authRouter);
+  // Guests: read-only, one race per share link, no account (public/routes.ts).
+  app.use("/api/v1/public", publicRouter);
   app.use("/api/v1/me/invitations", myInvitationsRouter);
   app.use("/api/v1/me", directoryRouter);
   app.use("/api/v1/me", preferencesRouter);
