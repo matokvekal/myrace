@@ -228,7 +228,16 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
       setBibError(`Bib ${bib} is already used by ${clash.lastName} ${clash.firstName}`);
       return;
     }
-    await updateRider({ ...rider, bibNumber: bib });
+    // A rider handing in a new bib is standing at the desk — check them in too
+    // (same DNS rule as toggleCheck: a checked-in rider can't stay DNS).
+    const wasChecked = rider.checked;
+    await updateRider({
+      ...rider,
+      bibNumber: bib,
+      checked: true,
+      ...(rider.status === "DNS" ? { status: "standing" as const } : {}),
+    });
+    if (!wasChecked) void recordCheckin({ ...rider, bibNumber: bib }, true);
     logCheckInChange(raceUuid, {
       kind: "bib",
       wave: waveNum,
