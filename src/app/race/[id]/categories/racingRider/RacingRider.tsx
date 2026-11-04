@@ -349,30 +349,35 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
         </div>
       )}
       <div className={styles.bib}><BibBadge rider={rider} /></div>
-      <div className={styles.laps}>
-        <span className={styles.lapsLabel}>finish:</span>
-        {rider.lapsCounter}/{rider.totalLaps}
+      {/* Timing panel: one integrated dark strip — laps and position, status, then times. */}
+      <div className={styles.panel}>
+        <div className={styles.panelTop}>
+          <div className={styles.laps}>
+            <span className={styles.lapsLabel}>finish:</span>
+            <span className={styles.lapsValue}>{rider.lapsCounter}/{rider.totalLaps}</span>
+          </div>
+          <div className={`${styles.pos} ${medalClass ? styles.posMedal : ""} ${medalClass}`}>{catPos ?? "—"}</div>
+        </div>
+        {rider.totalLaps > 0 && (
+          <div className={styles.remaining} data-state={hasFinished ? "finished" : phase.remaining === 1 || showStripes ? "last" : undefined}>
+            {/* Category-wide signals override the rider's own count: once the
+                leader is on the last lap everyone is, and once the leader has
+                finished everyone finishes on the next crossing. */}
+            {hasFinished ? 'Finished' : `${phase.remaining} left`}
+          </div>
+        )}
+        {!hasStarted ? (
+          <div className={styles.lapTime}>
+            <span className={styles.lapTimeCell}>00:00</span>
+            <span className={styles.lapTimeCell}>00:00</span>
+          </div>
+        ) : (lastLapTime || sinceArrive) && (
+          <div className={styles.lapTime}>
+            <span className={styles.lapTimeCell}>{lastLapTime ?? "--:--"}</span>
+            <span className={styles.lapTimeCell}>{sinceArrive ?? "--:--"}</span>
+          </div>
+        )}
       </div>
-      {rider.totalLaps > 0 && (
-        <div className={styles.remaining}>
-          {/* Category-wide signals override the rider's own count: once the
-              leader is on the last lap everyone is, and once the leader has
-              finished everyone finishes on the next crossing. */}
-          {hasFinished ? 'Finished' : `${phase.remaining} left`}
-        </div>
-      )}
-      {!hasStarted ? (
-        <div className={styles.lapTime}>
-          <span className={styles.lapTimeCell}>00:00</span>
-          <span className={styles.lapTimeCell}>00:00</span>
-        </div>
-      ) : (lastLapTime || sinceArrive) && (
-        <div className={styles.lapTime}>
-          <span className={styles.lapTimeCell}>{lastLapTime ?? "--:--"}</span>
-          <span className={styles.lapTimeCell}>{sinceArrive ?? "--:--"}</span>
-        </div>
-      )}
-      <div className={`${styles.pos} ${medalClass ? styles.posMedal : ""} ${medalClass}`}>{catPos ?? "—"}</div>
     </div>
   );
 };

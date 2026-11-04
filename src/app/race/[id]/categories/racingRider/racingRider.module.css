@@ -400,80 +400,151 @@
 }
 
 
-/* ═══ Readability on every category colour — typography, not boxes ═══
-   RacingRider sets data-ink from the colour's luminance (WCAG crossover):
-   "dark" on light colours (yellow, orange, red, light blue), "light" on deep
-   ones. The card keeps its own colour and shape; contrast comes from the ink
-   colour, weight and a fine shadow (engraved on light cards, soft drop on deep
-   ones). The counters stay plain text — no pills, plates or borders. */
+/* ═══ Card composition: a sports-timing card, not a set of buttons ═══
+   Hierarchy: the BIB is the hero, set straight on the category colour; below it
+   ONE integrated dark timing panel (small 5px radius, no pills, no borders)
+   carries the data in a fixed order — laps + position, status, then times —
+   always in light ink, so it reads the same on every category colour.
+   RacingRider sets data-ink (WCAG crossover 0.179) for the bib on the colour. */
 
-/* Counters: a touch larger and firmer, still type, not badges. */
-.laps {
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
+.rider {
+  justify-content: space-between;
+  padding: 7px 5px 5px;
+  gap: 5px;
+}
+
+/* Bib on the category colour */
+.rider[data-ink="dark"] .bib { color: #0b1220; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+.rider[data-ink="light"] .bib { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.bib {
+  margin-top: 2px;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
-.lapsLabel {
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+
+/* The timing panel */
+.panel {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 5px 4px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(9, 14, 26, 0.6) 0%, rgba(9, 14, 26, 0.76) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: #fff;
 }
-.remaining {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+
+.panelTop {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.rider .laps {
+  align-items: flex-start;
+  line-height: 1;
+  color: #fff;
+  text-shadow: none;
+}
+.rider .lapsLabel {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  background: none;
-  padding: 0;
-  border-radius: 0;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 2px;
+}
+.lapsValue {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.rider .pos {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow: none;
   font-variant-numeric: tabular-nums;
 }
-.lapTime {
-  font-size: 10px;
-  font-weight: 700;
+
+/* Status: one quiet uppercase line; colour only for the two states that matter */
+.rider .remaining {
+  margin: 0;
+  padding: 2px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+  background: none;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: none;
 }
+.rider .remaining[data-state="last"] { color: #ffd60a; }
+.rider .remaining[data-state="finished"] { color: #5ee38a; }
 
-/* Classic skin */
-.rider[data-ink="dark"] .bib,
-.rider[data-ink="dark"] .pos { color: #0b1220; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
-.rider[data-ink="dark"] .laps,
-.rider[data-ink="dark"] .remaining,
-.rider[data-ink="dark"] .lapTime { color: #111a2b; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3); }
-.rider[data-ink="dark"] .lapsLabel { color: rgba(11, 18, 32, 0.72); }
-.rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(11, 18, 32, 0.35); }
+/* Times: last lap | since last crossing, tabular, centred */
+.rider .lapTime {
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.86);
+  text-shadow: none;
+  font-variant-numeric: tabular-nums;
+}
+.rider .lapTimeCell { padding: 0 3px; }
+.rider .lapTimeCell + .lapTimeCell { border-left: 1px solid rgba(255, 255, 255, 0.22); }
 
-.rider[data-ink="light"] .bib,
-.rider[data-ink="light"] .pos { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
-.rider[data-ink="light"] .laps,
-.rider[data-ink="light"] .remaining,
-.rider[data-ink="light"] .lapTime { color: rgba(255, 255, 255, 0.96); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
-.rider[data-ink="light"] .lapsLabel { color: rgba(255, 255, 255, 0.8); }
-.rider[data-ink="light"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(255, 255, 255, 0.45); }
+/* Podium: a small rectangular metal tag, not a pill */
+.rider .pos.posMedal {
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #2a2000;
+  text-shadow: none;
+  transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.rider .pos.posMedal.posGold { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 0 1px rgba(244, 179, 0, 0.45); }
+.rider .pos.posMedal.posBronze { color: #fff; }
 
-/* PRO skin: the original pink kit lettering stays on deep colours (its identity);
-   on light colours the same italic type is set in deep ink, and the bottom of the
-   gloss is lighter so the lower rows (times, position) don't sink into it. */
+/* Still on track after the race ended: a flat strip, square to the card top */
+.onTrackRibbon { border-radius: 15px 15px 0 0; font-size: 8.5px; letter-spacing: 0.1em; }
+
+/* ── PRO skin: same composition, arcade identity — gloss card, italic pink kit
+   lettering in a deeper panel with a pink hairline. */
+:root[data-skin="gaming"] .rider[data-ink="dark"] .bib { color: #170a1f; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4); }
+:root[data-skin="gaming"] .rider[data-ink="light"] .bib { color: #ffd6e8; text-shadow: 0 2px 3px rgba(0, 0, 0, 0.55); }
 :root[data-skin="gaming"] .rider[data-ink="dark"] {
   background-image:
     linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 45%, rgba(0, 0, 0, 0.06) 55%, rgba(0, 0, 0, 0.12) 100%),
     repeating-conic-gradient(rgba(0, 0, 0, 0.035) 0% 25%, transparent 0% 50%) !important;
 }
-:root[data-skin="gaming"] .rider[data-ink="dark"] .bib,
-:root[data-skin="gaming"] .rider[data-ink="dark"] .pos { color: #170a1f; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4); }
-:root[data-skin="gaming"] .rider[data-ink="dark"] .laps,
-:root[data-skin="gaming"] .rider[data-ink="dark"] .remaining,
-:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTime { color: #1d1027; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
-:root[data-skin="gaming"] .rider[data-ink="dark"] .lapsLabel { color: rgba(23, 10, 31, 0.72); }
-:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(23, 10, 31, 0.35); }
-
-:root[data-skin="gaming"] .rider[data-ink="light"] .laps,
-:root[data-skin="gaming"] .rider[data-ink="light"] .remaining,
-:root[data-skin="gaming"] .rider[data-ink="light"] .lapTime { color: #ffe3ef; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
-:root[data-skin="gaming"] .rider[data-ink="light"] .lapsLabel { color: rgba(255, 227, 239, 0.82); }
-
-/* Medal chips keep their own ink. */
-.rider[data-ink] .pos.posMedal,
-:root[data-skin="gaming"] .rider[data-ink] .pos.posMedal { color: #2a2000; text-shadow: none; }
-.rider[data-ink] .pos.posMedal.posBronze,
-:root[data-skin="gaming"] .rider[data-ink] .pos.posMedal.posBronze { color: #fff; }
+:root[data-skin="gaming"] .panel {
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(24, 6, 32, 0.68) 0%, rgba(12, 2, 18, 0.86) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 232, 0.16);
+}
+:root[data-skin="gaming"] .rider .laps,
+:root[data-skin="gaming"] .rider .pos,
+:root[data-skin="gaming"] .rider .lapTime { color: #ffe3ef; text-shadow: none; }
+:root[data-skin="gaming"] .rider .lapsValue,
+:root[data-skin="gaming"] .rider .pos { font-style: italic; }
+:root[data-skin="gaming"] .rider .pos:not(.posMedal) { transform: skewX(-8deg); }
+:root[data-skin="gaming"] .rider .lapsLabel { color: rgba(255, 214, 232, 0.6); }
+:root[data-skin="gaming"] .rider .remaining { color: rgba(255, 214, 232, 0.85); border-top-color: rgba(255, 214, 232, 0.16); }
+:root[data-skin="gaming"] .rider .remaining[data-state="last"] { color: #ffd60a; }
+:root[data-skin="gaming"] .rider .remaining[data-state="finished"] { color: #6ff09a; }
+:root[data-skin="gaming"] .rider .lapTimeCell + .lapTimeCell { border-left-color: rgba(255, 214, 232, 0.28); }
+:root[data-skin="gaming"] .rider .pos.posMedal { color: #2a2000; font-style: normal; }
+:root[data-skin="gaming"] .rider .pos.posMedal.posBronze { color: #fff; }
