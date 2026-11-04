@@ -12,7 +12,7 @@ Read Order
 1. ../../../../AGENT.md
 2. ../AGENT.md
 3. ../../../../../docs/cloud/0-START.md
-5. ../../services/cloud/AGENT.md (the underlying sync/auth logic)
+4. ../../services/cloud/AGENT.md (the underlying sync/auth logic)
 
 Immediate Children Summary
 
