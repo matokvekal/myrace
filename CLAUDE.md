@@ -217,6 +217,15 @@ still open).
   titled "Live Settings") and the heat page must pick up the change without a
   remount.
 
+### Live screen readability, filter, Recap (2026-11-04)
+- Rider cards pick their ink from the category colour (`data-ink` dark/light in
+  `RacingRider`, WCAG crossover 0.179, not 0.5); the "finish X/TOTAL" and "N left"
+  counters sit on solid plates in both skins. Don't go back to fixed ink colours.
+- Category filter options = the wave's categories that have riders of this race
+  (`heat/[heatId]/liveFilter.ts`), with counts; stale choices drop on wave change.
+- Recap mode is toggled from the Wave info sheet (tap the wave chip), not the
+  filter panel. Finish Wave is an outlined button; the typed FINISH confirm stays.
+
 ### Card cover (heat page)
 - How long a tapped card stays washed out: 10 s / 30 s / 2 min / 4 min, default 10 s
   (`coverMs` in `boardHoldStore`, set in Race Setup). Separate from the board hold:

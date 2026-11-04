@@ -8,6 +8,7 @@ import { useBoardHold } from "@/stores/boardHoldStore";
 import { Bell } from "lucide-react";
 import { toPhaseRider } from "@/utils/linkedGroups";
 import { riderPhase, NO_GROUP_PHASE, type RiderPhase } from "../../../../../shared/race/finishPhases";
+import { getColorLuminance } from "@/utils/colorUtils";
 
 interface Props {
   rider: RiderProps;
@@ -214,6 +215,10 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
   }, [paceElapsedLen, paceRingPointAt]);
 
   const bgStyle = color;
+  // Ink that reads on this category colour: dark on light colours (yellow, orange,
+  // light blue…), light on dark ones. 0.179 is where black and white give equal
+  // contrast (WCAG), so orange gets dark text — the old 0.5 cut gave it white.
+  const ink = getColorLuminance(color) / 255 > 0.179 ? "dark" : "light";
 
   // Single source of truth for tap disambiguation: the browser always eventually fires
   // a 'click' event, for touch and mouse alike (the viewport meta tag already kills the
@@ -279,6 +284,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       data-recorded={isRecorded ? "true" : undefined}
       data-cooldown={coolingDown ? "true" : undefined}
       data-covered={covered ? "true" : undefined}
+      data-ink={ink}
       className={`${styles.rider} ${glowClass} ${isRecorded || covered ? styles.recorded : ""} ${raceEnded ? styles.onTrack : ""}`}
       style={{ background: bgStyle, "--glow-color": color } as React.CSSProperties}
       onClick={handleClick}

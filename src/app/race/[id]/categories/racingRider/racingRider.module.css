@@ -399,3 +399,100 @@
   z-index: 2;
 }
 
+
+/* ═══ Readability on any category colour (both skins) ═══
+   RacingRider sets data-ink from the colour's luminance: "dark" ink on light
+   colours (yellow, orange, light blue), "light" ink on dark ones. The two
+   counters — "finish X/TOTAL" and "N left" — sit on a solid plate so the gloss,
+   checker pattern and colour behind them can't eat the text. */
+.laps {
+  font-size: 12px;
+  font-weight: 800;
+}
+.lapsLabel {
+  font-size: 9px;
+  font-weight: 700;
+}
+.remaining {
+  font-size: 12px;
+  font-weight: 800;
+}
+.lapTime {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rider[data-ink="dark"] .bib,
+.rider[data-ink="dark"] .pos { color: #0b0f19; }
+.rider[data-ink="dark"] .lapTime { color: #111827; }
+.rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(17, 24, 39, 0.45); }
+
+.rider[data-ink="light"] .bib,
+.rider[data-ink="light"] .pos { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.rider[data-ink="light"] .lapTime { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.rider[data-ink="light"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(255, 255, 255, 0.55); }
+
+/* Counter plates */
+.rider .laps,
+.rider .remaining {
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.rider[data-ink="dark"] .laps,
+.rider[data-ink="dark"] .remaining {
+  background: rgba(255, 255, 255, 0.78);
+  color: #0b0f19;
+  text-shadow: none;
+}
+.rider[data-ink="dark"] .lapsLabel { color: #374151; }
+.rider[data-ink="light"] .laps,
+.rider[data-ink="light"] .remaining {
+  background: rgba(0, 0, 0, 0.42);
+  color: #ffffff;
+  text-shadow: none;
+}
+.rider[data-ink="light"] .lapsLabel { color: rgba(255, 255, 255, 0.85); }
+
+/* PRO skin: same rules win over its pink lettering; calmer pattern + gloss. */
+:root[data-skin="gaming"] .rider {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(0, 0, 0, 0.06) 55%, rgba(0, 0, 0, 0.14) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.025) 0% 25%, transparent 0% 50%) !important;
+}
+:root[data-skin="gaming"] .rider[data-ink="dark"] .bib,
+:root[data-skin="gaming"] .rider[data-ink="dark"] .pos {
+  color: #0b0f19;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTime {
+  color: #111827;
+  text-shadow: none;
+}
+:root[data-skin="gaming"] .rider[data-ink="light"] .bib,
+:root[data-skin="gaming"] .rider[data-ink="light"] .pos,
+:root[data-skin="gaming"] .rider[data-ink="light"] .lapTime {
+  color: #ffffff;
+}
+:root[data-skin="gaming"] .rider[data-ink="dark"] .laps,
+:root[data-skin="gaming"] .rider[data-ink="dark"] .remaining {
+  background: rgba(255, 255, 255, 0.8);
+  color: #0b0f19;
+  text-shadow: none;
+  padding: 1px 7px;
+}
+:root[data-skin="gaming"] .rider[data-ink="dark"] .lapsLabel { color: #374151; }
+:root[data-skin="gaming"] .rider[data-ink="light"] .laps,
+:root[data-skin="gaming"] .rider[data-ink="light"] .remaining {
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  text-shadow: none;
+  padding: 1px 7px;
+}
+:root[data-skin="gaming"] .rider[data-ink="light"] .lapsLabel { color: rgba(255, 255, 255, 0.85); }
+:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(17, 24, 39, 0.45); }
+
+/* Medal chips keep their own ink on top of the readability rules above. */
+.rider[data-ink] .pos.posMedal,
+:root[data-skin="gaming"] .rider[data-ink] .pos.posMedal { color: #2a2000; text-shadow: none; }
+.rider[data-ink] .pos.posMedal.posBronze,
+:root[data-skin="gaming"] .rider[data-ink] .pos.posMedal.posBronze { color: #fff; }

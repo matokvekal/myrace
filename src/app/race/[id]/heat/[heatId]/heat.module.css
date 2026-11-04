@@ -1288,16 +1288,39 @@
 }
 
 /* Finish Wave (manual, from Live) */
+/* Finish Wave: a calm, clearly labelled action (not an alarm). It still asks
+   for the typed FINISH confirmation; red appears only on hover / press. */
 .finishWaveBtn {
   min-height: 44px;
   padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 22px;
-  border: 2px solid #b91c1c;
-  background: #dc2626;
-  color: #fff;
-  font-weight: 800;
+  border: 1.5px solid #94a3b8;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.finishWaveBtn svg {
+  color: #64748b;
+}
+@media (hover: hover) {
+  .finishWaveBtn:not(:disabled):hover {
+    border-color: #dc2626;
+    color: #b91c1c;
+    background: #fef2f2;
+  }
+  .finishWaveBtn:not(:disabled):hover svg { color: #dc2626; }
+}
+.finishWaveBtn:not(:disabled):active {
+  border-color: #dc2626;
+  background: #fee2e2;
+  color: #991b1b;
 }
 .finishWaveBtn:disabled {
   opacity: 0.45;
@@ -1529,4 +1552,10 @@
   filter: grayscale(1);
   cursor: not-allowed;
   pointer-events: none;
+}
+
+:global([data-theme="dark"]) .finishWaveBtn {
+  background: var(--surface-1, #1f2937);
+  color: var(--text-primary, #e5e7eb);
+  border-color: #64748b;
 }

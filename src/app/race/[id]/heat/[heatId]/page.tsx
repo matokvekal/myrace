@@ -39,8 +39,9 @@ import { jokerResolveBlock } from "./jokerResolve";
 import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
+import { liveFilterOptions } from "./liveFilter";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
-import { Bike, List, ChevronDown } from "lucide-react";
+import { Bike, List, ChevronDown, Flag } from "lucide-react";
 import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 // Shared races: the sync state where it matters most (offline / waiting to send).
@@ -166,11 +167,22 @@ const Heat: React.FC = () => {
   // then finished, then not-started LAST. Not-started categories have no cards on
   // Live, so they're shown greyed-out and can't be selected — you can only filter
   // to categories that have started (user request).
-  const filterCategories = useMemo(() => {
-    const rank = (status?: string) =>
-      status === "running" ? 0 : status === "finished" ? 1 : 2;
-    return [...waveCategories].sort((a, b) => rank(a.status) - rank(b.status));
-  }, [waveCategories]);
+  // Only categories that actually have riders in THIS wave (and this race): a
+  // category the schedule places here but with nobody in it (e.g. all its riders
+  // are in another wave, or it has none) is not a filter option. Recomputed on
+  // wave change and whenever riders change.
+  const filterCategories = useMemo(
+    () => liveFilterOptions(waveCategories, riders, raceUuid),
+    [waveCategories, riders, raceUuid]
+  );
+  // Drop filter choices that are no longer options (wave switched, riders moved).
+  useEffect(() => {
+    const valid = new Set(filterCategories.map(({ cat }) => catKey(cat.name, cat.subCategory)));
+    setFilterCats((prev) => {
+      const next = new Set([...prev].filter((k) => valid.has(k)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filterCategories]);
 
   const filteredRiders = useMemo(
     () => {
@@ -892,6 +904,18 @@ const Heat: React.FC = () => {
                 {cat.laps && <span className={styles.waveModalLaps}>{cat.laps} laps</span>}
               </div>
             ))}
+            {/* RECAP (re-entering passages after the fact) lives here, off the filters:
+                an occasional tool, not a way to filter the board. */}
+            <div className={styles.filterDivider} />
+            <label className={styles.filterPanelRow}>
+              <input
+                type="checkbox"
+                data-testid="recap-btn"
+                checked={recap.active}
+                onChange={() => (recap.active ? exitRecap() : recap.enter())}
+              />
+              <span>Recap mode <span className={styles.filterStatusTag}>6-min duplicate check, ends after 30 s idle</span></span>
+            </label>
           </div>
         </div>
       )}
@@ -1084,7 +1108,7 @@ const Heat: React.FC = () => {
                   title={startedWaveCats.length === 0 ? "This wave has not started" : "Finish this wave now"}
                   onClick={() => setShowFinishWave(true)}
                 >
-                  Finish Wave {heatId}
+                  <Flag size={15} aria-hidden="true" /> Finish Wave {heatId}
                 </button>
               )
             )}
@@ -1108,7 +1132,7 @@ const Heat: React.FC = () => {
                 <span>{t("heat.allCategories", "All categories")}</span>
               </label>
               <div className={styles.filterDivider} />
-              {filterCategories.map((cat) => {
+              {filterCategories.map(({ cat, riders: catRiderCount }) => {
                 const running = cat.status === "running";
                 const finished = cat.status === "finished";
                 const notStarted = !running && !finished;
@@ -1128,21 +1152,11 @@ const Heat: React.FC = () => {
                     <span>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
                     {notStarted && <span className={styles.filterStatusTag}>{t("heat.notStarted", "not started")}</span>}
                     {finished && <span className={styles.filterStatusTagDone}>{t("heat.finished", "finished")}</span>}
+                    <span className={styles.filterLapTag} data-testid={`filter-count-${cat.id}`}>{catRiderCount} riders</span>
                     {cat.laps && <span className={styles.filterLapTag}>{cat.laps}L</span>}
                   </label>
                 );
               })}
-              <div className={styles.filterDivider} />
-              {/* RECAP: off the main screen, still available here */}
-              <label className={styles.filterPanelRow}>
-                <input
-                  type="checkbox"
-                  data-testid="recap-btn"
-                  checked={recap.active}
-                  onChange={() => (recap.active ? exitRecap() : recap.enter())}
-                />
-                <span>Recap mode <span className={styles.filterStatusTag}>6-min duplicate check, ends after 30 s idle</span></span>
-              </label>
             </div>
           </div>
         )}
