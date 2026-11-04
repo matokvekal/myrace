@@ -30,6 +30,7 @@ import { useCloudStore } from "@/stores/cloudStore";
 import { canForRace } from "./permissions";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
+import { newLocalId } from "@/utils/localId";
 
 // Postgres error codes
 const UNIQUE_VIOLATION = "23505";
@@ -155,7 +156,7 @@ export async function downloadRaceFromCloud(
          const localRace: RaceProps = snapshot
             ? { ...snapshot, uuid: localId }
             : ({
-                 id: Date.now(),
+                 id: newLocalId(),
                  uuid: localId,
                  name: raceRow.name,
                  date: raceRow.race_date ?? "",

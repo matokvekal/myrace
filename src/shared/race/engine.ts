@@ -319,8 +319,13 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       const running = Object.values(state.categories).find((c) => c.status === "running" && c.heat !== heat);
       if (running) return notApplied("locked"); // one wave at a time
       const wanted = action.payload.categoryUuids;
+      // A category with no wave yet (heat null/0: the app derives its wave from the start
+      // time) is started when the Device names it, and takes this wave from then on.
+      // Matching on heat alone left such races "started" on the phone and never on the
+      // server, so the server's rows later reset the riders and their cards vanished.
+      const inWave = (c: SharedCategory) => c.heat === heat || (!!wanted && !c.heat && wanted.includes(c.uuid));
       const cats = Object.values(state.categories).filter(
-        (c) => c.heat === heat && !c.ignored && c.status !== "running" && c.status !== "finished" && (!wanted || wanted.includes(c.uuid)),
+        (c) => inWave(c) && !c.ignored && c.status !== "running" && c.status !== "finished" && (!wanted || wanted.includes(c.uuid)),
       );
       if (cats.length === 0) return { applied: true, changes: ch }; // first start wins; nothing left to start
       // Close out riders of already-finished categories still on track (prior-wave sweep).
@@ -334,6 +339,7 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       }
       const clock = localClock(action.deviceTime);
       for (const c of cats) {
+        if (!c.heat) c.heat = heat;
         c.status = "running";
         c.startedAt = atMs;
         ch.categories.add(c.uuid);

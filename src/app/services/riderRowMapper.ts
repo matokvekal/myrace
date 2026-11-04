@@ -5,6 +5,7 @@ import { splitFullName } from "@/services/csvMapper";
 import useClubDictionaryStore from "@/stores/clubDictionaryStore";
 import { normalizeColor } from "@/utils/bibColors";
 import { normalizeUciId } from "@/utils/uciId";
+import { newLocalId } from "@/utils/localId";
 
 /**
  * Build a rider from one parsed CSV/scan row using the resolved column mappings.
@@ -177,7 +178,7 @@ export function rowToRider(
   }
 
   return {
-    id: Date.now() + index,
+    id: newLocalId(),
     raceUuid,
     bibNumber: data.bibNumber ?? 0,
     firstName: data.firstName ?? "",

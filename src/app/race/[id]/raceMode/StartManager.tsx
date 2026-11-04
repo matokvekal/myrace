@@ -7,7 +7,7 @@ import useRaceStore from "@/stores/racesStore";
 import Icons from "@/constants/Icons";
 import Button from "@/components/ui/Button";
 import { Plus, Edit2, GripVertical, X, Trash2, AlertTriangle, Play, Pause, Flag, ChevronUp, ChevronDown } from "lucide-react";
-import { riderInCategory } from "../schedule/Schedule";
+import { freezeDerivedWaves, riderInCategory } from "../schedule/Schedule";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
 import { isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
@@ -580,8 +580,16 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
       setStartError(errors);
       return;
     }
+    // Save the waves the schedule derived from start times (categories without one)
+    // BEFORE starting: the server starts categories by wave, and a wave it doesn't
+    // know started nothing there. Then re-read, so the writes below keep the wave.
+    const raceCats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === raceUuid);
+    for (const c of freezeDerivedWaves(raceCats)) await updateCategory(c);
+    const fresh = (id: number) =>
+      useCategoryStore.getState().categories.find((c) => c.id === id) ?? categories.find((c) => c.id === id);
+
     // Shared race: one WaveStarted for this start group (the server stamps the start time).
-    const groupCats = group.categoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) as CategoryProps[];
+    const groupCats = group.categoryIds.map(fresh).filter(Boolean) as CategoryProps[];
     const startPayload = {
       heat: groupCats[0]?.heat ?? Number(waveNum),
       categoryUuids: groupCats.filter((c) => c.status === "upcoming" && c.uuid).map((c) => c.uuid!),
@@ -598,7 +606,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
     if (race) await updateRace({ ...race, status: "running" });
 
     const cats = group.categoryIds
-      .map((id) => categories.find((c) => c.id === id))
+      .map(fresh)
       .filter(Boolean) as CategoryProps[];
 
     const allUpdatedRiders: RiderProps[] = [];

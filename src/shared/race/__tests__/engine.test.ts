@@ -179,6 +179,28 @@ describe("waves", () => {
     expect(applyAction(s, makeAction("WaveStarted", { heat: 2 }), T0 + MIN)).toEqual({ applied: false, reason: "locked" });
   });
 
+  it("a named category with no wave yet (start-time-derived in the app) starts and takes the wave", () => {
+    // Production race 2026-11-04: categories imported without a wave column had heat null,
+    // so WaveStarted{heat:1} started nothing on the server while the phone showed the wave running.
+    const noWave = makeCategory({ name: "Kids", heat: null, laps: 2 });
+    const other = makeCategory({ name: "Later", heat: null, laps: 2 });
+    const s = makeRaceState({ categories: [noWave, other], riders: [makeRider({ category: "Kids", heat: 0 }), makeRider({ category: "Later", heat: 0 })] });
+    const r = applyAction(s, makeAction("WaveStarted", { heat: 1, categoryUuids: [noWave.uuid] }), T0);
+    expect(r.applied).toBe(true);
+    expect(s.categories[noWave.uuid]).toMatchObject({ status: "running", heat: 1, startedAt: T0 });
+    expect(s.categories[other.uuid]).toMatchObject({ status: "upcoming", heat: null }); // not named: untouched
+    const [kid, later] = Object.values(s.riders);
+    expect(kid.timeStartRace).not.toBeNull();
+    expect(later.timeStartRace).toBeNull();
+  });
+
+  it("without named categories a wave-less category is not started (no guessing on the server)", () => {
+    const noWave = makeCategory({ name: "Kids", heat: null, laps: 2 });
+    const s = makeRaceState({ categories: [noWave], riders: [makeRider({ category: "Kids", heat: 0 })] });
+    applyAction(s, makeAction("WaveStarted", { heat: 1 }), T0);
+    expect(s.categories[noWave.uuid].status).toBe("upcoming");
+  });
+
   it("finishing the wave closes out riders still on track as finishers — never DNF", () => {
     const s = twoWaves();
     applyAction(s, makeAction("WaveStarted", { heat: 1 }), T0);

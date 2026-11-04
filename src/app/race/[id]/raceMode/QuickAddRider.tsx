@@ -5,6 +5,7 @@ import useRiderStore from "@/stores/ridersStore";
 import { logCheckInChange } from "@/stores/checkInChangesStore";
 import { canForRace } from "@/services/cloud/permissions";
 import { canOnScreen } from "@/services/live/liveBridge";
+import { newLocalId } from "@/utils/localId";
 
 /**
  * The ONE rule for who may add a rider, on every screen that offers it
@@ -63,7 +64,7 @@ const QuickAddRider: React.FC<Props> = ({ raceUuid, waveNum, categories, fixedCa
     const nextStanding = sameCat.length + 1;
 
     const newRider = {
-      id: Date.now(),
+      id: newLocalId(),
       raceUuid,
       bibNumber: bib,
       firstName: form.firstName,

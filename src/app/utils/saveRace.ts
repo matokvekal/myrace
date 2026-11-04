@@ -11,6 +11,7 @@ import useRiderStore from "@/stores/ridersStore";
 import { logAnalyticsEvent } from "@/services/analytics/analyticsClient";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 import type { NewRaceStorage } from "@/services/live/liveClient";
+import { newLocalId } from "@/utils/localId";
 
 const DEFAULT_IMAGES = [
   Images.bikeMountainSplash,
@@ -60,7 +61,7 @@ export const saveRace = async (
     const raceId = generateRaceId(resolvedDate, resolvedName);
 
     const newRace: RaceProps = {
-      id: Date.now(),
+      id: newLocalId(),
       uuid: (crypto.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = (Math.random() * 16) | 0;
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);

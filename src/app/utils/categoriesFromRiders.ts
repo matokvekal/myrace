@@ -1,6 +1,7 @@
 import { CategoryProps, RiderProps } from "@/types/types";
 import { assignCategoryColors } from "@/utils/colorAssignment";
 import { COLORS } from "@/constants/index";
+import { newLocalId } from "@/utils/localId";
 
 /** "8:05" / "08:05:00" → "08:05"; non-zero seconds are kept (08:22:30 is its own start). */
 const normTime = (t: string | null | undefined): string | null => {
@@ -44,7 +45,7 @@ export function buildCategoriesFromRiders(riders: RiderProps[], raceUuid: string
     if (!map[key]) {
       const n = Object.keys(map).length;
       map[key] = {
-        id: Date.now() + n,
+        id: newLocalId(),
         raceUuid,
         name: r.category,
         subCategory: r.subCategory || null,

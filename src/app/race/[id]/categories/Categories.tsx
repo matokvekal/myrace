@@ -18,6 +18,7 @@ import { isLeaderFinishAll } from "@/utils/linkedGroups";
 import { PREDEFINED_CATEGORY_TEMPLATES } from "@/constants/categoryTemplates";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 import { getRaceTracks } from "@/utils/raceTracks";
+import { newLocalId } from "@/utils/localId";
 
 interface CategoriesProps {
   raceUuid: string;
@@ -77,7 +78,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
       // instead of creating nested ones.
       template.subCategories.forEach((subCat, idx) => {
         const newCat: CategoryProps = {
-          id: Date.now() + idx,
+          id: newLocalId(),
           raceUuid,
           name: `${template.name} ${subCat}`.trim(),
           subCategory: null,
@@ -94,7 +95,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
       });
     } else {
       const newCat: CategoryProps = {
-        id: Date.now(),
+        id: newLocalId(),
         raceUuid,
         name: template.name,
         subCategory: null,
@@ -267,7 +268,7 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
     }
 
     const newCat: CategoryProps = {
-      id: Date.now(),
+      id: newLocalId(),
       raceUuid,
       name: newCategoryForm.name.trim(),
       // Sub-categories are no longer authored — one category per age band (BUGS.md #2)

@@ -200,6 +200,23 @@ export function buildSchedule(
   return waveMap;
 }
 
+/**
+ * Categories still without a wave (heat empty), with the wave the schedule shows
+ * them in (derived from start times). Saved when a wave is started, so the
+ * server and every device agree on it: the server starts categories by wave.
+ * All of them at once, so no wave is renumbered by freezing only some.
+ */
+export function freezeDerivedWaves(categories: CategoryProps[], waveGapMinutes = DEFAULT_WAVE_GAP_MINUTES): CategoryProps[] {
+  if (!categories.some((c) => !(Number(c.heat) > 0))) return [];
+  const out: CategoryProps[] = [];
+  buildSchedule(categories, waveGapMinutes).forEach((starts, wave) =>
+    starts.forEach((cats) => cats.forEach((c) => {
+      if (!(Number(c.heat) > 0) && wave > 0) out.push({ ...c, heat: wave });
+    })),
+  );
+  return out;
+}
+
 export interface WaveStatusEntry {
   waveNum: number;
   status: "upcoming" | "running" | "finished" | "partial";

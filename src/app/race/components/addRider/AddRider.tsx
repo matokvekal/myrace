@@ -8,6 +8,7 @@ import { useDropzone } from "react-dropzone";
 import * as z from "zod";
 import { RiderProps } from "@/types/types";
 import CategoryModal from "../../components/modals/CategoryModal";
+import { newLocalId } from "@/utils/localId";
 
 interface AddRiderModalProps {
   raceUuid: string;
@@ -103,7 +104,7 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
     );
 
     const newRider: RiderProps = {
-      id: Date.now() + Math.random(), // Ensure uniqueness
+      id: newLocalId(),
       raceUuid,
       heat: heatId,
       bibNumber: parseInt(bibNumber),

@@ -29,6 +29,7 @@ import MultiDayDialog from "./MultiDayDialog";
 // actually chooses "scan" (BUGS.md #1).
 const ImageCapture = lazy(() => import("@/components/importImage/ImageCapture"));
 import styles from "./csvImportWizard.module.css";
+import { newLocalId } from "@/utils/localId";
 
 type WizardStep = "upload" | "mapping" | "preview" | "importing";
 
@@ -176,7 +177,7 @@ export default function CSVImportWizard({
         const newUuid = crypto.randomUUID();
         const newRace: RaceProps = {
           ...currentRace,
-          id: Date.now() + i,
+          id: newLocalId(),
           uuid: newUuid,
           name: `${currentRace.name} - ${day}`,
           createdAt: new Date(),

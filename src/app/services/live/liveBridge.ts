@@ -29,6 +29,8 @@ export interface LiveLink {
   /** Last Race sequence this Device has applied. */
   lastSeq: number;
   linkedAt: string;
+  /** Set once the full reload that repairs duplicate local ids has run (see utils/localId). */
+  idRepair?: number;
 }
 
 export function readLinks(): Record<string, LiveLink> {

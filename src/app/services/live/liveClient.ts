@@ -27,6 +27,7 @@ import { PROTOCOL_VERSION, type RaceAction } from "../../../shared/race/actions"
 import type { MemberRole } from "../../../shared/race/roles";
 import { RACE_INFO_FIELDS, RIDER_IDENTITY_FIELDS, type RaceState, type SharedCategory, type SharedRace, type SharedRider } from "../../../shared/race/state";
 import { buildCategoriesFromRiders, riderCategoryKey } from "@/utils/categoriesFromRiders";
+import { duplicateIds, newLocalId } from "@/utils/localId";
 import { describeProblems, importProblems, type ImportProblem } from "./importCheck";
 import { applyingRemote, LIVE_ACCESS_EVENT, LIVE_LINKS_KEY, readLinks, setLiveBridge, type LiveBridge, type LiveLink } from "./liveBridge";
 
@@ -454,7 +455,6 @@ export const pendingCount = async (local: string) => (await outboxList(local)).l
 // ---------------------------------------------------------------------------
 // Local ↔ server records
 
-const newLocalId = () => Date.now() * 1000 + Math.floor(Math.random() * 1000);
 const toDate = (v: unknown) => (typeof v === "string" ? new Date(v) : v);
 
 const RIDER_DEFAULTS: Omit<RiderProps, "id" | "raceUuid"> = {
@@ -779,13 +779,23 @@ export async function refreshRace(local: string): Promise<boolean> {
   return true;
 }
 
+const ID_REPAIR_VERSION = 1;
+
 async function catchUpOnce(local: string): Promise<void> {
   const link = linkOf(local);
   if (!link || !session) return;
   try {
-    const ch = await api<ChangeSet & { snapshot?: boolean }>("GET", `/races/${link.serverRaceUuid}/changes?afterSeq=${link.lastSeq}`);
-    if (ch.snapshot) await loadSnapshot(local);
-    else await applyChanges(local, ch);
+    if (link.idRepair !== ID_REPAIR_VERSION && syncOf(local).pending === 0) {
+      // Once per race: older builds could give two riders the same local id, which
+      // hid one of them (overwritten in IndexedDB, one card on Live). A full reload
+      // from the server puts every rider back exactly once.
+      await loadSnapshot(local);
+      setLink(local, { idRepair: ID_REPAIR_VERSION });
+    } else {
+      const ch = await api<ChangeSet & { snapshot?: boolean }>("GET", `/races/${link.serverRaceUuid}/changes?afterSeq=${link.lastSeq}`);
+      if (ch.snapshot) await loadSnapshot(local);
+      else await applyChanges(local, ch);
+    }
     await api("POST", `/races/${link.serverRaceUuid}/sync`, { deviceId: deviceId(), lastSeq: linkOf(local)!.lastSeq, pendingCount: syncOf(local).pending });
   } catch (err) {
     if (err instanceof LiveApiError && err.status === 404) setSync(local, { revoked: true });
@@ -819,11 +829,26 @@ async function loadSnapshot(local: string): Promise<void> {
   if (rs.lastFetchedRaceUuid !== local) await rs.getRiders(local);
   const currentRiders = useRiderStore.getState().riders.filter((r) => r.raceUuid === local);
   const keep = new Set(snap.riders.map((r) => r.uuid));
-  for (const r of currentRiders) if (!r.uuid || !keep.has(r.uuid)) await applyingRemote(() => useRiderStore.getState().deleteRider(r.id));
+  // Riders sharing a local id (older builds) can't be told apart by the store: drop them
+  // here and let the snapshot add each one back once, with a unique id.
+  // Never one with a queued change: the snapshot skips those, so it would not come back.
+  const pendingUuids = pendingRiders.get(local) ?? new Set<string>();
+  const dupIds = duplicateIds(currentRiders);
+  for (const r of currentRiders) if (dupIds.has(r.id) && (!r.uuid || pendingUuids.has(r.uuid) || !keep.has(r.uuid))) dupIds.delete(r.id);
+  for (const id of dupIds) await applyingRemote(() => useRiderStore.getState().deleteRider(id));
+  for (const r of currentRiders) {
+    if (dupIds.has(r.id)) continue;
+    if (!r.uuid || !keep.has(r.uuid)) await applyingRemote(() => useRiderStore.getState().deleteRider(r.id));
+  }
   await useCategoryStore.getState().getCategories(local);
   const currentCats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === local);
   const keepCats = new Set(snap.categories.map((c) => c.uuid));
-  for (const c of currentCats) if (!c.uuid || !keepCats.has(c.uuid)) await applyingRemote(() => useCategoryStore.getState().deleteCategory(c.id));
+  const dupCatIds = duplicateIds(currentCats);
+  for (const id of dupCatIds) await applyingRemote(() => useCategoryStore.getState().deleteCategory(id));
+  for (const c of currentCats) {
+    if (dupCatIds.has(c.id)) continue;
+    if (!c.uuid || !keepCats.has(c.uuid)) await applyingRemote(() => useCategoryStore.getState().deleteCategory(c.id));
+  }
   await applyChanges(local, { ...snap, seq: snap.lastSeq });
   setLink(local, { lastSeq: snap.lastSeq });
 }

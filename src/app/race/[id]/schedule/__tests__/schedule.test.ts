@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSchedule,
+  freezeDerivedWaves,
   riderInCategory,
   effectiveTotalLaps,
   withCategoryLaps,
@@ -65,6 +66,26 @@ describe("laps resolve through the category", () => {
     const [a, b] = withCategoryLaps([same, diff], cats);
     expect(a).toBe(same);
     expect(b.totalLaps).toBe(5);
+  });
+});
+
+describe("freezeDerivedWaves (wave saved before a start)", () => {
+  it("gives every wave-less category the wave the schedule shows, and nothing is renumbered", () => {
+    const cats = [
+      makeCategory({ name: "A", heat: null, startTime: "09:00" }),
+      makeCategory({ name: "B", heat: null, startTime: "09:10" }),
+      makeCategory({ name: "C", heat: null, startTime: "11:00" }),
+    ];
+    const before = buildSchedule(cats, 30);
+    const frozen = freezeDerivedWaves(cats, 30);
+    expect(frozen.map((c) => [c.name, c.heat])).toEqual([["A", 1], ["B", 1], ["C", 2]]);
+    const after = buildSchedule(cats.map((c) => frozen.find((f) => f.id === c.id) ?? c), 30);
+    expect([...after.keys()]).toEqual([...before.keys()]);
+  });
+
+  it("leaves categories that already have a wave alone", () => {
+    const cats = [makeCategory({ name: "A", heat: 1, startTime: "09:00" }), makeCategory({ name: "B", heat: 2, startTime: "10:00" })];
+    expect(freezeDerivedWaves(cats, 30)).toEqual([]);
   });
 });
 

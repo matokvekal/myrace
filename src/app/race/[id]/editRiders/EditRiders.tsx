@@ -10,6 +10,7 @@ import { riderDeletionBlock, riderLabel } from "@/utils/riderDeletion";
 import { normalizeColor } from "@/utils/bibColors";
 import { isValidUciId, normalizeUciId } from "@/utils/uciId";
 import { toast } from "react-toastify";
+import { newLocalId } from "@/utils/localId";
 
 interface Props {
   raceUuid: string;
@@ -202,7 +203,7 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
           r.category === form.category && r.subCategory === form.subCategory
       );
       const newRider: RiderProps = {
-        id: Date.now() + Math.random(),
+        id: newLocalId(),
         raceUuid,
         bibNumber: parseInt(form.bibNumber),
         firstName: form.firstName,
@@ -332,7 +333,7 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
       if (!exists) {
         const colorIndex = existingCats.length % COLORS.length;
         const newCat: CategoryProps = {
-          id: Date.now() + existingCats.length,
+          id: newLocalId(),
           raceUuid,
           name,
           subCategory: subCategory || null,
