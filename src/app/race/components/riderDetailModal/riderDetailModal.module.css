@@ -312,3 +312,31 @@
   font-size: 13px;
   font-weight: 700;
 }
+
+/* Delete → Confirm (two taps). Kept apart from Edit so it isn't hit by mistake. */
+.deleteBtn,
+.deleteConfirmBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  margin-inline-end: 6px;
+}
+.deleteBtn {
+  color: #c62828;
+  background: #fff5f5;
+  border: 1px solid #f3c1c1;
+}
+.deleteConfirmBtn {
+  color: #fff;
+  background: #c62828;
+  border: 1px solid #c62828;
+}
+.deleteBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

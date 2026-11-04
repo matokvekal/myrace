@@ -280,14 +280,21 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                             <span className={styles.startRow}>
                               <span className={styles.startName}>Start {si + 1}</span>
                               <span className={styles.startClock}>{st.label}</span>
-                            </span>
-                            {st.cats.map((c) => (
-                              <span key={c.id} className={styles.catLine} title={c.name}>
-                                <span className={styles.catDot} style={{ background: c.color ?? "#9ca3af" }} />
-                                <span className={styles.catLineName} dir="auto">{c.name}{c.subCategory ? ` · ${c.subCategory}` : ""}</span>
-                                <span className={styles.catLineTime}>{normalizeTime(c.startTime) ?? "TBD"}</span>
+                              <span className={styles.startCount} data-testid={`timeline-start-count-${it.wave}-${si + 1}`}>
+                                {waveStats(st.cats, riders).registered} riders
                               </span>
-                            ))}
+                            </span>
+                            {st.cats.map((c) => {
+                              const n = waveStats([c], riders).registered;
+                              return (
+                                <span key={c.id} className={styles.catLine} title={`${c.name} · ${n} rider${n === 1 ? "" : "s"}`}>
+                                  <span className={styles.catDot} style={{ background: c.color ?? "#9ca3af" }} />
+                                  <span className={styles.catLineName} dir="auto">{c.name}{c.subCategory ? ` · ${c.subCategory}` : ""}</span>
+                                  <span className={styles.catLineCount} data-testid={`timeline-cat-count-${c.id}`} aria-label={`${n} riders`}>{n}</span>
+                                  <span className={styles.catLineTime}>{normalizeTime(c.startTime) ?? "TBD"}</span>
+                                </span>
+                              );
+                            })}
                           </span>
                         ))}
                       </span>

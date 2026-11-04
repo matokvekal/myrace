@@ -1343,14 +1343,19 @@ button.libRow:hover {
   gap: 6px;
 }
 
-/* 5 columns: colour | name | laps | edit | remove */
+/* 5 columns: colour | name | laps | edit | remove. Remove sits at the far end of a
+   wider column, so ~24px separate it from Edit and a tap meant for one can't hit the other. */
 .table .row {
-  grid-template-columns: 28px minmax(0, 1fr) 104px 28px 28px;
+  grid-template-columns: 28px minmax(0, 1fr) 104px 28px 44px;
+}
+
+.table .row .removeBtn {
+  justify-self: end;
 }
 
 @media (max-width: 480px) {
   .table .row {
-    grid-template-columns: 24px minmax(0, 1fr) 96px 28px 28px;
+    grid-template-columns: 24px minmax(0, 1fr) 96px 28px 44px;
   }
 
   .fieldLabel {

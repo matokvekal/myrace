@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { BookOpen, Check, ChevronDown, Layers, Plus, Save, Search, X } from "lucide-react";
+import { Check, ChevronDown, Layers, Plus, Save, Search, X } from "lucide-react";
 import type { ColumnMapping, RiderFieldKey, MappingTemplate } from "@/types/csv.types";
 import { FIELD_KEYWORDS, IGNORED_FIELDS, OPT_IN_FIELDS, isIdColumnHeader } from "@/types/csv.types";
 import {
@@ -16,7 +16,6 @@ import {
   touchTemplate,
   removeTemplate
 } from "@/services/templateStorage";
-import ClubDictionaryManager from "./ClubDictionaryManager";
 import styles from "./columnMappingStep.module.css";
 
 interface ColumnMappingStepProps {
@@ -66,8 +65,6 @@ export default function ColumnMappingStep({
   const [appliedMsg, setAppliedMsg] = useState("");
   const saveInputRef = useRef<HTMLInputElement>(null);
 
-  // Dictionary manager state
-  const [showDictionary, setShowDictionary] = useState(false);
 
   // Column whose app field is being chosen, and columns opened to show their data
   const [pickerFor, setPickerFor] = useState<number | null>(null);
@@ -349,14 +346,6 @@ export default function ColumnMappingStep({
         >
           <Save size={14} aria-hidden="true" /> Save as template
         </button>
-        <button
-          type="button"
-          className={styles.toolBtn}
-          onClick={() => setShowDictionary(true)}
-          title="Manage club name dictionary mappings"
-        >
-          <BookOpen size={14} aria-hidden="true" /> Club dictionary
-        </button>
       </div>
 
       {showTemplates && templates.length > 0 && (
@@ -424,11 +413,7 @@ export default function ColumnMappingStep({
 
       {appliedMsg && <div className={styles.note}>{appliedMsg}</div>}
 
-      {showDictionary && (
-        <ClubDictionaryManager
-          onClose={() => setShowDictionary(false)}
-        />
-      )}
+
 
       {splitFullName && (
         <div className={styles.note}>

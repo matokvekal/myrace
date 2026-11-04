@@ -73,3 +73,35 @@ export function getUpcomingBibWarnings(
     .map((category) => ({ category, issues: getCategoryBibIssues(category, riders, raceUuid) }))
     .filter(({ issues }) => issues.noBib > 0 || issues.dupBib > 0);
 }
+
+// ---------------------------------------------------------------------------
+// Per rider (Riders tab): what makes a start-list row invalid until it's fixed.
+
+export type RiderIssue = "noName" | "noBib" | "dupBib";
+
+type CheckedRider = Pick<RiderProps, "id" | "raceUuid" | "bibNumber" | "status" | "firstName" | "lastName">;
+
+/**
+ * Riders of a race that need fixing: no name, no bib, or a bib another rider of
+ * the race also has. DNS riders are left out of the duplicate check (same rule
+ * as Start), but still need a name and a bib.
+ */
+export function riderIssues(riders: CheckedRider[], raceUuid: string): Map<number, RiderIssue[]> {
+  const raceRiders = riders.filter((r) => r.raceUuid === raceUuid);
+  const count = bibCounts(activeRaceRiders(raceRiders as unknown as BibRider[], raceUuid));
+  const out = new Map<number, RiderIssue[]>();
+  for (const r of raceRiders) {
+    const issues: RiderIssue[] = [];
+    if (!(r.firstName ?? "").trim() && !(r.lastName ?? "").trim()) issues.push("noName");
+    if (!r.bibNumber) issues.push("noBib");
+    else if (r.status !== "DNS" && (count.get(r.bibNumber) ?? 0) > 1) issues.push("dupBib");
+    if (issues.length) out.set(r.id, issues);
+  }
+  return out;
+}
+
+export const RIDER_ISSUE_LABEL: Record<RiderIssue, string> = {
+  noName: "No name",
+  noBib: "No bib",
+  dupBib: "Duplicate bib",
+};

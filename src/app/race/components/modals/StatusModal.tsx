@@ -58,7 +58,8 @@ const StatusModal: React.FC<StatusModalProps> = ({ rider, onStatusChange, status
         </div>
 
         <div className={styles.modalbottom}>
-          {statuses.map((status) => {
+          {/* "Standing" is a way back from another status: a standing rider isn't offered it. */}
+          {statuses.filter((s) => !(s === "standing" && (rider?.status ?? "standing") === "standing")).map((status) => {
             const { label, hint, tone } = LABEL[status];
             const current = rider?.status === status;
             return (

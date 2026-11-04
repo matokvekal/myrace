@@ -867,3 +867,30 @@
 .now {
   inset-inline: 62px 0;
 }
+
+/* Participant counts: per start (on its line) and per category (before its time). */
+.startRow .startClock {
+  margin-inline: 8px auto;
+}
+.startCount {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+.catLineCount {
+  flex-shrink: 0;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--text-secondary, #334155);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

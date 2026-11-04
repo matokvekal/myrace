@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, UserRoundPlus } from "lucide-react";
+import { ChevronDown, Pencil, UserRoundPlus } from "lucide-react";
 import styles from "./checkIn.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
@@ -293,7 +293,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
             title="Edit bib number"
             aria-label={`Edit bib ${rider.bibNumber}`}
             data-testid={`checkin-editbib-${rider.bibNumber}`}
-          >✎</button>
+          ><Pencil size={13} aria-hidden="true" /></button>
         )}
       </span>
     );
@@ -478,6 +478,11 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
                 <span className={`${styles.countItem} ${styles.countDns}`} data-testid="checkin-dns-count"><b>{waveRiders.filter((r) => r.status === "DNS").length}</b> DNS</span>
               )}
             </div>
+            {!allAccountedFor && !isRaceActive && (
+              <button className={styles.checkAllBtn} onClick={checkAll} data-testid="checkin-check-all">
+                ✓ Check All
+              </button>
+            )}
             <button
               className={`${styles.toolsBtn} ${toolsOpen || search ? styles.toolsBtnActive : ""}`}
               onClick={() => setToolsOpen((o) => !o)}
@@ -523,9 +528,6 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
                 >{sortDir === "asc" ? "▲" : "▼"}</button>
               </div>
               <div className={styles.panelRow}>
-                {!allAccountedFor && !isRaceActive && (
-                  <button className={styles.scopeBtn} onClick={checkAll}>Check All</button>
-                )}
                 <button className={styles.doneBtn} onClick={() => setToolsOpen(false)}>Done</button>
               </div>
             </div>
@@ -540,8 +542,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
         <StatusModal
           rider={riders.find((r) => r.id === selectedRider.id) ?? selectedRider}
           onStatusChange={handleStatusChange}
-          statuses={["DNS", "DSQ", "standing"]}
-          onEditBib={isRaceActive ? undefined : () => startEditBib(selectedRider)}
+          statuses={["DSQ", "DNS", "standing"]}
         />
       )}
 

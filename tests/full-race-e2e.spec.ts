@@ -490,7 +490,6 @@ async function runWave(
     await selectWave(page, plan.wave);
     await openRaceModeTab(page, "Check-In");
 
-    await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
     const checkAll = page.getByRole("button", { name: /Check All/ });
     await expect(checkAll).toBeVisible();
     await checkAll.click();

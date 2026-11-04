@@ -225,7 +225,10 @@ describe("Check-In: edit bib", () => {
 
     expect(await screen.findByText(/Bib 20 is already used by Beta B/)).toBeInTheDocument();
     expect(useRiderStore.getState().riders.find((r) => r.id === a.id)!.bibNumber).toBe(10);
-    expect(recordRaceEvent).not.toHaveBeenCalled();
+    // Nothing logged for the refused edit. (The previous test's bib save also checks the
+    // rider in, and that async RIDER_CHECKIN can land after this test's mockClear.)
+    expect(recordRaceEvent).not.toHaveBeenCalledWith(expect.objectContaining({ eventType: "RIDER_EDITED" }));
+    expect(recordRaceEvent).not.toHaveBeenCalledWith(expect.objectContaining({ bibNumber: 20 }));
   });
 
   it.each(["", "0", "-5"])("rejects an invalid bib (%j)", async (bad) => {

@@ -70,7 +70,6 @@ test.describe("Commissaire race flow", () => {
     // ── 6. Check-in all riders in the selected wave ──────────────────────────
     await test.step("check in wave riders", async () => {
       await openRaceView(page, "Check-In");
-      await page.getByTestId("checkin-tools").click(); // Check All sits in the Search/Sort panel
       const checkAll = page.getByRole("button", { name: /Check All/i });
       await expect(checkAll).toBeVisible();
       await checkAll.click();

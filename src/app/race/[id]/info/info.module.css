@@ -903,22 +903,31 @@
   overflow-wrap: anywhere;
 }
 
+/* Date / time / place: plain information, not actions — no fill, no pill shape. */
 .evChips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 4px;
 }
 
 .evChip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #0b1f3f;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 0;
+  background: none;
+  color: var(--text-secondary, #475569);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: default;
+  user-select: text;
+}
+
+.evChip svg {
+  flex-shrink: 0;
+  color: var(--text-muted, #94a3b8);
 }
 
 .evGrid {

@@ -360,3 +360,51 @@
   padding-inline-start: 18px;
   font-size: 13px;
 }
+
+/* Simplified start-list upload */
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 12px;
+  border: 1.5px dashed #93b4e8;
+  border-radius: 10px;
+  background: rgba(79, 143, 232, 0.06);
+  color: #1d4ed8;
+  cursor: pointer;
+}
+.dropZone strong { font-size: 15px; }
+.dropZone small { color: #64748b; font-size: 12px; }
+.templateLink {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #1d4ed8;
+}
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 14px;
+}
+.fileName {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.previewSummary {
+  margin: 0;
+  font-weight: 700;
+}
+.previewSubhead {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

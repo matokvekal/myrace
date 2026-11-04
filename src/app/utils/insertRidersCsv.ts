@@ -46,7 +46,7 @@ export const saveRidersFromRows = async (rows: string[][], raceUuid: string) => 
       }
 
       const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
-      const mappings = await autoMapColumns(headers);
+      const mappings = await autoMapColumns(headers, rows.slice(1));
 
       // field → column index
       const col = new Map<RiderFieldKey, number>();

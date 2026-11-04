@@ -60,7 +60,6 @@ src/
 
 public/data/
 ├── dictionary_csv.json           # Field keywords (bib, first_name, club, etc.)
-├── dictionary_clubs.json         # Club name mappings
 └── README.md
 ```
 
@@ -96,7 +95,7 @@ public/data/
 
 ### Completed Features
 - CSV import wizard (4-step: upload → mapping → preview → import)
-- Club dictionary system (multi-term, Hebrew + English)
+- Club dictionary: UI removed 2026-11-04 (seed file never existed, only the wizard applied it); store + rowToRider hook kept for existing entries
 - Middle name field in rider model
 - Column mapping templates (save/load)
 - RaceMode with StartManager, CheckIn, LiveBoard
@@ -178,8 +177,10 @@ still open).
 - Every action in the log carries `prevRider` (exact pre-tap snapshot) +
   `prevOrderIndex`. Undo restores from the snapshot — never rebuild state from
   `lapsDetails`, that drops `elapsedTimeFromStart` and `position_category`.
-- Status buttons are ordered DNF → DSQ → DNS everywhere (`RiderLiveModal`,
-  `StatusModal`); out-statuses come before the internal ones.
+- Status buttons are ordered DNF → DSQ → DNS (`RiderLiveModal`, `StatusModal`);
+  out-statuses come before the internal ones. Check-In offers DSQ (left) | DNS (right)
+  and "Standing" only as a way back (`StatusModal` never offers Standing to a standing
+  rider). Bibs are edited with the pencil next to the number, phones included.
 - The action log (`riderActions`) is the complete arrival record and is PERSISTED
   per wave to localStorage (`commissaire.actionLog.${raceUuid}:heat:${heatId}`) so
   a mid-wave reload restores it. `useLapRecording` takes `persistKey`; it hydrates
@@ -417,6 +418,23 @@ still open).
 - Limitation: viewers must be signed-in race members; there is no anonymous
   read-only feed on the server, so public mass viewing needs a backend change.
 
+### Local ids and waves (missing rider cards, 2026-11-04)
+- Every local rider/category/race id comes from `newLocalId()` (`utils/localId.ts`).
+  IndexedDB and the Live board are keyed by `id`: a duplicate overwrites/hides a rider.
+  Never `Date.now() + i` or `Date.now()*1000 + random` again. `loadSnapshot` drops
+  riders sharing an id and lets the server snapshot restore each once (one-time
+  `link.idRepair` reload per shared race; skipped while actions are pending).
+- A category without a wave (`heat` empty) gets its wave from start times in the app.
+  The server starts categories by wave, so Start first saves the derived waves
+  (`freezeDerivedWaves`, all at once so nothing renumbers), and the engine starts a
+  named wave-less category and gives it the wave.
+
+### Import mapping: start / wave / class
+- Wave (`heat`) is auto-mapped only from an explicit wave header (`גל`, wave, heat).
+  `מקצה` is the category; `שעת זינוק` is the start time; a bare `זינוק` is mapped to
+  start time only when its values are clock times, else left for the user (it can be
+  a start group). `autoMapColumns(headers, sampleRows)`.
+
 ### Sign-in and where a new race is saved
 - ONE sign-in system: the Commissaire server account (`/account`, `liveClient` session).
   The side menu's Register / Login opens `/account`, Logout calls `auth.logout()` and keeps
@@ -497,6 +515,6 @@ still open).
 
 ### Important Constraints
 - CSV import fields: `bib, first_name, middle_name, last_name, full_name, club, category, gender, heat, start_time, total_laps, position, points, federation, race_day`
-- Club dictionary: manual JSON or in-app ClubDictionaryManager
+- Club dictionary: no UI; `clubDictionaryStore` entries (if any) are still applied by the import wizard
 - Hebrew + English support required (use `dir="auto"` on text elements)
 - No database yet — all data is local IDB (planned: Phase 4)

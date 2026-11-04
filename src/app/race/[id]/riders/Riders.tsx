@@ -17,6 +17,7 @@ import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey } from "../schedule/Schedule";
 import QuickAddRider, { canAddRider } from "../raceMode/QuickAddRider";
 import { matchesRiderSearch, groupRidersByWaveAndCategory } from "@/utils/riderList";
+import { riderIssues, RIDER_ISSUE_LABEL } from "@/utils/bibIssues";
 
 interface ManageHeatProps {
   raceUuid: string;
@@ -61,6 +62,8 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  // Only riders that still need fixing (no name / no bib / duplicate bib).
+  const [invalidOnly, setInvalidOnly] = useState(false);
   const [showAddRider, setShowAddRider] = useState(false);
   // Category the Add Rider form was opened from (preset, picker hidden); null = pick one.
   const [addFor, setAddFor] = useState<CategoryProps | null>(null);
@@ -133,8 +136,18 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
     };
   }, [categories]);
 
+  // Validation over the whole race (not the search), so counts never depend on the filter.
+  const issues = useMemo(() => riderIssues(riders, raceUuid), [riders, raceUuid]);
+  const raceRiderCount = useMemo(() => riders.filter((r) => r.raceUuid === raceUuid).length, [riders, raceUuid]);
+  const invalidCount = issues.size;
+  useEffect(() => {
+    if (invalidCount === 0) setInvalidOnly(false);
+  }, [invalidCount]);
+  const issueText = (id: number) => (issues.get(id) ?? []).map((i) => RIDER_ISSUE_LABEL[i]).join(" · ");
+
   const filteredAndSorted = useMemo(() => {
     let list = riders.filter((r) => r.raceUuid === raceUuid);
+    if (invalidOnly) list = list.filter((r) => issues.has(r.id));
     if (searchTerm.trim()) list = list.filter((r) => matchesRiderSearch(r, searchTerm));
 
     const byName = (a: RiderProps, b: RiderProps) =>
@@ -156,7 +169,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
       return sortDir === "asc" ? base : -base;
     });
     return sorted;
-  }, [riders, raceUuid, sortBy, sortDir, searchTerm]);
+  }, [riders, raceUuid, sortBy, sortDir, searchTerm, invalidOnly, issues]);
 
   const hasRiders = riders.some((r) => r.raceUuid === raceUuid);
   const anyFlag = filteredAndSorted.some((r) => r.flag);
@@ -270,9 +283,27 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
         </div>
       )}
 
+      {hasRiders && invalidCount > 0 && (
+        <div className={styles.invalidBanner} role="alert" data-testid="riders-invalid-banner">
+          <span dir="auto">
+            ⚠ {invalidCount} rider{invalidCount === 1 ? "" : "s"} need{invalidCount === 1 ? "s" : ""} fixing: missing name, missing bib or
+            duplicate bib. Tap a red row to correct it. A wave with bib problems can't start.
+          </span>
+          <button type="button" className={styles.invalidToggle} onClick={() => setInvalidOnly((v) => !v)} data-testid="riders-invalid-only">
+            {invalidOnly ? "Show all" : "Show invalid only"}
+          </button>
+        </div>
+      )}
+
       {filteredAndSorted.length > 0 && (
         <div className={styles.tabCount}>
           <span>Riders ({filteredAndSorted.length})</span>
+          <span className={styles.validityCounts} data-testid="riders-validity">
+            <span className={styles.validCount} data-testid="riders-valid-count">✓ {raceRiderCount - invalidCount} valid</span>
+            {invalidCount > 0 && (
+              <span className={styles.invalidCount} data-testid="riders-invalid-count">⚠ {invalidCount} invalid</span>
+            )}
+          </span>
           {groupKeys.length > 0 && (
             <button
               type="button"
@@ -323,11 +354,14 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                           const isOut = ["DNS", "DNF", "DSQ"].includes(rider.status);
                           const isRunning = rider.raceStatus === "running" && !isOut;
                           const isFinished = rider.raceStatus === "finished" && !isOut;
+                          const invalid = issues.has(rider.id);
                           return (
                             <div
                               key={rider.id}
-                              className={`${styles.dataRow} ${isRunning ? styles.rowRunning : ""} ${isOut ? styles.rowOut : ""}`}
+                              className={`${styles.dataRow} ${isRunning ? styles.rowRunning : ""} ${isOut ? styles.rowOut : ""} ${invalid ? styles.rowInvalid : ""}`}
                               data-category={rider.category}
+                              data-invalid={invalid || undefined}
+                              title={invalid ? issueText(rider.id) : undefined}
                               onClick={() => setSelectedRider(rider)}
                             >
                               {anyFlag && (
@@ -340,6 +374,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                                 {rider.lastName || rider.firstName
                                   ? `${rider.lastName} ${rider.firstName}`.trim()
                                   : "—"}
+                                {invalid && <span className={styles.invalidReason}>{issueText(rider.id)}</span>}
                               </span>
                               <span className={styles.colStatus}>
                                 {isOut ? (
@@ -371,7 +406,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
                   {catAddBtn(categories.find((c) => c.name === catName), catName)}
                 </div>
                 {!collapsedGroups.has(`g:${catName}`) && catRiders.map((rider) => (
-                  <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
+                  <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }} className={issues.has(rider.id) ? styles.cardInvalid : undefined} data-invalid={issues.has(rider.id) || undefined} title={issues.has(rider.id) ? issueText(rider.id) : undefined}>
                     <RiderCard {...rider} />
                   </div>
                 ))}
@@ -379,7 +414,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, r
             ))
           ) : (
             filteredAndSorted.map((rider) => (
-              <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
+              <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }} className={issues.has(rider.id) ? styles.cardInvalid : undefined} data-invalid={issues.has(rider.id) || undefined} title={issues.has(rider.id) ? issueText(rider.id) : undefined}>
                 <RiderCard {...rider} />
               </div>
             ))

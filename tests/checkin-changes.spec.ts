@@ -46,9 +46,8 @@ test.describe("Check-In on a narrow phone", () => {
     await expect(checkInRow(page, bib).getByRole("button", { name: /DNS/ })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath("checkin-row.png") });
 
-    // Change the bib too, from the menu
-    await page.getByTestId(`checkin-row-${bib + 1}`).getByRole("button", { name: "Status" }).click();
-    await page.getByRole("button", { name: "Change bib number" }).click();
+    // Change the bib too, with the pencil next to the bib number
+    await page.getByTestId(`checkin-editbib-${bib + 1}`).click();
     await page.getByTestId(`checkin-bibinput-${bib + 1}`).fill("777");
     await page.getByRole("button", { name: "Save bib" }).click();
     await expect(checkInRow(page, 777)).toBeVisible();

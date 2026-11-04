@@ -58,8 +58,11 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
       state === "upcoming" &&
       waveRiders.some((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status));
     setSheetView(ciIncomplete ? "checkin" : "summary");
-    setSheet((s) => s ?? "half");
+    setSheet((s) => s ?? (ciIncomplete ? "half" : startSheetSize(w)));
   };
+  // A wave with several starts opens the start sheet tall, so every start shows
+  // without dragging; a single start keeps the half sheet.
+  const startSheetSize = (w: number): SheetSize => ((schedule.get(w)?.size ?? 0) > 1 ? "full" : "half");
   // Card actions: Check-In / Start open the sheet; Live / Finish go to the Live screen
   // (Finish opens its existing FINISH confirmation there).
   const onWaveAction = (w: number, action: WaveAction) => {
@@ -71,7 +74,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
       setSheet("half"); // Check-In opens at 70%; drag up to 95%
     } else if (action === "start") {
       setSheetView("summary");
-      setSheet((s) => s ?? "half");
+      setSheet((s) => s ?? startSheetSize(w));
     } else if (action === "results" || action === "board") {
       // The existing screens, opened on this wave
       navigate(`/race/${raceUuid}/${action}?wave=${w}`);

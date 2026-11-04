@@ -539,3 +539,72 @@
   font-weight: 700;
   opacity: 1;
 }
+
+/* Validation: rows that need fixing stay red until corrected */
+.rowInvalid {
+  background: #fde8e8;
+  box-shadow: inset 4px 0 0 #dc2626;
+}
+.rowInvalid:hover {
+  background: #fbd5d5;
+}
+.rowInvalid .colName {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.invalidReason {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b91c1c;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.cardInvalid {
+  border-radius: 12px;
+  outline: 2px solid #dc2626;
+  outline-offset: 1px;
+  background: #fde8e8;
+}
+.validityCounts {
+  display: inline-flex;
+  gap: 8px;
+  margin-inline-start: auto;
+  margin-inline-end: 8px;
+  letter-spacing: 0.02em;
+}
+.validCount {
+  color: #15803d;
+}
+.invalidCount {
+  color: #b91c1c;
+}
+.invalidBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.invalidBanner > span {
+  flex: 1 1 220px;
+}
+.invalidToggle {
+  border: 1px solid #dc2626;
+  background: #fff;
+  color: #b91c1c;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}

@@ -284,10 +284,8 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
             <option value="finished">Completed</option>
           </select>
 
+          {/* Start list: one action before a file; after it, only what to check and confirm. */}
           <div className={styles.fileUpload}>
-            <label htmlFor="ridersFileUpload" className={styles.fileLabel}>
-              Upload Riders File
-            </label>
             <input
               id="ridersFileUpload"
               type="file"
@@ -295,11 +293,22 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
               onChange={handleFileUpload}
               style={{ display: "none" }}
             />
-            {ridersFile && (
-              <p>
-                {ridersFile.name}{" "}
+            {!ridersFile ? (
+              <>
+                <label htmlFor="ridersFileUpload" className={styles.dropZone}>
+                  <strong>Upload start list</strong>
+                  <small>.xlsx or .csv · optional, you can add riders later</small>
+                </label>
+                <a className={styles.templateLink} href={`${BASE}start-list-template.xlsx`} download="start-list-template.xlsx">
+                  Download template
+                </a>
+              </>
+            ) : (
+              <div className={styles.fileRow}>
+                <span className={styles.fileName} dir="auto">📄 {ridersFile.name}</span>
+                <label htmlFor="ridersFileUpload" className={styles.linkBtn}>Replace</label>
                 <button type="button" className={styles.linkBtn} onClick={clearRidersFile}>Remove</button>
-              </p>
+              </div>
             )}
           </div>
 
@@ -315,9 +324,23 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
           )}
           {preview && (
             <div className={styles.preview} data-testid="import-preview">
-              <strong>Import preview</strong>
+              <p className={styles.previewSummary}>
+                {preview.riders} rider{preview.riders === 1 ? "" : "s"} · {preview.categories.length} categor
+                {preview.categories.length === 1 ? "y" : "ies"} ·{" "}
+                {preview.waveSource === "column" ? `${preview.waves.length} wave${preview.waves.length === 1 ? "" : "s"} (wave column)` : "waves from start times"}
+                {preview.skipped.length > 0 && ` · ${preview.skipped.length} row(s) skipped`}
+              </p>
+              {preview.warnings.length > 0 && (
+                <ul className={styles.previewWarnings} data-testid="import-preview-warnings">
+                  {preview.warnings.slice(0, 3).map((w) => (
+                    <li key={w} dir="auto">⚠ {w}</li>
+                  ))}
+                  {preview.warnings.length > 3 && <li>+{preview.warnings.length - 3} more in Details</li>}
+                </ul>
+              )}
               <details className={styles.previewMapping} data-testid="import-preview-mapping">
-                <summary>Columns detected ({preview.mapping.filter((m) => m.field).length} of {preview.mapping.length} used)</summary>
+                <summary>Details</summary>
+                <p className={styles.previewSubhead}>Columns ({preview.mapping.filter((m) => m.field).length} of {preview.mapping.length} used)</p>
                 <ul>
                   {preview.mapping.map((m, i) => (
                     <li key={`${m.header}-${i}`} dir="auto">
@@ -325,33 +348,26 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
                     </li>
                   ))}
                 </ul>
-              </details>
-              <p>
-                {preview.riders} rider{preview.riders === 1 ? "" : "s"} · {preview.categories.length} categor
-                {preview.categories.length === 1 ? "y" : "ies"} ·{" "}
-                {preview.waveSource === "column" ? `${preview.waves.length} wave${preview.waves.length === 1 ? "" : "s"} (wave column)` : "waves from start times"}
-                {preview.skipped.length > 0 && ` · ${preview.skipped.length} row(s) skipped`}
-              </p>
-              <ul className={styles.previewList}>
-                {preview.categories.map((c) => (
-                  <li key={`${c.name}::${c.wave}`} dir="auto">
-                    {preview.waveSource === "column" ? `Wave ${c.wave || "—"} · ` : ""}{c.name} · {c.riders}
-                  </li>
-                ))}
-              </ul>
-              {preview.warnings.length > 0 && (
-                <ul className={styles.previewWarnings} data-testid="import-preview-warnings">
-                  {preview.warnings.map((w) => (
-                    <li key={w} dir="auto">⚠ {w}</li>
+                <p className={styles.previewSubhead}>Categories</p>
+                <ul className={styles.previewList}>
+                  {preview.categories.map((c) => (
+                    <li key={`${c.name}::${c.wave}`} dir="auto">
+                      {preview.waveSource === "column" ? `Wave ${c.wave || "—"} · ` : ""}{c.name} · {c.riders}
+                    </li>
                   ))}
                 </ul>
-              )}
-              {preview.skipped.length > 0 && (
-                <p className={styles.previewSkipped}>
-                  Skipped rows: {preview.skipped.slice(0, 12).map((s) => `${s.row + 1} (${s.reason})`).join(", ")}
-                  {preview.skipped.length > 12 ? "…" : ""}
-                </p>
-              )}
+                {preview.warnings.length > 3 && (
+                  <ul className={styles.previewWarnings}>
+                    {preview.warnings.slice(3).map((w) => <li key={w} dir="auto">⚠ {w}</li>)}
+                  </ul>
+                )}
+                {preview.skipped.length > 0 && (
+                  <p className={styles.previewSkipped}>
+                    Skipped rows: {preview.skipped.slice(0, 12).map((s) => `${s.row + 1} (${s.reason})`).join(", ")}
+                    {preview.skipped.length > 12 ? "…" : ""}
+                  </p>
+                )}
+              </details>
               <label className={styles.previewConfirm}>
                 <input
                   type="checkbox"
@@ -359,7 +375,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
                   onChange={(e) => setPreviewConfirmed(e.target.checked)}
                   data-testid="import-preview-confirm"
                 />
-                Confirm import — this is what should be created
+                Looks right — import it
               </label>
             </div>
           )}

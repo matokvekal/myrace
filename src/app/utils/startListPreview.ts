@@ -21,7 +21,7 @@ const REQUIRED_ANY: RiderFieldKey[][] = [["bibNumber"], ["firstName", "lastName"
 export async function previewStartListRows(rows: string[][]): Promise<StartListPreview> {
   if (!rows || rows.length < 2) throw new Error("The file is empty.");
   const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
-  const mappings = await autoMapColumns(headers);
+  const mappings = await autoMapColumns(headers, rows.slice(1));
   const mapped = new Set(mappings.map((m) => m.targetField).filter(Boolean));
   const missing = REQUIRED_ANY.filter((g) => !g.some((f) => mapped.has(f)));
   if (missing.length) {

@@ -7,7 +7,7 @@ import useRiderStore from "@/stores/ridersStore";
 import { useRaceFinalized } from "@/utils/raceLock";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import styles from "./riderDetailModal.module.css";
-import { X, Edit2, Save, XCircle, User, Lock } from "lucide-react";
+import { X, Edit2, Save, XCircle, User, Lock, Trash2 } from "lucide-react";
 
 interface Props {
   rider: RiderProps;
@@ -61,6 +61,12 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
   });
 
   const updateRider = useRiderStore((s) => s.updateRider);
+  const deleteRider = useRiderStore((s) => s.deleteRider);
+  // Delete is two taps: "Delete" turns into "Confirm" (3 s), only then is the rider removed.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // A rider on the road or already classified is part of the result: mark DNF/DNS instead.
+  const started = rider.raceStatus !== "upcoming" || (rider.lapsCounter ?? 0) > 0;
   const allRiders = useRiderStore((s) => s.riders);
   // The modal opens from Riders, Results and Standing alike, so it asks about
   // the lock itself rather than making three callers remember to pass it down.
@@ -141,6 +147,26 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
     setEditMode(false);
   };
 
+  const handleDelete = async () => {
+    if (started) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      window.setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    setDeleting(true);
+    setError("");
+    await deleteRider(rider.id);
+    setDeleting(false);
+    // The store refuses what the role (shared race) or the lock doesn't allow.
+    if (useRiderStore.getState().riders.some((r) => r.id === rider.id)) {
+      setConfirmDelete(false);
+      setError("This rider can't be deleted here (your role in this race doesn't allow it).");
+      return;
+    }
+    onClose();
+  };
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -155,9 +181,21 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
               <Lock size={13} /> Final
             </span>
           ) : !editMode ? (
-            <button className={styles.editBtn} onClick={() => setEditMode(true)}>
-              <Edit2 size={14} /> Edit
-            </button>
+            <div className={styles.editActions}>
+              <button
+                className={confirmDelete ? styles.deleteConfirmBtn : styles.deleteBtn}
+                onClick={handleDelete}
+                disabled={started || deleting}
+                title={started ? "Started riders can't be deleted — mark them DNF or DNS instead" : confirmDelete ? "Tap again to delete" : "Delete rider"}
+                data-testid="rider-delete"
+                data-confirm={confirmDelete || undefined}
+              >
+                <Trash2 size={14} /> {deleting ? "Deleting…" : confirmDelete ? "Confirm" : "Delete"}
+              </button>
+              <button className={styles.editBtn} onClick={() => setEditMode(true)}>
+                <Edit2 size={14} /> Edit
+              </button>
+            </div>
           ) : (
             <div className={styles.editActions}>
               <button className={styles.cancelBtn} onClick={() => { setEditMode(false); setError(""); setStatus(rider.status); setForm({ firstName: rider.firstName ?? "", lastName: rider.lastName ?? "", bibNumber: String(rider.bibNumber ?? ""), category: rider.category ?? "", subCategory: rider.subCategory ?? "", team: rider.team ?? "", heat: String(rider.heat ?? ""), timeStartRace: rider.timeStartRace ?? "", totalLaps: String(rider.totalLaps ?? ""), points: String(rider.points ?? ""), federation: rider.federation ?? "", comment: rider.comment ?? "", chipNumber: rider.chipNumber ?? "" }); }}>

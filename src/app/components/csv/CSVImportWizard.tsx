@@ -76,7 +76,7 @@ export default function CSVImportWizard({
         ? await (await import("@/utils/xlsxParser")).parseXLSXFile(file)
         : await parseCSVFile(file);
       setParseResult(result);
-      const autoMappings = await autoMapColumns(result.headers);
+      const autoMappings = await autoMapColumns(result.headers, result.rows);
       setSuggestedName(file.name.replace(/\.(xlsx?|csv)$/i, ""));
 
       if (template) {
@@ -106,7 +106,7 @@ export default function CSVImportWizard({
   // Photo-OCR source: same handoff as handleFileUpload, minus file parsing
   const handleOcrParsed = async (result: CSVParseResult) => {
     setParseResult(result);
-    const autoMappings = await autoMapColumns(result.headers);
+    const autoMappings = await autoMapColumns(result.headers, result.rows);
     setSuggestedName("Scanned start list");
     setColumnMappings(autoMappings);
     setScanMode(false);

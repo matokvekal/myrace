@@ -259,12 +259,31 @@ function findBestFieldMatch(
    return suggestions;
 }
 
+/** Headers that name a wave outright ("גל", "wave", "heat" and their compounds). */
+export function isExplicitWaveHeader(header: string): boolean {
+   const h = normalize(header);
+   return /(^|\s)גל($|\s|')|wave|heat/.test(h);
+}
+
+/** "Start" alone: start time, or a start group / parent category — never decided by name. */
+export const START_ONLY_HEADERS = new Set<string>(['זינוק', 'start', 'הזינוק']);
+
+/** Most non-empty values of the column are clock times (08:20, 8:20:30, 08.20). */
+export function columnLooksLikeTimes(rows: string[][], col: number): boolean {
+   const values = rows.map((r) => String(r[col] ?? '').trim()).filter(Boolean).slice(0, 50);
+   if (values.length === 0) return false;
+   const times = values.filter((v) => /^\d{1,2}[:.]\d{2}([:.]\d{2})?$/.test(v) || /^0?\.\d+$/.test(v));
+   return times.length / values.length >= 0.8;
+}
+
 /**
  * Auto-map CSV columns to app fields
  * Returns array of column mappings with confidence scores
  */
 export async function autoMapColumns(
-   headers: string[]
+   headers: string[],
+   /** Data rows (no header), when known: lets a vague header be judged by its values. */
+   sampleRows?: string[][]
 ): Promise<ColumnMapping[]> {
    // Collect every candidate (column → field) BEFORE claiming anything.
    // Assigning left-to-right let a leading seeding column headed "מס'" claim
@@ -321,6 +340,17 @@ export async function autoMapColumns(
          }
       }
 
+      // Waves: only an explicit wave column is a wave. "מקצה" (the race class),
+      // "זינוק"/"שעת זינוק" (the start / its time) and start groups fuzzy-match the
+      // wave keywords, but waves come from start times unless a column says "wave".
+      // Before the vague-header step below, so "מקצה" keeps Category as its best guess.
+      if (!isExplicitWaveHeader(header)) {
+         for (let k = candidates.length - 1; k >= 0; k--) {
+            const c = candidates[k];
+            if (c.columnIndex === i && c.field === 'heat' && !c.fromMemory) candidates.splice(k, 1);
+         }
+      }
+
       // A vague header ("מס'", "No.") scores the same low cap against every
       // field it brushes, so letting it fall through to runner-up fields drops
       // a serial column onto something unrelated like heat. Keep only its best
@@ -336,6 +366,19 @@ export async function autoMapColumns(
                }
             }
          }
+      }
+   }
+
+   // A bare "זינוק"/"start" header can be the start time or a start group (a parent
+   // category). Auto-map it only when its values really are clock times; otherwise
+   // leave it for the user to map (Category, Keep as info, ...).
+   for (let i = 0; i < headers.length; i++) {
+      if (!START_ONLY_HEADERS.has(normalize(headers[i]))) continue;
+      const looksLikeTimes = !!sampleRows && columnLooksLikeTimes(sampleRows, i);
+      for (let k = candidates.length - 1; k >= 0; k--) {
+         const c = candidates[k];
+         if (c.columnIndex !== i || c.fromMemory) continue;
+         if (!(looksLikeTimes && c.field === 'startTime')) candidates.splice(k, 1);
       }
    }
 
