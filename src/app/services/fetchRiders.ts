@@ -6,7 +6,6 @@ import { RiderProps } from "@/types/types";
 export const fetchRiders = async (raceUuid: string): Promise<RiderProps[]> => {
   try {
     const riders:RiderProps[] = [];
-    console.log(`Fetching riders for raceUuid: ${raceUuid}`);
     // Simulate a delay for fetching data
     return new Promise((resolve) => {
       setTimeout(() => {

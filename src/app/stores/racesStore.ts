@@ -151,7 +151,6 @@ const useRaceStore = create<RaceState>()(
                await tx.done;
                db.close();
 
-               console.log("Race updated successfully");
             } catch (error) {
                console.error("Error updating race:", error);
             }
@@ -201,19 +200,6 @@ const useRaceStore = create<RaceState>()(
          name: "race-storage", //  Store Zustand Data
          storage: raceStorageAdapter(), // custom adapter
          partialize: (state) => ({ races: state.races }),
-         // onRehydrateStorage: () => async (state) => {
-         //    if (!state?.races || state.races.length === 0) {
-         //       console.log("Restoring races from IndexedDB...");
-         //       const db = await initIndexedDB();
-         //       const races = await db.getAll("races");
-
-         //       if (races.length > 0) {
-         //          console.log("Restored races from IndexedDB to Zustand store");
-         //          useRaceStore.setState({ races }); //  Sync Zustand with IndexedDB
-         //       }
-         //       db.close();
-         //    }
-         // },
       }
    )
 );

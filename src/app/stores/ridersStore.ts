@@ -113,7 +113,6 @@ const useRiderStore = create<RiderState>()(
 
           // ✅ Prevent redundant API calls
           if (riders.length > 0 && lastFetchedRaceUuid === raceUuid) {
-            console.log("Returning cached riders");
             return riders;
           }
 
@@ -131,7 +130,6 @@ const useRiderStore = create<RiderState>()(
             return storedRiders;
           }
 
-          console.log("Fetching riders from API...");
           const fetchedRiders = await fetchRidersFromAPI(raceUuid);
           if (fetchedRiders.length > 0) {
             set((state) => ({

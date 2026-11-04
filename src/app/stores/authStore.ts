@@ -101,11 +101,6 @@ export const useAuthStore = create<AuthState>()(
                   viewMode: 'edit' // Default to edit mode
                });
 
-               console.log('Login successful:', {
-                  userId: user.id,
-                  role: payload.roleName,
-                  permissions: payload.permissions?.length || 0
-               });
 
                return true;
             } catch (error) {
@@ -126,7 +121,6 @@ export const useAuthStore = create<AuthState>()(
                viewMode: 'edit'
             });
 
-            console.log('Logged out successfully');
          },
 
          /**
@@ -194,7 +188,6 @@ export const useAuthStore = create<AuthState>()(
           */
          setViewMode: (mode: ViewMode) => {
             set({ viewMode: mode });
-            console.log('View mode changed to:', mode);
          },
 
          /**
