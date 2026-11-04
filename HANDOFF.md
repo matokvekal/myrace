@@ -8,7 +8,7 @@ beyond what "Production" below says.
 - Branch: **`chore/cleanup-tests`** — the commit holding this file is its tip (`git log -1`).
 - `main` = `61885bd` (Release 0.1.12, pushed). The branch is AHEAD of main with the work
   after 0.1.12 (soft delete, publish/unpublish, build-integrity fix, restored tests).
-  **Not merged into main and not pushed yet** — next session: push, merge, release.
+  Pushed to `origin/chore/cleanup-tests`; **not merged into main** — next session: merge, release.
 - Untracked `_bmad/` is not ours — leave it alone, never commit it.
 
 ## Production
