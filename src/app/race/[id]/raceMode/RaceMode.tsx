@@ -18,6 +18,8 @@ import { canViewScreen } from "@/services/live/liveBridge";
 import { canForRace } from "@/services/cloud/permissions";
 import { useCheckInChanges, type CheckInChange } from "@/stores/checkInChangesStore";
 import CheckInChanges from "./CheckInChanges";
+import WaveBlockedNotice from "./WaveBlockedNotice";
+import { runningWaveOtherThan } from "@/utils/activeWave";
 
 const NO_CHANGES: CheckInChange[] = [];
 
@@ -41,6 +43,11 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   const [sheetView, setSheetView] = useState<SheetView>("summary");
   const [changesWave, setChangesWave] = useState<number | null>(null);
   const navigate = useNavigate();
+  // Start while an earlier wave is still on course: explain it here, before the
+  // Start screen opens (the rule itself stays in StartManager + the server).
+  const [blockedStart, setBlockedStart] = useState<{ wave: number; active: number } | null>(null);
+  const startBlockedBy = (w: number): number | null =>
+    waveStatusMap.get(w) === "upcoming" ? runningWaveOtherThan(categories, w) : null;
   const openWave = (w: number) => {
     setSelectedWave(w);
     // The card tap follows the wave's lifecycle (persisted state only):
@@ -57,6 +64,13 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
     const ciIncomplete =
       state === "upcoming" &&
       waveRiders.some((r) => !r.checked && !["DNS", "DNF", "DSQ"].includes(r.status));
+    if (!ciIncomplete) {
+      const active = startBlockedBy(w);
+      if (active != null) {
+        setBlockedStart({ wave: w, active });
+        return;
+      }
+    }
     setSheetView(ciIncomplete ? "checkin" : "summary");
     setSheet((s) => s ?? (ciIncomplete ? "half" : startSheetSize(w)));
   };
@@ -73,6 +87,11 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
       setSheetView("checkin");
       setSheet("half"); // Check-In opens at 70%; drag up to 95%
     } else if (action === "start") {
+      const active = startBlockedBy(w);
+      if (active != null) {
+        setBlockedStart({ wave: w, active });
+        return;
+      }
       setSheetView("summary");
       setSheet((s) => s ?? startSheetSize(w));
     } else if (action === "results" || action === "board") {
@@ -166,6 +185,14 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
         />
       </div>
 
+      {blockedStart && (
+        <WaveBlockedNotice
+          activeWave={blockedStart.active}
+          wave={blockedStart.wave}
+          onBack={() => setBlockedStart(null)}
+          onGoToActive={() => { const a = blockedStart.active; setBlockedStart(null); navigate(`/race/${raceUuid}/heat/${a}`); }}
+        />
+      )}
       {changesWave != null && (
         <CheckInChanges
           wave={changesWave}
@@ -185,10 +212,10 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           onSize={setSheet}
           onClose={() => setSheet(null)}
           view={sheetView}
-          onView={setSheetView}
+          onView={(v) => { setSheetView(v); if (v === "summary") setSheet(startSheetSize(selectedWave)); }}
           renderStart={() =>
             canViewScreen(raceUuid, "start")
-              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} simple onFixCheckIn={() => setSheetView("checkin")} />
+              ? <StartManager raceUuid={raceUuid} waveNum={selectedWave} categories={waveCategories} simple onFixCheckIn={() => setSheetView("checkin")} onBackToRace={() => setSheet(null)} />
               : deny
           }
           renderCheckIn={() =>

@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import WaveBlockedNotice from "./WaveBlockedNotice";
+import { runningWaveOtherThan } from "@/utils/activeWave";
 import styles from "./startManager.module.css";
 import { CategoryProps, RiderProps } from "@/types/types";
 import useCategoryStore from "@/stores/categoryStore";
@@ -20,6 +23,8 @@ interface Props {
   simple?: boolean;
   /** Simple mode: "Fix" on a check-in warning opens Check-In. */
   onFixCheckIn?: () => void;
+  /** "Back to Race" on the wave-in-progress notice (e.g. close the race-day sheet). */
+  onBackToRace?: () => void;
 }
 
 interface StartGroup {
@@ -311,7 +316,8 @@ const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   );
 };
 
-const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories, simple = false, onFixCheckIn }) => {
+const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories, simple = false, onFixCheckIn, onBackToRace }) => {
+  const navigate = useNavigate();
   const { updateCategory, categories: allCategories } = useCategoryStore();
   const { riders, updateAllRiders } = useRiderStore();
   const { races, updateRace } = useRaceStore();
@@ -333,6 +339,12 @@ const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories, simple =
   const otherWaveRunning = allCategories.some(
     (c) => c.raceUuid === raceUuid && !thisWaveIds.has(c.id) && c.status === "running"
   );
+  // Which wave that is, so the screen can say so (and link to it) instead of a silent no-op.
+  const activeWave = useMemo(
+    () => (otherWaveRunning ? runningWaveOtherThan(allCategories.filter((c) => c.raceUuid === raceUuid), waveNum) : null),
+    [otherWaveRunning, allCategories, raceUuid, waveNum]
+  );
+  const [blockedNotice, setBlockedNotice] = useState(false);
   const [countdown, setCountdown] = useState<{ groupId: string; seconds: number } | null>(null);
 const [editingStartId, setEditingStartId] = useState<string | null>(null);
   const [startGroups, setStartGroups] = useState<StartGroup[]>([]);
@@ -572,7 +584,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
   const startGroup = async (group: StartGroup) => {
     // Only one wave may run at a time.
     if (otherWaveRunning) {
-      setStartError(["Another wave is still running — finish it before starting this wave."]);
+      setBlockedNotice(true);
       return;
     }
     const errors = validateGroup(group);
@@ -930,10 +942,36 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
   );
 
   // ── Simple race-day layout: the same start handlers, nothing else ──
+  // "Wave N is still in progress": banner + the notice Start opens (both layouts).
+  const waveBlockUi = (
+    <>
+      {otherWaveRunning && (
+        <div className={styles.otherWaveBanner} data-testid="other-wave-banner">
+          {activeWave != null ? `Wave ${activeWave} is still in progress — finish it before starting Wave ${waveNum}.` : "Another wave is still in progress — finish it before starting this wave."}
+          {activeWave != null && (
+            <button type="button" className={styles.otherWaveGo} onClick={() => navigate(`/race/${raceUuid}/heat/${activeWave}`)}>
+              Go to Wave {activeWave}
+            </button>
+          )}
+        </div>
+      )}
+
+      {blockedNotice && (
+        <WaveBlockedNotice
+          activeWave={activeWave ?? 0}
+          wave={waveNum}
+          onBack={() => { setBlockedNotice(false); onBackToRace?.(); }}
+          onGoToActive={() => { setBlockedNotice(false); if (activeWave != null) navigate(`/race/${raceUuid}/heat/${activeWave}`); }}
+        />
+      )}
+    </>
+  );
+
   if (simple) {
     return (
       <div className={styles.simple}>
         {overlays}
+        {waveBlockUi}
         {startGroups.map((group) => {
           const cats = group.categoryIds
             .map((id) => categories.find((c) => c.id === id))
@@ -986,9 +1024,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                       type="button"
                       data-testid="start-all"
                       className={`${styles.simpleBtn} ${styles.simpleStart} ${blocked ? styles.btnBlocked : ""}`}
-                      disabled={otherWaveRunning}
-                      aria-disabled={blocked}
-                      title={otherWaveRunning ? "Another wave is still running" : undefined}
+                      aria-disabled={blocked || otherWaveRunning}
                       onClick={() => startGroup(group)}
                     >
                       <Play size={15} /> Start Now
@@ -996,10 +1032,10 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                     <button
                       type="button"
                       className={`${styles.simpleBtn} ${blocked ? styles.btnBlocked : ""}`}
-                      disabled={otherWaveRunning || countdown?.groupId === group.id}
-                      aria-disabled={blocked}
+                      disabled={countdown?.groupId === group.id}
+                      aria-disabled={blocked || otherWaveRunning}
                       onClick={() => {
-                        if (otherWaveRunning) { setStartError(["Another wave is still running — finish it before starting this wave."]); return; }
+                        if (otherWaveRunning) { setBlockedNotice(true); return; }
                         const errors = validateGroup(group);
                         if (errors.length > 0) { setStartError(errors); return; }
                         setCountdown({ groupId: group.id, seconds: 60 });
@@ -1157,11 +1193,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
         </div>
       </div>
 
-      {otherWaveRunning && (
-        <div className={styles.otherWaveBanner}>
-          ⚠ Another wave is still running — finish it before starting this wave.
-        </div>
-      )}
+      {waveBlockUi}
 
       {startGroups.map((group, si) => {
         const cats = group.categoryIds
@@ -1469,12 +1501,11 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                   {[30, 60, 120].map((sec) => (
                     <button
                       key={sec}
-                      className={`${styles.countdownBtn} ${totalIssues > 0 ? styles.btnBlocked : ""}`}
-                      disabled={otherWaveRunning}
-                      aria-disabled={totalIssues > 0}
-                      title={otherWaveRunning ? "Another wave is still running" : totalIssues > 0 ? "Resolve check-in / laps issues first" : undefined}
+                      className={`${styles.countdownBtn} ${totalIssues > 0 || otherWaveRunning ? styles.btnBlocked : ""}`}
+                      aria-disabled={totalIssues > 0 || otherWaveRunning}
+                      title={totalIssues > 0 ? "Resolve check-in / laps issues first" : undefined}
                       onClick={() => {
-                        if (otherWaveRunning) { setStartError(["Another wave is still running — finish it before starting this wave."]); return; }
+                        if (otherWaveRunning) { setBlockedNotice(true); return; }
                         const errors = validateGroup(group);
                         if (errors.length > 0) { setStartError(errors); return; }
                         setCountdown({ groupId: group.id, seconds: sec });
@@ -1485,10 +1516,9 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                   ))}
                   <button
                     data-testid="start-all"
-                    className={`${styles.startBtn} ${totalIssues > 0 ? styles.btnBlocked : ""}`}
-                    disabled={otherWaveRunning}
-                    aria-disabled={totalIssues > 0}
-                    title={otherWaveRunning ? "Another wave is still running" : totalIssues > 0 ? "Resolve check-in / laps issues first" : undefined}
+                    className={`${styles.startBtn} ${totalIssues > 0 || otherWaveRunning ? styles.btnBlocked : ""}`}
+                    aria-disabled={totalIssues > 0 || otherWaveRunning}
+                    title={totalIssues > 0 ? "Resolve check-in / laps issues first" : undefined}
                     onClick={() => startGroup(group)}
                   >
                     <img src={Icons.buttonStart} alt="" width={14} height={14} />

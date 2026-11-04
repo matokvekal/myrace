@@ -226,6 +226,17 @@ still open).
 - Recap mode is toggled from the Wave info sheet (tap the wave chip), not the
   filter panel. Finish Wave is an outlined button; the typed FINISH confirm stays.
 
+### Finish Wave / starting a wave while another runs
+- Live's Finish Wave confirm is `heat/[heatId]/FinishWaveModal.tsx` ("Finish This Wave?",
+  summary, typed FINISH, Confirm Finish, short celebration). `finishWaveFromLive`
+  returns true when it finished; the modal closes itself via a ref'd onClose (Live
+  re-renders every second — a plain onClose dep restarts the timer forever).
+- One wave at a time is still enforced by StartManager + the engine. The UI never
+  blocks silently: `utils/activeWave.runningWaveOtherThan` names the running wave;
+  the Race card's Start (and a card tap that would open Start) shows
+  `WaveBlockedNotice` (Back to Race / Go to Active Wave); on the Start screen the
+  Start buttons stay tappable and open the same notice, plus a banner (both layouts).
+
 ### Card cover (heat page)
 - How long a tapped card stays washed out: 10 s / 30 s / 2 min / 4 min, default 10 s
   (`coverMs` in `boardHoldStore`, set in Race Setup). Separate from the board hold:
