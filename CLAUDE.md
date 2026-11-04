@@ -22,6 +22,7 @@ Read this file first, then drill into the specific doc as needed.
 | Rider data structure + store | `docs/rider-data.md` |
 | Race data structure + store | `docs/race-data.md` |
 | Category data structure + store | `docs/category-data.md` |
+| Server tests (unit always; database tests only on a dedicated `*_test` cloud DB) | `docs/server/testing.md` |
 | Production deployment (one Linux server: app in `/var/www/commissaire`, API = PM2 `server-commissaire` :5000, same domain; manual releases) | `docs/server/deployment.md` |
 | Old GitHub Pages setup (no longer used for production) | `docs/github-pages.md` |
 | Cloud sync, per-race roles, Supabase (numbered doc set) | `docs/cloud/0-START.md` |
@@ -486,7 +487,8 @@ still open).
   Categories are built by `utils/categoriesFromRiders.ts` for local and shared races
   alike; the store's category builders still skip shared races. Other importers go
   through the bridge, which applies the same check and adds the categories to the Action.
-- `tests/race-persistence.spec.ts` needs a real API (`E2E_API_URL`); skipped otherwise.
+- `tests/race-persistence.spec.ts` and `tests/cloud-sync.spec.ts` (PC ↔ phone sync) need a real API (`E2E_API_URL`); skipped otherwise.
+- Dead-code check: `npx knip` (2026-11-04 cleanup removed 33 unreferenced files and 13 unused deps). Shared-code exports look unused to knip only because `server/` is outside its scan.
 
 ### Terms & Conditions (landing-page acceptance)
 - Content lives in `legal/terms.ts` (the ONLY file to edit; it's a DRAFT, not
@@ -539,4 +541,4 @@ still open).
 - CSV import fields: `bib, first_name, middle_name, last_name, full_name, club, category, gender, heat, start_time, total_laps, position, points, federation, race_day`
 - Club dictionary: no UI; `clubDictionaryStore` entries (if any) are still applied by the import wizard
 - Hebrew + English support required (use `dir="auto"` on text elements)
-- No database yet — all data is local IDB (planned: Phase 4)
+- Local data is IndexedDB; shared races sync with the Commissaire server (cloud PostgreSQL). Tests never use the production DB.
