@@ -40,7 +40,7 @@ import { activeCategories, withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
 import { liveFilterOptions } from "./liveFilter";
-import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import FinishWaveModal from "./FinishWaveModal";
 import { Bike, List, ChevronDown, Flag } from "lucide-react";
 import { canViewScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
@@ -490,9 +490,10 @@ const Heat: React.FC = () => {
   );
   const waveStillRacing = waveAllRiders.filter((r) => r.raceStatus === "running" && !["DNF", "DSQ", "DNS"].includes(r.status)).length;
   const waveAllFinished = waveCategories.length > 0 && waveCategories.every((c) => c.status === "finished");
-  const finishWaveFromLive = async () => {
-    if (finishingWaveRef.current || waveAllFinished || heatId == null) return; // no double execution
-    if (!liveAllows(raceUuid, "WaveFinished", { heat: heatId })) return;
+  /** Same finish as before; returns true once the wave was finished (the modal then celebrates and closes itself). */
+  const finishWaveFromLive = async (): Promise<boolean> => {
+    if (finishingWaveRef.current || waveAllFinished || heatId == null) return false; // no double execution
+    if (!liveAllows(raceUuid, "WaveFinished", { heat: heatId })) return false;
     finishingWaveRef.current = true;
     try {
       const now = new Date();
@@ -517,7 +518,7 @@ const Heat: React.FC = () => {
         });
       }
       toast.success(`Wave ${heatId} finished — ${plan.closedOut.length} rider${plan.closedOut.length === 1 ? "" : "s"} still racing marked as finished (administrative).`);
-      setShowFinishWave(false);
+      return true;
     } finally {
       finishingWaveRef.current = false;
     }
@@ -856,14 +857,21 @@ const Heat: React.FC = () => {
       )}
 
       {showFinishWave && heatId != null && (
-        <DeleteConfirmModal
-          title={`Finish Wave ${heatId}?`}
-          description={`Wave ${heatId}: ${waveAllRiders.length} rider${waveAllRiders.length === 1 ? "" : "s"}, ${waveStillRacing} still racing. All remaining active riders in this wave will be marked as finished (administrative — no finish time is invented; their recorded laps and times are kept). Other waves are not affected.`}
-          confirmWord="FINISH"
-          confirmLabel="Finish Wave"
-          busyLabel="Finishing…"
+        <FinishWaveModal
+          wave={heatId}
+          raceName={currentRace?.name}
+          startTime={currentWave?.startTime ?? null}
+          categories={startedWaveCats.map((c) => `${c.name}${c.subCategory ? ` · ${c.subCategory}` : ""}`)}
+          summary={{
+            total: waveAllRiders.length,
+            finished: waveAllRiders.filter((r) => r.raceStatus === "finished" && !["DNF", "DSQ", "DNS"].includes(r.status)).length,
+            onCourse: waveStillRacing,
+            dnf: waveAllRiders.filter((r) => r.status === "DNF").length,
+            dsq: waveAllRiders.filter((r) => r.status === "DSQ").length,
+            dns: waveAllRiders.filter((r) => r.status === "DNS").length,
+          }}
           onConfirm={finishWaveFromLive}
-          onCancel={() => setShowFinishWave(false)}
+          onClose={() => setShowFinishWave(false)}
         />
       )}
 

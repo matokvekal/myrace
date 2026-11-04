@@ -1,9 +1,9 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { planWaveFinish, isAdministrativeFinish } from "../waveFinish";
-import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import FinishWaveModal from "@/race/[id]/heat/[heatId]/FinishWaveModal";
 import { makeCategory, makeRider } from "@/test/factories";
 
 /** Finish Wave from Live: same rule as Race → Start; only this wave; nothing invented; idempotent. */
@@ -53,19 +53,69 @@ describe("planWaveFinish", () => {
 });
 
 describe("Finish Wave confirmation", () => {
+  const summary = { total: 4, finished: 2, onCourse: 1, dnf: 1, dsq: 0, dns: 0 };
+  const renderModal = (onConfirm: () => Promise<boolean>, onClose = vi.fn()) => {
+    render(<FinishWaveModal wave={2} raceName="Spring Cup" startTime="09:00" categories={["Masters Men"]} summary={summary} onConfirm={onConfirm} onClose={onClose} />);
+    return onClose;
+  };
+
+  it("asks 'Finish This Wave?' with the wave summary; a gentle note when riders are on course", () => {
+    renderModal(vi.fn());
+    expect(screen.getByRole("dialog", { name: "Finish This Wave?" })).toBeInTheDocument();
+    expect(screen.getByText(/Wave 2 · 09:00 · Spring Cup/)).toBeInTheDocument();
+    expect(screen.getByTestId("finish-wave-finished")).toHaveTextContent("2");
+    expect(screen.getByTestId("finish-wave-oncourse")).toHaveTextContent("1");
+    expect(screen.getByTestId("finish-wave-note")).toHaveTextContent(/1 rider is still on course/);
+  });
+
   it("needs FINISH typed; Cancel does nothing", async () => {
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
-    const onCancel = vi.fn();
-    render(<DeleteConfirmModal title="Finish Wave 2?" description="Wave 2: 4 riders, 1 still racing." confirmWord="FINISH" confirmLabel="Finish Wave" busyLabel="Finishing…" onConfirm={onConfirm} onCancel={onCancel} />);
-    const btn = screen.getByRole("button", { name: "Finish Wave" });
+    const onConfirm = vi.fn().mockResolvedValue(true);
+    const onClose = renderModal(onConfirm);
+    const btn = screen.getByRole("button", { name: /Confirm Finish/ });
     expect(btn).toBeDisabled();
     await user.type(screen.getByPlaceholderText("FINISH"), "finish");
     expect(btn).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(onCancel).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
     expect(onConfirm).not.toHaveBeenCalled();
-    await user.click(btn);
+  });
+
+  it("confirming finishes once and shows the finish celebration; a refused finish just closes", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn().mockResolvedValue(true);
+    renderModal(onConfirm);
+    await user.type(screen.getByPlaceholderText("FINISH"), "FINISH");
+    await user.click(screen.getByRole("button", { name: /Confirm Finish/ }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("finish-wave-done")).toHaveTextContent("Wave 2 finished");
+  });
+
+  it("the celebration closes by itself even while the parent keeps re-rendering (Live's clock)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const onClose = vi.fn();
+      const props = { wave: 2, categories: [], summary, onConfirm: vi.fn().mockResolvedValue(true) };
+      const { rerender } = render(<FinishWaveModal {...props} onClose={() => onClose()} />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.type(screen.getByPlaceholderText("FINISH"), "FINISH{Enter}");
+      await screen.findByTestId("finish-wave-done");
+      for (let i = 0; i < 4; i++) {
+        rerender(<FinishWaveModal {...props} onClose={() => onClose()} />); // a new onClose every second
+        vi.advanceTimersByTime(600);
+      }
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("closes without celebrating when the finish was refused", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderModal(vi.fn().mockResolvedValue(false), onClose);
+    await user.type(screen.getByPlaceholderText("FINISH"), "FINISH{Enter}");
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(screen.queryByTestId("finish-wave-done")).not.toBeInTheDocument();
   });
 });

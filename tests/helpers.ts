@@ -110,8 +110,12 @@ export async function finishWave(page: Page, wave: number): Promise<void> {
   await page.getByTestId(`wave-act-finish-${wave}`).click();
   await page.waitForURL(new RegExp(`/heat/${wave}`));
   await page.getByPlaceholder("FINISH").fill("FINISH");
-  await page.getByRole("button", { name: "Finish Wave", exact: true }).click();
+  await page.getByRole("button", { name: /Confirm Finish/ }).click();
   await expect(page.getByText(new RegExp(`Wave ${wave} finished`)).first()).toBeVisible();
+  // The short finish celebration closes itself, or on a tap (tests may run on a fake clock).
+  await expect(page.getByTestId("finish-wave-done")).toBeVisible();
+  await page.getByTestId("finish-wave-modal").click({ position: { x: 5, y: 5 } });
+  await expect(page.getByTestId("finish-wave-modal")).toHaveCount(0);
 }
 
 /** Open a top-level race tab (Schedule / Categories / Riders / Results / …). */
