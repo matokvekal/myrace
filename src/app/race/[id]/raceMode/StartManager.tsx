@@ -785,6 +785,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
     for (const cat of plan.categories) await updateCategory(cat);
     if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
     if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
+    if (plan.markedDNS.length > 0) await updateAllRiders(plan.markedDNS); // never-started categories: DNS
   };
 
   const adjustTime = (groupId: string, seconds: number) => {

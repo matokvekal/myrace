@@ -284,6 +284,11 @@ still open).
 - Riders still on the road become **finishers on the laps they completed**, never
   DNF — same rule as `closeOutRiderOnTrack` in StartManager. DNF is a human
   classification; never infer it from the clock. DNF/DSQ/DNS are preserved.
+  Riders of a wave/category that never started become **DNS**, and that category is
+  closed "not started". ONE rule, `shared/race/finalPlan.ts` `planFinalization`, used
+  by the confirmation modal (shows the exact lists first), the local finalize and the
+  server finalize transaction; Finish Wave (`waveFinish.planWaveFinish` + engine
+  `WaveFinished`) applies the same rule to its wave.
 - **The lock is enforced in the STORES, not the UI** (`utils/raceLock.ts`).
   `ridersStore` (add/insert/update/patch/updateAll/delete/deleteByRace),
   `categoryStore` (upsert/update/rebuild/recolour) and `racesStore.updateRace`

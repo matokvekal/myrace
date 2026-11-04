@@ -502,6 +502,7 @@ const Heat: React.FC = () => {
       for (const cat of plan.categories) await useCategoryStore.getState().updateCategory(cat);
       if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
       if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
+      if (plan.markedDNS.length > 0) await updateAllRiders(plan.markedDNS); // never-started categories: DNS
       if (currentRace) {
         AuditLogService.log({
           race: currentRace,

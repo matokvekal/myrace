@@ -1,6 +1,11 @@
 /**
  * Confirmation for the one irreversible action in the app.
  *
+ * The impact shown here comes from `planFinalization` (shared/race/finalPlan.ts),
+ * the SAME rule the local finalize and the server transaction apply: riders still
+ * on course finish on the laps they completed, riders of waves that never started
+ * become DNS, DNF/DSQ/DNS stay. Each group expands to list its riders.
+ *
  * It is deliberately NOT a generic "are you sure?". Finishing a race rewrites
  * every rider still on the road and then locks the whole race, so the modal
  * shows the actual counts FIRST — a commissaire who forgot a wave is still out
@@ -14,6 +19,7 @@ import React, { useMemo, useState } from "react";
 import styles from "./finishRaceModal.module.css";
 import { AlertTriangle, Flag, Lock } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
+import { planFinalization } from "../../../../shared/race/finalPlan";
 
 interface Props {
   raceName: string;
@@ -36,13 +42,14 @@ const FinishRaceModal: React.FC<Props> = ({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const stats = useMemo(() => {
-    const onRoad = riders.filter((r) => r.raceStatus === "running").length;
-    const out = riders.filter((r) => ["DNF", "DSQ", "DNS"].includes(r.status)).length;
-    const openCats = categories.filter((c) => c.status !== "finished").length;
-    const neverStarted = categories.filter((c) => c.status === "upcoming").length;
-    return { onRoad, out, openCats, neverStarted, total: riders.length };
-  }, [riders, categories]);
+  const plan = useMemo(() => planFinalization(riders, categories), [riders, categories]);
+  const stats = {
+    onRoad: plan.toFinish.length,
+    toDNS: plan.toDNS.length,
+    out: plan.kept.DNF.length + plan.kept.DSQ.length + plan.kept.DNS.length,
+    openCats: plan.toClose.length,
+    neverStarted: plan.notStarted.length,
+  };
 
   const isValid = input.trim().toUpperCase() === CONFIRM_WORD;
 
@@ -78,30 +85,41 @@ const FinishRaceModal: React.FC<Props> = ({
           This closes the race for good and publishes the final classification.
         </p>
 
-        {/* What this will actually do to the data, in numbers. */}
+        {/* What this will actually do to the data — the same plan finalize applies. */}
         <div className={styles.summary}>
-          <SummaryRow
-            value={stats.total}
-            label="riders will get their final placing and total time"
-          />
+          <SummaryRow testId="finish-race-finished" value={plan.finished.length} label="finished — results kept" riders={plan.finished} />
           {stats.onRoad > 0 && (
             <SummaryRow
+              testId="finish-race-onroad"
               value={stats.onRoad}
-              label="still on the road — classified as finishers on the laps they completed"
+              label="still on course — become FINISHED on the laps they completed"
+              riders={plan.toFinish}
+              warn
+            />
+          )}
+          {stats.toDNS > 0 && (
+            <SummaryRow
+              testId="finish-race-dns"
+              value={stats.toDNS}
+              label="never started — become DNS"
+              riders={plan.toDNS}
               warn
             />
           )}
           {stats.out > 0 && (
-            <SummaryRow value={stats.out} label="DNF / DSQ / DNS keep their status" />
+            <SummaryRow
+              testId="finish-race-kept"
+              value={stats.out}
+              label={`keep their status (${[["DNF", plan.kept.DNF.length], ["DSQ", plan.kept.DSQ.length], ["DNS", plan.kept.DNS.length]].filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(", ")})`}
+              riders={[...plan.kept.DNF, ...plan.kept.DSQ, ...plan.kept.DNS]}
+            />
           )}
           {stats.openCats > 0 && (
             <SummaryRow
+              testId="finish-race-categories"
               value={stats.openCats}
-              label={
-                stats.neverStarted > 0
-                  ? `categories will be closed (${stats.neverStarted} never started)`
-                  : "categories will be closed"
-              }
+              label={stats.neverStarted > 0 ? `categories will be closed (${stats.neverStarted} never started)` : "categories will be closed"}
+              items={plan.toClose.map((c) => `${c.name}${c.subCategory ? ` ${c.subCategory}` : ""}${plan.notStarted.includes(c) ? " — not started" : ""}`)}
               warn={stats.neverStarted > 0}
             />
           )}
@@ -166,15 +184,36 @@ const FinishRaceModal: React.FC<Props> = ({
   );
 };
 
-const SummaryRow: React.FC<{ value: number; label: string; warn?: boolean }> = ({
-  value,
-  label,
-  warn,
-}) => (
-  <div className={`${styles.summaryRow} ${warn ? styles.summaryWarn : ""}`}>
-    <span className={styles.summaryValue}>{value}</span>
-    <span className={styles.summaryLabel}>{label}</span>
-  </div>
-);
+const riderLine = (r: RiderProps) =>
+  `${r.bibNumber != null ? `#${r.bibNumber} ` : ""}${[r.firstName, r.lastName].filter(Boolean).join(" ")}${r.category ? ` · ${r.category}` : ""}${["DNF", "DSQ", "DNS"].includes(r.status) ? ` · ${r.status}` : ""}`;
+
+const SummaryRow: React.FC<{
+  value: number;
+  label: string;
+  warn?: boolean;
+  testId: string;
+  riders?: RiderProps[];
+  items?: string[];
+}> = ({ value, label, warn, testId, riders, items }) => {
+  const lines = items ?? (riders ?? []).map(riderLine);
+  const row = (
+    <>
+      <span className={styles.summaryValue}>{value}</span>
+      <span className={styles.summaryLabel}>{label}</span>
+    </>
+  );
+  if (lines.length === 0)
+    return <div className={`${styles.summaryRow} ${warn ? styles.summaryWarn : ""}`} data-testid={testId}>{row}</div>;
+  return (
+    <details className={`${styles.summaryGroup} ${warn ? styles.summaryWarn : ""}`} data-testid={testId}>
+      <summary className={styles.summaryRow}>{row}</summary>
+      <ul className={styles.summaryList}>
+        {lines.map((l, i) => (
+          <li key={i} dir="auto">{l}</li>
+        ))}
+      </ul>
+    </details>
+  );
+};
 
 export default FinishRaceModal;

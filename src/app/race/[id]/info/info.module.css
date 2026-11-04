@@ -715,29 +715,44 @@
   }
 
   .finishBtn {
-    margin-inline-start: auto;
+    width: 100%;
   }
 }
 
 .finishBtn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  gap: 10px;
   flex-shrink: 0;
-  padding: 9px 20px;
-  background: linear-gradient(180deg, #d8a53a 0%, #b4801a 100%);
+  min-height: 48px;
+  padding: 12px 26px;
+  background: linear-gradient(180deg, #23283a 0%, #0f1220 100%);
   color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
+  border: 2px solid #d8a53a;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: filter 0.15s;
+  box-shadow: 0 6px 18px rgba(180, 128, 26, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: transform 0.12s, box-shadow 0.15s, filter 0.15s;
   white-space: nowrap;
 }
 
 .finishBtn:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.15);
+  box-shadow: 0 8px 22px rgba(180, 128, 26, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.finishBtn:active {
+  transform: translateY(1px);
+}
+
+.checkered {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 
 /* Replaces the Edit bar once the race is closed. */

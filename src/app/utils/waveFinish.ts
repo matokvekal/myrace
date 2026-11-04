@@ -51,7 +51,19 @@ export function planWaveFinish(waveCats: CategoryProps[], riders: RiderProps[], 
       status: ["DNF", "DSQ", "DNS"].includes(r.status) ? r.status : ("finished" as const),
     }));
 
-  return { categories, finalized, closedOut };
+  // A category of this wave that never started: its riders did not start → DNS
+  // (same rule as the server engine's WaveFinished and Finish Race).
+  const markedDNS = riders
+    .filter(
+      (r) =>
+        r.raceUuid === raceUuid &&
+        !["DNF", "DSQ", "DNS"].includes(r.status) &&
+        r.raceStatus === "upcoming" &&
+        waveCats.some((c) => c.status === "upcoming" && riderInCategory(r, c))
+    )
+    .map((r) => ({ ...r, status: "DNS" as const }));
+
+  return { categories, finalized, closedOut, markedDNS };
 }
 
 /** A rider closed out by a wave finish (administrative), as opposed to one who crossed the line to finish. */

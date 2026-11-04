@@ -18,6 +18,7 @@ import type { CategoryProps, RaceProps, RiderProps, RaceFinalization } from "@/t
 import calculatePositions from "./calculatePosition";
 import { formatElapsedSince } from "./timeUtils";
 import { signRaceFinalization } from "./raceSignature";
+import { planFinalization } from "../../shared/race/finalPlan";
 import useRaceStore from "@/stores/racesStore";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
@@ -28,23 +29,22 @@ const OUT_STATUSES: RiderProps["status"][] = ["DNF", "DSQ", "DNS"];
 const isOut = (r: RiderProps): boolean => OUT_STATUSES.includes(r.status);
 
 /**
- * Final classification for every rider in the race.
- *
- * Riders still on the road are credited as FINISHERS on the laps they actually
- * completed — the same rule `finishWave` uses. They are NOT turned into DNFs:
- * DNF is a human judgement a commissaire makes, never something inferred from
- * the clock (see StartManager's `closeOutRiderOnTrack`).
- *
- * DNS riders keep their status and stay out of the placings, but are still
- * closed out so nothing is left in a "running" state anywhere.
+ * Final classification for every rider in the race — the shared rule
+ * (shared/race/finalPlan, same as the server and the confirmation modal):
+ * FINISHED / DNF / DSQ / DNS are kept; a rider still on course is credited as a
+ * FINISHER on the laps actually completed (never DNF — DNF is a human decision,
+ * see StartManager's closeOutRiderOnTrack); a rider whose wave never started
+ * becomes DNS. The modal lists exactly these riders before the commissaire confirms.
  *
  * Pure — returns new objects, touches nothing in the stores.
  */
-export function computeFinalRiders(riders: RiderProps[], now: Date): RiderProps[] {
+export function computeFinalRiders(riders: RiderProps[], now: Date, categories: CategoryProps[] = []): RiderProps[] {
+  const plan = planFinalization(riders, categories);
+  const toDNS = new Set(plan.toDNS.map((r) => r.id));
   const closed = riders.map((r) => ({
     ...r,
     raceStatus: "finished" as const,
-    status: isOut(r) ? r.status : ("finished" as const),
+    status: toDNS.has(r.id) ? ("DNS" as const) : isOut(r) ? r.status : ("finished" as const),
     // Backfill only when missing: a real crossing time already recorded during
     // the race is the truth and must survive finalizing untouched.
     elapsedTimeFromStart:
@@ -107,7 +107,7 @@ export async function finalizeRace(
     .getState()
     .categories.filter((c) => c.raceUuid === race.uuid);
 
-  const finalRiders = computeFinalRiders(riders, now);
+  const finalRiders = computeFinalRiders(riders, now, categories);
   const finalCategories = computeFinalCategories(categories, now);
 
   // 1. Results first — while the race is still writable.

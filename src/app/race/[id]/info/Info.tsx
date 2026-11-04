@@ -821,7 +821,7 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
               onClick={() => setShowFinishRace(true)}
               data-testid="finish-race-btn"
             >
-              <Flag size={14} /> Finish Race
+              <CheckeredFlag /> Finish Race
             </button>
           </div>
         </div>
@@ -1025,3 +1025,18 @@ const FormRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label
 );
 
 export default Info;
+
+/** Chequered finish flag for the Finish Race button (lucide has no chequered one). */
+function CheckeredFlag() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" className={styles.checkered}>
+      <path d="M4 22V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="5" y="3" width="16" height="11" rx="1" fill="#fff" />
+      <g fill="#111">
+        <rect x="5" y="3" width="4" height="3.67" /><rect x="13" y="3" width="4" height="3.67" />
+        <rect x="9" y="6.67" width="4" height="3.67" /><rect x="17" y="6.67" width="4" height="3.67" />
+        <rect x="5" y="10.33" width="4" height="3.67" /><rect x="13" y="10.33" width="4" height="3.67" />
+      </g>
+    </svg>
+  );
+}

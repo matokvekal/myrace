@@ -212,6 +212,24 @@ describe("waves", () => {
     expect(s.riders[w1.uuid].raceStatus).toBe("finished");
   });
 
+  it("finishing a wave whose category never started: its riders become DNS, out statuses kept, category closed", () => {
+    const started = makeCategory({ name: "Elite", heat: 1, laps: 3 });
+    const idle = makeCategory({ name: "Kids", heat: 1, laps: 2 });
+    const s = makeRaceState({
+      categories: [started, idle],
+      riders: [makeRider({ category: "Elite", heat: 1 }), makeRider({ category: "Kids", heat: 1 }), makeRider({ category: "Kids", heat: 1, status: "DSQ" })],
+    });
+    s.categories[started.uuid].status = "running";
+    s.categories[started.uuid].startedAt = T0;
+    const [elite, kid, dsq] = Object.values(s.riders);
+    elite.raceStatus = "running";
+    applyAction(s, makeAction("WaveFinished", { heat: 1 }), T0 + 30 * MIN);
+    expect(s.riders[elite.uuid].status).toBe("finished");
+    expect(s.riders[kid.uuid].status).toBe("DNS");
+    expect(s.riders[dsq.uuid].status).toBe("DSQ");
+    expect(s.categories[idle.uuid].status).toBe("finished");
+  });
+
   it("starting the next wave sweeps riders of finished categories still on track", () => {
     const s = twoWaves();
     applyAction(s, makeAction("WaveStarted", { heat: 1 }), T0);

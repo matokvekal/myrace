@@ -376,7 +376,16 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
         c.status = "finished";
         c.finishedAt = atMs;
         ch.categories.add(c.uuid);
-        if (!wasStarted) continue;
+        if (!wasStarted) {
+          // The wave closed without this category ever starting: its riders did not start.
+          for (const r of ridersOfCategory(state, c)) {
+            if (OUT.has(r.status)) continue;
+            r.status = "DNS";
+            touch(r);
+            ch.rederive.add(r.uuid);
+          }
+          continue;
+        }
         for (const r of ridersOfCategory(state, c)) {
           // The wave is over: riders still on the road finish on the laps they completed.
           if (r.raceStatus === "running" && !OUT.has(r.status)) {

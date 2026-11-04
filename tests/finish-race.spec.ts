@@ -75,6 +75,12 @@ test.describe("Finish Race", () => {
     await page.getByTestId("finish-race-btn").scrollIntoViewIfNeeded();
     await page.getByTestId("finish-race-btn").click();
     await expect(page.getByTestId("finish-race-onroad-warning")).toBeVisible();
+    // The exact impact, from the same plan finalize applies: on course → FINISHED.
+    const onRoad = page.getByTestId("finish-race-onroad");
+    await expect(onRoad).toContainText(String(before.stillRunning));
+    await expect(onRoad).toContainText("become FINISHED");
+    await onRoad.locator("summary").click();
+    await expect(onRoad.locator("li")).toHaveCount(before.stillRunning);
     await page.locator("#finish-race-input").fill("FINISH");
     await page.getByTestId("finish-race-confirm").click();
     await expect(page.getByTestId("race-certificate")).toBeVisible();

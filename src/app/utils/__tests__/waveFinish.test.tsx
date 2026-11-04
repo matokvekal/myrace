@@ -25,6 +25,16 @@ describe("planWaveFinish", () => {
     return { waveCats: [w2a, w2b], riders };
   };
 
+  it("a category of this wave that never started: its riders become DNS, out statuses kept, other waves untouched", () => {
+    const { waveCats, riders } = setup();
+    const extra = [
+      makeRider({ id: 5, raceUuid: RACE, category: "Juniors", raceStatus: "upcoming" }),
+      makeRider({ id: 6, raceUuid: RACE, category: "Juniors", raceStatus: "upcoming", status: "DSQ" }),
+    ];
+    const plan = planWaveFinish(waveCats, [...riders, ...extra], RACE, NOW);
+    expect(plan.markedDNS.map((r) => [r.id, r.status])).toEqual([[5, "DNS"]]);
+  });
+
   it("finishes only this wave; still-racing riders become administrative finishers with laps and times untouched", () => {
     const { waveCats, riders } = setup();
     const plan = planWaveFinish(waveCats, riders, RACE, NOW);

@@ -71,8 +71,36 @@
   line-height: 1.4;
 }
 
-.summaryRow + .summaryRow {
+.summary > * + * {
   border-top: 1px solid #f2f4f8;
+}
+
+/* A group that lists its riders: tap the row to expand. */
+.summaryGroup > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.summaryGroup > summary::-webkit-details-marker {
+  display: none;
+}
+.summaryGroup > summary::after {
+  content: "▸";
+  margin-inline-start: auto;
+  color: #9aa3b8;
+  transition: transform 0.15s;
+}
+.summaryGroup[open] > summary::after {
+  transform: rotate(90deg);
+}
+.summaryList {
+  margin: 0;
+  padding: 0 12px 10px 52px;
+  list-style: none;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 12.5px;
+  color: #46506a;
+  line-height: 1.6;
 }
 
 .summaryValue {

@@ -22,6 +22,7 @@ import { publishChanges, type CommittedChanges } from "../realtime/socket.js";
 import { projectRider } from "../../../src/shared/race/access.js";
 import { PROTOCOL_VERSION, type RaceAction } from "../../../src/shared/race/actions.js";
 import { actionTime, applyAction, categoryKey } from "../../../src/shared/race/engine.js";
+import { planFinalization } from "../../../src/shared/race/finalPlan.js";
 import type { RaceState, SharedRider } from "../../../src/shared/race/state.js";
 import { raceNotFound, requireMember, requireOwner } from "../races/access.js";
 import { rederive } from "../races/actions.js";
@@ -128,7 +129,25 @@ resultsRouter.post("/finalize", route(async (req, res) => {
     const state = await loadState(d, m.raceUuid, true);
     if (!state) throw raceNotFound();
     if (await d.one(`SELECT 1 FROM official_versions WHERE "raceUuid" = $1`, [m.raceUuid])) throw new ApiError(409, "already_official", "The race is already final — amend it instead");
-    // Close every open wave first: riders still on track finish on their completed laps (never DNF).
+    // The shared Finish Race rule (shared/race/finalPlan — the app's modal showed exactly this):
+    // never started → DNS; still on course → FINISHED on the laps completed (below, never DNF);
+    // every other result is kept. All inside this one transaction.
+    const plan = planFinalization(Object.values(state.riders), Object.values(state.categories));
+    {
+      const status = "DNS" as const;
+      for (const rider of plan.toDNS) {
+        const now = new Date().toISOString();
+        const action = { actionId: randomUUID(), raceUuid: m.raceUuid, type: "StatusCorrection", payload: { riderUuid: rider.uuid, status }, deviceTime: now, clockOffsetMs: 0, deviceId: "server", protocolVersion: PROTOCOL_VERSION } as RaceAction;
+        const r = applyAction(state, action, actionTime(action));
+        if (!r.applied) continue;
+        const seq = await appendServerEvent(d, m.raceUuid, m.userId, "StatusCorrection", { riderUuid: rider.uuid, status, reason: "finalize" }, null);
+        const touched = new Set(r.changes.riders);
+        await rederive(d, state, r.changes.rederive, touched);
+        await saveChanges(d, state, { race: false, categories: [], riders: touched, removedRiders: [], removedCategories: [] }, seq);
+        touched.forEach((x) => commit.riders.add(x));
+      }
+    }
+    // Close every open wave: riders still on track finish on their completed laps (never DNF).
     const heats = [...new Set(Object.values(state.categories).filter((c) => c.status !== "finished").map((c) => c.heat ?? 0))];
     for (const heat of heats) {
       const now = new Date().toISOString();
@@ -142,10 +161,30 @@ resultsRouter.post("/finalize", route(async (req, res) => {
       r.changes.categories.forEach((c) => commit.categories.add(c));
       touched.forEach((x) => commit.riders.add(x));
     }
+    // Categories no wave number reaches (heat empty — waves derived from start times in the app)
+    // are closed here too; one that never started stays without a start time ("not started").
+    const stillOpen = Object.values(state.categories).filter((c) => c.status !== "finished" && !c.ignored);
+    for (const c of stillOpen) {
+      // One allowed event type per category (race_events.type CHECK): no migration needed.
+      const seq = await appendServerEvent(d, m.raceUuid, m.userId, "CategoryFinished", { categoryUuid: c.uuid, reason: "finalize" }, c.heat ?? null);
+      c.status = "finished";
+      c.finishedAt = Date.now();
+      commit.categories.add(c.uuid);
+      await saveChanges(d, state, { race: false, categories: new Set([c.uuid]), riders: new Set(), removedRiders: [], removedCategories: [] }, seq);
+    }
+    // Still on course after their category had already been closed (ON TRACK): they finish
+    // on the laps they completed too — saved with the Finalized event below.
+    const lateFinishers = Object.values(state.riders).filter((r) => r.raceStatus === "running" && !["DNF", "DSQ", "DNS"].includes(r.status));
+    for (const r of lateFinishers) r.status = "finished";
+    if (lateFinishers.length) {
+      const touched = new Set(lateFinishers.map((r) => r.uuid));
+      await rederive(d, state, new Set(touched), touched);
+      touched.forEach((x) => commit.riders.add(x));
+    }
     const rec = buildRecord(state, me.name || me.email || m.userId, 1, null);
     const seq = await appendServerEvent(d, m.raceUuid, m.userId, "Finalized", { version: 1, token: rec.token }, null);
     state.race.status = "finished";
-    await saveChanges(d, state, { race: true, categories: [], riders: [], removedRiders: [], removedCategories: [] }, seq);
+    await saveChanges(d, state, { race: true, categories: [], riders: new Set(lateFinishers.map((r) => r.uuid)), removedRiders: [], removedCategories: [] }, seq);
     await d.query(
       `INSERT INTO official_versions ("raceUuid", "officialVersion", version, algo, at, by, nonce, payload, token, "riderCount", "categoryCount", "issuedBy", signature, "keyId", "atSeq")
        VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
