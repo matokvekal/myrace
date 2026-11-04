@@ -21,9 +21,7 @@ Immediate Children Summary
     category groups, 60s countdown overlay, starts all categories in a start
     slot, stamps `timeStartRace` on every rider in the wave)
   - CheckIn.tsx + checkIn.module.css (pre-start roster check-in per wave)
-  - LiveBoard.tsx + liveBoard.module.css, LiveCards.tsx + liveCards.module.css
     (live per-category board during a running wave, ranks via calculatePosition)
-  - WaveStatus.tsx + waveStatus.module.css (running/finished status indicator per wave)
   - QuickAddRider.tsx + quickAddRider.module.css (add a rider mid-flow without
     leaving RaceMode)
 

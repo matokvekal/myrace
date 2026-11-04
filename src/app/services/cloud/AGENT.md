@@ -44,5 +44,4 @@ Conventions
 When To Update
 
 - Sync protocol or conflict-resolution behavior changes
-- Role/permission model changes (coordinate with `components/admin/AdminPanel.tsx`)
 - Supabase schema changes (coordinate with `docs/cloud/6-database.md`)

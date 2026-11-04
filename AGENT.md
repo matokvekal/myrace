@@ -111,7 +111,6 @@ maintained child list; this is just enough for orientation):
 
 - globals.css
 - page.tsx
-- not-found.tsx
 - assets/
 - config/
 - constants/

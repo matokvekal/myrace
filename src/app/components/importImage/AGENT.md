@@ -21,7 +21,6 @@ Immediate Children Summary
 - Top-level files:
   - ImageCapture.tsx + imageCapture.module.css (camera/file capture entry point)
   - ImageCropper.tsx + imageCropper.module.css (crop before OCR)
-  - ScanDocumentButton.tsx + scanDocumentButton.module.css (trigger button)
   - PerspectiveCorrection.ts (deskew/perspective-correct the captured image)
   - preprocess.ts (image cleanup before OCR — contrast/threshold, etc.)
   - OCRProvider.ts (provider interface), TesseractProvider.ts (offline

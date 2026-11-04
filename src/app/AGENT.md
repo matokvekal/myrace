@@ -46,9 +46,7 @@ Immediate Children Summary
   - workers (web workers)
 - Top-level files:
   - globals.css (global styles)
-  - layout.tsx (app layout wrapper)
   - page.tsx + page.module.css (root app page)
-  - not-found.tsx + not-found.css (404 route)
   - landing.module.css (landing styling)
   - version.json (app version metadata)
 

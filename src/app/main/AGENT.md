@@ -16,9 +16,7 @@ Immediate Children Summary
 - Folders:
   - addRace (AddRace.tsx — new-race form: metadata, cover image, optional
     CSV/xlsx start-list upload, calls saveRace/insertRidersCsv)
-  - allRaces (AllRaces.tsx — thin placeholder wrapper, not wired into page.tsx's
     "See All" flow which renders race cards directly)
-  - myRaces (MyRaces.tsx — alternate/legacy race-list rendering, fetches its own
     races via useRaceStore rather than receiving them as props)
   - components (HeaderMain, EmptyRaces, RaceCard, RaceTile, DownloadRace — the
     actual building blocks page.tsx assembles; see components/AGENT.md)

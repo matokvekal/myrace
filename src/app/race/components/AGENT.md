@@ -16,14 +16,10 @@ Immediate Children Summary
 
 - Folders:
   - addRider (AddRider.tsx — add-a-rider form/modal used from Standing/RaceMode)
-  - buttons (ButtonStart/ButtonRunning/ButtonFinished — category/heat status
     action buttons)
-  - categoryCard (CategoryCard.tsx — summary card for one category)
   - categoryManager (CategoryManager.tsx — category list/CRUD panel)
   - headerHeat (HeaderHeat.tsx — header bar for heat/wave-scoped pages)
   - headerRace (HeaderRace.tsx — header bar for the race workspace)
-  - heatCard (HeatCard.tsx — one heat's summary card, used by `[id]/heats/Heats.tsx`)
-  - modals (CategoryModal, CategorySettingsModal, StatusModal — shared modal set)
   - raceInfo (RaceInfo.tsx — compact race metadata display block)
   - raceSidebar (RaceTopBar.tsx + RaceSidebar.tsx — the one race header and the Create/Race/Live/Results/All Races menu, shared by every race screen)
   - riderCard (RiderCard.tsx — rider summary card)

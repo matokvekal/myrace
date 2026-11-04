@@ -3,8 +3,8 @@
 Purpose
 
 - UI for cloud-synced races: a section listing a user's cloud races
-  (`CloudRacesSection`) and a per-race cloud panel (`RaceCloudPanel`) for
-  sync/role management. Backed by `src/app/services/cloud/`. See
+  (`CloudRacesSection`). (The per-race cloud panel was removed 2026-11-04 — it was
+  never mounted.) Backed by `src/app/services/cloud/`. See
   `docs/cloud/0-START.md` before changing this folder.
 
 Read Order
@@ -12,7 +12,6 @@ Read Order
 1. ../../../../AGENT.md
 2. ../AGENT.md
 3. ../../../../../docs/cloud/0-START.md
-4. CloudRacesSection.tsx, RaceCloudPanel.tsx
 5. ../../services/cloud/AGENT.md (the underlying sync/auth logic)
 
 Immediate Children Summary
@@ -21,7 +20,6 @@ Immediate Children Summary
 - Top-level files:
   - CloudRacesSection.tsx (list of a user's cloud-synced races, rendered from
     `main/page.tsx`)
-  - RaceCloudPanel.tsx (largest file — per-race sync status, role management,
     invite/permission UI)
   - raceCloudPanel.module.css
 

@@ -31,10 +31,7 @@ Immediate Children Summary
   - Version (version display)
   - voice (voice mode UI)
 - Top-level files:
-  - DictionaryInitializer.tsx (dictionary bootstrap)
   - Loader.tsx + loader.module.css (loading component)
-  - MenuToggle.tsx (menu toggle control)
-  - ViewModeToggle.tsx + viewModeToggle.module.css (view mode switch)
 
 Conventions
 

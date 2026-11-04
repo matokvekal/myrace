@@ -13,7 +13,6 @@ Read Order
 3. ../../../../../docs/csv-import.md (component flow doc)
 4. CSVImportWizard.tsx (orchestrator)
 5. UploadStep.tsx -> ColumnMappingStep.tsx -> PreviewStep.tsx -> ImportProgressStep.tsx
-6. ClubDictionaryManager.tsx, MultiDayDialog.tsx
 
 Immediate Children Summary
 
@@ -25,7 +24,6 @@ Immediate Children Summary
     "Keep as info" synthetic target)
   - PreviewStep.tsx (row preview, RTL-aware for Hebrew)
   - ImportProgressStep.tsx (final import progress/summary)
-  - ClubDictionaryManager.tsx (manages `public/data/dictionary_clubs.json`
     mappings, multi-term Hebrew + English)
   - MultiDayDialog.tsx (handles multi-day start lists)
 
