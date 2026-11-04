@@ -49,10 +49,15 @@ describe("cloud PostgreSQL only", () => {
   });
 });
 
-describe("tests never reach a real database", () => {
-  it("NODE_ENV=test requires skipping server/.env, and a local database", () => {
-    expect(() => parseEnv({ ...base, NODE_ENV: "test", COMMISSAIRE_SKIP_DOTENV: undefined })).toThrow(/must not read server\/\.env/);
-    expect(() => parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: "postgresql://u:p@db.commissaire.us/x" })).toThrow(/only against a local database/);
-    expect(parseEnv({ ...base, NODE_ENV: "test" }).NODE_ENV).toBe("test");
+describe("tests never reach production data", () => {
+  const TEST_DB = "postgresql://commissaire_app:pw@db.commissaire.us:5432/commissaire_test?sslmode=require";
+  it("NODE_ENV=test requires skipping server/.env", () => {
+    expect(() => parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: TEST_DB, COMMISSAIRE_SKIP_DOTENV: undefined })).toThrow(/must not read server\/\.env/);
+  });
+  it("only a database named *_test is accepted — the production one (and any other) is refused", () => {
+    for (const url of [CLOUD, base.DATABASE_URL, "postgresql://u:p@db.commissaire.us/elnino", "postgresql://u:p@db.commissaire.us/commissaire_testing", "postgresql://u:p@db.commissaire.us/"]) {
+      expect(() => parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: url }), url).toThrow(/dedicated test database/);
+    }
+    expect(parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: TEST_DB }).DATABASE_URL).toBe(TEST_DB);
   });
 });

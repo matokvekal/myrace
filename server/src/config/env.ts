@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { serverRoot } from "../lib/paths.js";
+import { isTestDatabase } from "./testDatabase.js";
+export { isTestDatabase };
 
 /** The database URL in server/.env beats an inherited one: a shell's DATABASE_URL may be El Niño's. */
 const DB_KEYS = ["DATABASE_URL", "COMMISSAIRE_DATABASE_URL"];
@@ -100,14 +102,15 @@ export function parseEnv(vars: NodeJS.ProcessEnv = process.env): Env {
   if (env.NODE_ENV === "development" && isLoopbackDb(env.DATABASE_URL)) {
     throw new Error("Invalid server configuration — DATABASE_URL points to a local database; Commissaire uses the cloud PostgreSQL database only (see docs/server/database.md)");
   }
-  // Tests must never write to the cloud database: they never read server/.env (it holds the
-  // cloud URL) and refuse any non-loopback database.
+  // Tests never touch production data: they never read server/.env (it holds the production
+  // URL) and run only against a dedicated test database — its name must end in "_test"
+  // (e.g. commissaire_test on the cloud server), so the production database can't be hit.
   if (env.NODE_ENV === "test") {
     if (vars.COMMISSAIRE_SKIP_DOTENV !== "1") {
       throw new Error("Invalid server configuration — tests must not read server/.env (run them with vitest)");
     }
-    if (!isLoopbackDb(env.DATABASE_URL)) {
-      throw new Error("Invalid server configuration — tests run only against a local database");
+    if (!isTestDatabase(env.DATABASE_URL)) {
+      throw new Error("Invalid server configuration — tests run only against a dedicated test database (name ending in _test)");
     }
   }
   return env;
