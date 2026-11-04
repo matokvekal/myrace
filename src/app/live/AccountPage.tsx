@@ -1,122 +1,17 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { auth, invitations, myRaces, openSharedRace, useLiveStore, type MyRace } from "@/services/live/liveClient";
 import styles from "./live.module.css";
-
-type Mode = "password" | "register" | "code";
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (o: { client_id: string; callback: (r: { credential: string }) => void }) => void;
-          renderButton: (el: HTMLElement, o: Record<string, unknown>) => void;
-        };
-      };
-    };
-  }
-}
-
-/** "Sign in with Google" (Google Identity Services), only when a client id is configured. */
-function GoogleButton({ onToken }: { onToken: (idToken: string) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  useEffect(() => {
-    if (!clientId || !ref.current) return;
-    const render = () => {
-      window.google?.accounts.id.initialize({ client_id: clientId, callback: (r) => onToken(r.credential) });
-      if (ref.current) window.google?.accounts.id.renderButton(ref.current, { theme: "outline", size: "large", width: 280 });
-    };
-    if (window.google) return render();
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.onload = render;
-    document.head.appendChild(s);
-  }, [clientId, onToken]);
-  if (!clientId) return null;
-  return <div ref={ref} />;
-}
+import SignInForm from "./SignInForm";
 
 /** Sign in / register for shared races, and the signed-in user's invitations and shared races. */
 export default function AccountPage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = params.get("next");
   const user = useLiveStore((s) => s.user);
-  const [mode, setMode] = useState<Mode>("password");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const run = async (fn: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await fn();
-      if (next) navigate(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (user) return <SignedIn next={next} />;
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.inner}>
-        <button className={styles.link} onClick={() => navigate("/main")}>← {t("live.back", "Back")}</button>
-        <div className={styles.card}>
-          <h1 className={styles.title}>{t("live.signInTitle", "Sign in to share races")}</h1>
-          <p className={styles.muted}>
-            {t("live.signInWhy", "An account lets your team run the same race on several phones. Local races keep working without one.")}
-          </p>
-          <GoogleButton onToken={(idToken) => void run(() => auth.google(idToken))} />
-          <div className={styles.tabs}>
-            {(["password", "register", "code"] as Mode[]).map((m) => (
-              <button key={m} className={mode === m ? styles.tabActive : styles.tab} onClick={() => setMode(m)}>
-                {m === "password" ? t("live.modePassword", "Email + password") : m === "register" ? t("live.modeRegister", "New account") : t("live.modeCode", "Email code")}
-              </button>
-            ))}
-          </div>
-          {mode === "register" && (
-            <input className={styles.input} dir="auto" placeholder={t("live.name", "Your name")} value={name} onChange={(e) => setName(e.target.value)} />
-          )}
-          <input className={styles.input} type="email" dir="ltr" placeholder={t("live.email", "Email")} value={email} onChange={(e) => setEmail(e.target.value)} />
-          {mode !== "code" && (
-            <input className={styles.input} type="password" dir="ltr" placeholder={t("live.password", "Password (8+ characters)")} value={password} onChange={(e) => setPassword(e.target.value)} />
-          )}
-          {mode === "code" && codeSent && (
-            <input className={styles.input} inputMode="numeric" dir="ltr" placeholder={t("live.code", "6-digit code")} value={code} onChange={(e) => setCode(e.target.value)} />
-          )}
-          {error && <p className={styles.error} dir="auto">{error}</p>}
-          {mode === "password" && (
-            <button className={styles.button} disabled={busy} onClick={() => run(() => auth.login(email, password))}>{t("live.signIn", "Sign in")}</button>
-          )}
-          {mode === "register" && (
-            <button className={styles.button} disabled={busy} onClick={() => run(() => auth.register(email, password, name))}>{t("live.createAccount", "Create account")}</button>
-          )}
-          {mode === "code" && !codeSent && (
-            <button className={styles.button} disabled={busy} onClick={() => run(async () => { await auth.requestEmailCode(email); setCodeSent(true); })}>
-              {t("live.sendCode", "Email me a code")}
-            </button>
-          )}
-          {mode === "code" && codeSent && (
-            <button className={styles.button} disabled={busy} onClick={() => run(() => auth.verifyEmailCode(email, code.trim()))}>{t("live.signIn", "Sign in")}</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <SignInForm next={next} />;
 }
 
 function SignedIn({ next }: { next: string | null }) {

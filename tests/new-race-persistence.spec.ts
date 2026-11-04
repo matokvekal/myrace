@@ -53,10 +53,11 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
 
   await test.step("sign in", async () => {
     await page.goto("/account");
-    await page.getByRole("button", { name: "New account" }).click();
+    await page.getByRole("tab", { name: "New account" }).click();
     await page.getByPlaceholder("Your name").fill("Persist");
     await page.getByPlaceholder("Email").fill(`persist.${stamp}@x.test`);
     await page.getByPlaceholder("Password (8+ characters)").fill("password-persist");
+    await page.getByPlaceholder("Repeat password").fill("password-persist");
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByText("My shared races")).toBeVisible();
   });

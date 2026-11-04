@@ -427,6 +427,13 @@ still open).
   only. <reason>" and it keeps retrying (queue `commissaire.live.pendingPublish.v2`, per
   account — never published under another account). New races go up without categories
   (`publishRace(…, { allowEmpty: true })`); Team → Share still requires categories.
+- Signed-out screen is `live/SignInForm.tsx`: Sign in / New account (repeat password +
+  show/hide eye, proper `autoComplete` so phones save the password) / Forgot password.
+  Emailed codes (`sendEmailCode` in `server/src/auth/auth.ts`) go ONLY to registered
+  emails, max 3 per address per 24 h (`EMAIL_CODES_PER_DAY`), 60 s apart; a failed send
+  isn't counted. `/auth/password-reset/confirm` sets the new password, marks the email
+  verified and signs out other devices. Production with `MAIL_TRANSPORT=log` answers 503
+  instead of pretending the email was sent.
 - Created signed out, or older local races: never uploaded automatically. The race page
   badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
 - `publishRace` runs once per race at a time (in-tab map + Web Locks across tabs): two

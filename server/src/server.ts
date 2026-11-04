@@ -25,6 +25,9 @@ try {
   }
   if (schema.foreignKeys > 0) logger.warn({ foreignKeys: schema.foreignKeys }, "database has foreign keys; policy is none (run 006)");
   logger.info("database schema check passed");
+  if (env.NODE_ENV === "production" && env.MAIL_TRANSPORT === "log") {
+    logger.error("MAIL_TRANSPORT=log in production: sign-in and password-reset codes cannot be emailed (set MAIL_TRANSPORT=smtp and SMTP_URL)");
+  }
 } catch (err) {
   // pg errors carry no connection string; log only the message and code.
   const e = err as { message?: string; code?: string };

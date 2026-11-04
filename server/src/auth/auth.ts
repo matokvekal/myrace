@@ -23,7 +23,7 @@ import {
   sha256,
   verifyPassword,
 } from "../lib/core.js";
-import { sendMail, sendSms, smsEnabled } from "../lib/messaging.js";
+import { mailDeliverable, sendMail, sendSms, smsEnabled } from "../lib/messaging.js";
 import {
   createSession,
   RefreshReuseError,
@@ -143,6 +143,45 @@ async function issueCode(channel: "email" | "sms", destination: string): Promise
   return code;
 }
 
+/** Emailed codes per address per 24 h, and the wait between two of them. */
+export const EMAIL_CODES_PER_DAY = Number(process.env.EMAIL_CODES_PER_DAY ?? 3);
+export const EMAIL_RESEND_SECONDS = Number(process.env.EMAIL_RESEND_SECONDS ?? 60);
+
+/**
+ * Emails a 6-digit code to a REGISTERED address only, at most EMAIL_CODES_PER_DAY a
+ * day and one per EMAIL_RESEND_SECONDS. A failed send is not counted.
+ */
+async function sendEmailCode(address: string, subject: string, intro: string) {
+  if (!mailDeliverable()) {
+    throw new ApiError(503, "email_unavailable", "Email can't be sent from the server right now. Please contact support.");
+  }
+  const user = await db.one(`SELECT 1 FROM users WHERE email = $1 AND "isActive"`, [address]);
+  if (!user) throw new ApiError(404, "no_account", "No account uses this email. Check the spelling, or create a new account.");
+  const recent = await db.query<{ createdAt: Date }>(
+    `SELECT "createdAt" FROM otp_codes WHERE channel = 'email' AND destination = $1 AND "createdAt" > now() - interval '24 hours'
+     ORDER BY "createdAt" DESC`,
+    [address],
+  );
+  if (recent.length >= EMAIL_CODES_PER_DAY) {
+    const oldest = recent[recent.length - 1]!.createdAt.getTime();
+    const hours = Math.max(1, Math.ceil((oldest + 24 * 3600_000 - Date.now()) / 3600_000));
+    throw new ApiError(429, "daily_limit", `You've used all ${EMAIL_CODES_PER_DAY} codes for today. Try again in about ${hours} h.`);
+  }
+  const waited = recent[0] ? (Date.now() - recent[0].createdAt.getTime()) / 1000 : Infinity;
+  if (waited < EMAIL_RESEND_SECONDS) {
+    throw new ApiError(429, "too_soon", `Wait ${Math.ceil(EMAIL_RESEND_SECONDS - waited)} seconds before asking for another code.`);
+  }
+  const code = await issueCode("email", address);
+  try {
+    await sendMail(address, subject, `${intro}\n\nYour code is ${code}. It expires in 10 minutes.\n\nIf you didn't ask for it, ignore this email.`);
+  } catch (err) {
+    await db.query(`DELETE FROM otp_codes WHERE channel = 'email' AND destination = $1 AND "codeHash" = $2`, [address, sha256(`${address}:${code}`)]);
+    logger.error({ err }, "email code could not be sent");
+    throw new ApiError(503, "email_failed", "We couldn't send the email. Try again in a few minutes.");
+  }
+  return { sent: true, remainingToday: EMAIL_CODES_PER_DAY - recent.length - 1, resendAfterSeconds: EMAIL_RESEND_SECONDS };
+}
+
 async function consumeCode(d: Db, channel: "email" | "sms", destination: string, code: string): Promise<void> {
   const row = await d.one<{ id: string; codeHash: string; attempts: number }>(
     `SELECT id, "codeHash", attempts FROM otp_codes
@@ -166,7 +205,7 @@ const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Phone in internation
 
 export const authRouter = Router();
 const limiter = rateLimit({ windowMs: 60_000, limit: Number(process.env.AUTH_RATE_LIMIT ?? 20), standardHeaders: true, legacyHeaders: false });
-authRouter.use(["/register", "/login", "/google", "/email-code", "/sms-code"], limiter);
+authRouter.use(["/register", "/login", "/google", "/email-code", "/sms-code", "/password-reset"], limiter);
 
 authRouter.post("/register", route(async (req, res) => {
   const body = z.object({ email, password, name: z.string().trim().min(1).max(100) }).parse(req.body);
@@ -206,9 +245,38 @@ authRouter.post("/google", route(async (req, res) => {
 
 authRouter.post("/email-code", route(async (req, res) => {
   const body = z.object({ email }).parse(req.body);
-  const code = await issueCode("email", body.email);
-  await sendMail(body.email, "Your Commissaire sign-in code", `Your code is ${code}. It expires in 10 minutes.`);
-  res.status(202).json({ sent: true });
+  res.status(202).json(await sendEmailCode(body.email, "Your Commissaire sign-in code", "Here is your code to sign in to Commissaire."));
+}));
+
+/** Forgot password, step 1: email a code to a registered address. */
+authRouter.post("/password-reset", route(async (req, res) => {
+  const body = z.object({ email }).parse(req.body);
+  res.status(202).json(await sendEmailCode(body.email, "Reset your Commissaire password", "Someone (hopefully you) asked to reset your Commissaire password."));
+}));
+
+/**
+ * Forgot password, step 2: the code proves the email, so set the new password,
+ * mark the email verified, sign out every other device and sign in here.
+ */
+authRouter.post("/password-reset/confirm", route(async (req, res) => {
+  const body = z.object({ email, code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code from the email"), password }).parse(req.body);
+  res.json(await tx(async (d) => {
+    await consumeCode(d, "email", body.email, body.code);
+    const user = await d.one<{ id: string }>(`SELECT id FROM users WHERE email = $1 AND "isActive"`, [body.email]);
+    if (!user) throw new ApiError(400, "invalid_code", "The code is wrong or expired");
+    const set = await d.query(
+      `INSERT INTO user_identities ("userId", provider, subject, email, "emailVerified", "passwordHash", "lastUsedAt")
+       VALUES ($1, 'password', $2, $2, true, $3, now())
+       ON CONFLICT (provider, subject) DO UPDATE SET "passwordHash" = EXCLUDED."passwordHash", "emailVerified" = true, "lastUsedAt" = now()
+       WHERE user_identities."userId" = EXCLUDED."userId"
+       RETURNING 1`,
+      [user.id, body.email, await hashPassword(body.password)],
+    );
+    if (!set.length) throw new ApiError(409, "identity_taken", "This email's password belongs to another account");
+    await d.query(`UPDATE user_identities SET "emailVerified" = true WHERE "userId" = $1 AND email = $2`, [user.id, body.email]);
+    await revokeAllSessions(d, user.id);
+    return signedIn(d, req, user.id);
+  }));
 }));
 
 authRouter.post("/email-code/verify", route(async (req, res) => {

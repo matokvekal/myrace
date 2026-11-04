@@ -2,6 +2,12 @@ import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 import { ApiError, logger } from "./core.js";
 
+/**
+ * Can this server really deliver email? False in production with the log transport:
+ * a code "sent" that way never reaches anyone, so callers must refuse instead.
+ */
+export const mailDeliverable = () => !(env.NODE_ENV === "production" && env.MAIL_TRANSPORT === "log");
+
 /** Sends an email, or logs it (MAIL_TRANSPORT=log, the default in development). */
 export async function sendMail(to: string, subject: string, text: string): Promise<void> {
   if (env.MAIL_TRANSPORT === "log") {

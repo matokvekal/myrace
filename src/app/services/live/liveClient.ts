@@ -147,14 +147,25 @@ async function refreshTokens(): Promise<boolean> {
 }
 
 export async function api<T = unknown>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
-  const r = await fetch(API + path, {
-    method,
-    headers: { "content-type": "application/json", ...(session ? { authorization: `Bearer ${session.accessToken}` } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let r: Response;
+  try {
+    r = await fetch(API + path, {
+      method,
+      headers: { "content-type": "application/json", ...(session ? { authorization: `Bearer ${session.accessToken}` } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new LiveApiError(0, "offline", "No connection to the server");
+  }
   if (r.status === 401 && retry && session && (await refreshTokens())) return api<T>(method, path, body, false);
   const text = await r.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // An HTML error page from a proxy (502, maintenance) instead of the API's JSON.
+    throw new LiveApiError(r.status, "bad_response", `The server isn't answering properly (${r.status}). Try again in a minute.`);
+  }
   if (!r.ok) {
     const e = (data as { error?: { code?: string; message?: string } })?.error;
     throw new LiveApiError(r.status, e?.code ?? "error", e?.message ?? `Request failed (${r.status})`);
@@ -163,6 +174,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
 }
 
 type AuthResponse = { accessToken: string; refreshToken: string; user: LiveUser };
+export type CodeSent = { sent: boolean; remainingToday: number; resendAfterSeconds: number };
 const signedIn = (r: AuthResponse) => {
   saveSession({ accessToken: r.accessToken, refreshToken: r.refreshToken, user: r.user });
   void flushAll();
@@ -185,7 +197,12 @@ export const auth = {
   login: async (email: string, password: string) =>
     signedIn(await api<AuthResponse>("POST", "/auth/login", { email, password, deviceId: deviceId() })),
   google: async (idToken: string) => signedIn(await api<AuthResponse>("POST", "/auth/google", { idToken, deviceId: deviceId() })),
-  requestEmailCode: (email: string) => api("POST", "/auth/email-code", { email }),
+  requestEmailCode: (email: string) => api<CodeSent>("POST", "/auth/email-code", { email }),
+  /** Forgot password: emails a code to a registered address (3 a day, 60 s apart). */
+  requestPasswordReset: (email: string) => api<CodeSent>("POST", "/auth/password-reset", { email }),
+  /** Sets the new password with the emailed code, and signs in. */
+  confirmPasswordReset: async (email: string, code: string, password: string) =>
+    signedIn(await api<AuthResponse>("POST", "/auth/password-reset/confirm", { email, code, password, deviceId: deviceId() })),
   verifyEmailCode: async (email: string, code: string, name?: string) =>
     signedIn(await api<AuthResponse>("POST", "/auth/email-code/verify", { email, code, name, deviceId: deviceId() })),
   smsEnabled: async () => (await api<{ enabled: boolean }>("GET", "/auth/sms-code/enabled")).enabled,

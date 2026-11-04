@@ -13,10 +13,11 @@ test.skip(!API_ORIGIN, "needs a Commissaire API: set E2E_API_URL and serve the a
 const PASSWORD = "password-123";
 
 async function register(page: Page, email: string, name = "Owner") {
-  await page.getByRole("button", { name: "New account" }).click();
+  await page.getByRole("tab", { name: "New account" }).click();
   await page.getByPlaceholder("Your name").fill(name);
   await page.getByPlaceholder("Email").fill(email);
   await page.getByPlaceholder(/Password/).fill(PASSWORD);
+  await page.getByPlaceholder("Repeat password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
 }
 

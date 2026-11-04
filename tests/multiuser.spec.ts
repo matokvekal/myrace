@@ -30,10 +30,11 @@ async function newUserPage(browser: Browser): Promise<{ ctx: BrowserContext; pag
 
 async function signUp(page: Page, name: string) {
   await page.goto("/account");
-  await page.getByRole("button", { name: "New account" }).click();
+  await page.getByRole("tab", { name: "New account" }).click();
   await page.getByPlaceholder("Your name").fill(name);
   await page.getByPlaceholder("Email").fill(`${name.toLowerCase()}.${stamp}@x.test`);
   await page.getByPlaceholder("Password (8+ characters)").fill(`password-${name}`);
+  await page.getByPlaceholder("Repeat password").fill(`password-${name}`);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("My shared races")).toBeVisible();
 }
