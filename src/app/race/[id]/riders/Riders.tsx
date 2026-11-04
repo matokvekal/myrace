@@ -10,7 +10,7 @@ import RiderCard from "../../components/riderCard/RiderCard";
 import RiderFlag from "../../components/riderFlag/RiderFlag";
 import Icons from "@/constants/Icons";
 import { shallow } from "zustand/shallow";
-import { debounce } from "lodash";
+import { debounce } from "@/utils/debounce";
 import CSVImportWizard from "@/components/csv/CSVImportWizard";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
