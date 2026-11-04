@@ -400,98 +400,79 @@
 }
 
 
-/* ═══ Readability on any category colour (both skins) ═══
-   RacingRider sets data-ink from the colour's luminance: "dark" ink on light
-   colours (yellow, orange, light blue), "light" ink on dark ones. The two
-   counters — "finish X/TOTAL" and "N left" — sit on a solid plate so the gloss,
-   checker pattern and colour behind them can't eat the text. */
+/* ═══ Readability on every category colour — typography, not boxes ═══
+   RacingRider sets data-ink from the colour's luminance (WCAG crossover):
+   "dark" on light colours (yellow, orange, red, light blue), "light" on deep
+   ones. The card keeps its own colour and shape; contrast comes from the ink
+   colour, weight and a fine shadow (engraved on light cards, soft drop on deep
+   ones). The counters stay plain text — no pills, plates or borders. */
+
+/* Counters: a touch larger and firmer, still type, not badges. */
 .laps {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 .lapsLabel {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
+  letter-spacing: 0.08em;
 }
 .remaining {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-variant-numeric: tabular-nums;
 }
 .lapTime {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 }
 
+/* Classic skin */
 .rider[data-ink="dark"] .bib,
-.rider[data-ink="dark"] .pos { color: #0b0f19; }
-.rider[data-ink="dark"] .lapTime { color: #111827; }
-.rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(17, 24, 39, 0.45); }
+.rider[data-ink="dark"] .pos { color: #0b1220; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+.rider[data-ink="dark"] .laps,
+.rider[data-ink="dark"] .remaining,
+.rider[data-ink="dark"] .lapTime { color: #111a2b; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3); }
+.rider[data-ink="dark"] .lapsLabel { color: rgba(11, 18, 32, 0.72); }
+.rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(11, 18, 32, 0.35); }
 
 .rider[data-ink="light"] .bib,
 .rider[data-ink="light"] .pos { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
-.rider[data-ink="light"] .lapTime { color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
-.rider[data-ink="light"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(255, 255, 255, 0.55); }
-
-/* Counter plates */
-.rider .laps,
-.rider .remaining {
-  padding: 1px 7px;
-  border-radius: 999px;
-}
-.rider[data-ink="dark"] .laps,
-.rider[data-ink="dark"] .remaining {
-  background: rgba(255, 255, 255, 0.78);
-  color: #0b0f19;
-  text-shadow: none;
-}
-.rider[data-ink="dark"] .lapsLabel { color: #374151; }
 .rider[data-ink="light"] .laps,
-.rider[data-ink="light"] .remaining {
-  background: rgba(0, 0, 0, 0.42);
-  color: #ffffff;
-  text-shadow: none;
-}
-.rider[data-ink="light"] .lapsLabel { color: rgba(255, 255, 255, 0.85); }
+.rider[data-ink="light"] .remaining,
+.rider[data-ink="light"] .lapTime { color: rgba(255, 255, 255, 0.96); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.rider[data-ink="light"] .lapsLabel { color: rgba(255, 255, 255, 0.8); }
+.rider[data-ink="light"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(255, 255, 255, 0.45); }
 
-/* PRO skin: same rules win over its pink lettering; calmer pattern + gloss. */
-:root[data-skin="gaming"] .rider {
+/* PRO skin: the original pink kit lettering stays on deep colours (its identity);
+   on light colours the same italic type is set in deep ink, and the bottom of the
+   gloss is lighter so the lower rows (times, position) don't sink into it. */
+:root[data-skin="gaming"] .rider[data-ink="dark"] {
   background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(0, 0, 0, 0.06) 55%, rgba(0, 0, 0, 0.14) 100%),
-    repeating-conic-gradient(rgba(0, 0, 0, 0.025) 0% 25%, transparent 0% 50%) !important;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 45%, rgba(0, 0, 0, 0.06) 55%, rgba(0, 0, 0, 0.12) 100%),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.035) 0% 25%, transparent 0% 50%) !important;
 }
 :root[data-skin="gaming"] .rider[data-ink="dark"] .bib,
-:root[data-skin="gaming"] .rider[data-ink="dark"] .pos {
-  color: #0b0f19;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
-}
-:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTime {
-  color: #111827;
-  text-shadow: none;
-}
-:root[data-skin="gaming"] .rider[data-ink="light"] .bib,
-:root[data-skin="gaming"] .rider[data-ink="light"] .pos,
-:root[data-skin="gaming"] .rider[data-ink="light"] .lapTime {
-  color: #ffffff;
-}
+:root[data-skin="gaming"] .rider[data-ink="dark"] .pos { color: #170a1f; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4); }
 :root[data-skin="gaming"] .rider[data-ink="dark"] .laps,
-:root[data-skin="gaming"] .rider[data-ink="dark"] .remaining {
-  background: rgba(255, 255, 255, 0.8);
-  color: #0b0f19;
-  text-shadow: none;
-  padding: 1px 7px;
-}
-:root[data-skin="gaming"] .rider[data-ink="dark"] .lapsLabel { color: #374151; }
-:root[data-skin="gaming"] .rider[data-ink="light"] .laps,
-:root[data-skin="gaming"] .rider[data-ink="light"] .remaining {
-  background: rgba(0, 0, 0, 0.45);
-  color: #ffffff;
-  text-shadow: none;
-  padding: 1px 7px;
-}
-:root[data-skin="gaming"] .rider[data-ink="light"] .lapsLabel { color: rgba(255, 255, 255, 0.85); }
-:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(17, 24, 39, 0.45); }
+:root[data-skin="gaming"] .rider[data-ink="dark"] .remaining,
+:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTime { color: #1d1027; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+:root[data-skin="gaming"] .rider[data-ink="dark"] .lapsLabel { color: rgba(23, 10, 31, 0.72); }
+:root[data-skin="gaming"] .rider[data-ink="dark"] .lapTimeCell + .lapTimeCell { border-left-color: rgba(23, 10, 31, 0.35); }
 
-/* Medal chips keep their own ink on top of the readability rules above. */
+:root[data-skin="gaming"] .rider[data-ink="light"] .laps,
+:root[data-skin="gaming"] .rider[data-ink="light"] .remaining,
+:root[data-skin="gaming"] .rider[data-ink="light"] .lapTime { color: #ffe3ef; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+:root[data-skin="gaming"] .rider[data-ink="light"] .lapsLabel { color: rgba(255, 227, 239, 0.82); }
+
+/* Medal chips keep their own ink. */
 .rider[data-ink] .pos.posMedal,
 :root[data-skin="gaming"] .rider[data-ink] .pos.posMedal { color: #2a2000; text-shadow: none; }
 .rider[data-ink] .pos.posMedal.posBronze,

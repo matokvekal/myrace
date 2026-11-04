@@ -219,8 +219,10 @@ still open).
 
 ### Live screen readability, filter, Recap (2026-11-04)
 - Rider cards pick their ink from the category colour (`data-ink` dark/light in
-  `RacingRider`, WCAG crossover 0.179, not 0.5); the "finish X/TOTAL" and "N left"
-  counters sit on solid plates in both skins. Don't go back to fixed ink colours.
+  `RacingRider`, WCAG crossover 0.179, not 0.5). Contrast is typography only —
+  ink colour, weight, a fine engraved/drop shadow; NO plates, pills or boxes behind
+  the counters (tried, rejected: it broke the card design). PRO keeps its pink
+  lettering on deep colours and uses deep ink + a lighter bottom gloss on light ones.
 - Category filter options = the wave's categories that have riders of this race
   (`heat/[heatId]/liveFilter.ts`), with counts; stale choices drop on wave change.
 - Recap mode is toggled from the Wave info sheet (tap the wave chip), not the
