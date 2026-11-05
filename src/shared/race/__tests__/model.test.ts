@@ -23,7 +23,7 @@ import {
 beforeEach(() => resetHarnessIds());
 
 describe("Action catalog", () => {
-  it("is the closed enum from the architecture, in order (same list as server/sql/004)", () => {
+  it("is the closed enum from the architecture, in order (same list as server/sql/011 race_events_type_check)", () => {
     expect(ACTION_TYPES).toEqual([
       "AddLap", "Undo", "RiderFinished", "LapCountCorrection", "StatusCorrection",
       "WaveStarted", "WaveFinished", "CategoryFinished",
@@ -31,6 +31,7 @@ describe("Action catalog", () => {
       "RiderAdded", "RiderEdited", "RiderDeleted", "RidersImported",
       "RiderCheckedIn", "CommentSet", "RaceEdited", "SettingChanged",
       "MemberChanged", "Finalized", "Amended",
+      "RaceAdmin", // 0.2: server-written audit of owner/admin operations
     ]);
   });
 

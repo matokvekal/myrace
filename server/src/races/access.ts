@@ -18,6 +18,10 @@ export interface Membership {
   raceUuid: string;
   userId: string;
   isOwner: boolean;
+  /** The race's original creator (011) — the only one who may delete it. Unknown creator (legacy) → the owner. */
+  isCreator: boolean;
+  /** The owner let members change race data in this race (011, per race). */
+  memberWrites: boolean;
   roles: MemberRole[];
   permissions: MemberPermissions;
   revoked: boolean;
@@ -31,8 +35,8 @@ export const raceDeleted = () => new ApiError(410, "race_deleted", "This race wa
 /** The user's membership in the race, or null (also null when the race does not exist). */
 export async function loadMembership(d: Db, raceUuid: string, userId: string): Promise<Membership | null> {
   if (!/^[0-9a-f-]{36}$/i.test(raceUuid)) return null;
-  const row = await d.one<{ ownerUserId: string; roles: MemberRole[] | null; permissions: MemberPermissions | null; revokedAt: Date | null; deletedAt: Date | null }>(
-    `SELECT r."ownerUserId", m.roles, m.permissions, m."revokedAt", r."deletedAt"
+  const row = await d.one<{ ownerUserId: string; createdByUserId: string | null; memberWrites: boolean; roles: MemberRole[] | null; permissions: MemberPermissions | null; revokedAt: Date | null; deletedAt: Date | null }>(
+    `SELECT r."ownerUserId", r."createdByUserId", r."memberWrites", m.roles, m.permissions, m."revokedAt", r."deletedAt"
      FROM races r LEFT JOIN race_members m ON m."raceUuid" = r.uuid AND m."userId" = $2
      WHERE r.uuid = $1`,
     [raceUuid, userId],
@@ -50,16 +54,26 @@ export async function loadMembership(d: Db, raceUuid: string, userId: string): P
     raceUuid,
     userId,
     isOwner,
+    isCreator: isCreatorOf(row, userId),
+    memberWrites: row.memberWrites,
     roles,
     permissions,
     revoked,
-    access: revoked ? noAccess() : phaseAccess(effectiveAccess({ isOwner, roles, permissions }), isOwner),
+    access: revoked ? noAccess() : phaseAccess(effectiveAccess({ isOwner, roles, permissions }), isOwner, row.memberWrites),
   };
 }
 
-/** This phase: a member who is not the owner may view what their role shows, never write. */
-function phaseAccess(a: EffectiveAccess, isOwner: boolean): EffectiveAccess {
-  if (isOwner || !WRITES_OWNER_ONLY()) return a;
+/** The original creator; a legacy race whose creator is unknown falls back to its current owner. */
+export const isCreatorOf = (race: { ownerUserId: string; createdByUserId: string | null }, userId: string): boolean =>
+  (race.createdByUserId ?? race.ownerUserId) === userId;
+
+/**
+ * Members write only in races whose owner switched member writes on (per race, 011);
+ * otherwise a member who is not the owner may view what their role shows, never write.
+ * COMMISSAIRE_MEMBER_WRITES=1 (tests only) turns member writes on everywhere.
+ */
+function phaseAccess(a: EffectiveAccess, isOwner: boolean, memberWrites: boolean): EffectiveAccess {
+  if (isOwner || memberWrites || !WRITES_OWNER_ONLY()) return a;
   const screens = Object.fromEntries(
     SCREENS.map((s) => [s, { view: a.screens[s].view, create: false, update: false, delete: false }]),
   ) as EffectiveAccess["screens"];
@@ -105,6 +119,8 @@ export function requireOwner(m: Membership): void {
 /** A summary the app uses to show and hide screens. */
 export const accessSummary = (m: Membership) => ({
   isOwner: m.isOwner,
+  isCreator: m.isCreator,
+  memberWrites: m.memberWrites,
   roles: m.roles,
   permissions: m.permissions,
   screens: m.access.screens,

@@ -109,11 +109,14 @@ describe("ownership and delete", () => {
     const ok = await transfer(owner, admin.id);
     expect(ok.status).toBe(200);
     expect(ok.body.ownerUserId).toBe(admin.id);
-    // The old owner (now a member) can no longer delete it for everyone, only hide it for themselves.
-    const r = await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(owner.token));
+    // 0.2 decision 3: the right to delete stays with the ORIGINAL creator. The new owner's
+    // delete only hides the race for them; the creator (old owner) still deletes it for everyone.
+    const r = await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(admin.token));
     expect(r.status).toBe(200);
-    expect(r.body.deleted).toBe('hidden');
+    expect(r.body.deleted).toBe("hidden");
     expect((await snapshot(owner, race.raceUuid)).race.uuid).toBe(race.raceUuid);
+    const del = await api().delete(`/api/v1/races/${race.raceUuid}`).set(auth(owner.token));
+    expect(del.body.deleted).toBe("race");
   });
 
   it("the owner deleting an active race soft-deletes it for every member (410), keeping its rows; a member only hides it", async () => {

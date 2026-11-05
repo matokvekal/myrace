@@ -420,6 +420,9 @@ export function authorizeAction(access: EffectiveAccess, action: RaceAction, sta
     case "Finalized":
     case "Amended":
       return access.isOwner ? OK : forbidden;
+    case "RaceAdmin":
+      // Written by the Server only (audit of owner/admin operations); never from a Device.
+      return forbidden;
   }
 }
 

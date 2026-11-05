@@ -557,7 +557,8 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
     case "MemberChanged":
     case "Finalized":
     case "Amended":
-      // Handled by the Server's membership and official-results services.
+    case "RaceAdmin":
+      // Handled by the Server's membership and official-results services (RaceAdmin: audit only).
       return { applied: true, changes: ch };
   }
 }

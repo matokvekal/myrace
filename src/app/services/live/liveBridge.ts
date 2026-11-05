@@ -138,7 +138,7 @@ export const liveAllows = (localRaceUuid: string | null | undefined, type: strin
 export const LIVE_ACCESS_EVENT = "commissaire-live-access";
 
 /** The member's screen access for a shared race (cached by the live client), or null. */
-export function readLiveAccess(localRaceUuid: string): { isOwner: boolean; screens: Record<string, { view: boolean; create: boolean; update: boolean; delete: boolean }> } | null {
+export function readLiveAccess(localRaceUuid: string): { isOwner: boolean; isCreator?: boolean; memberWrites?: boolean; screens: Record<string, { view: boolean; create: boolean; update: boolean; delete: boolean }> } | null {
   if (!isLiveRace(localRaceUuid)) return null;
   try {
     return JSON.parse(localStorage.getItem(`commissaire.live.access.${localRaceUuid}`) ?? "null");
@@ -157,6 +157,16 @@ export const canViewScreen = (localRaceUuid: string, screen: string): boolean =>
 export const canOnScreen = (localRaceUuid: string, screen: string, op: "create" | "update" | "delete"): boolean => {
   const a = readLiveAccess(localRaceUuid);
   return !a || !!a.screens[screen]?.[op];
+};
+
+/**
+ * Does deleting this race remove it for everyone? Only for its original creator (0.2) — anyone
+ * else (the owner after a transfer, a member) only removes it from their own list. Local races
+ * and older servers without `isCreator`: the owner, as before.
+ */
+export const deletesForEveryone = (localRaceUuid: string): boolean => {
+  const a = readLiveAccess(localRaceUuid);
+  return !a || (a.isCreator ?? a.isOwner);
 };
 
 /** Synchronous id for an Action the caller wants to remember (e.g. a lap it can undo later). */

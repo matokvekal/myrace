@@ -55,7 +55,11 @@ describe("race delete keeps every row (no cascades, no hard delete)", () => {
     const del = await api().delete(`/api/v1/races/${a.raceUuid}`).set(auth(owner.token));
     expect(del.status).toBe(200);
     expect(del.body.deleted).toBe("hidden");
-    expect(await rowsOf(a.raceUuid)).toEqual(before);
+    // Every row stays; the only addition is the hide's own audit entry (0.2, RaceAdmin).
+    expect(await rowsOf(a.raceUuid)).toEqual({ ...before, race_events: before.race_events + 1 });
+    const last = await db.one<{ type: string; payload: { op: string }; userId: string }>(
+      `SELECT type, payload, "userId" FROM race_events WHERE "raceUuid" = $1 ORDER BY seq DESC LIMIT 1`, [a.raceUuid]);
+    expect(last).toMatchObject({ type: "RaceAdmin", payload: { op: "hidden" }, userId: owner.id });
     expect(await rowsOf(b.raceUuid)).toEqual(bBefore);
     const mine = await api().get("/api/v1/races").set(auth(owner.token));
     expect(mine.body.removed).toContain(a.raceUuid);

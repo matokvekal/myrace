@@ -9,7 +9,6 @@
  *    an email invitation must be accepted by an account that verified that email.
  *    Only a hash of the link secret is stored.
  */
-import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -18,12 +17,11 @@ import { authed, loadUser, requireAuth } from "../auth/auth.js";
 import { db, type Db, tx } from "../db/pool.js";
 import { ApiError, normalizeEmail, randomToken, route, sha256 } from "../lib/core.js";
 import { sendMail } from "../lib/messaging.js";
-import { publishChanges, refreshMemberSockets } from "../realtime/socket.js";
+import { refreshMemberSockets } from "../realtime/socket.js";
 import { validatePermissions, validateRoles, type MemberPermissions } from "../../../src/shared/race/access.js";
-import { PROTOCOL_VERSION } from "../../../src/shared/race/actions.js";
 import type { MemberRole } from "../../../src/shared/race/roles.js";
 import { raceNotFound, requireMember } from "../races/access.js";
-import { loadState } from "../races/repo.js";
+import { announceSeq, logServerEvent } from "../races/audit.js";
 
 const rolesSchema = z.array(z.string()).max(5).superRefine((v, c) => {
   const e = validateRoles(v);
@@ -35,24 +33,8 @@ const permissionsSchema = z.unknown().superRefine((v, c) => {
 });
 
 /** Records a membership change in the race log (audit) without changing race data. */
-async function logMemberChange(d: Db, raceUuid: string, actorId: string, payload: { userId: string; roles: MemberRole[] | null; permissions: MemberPermissions }) {
-  const s = await d.one<{ lastSeq: number }>(`UPDATE races SET "lastSeq" = "lastSeq" + 1 WHERE uuid = $1 RETURNING "lastSeq"`, [raceUuid]);
-  if (!s) throw raceNotFound(); // deleted meanwhile: the caller's transaction rolls back
-  await d.query(
-    `INSERT INTO race_events ("actionId", "raceUuid", seq, type, payload, heat, "deviceTime", "clockOffsetMs", "eventAt", "deviceId", "protocolVersion", "userId", applied)
-     VALUES ($1, $2, $3, 'MemberChanged', $4, NULL, now(), 0, now(), 'server', $5, $6, true)`,
-    [randomUUID(), raceUuid, s.lastSeq, JSON.stringify(payload), PROTOCOL_VERSION, actorId],
-  );
-  return s.lastSeq;
-}
-
-/** Advance every Device's cursor past a membership entry (it carries no race data). */
-async function announceSeq(raceUuid: string, seq: number) {
-  const state = await loadState(db, raceUuid);
-  if (state) {
-    await publishChanges(state, { raceUuid, seq, race: false, categories: new Set(), riders: new Set(), removedRiders: [], removedCategories: [], results: [] });
-  }
-}
+const logMemberChange = (d: Db, raceUuid: string, actorId: string, payload: { userId: string; roles: MemberRole[] | null; permissions: MemberPermissions }) =>
+  logServerEvent(d, raceUuid, actorId, "MemberChanged", payload);
 
 export const membersRouter = Router({ mergeParams: true });
 membersRouter.use(requireAuth);
@@ -158,10 +140,12 @@ membersRouter.post("/invitations", route(async (req, res) => {
   if (targets.size === 0) throw new ApiError(400, "invalid", "Choose who to invite, or create a link");
 
   const expiresAt = new Date(Date.now() + body.expiresInDays * 86_400_000);
+  let lastSeq: number | null = null;
   // All rows in one transaction under the race row lock (no foreign keys: a race
   // deleted meanwhile must not keep invitations); invited accounts must exist.
   const rows = await tx(async (d) => {
-    if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR SHARE`, [m.raceUuid]))) throw raceNotFound();
+    // FOR UPDATE (not SHARE): each invitation's audit entry advances races."lastSeq".
+    if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]))) throw raceNotFound();
     const out: { id: string; secret: string; key: string; t: { email: string | null; userId: string | null } }[] = [];
     for (const [key, t] of targets) {
       if (t.userId && !(await d.one(`SELECT 1 FROM users WHERE id = $1`, [t.userId]))) continue;
@@ -172,9 +156,14 @@ membersRouter.post("/invitations", route(async (req, res) => {
         [m.raceUuid, t.email, t.userId, sha256(secret), body.roles, JSON.stringify(body.permissions), key === "link" ? body.maxUses : 1, m.userId, expiresAt],
       );
       out.push({ id: row!.id, secret, key, t });
+      lastSeq = await logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", {
+        op: "invitationCreated", invitationId: row!.id, email: t.email, userId: t.userId, link: key === "link",
+        roles: body.roles as MemberRole[], waves: (body.permissions as MemberPermissions).waves ?? null,
+      });
     }
     return out;
   });
+  if (lastSeq) await announceSeq(m.raceUuid, lastSeq);
   const created = [];
   for (const { id, secret, key, t } of rows) {
     const url = inviteUrl(secret);
@@ -206,7 +195,12 @@ membersRouter.get("/invitations", route(async (req, res) => {
 
 membersRouter.delete("/invitations/:id", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "update"]);
-  await db.query(`UPDATE invitations SET "revokedAt" = now() WHERE id = $1 AND "raceUuid" = $2 AND "revokedAt" IS NULL`, [String(req.params.id), m.raceUuid]);
+  const id = String(req.params.id);
+  const seq = await tx(async (d) => {
+    const n = await d.query(`UPDATE invitations SET "revokedAt" = now() WHERE id = $1 AND "raceUuid" = $2 AND "revokedAt" IS NULL RETURNING 1`, [id, m.raceUuid]);
+    return n.length ? logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "invitationRevoked", invitationId: id }) : null;
+  });
+  if (seq) await announceSeq(m.raceUuid, seq);
   res.status(204).end();
 }));
 

@@ -36,7 +36,7 @@ import {
   type FinalizationCheck,
 } from "@/utils/raceSignature";
 import { toast } from "react-toastify";
-import { isLiveRace } from "@/services/live/liveBridge";
+import { deletesForEveryone, isLiveRace } from "@/services/live/liveBridge";
 
 interface Props {
   race: RaceProps;
@@ -927,12 +927,19 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
             <div className={styles.dangerTitle}>Danger Zone</div>
             <div className={styles.dangerBody}>
               <div className={styles.dangerText}>
-                <MoreText lead="Deletes the race. Can’t be undone." testId="delete-race-more">
-                  Permanently delete this race, all its riders, and all categories. This cannot be undone.
-                </MoreText>
+                {deletesForEveryone(race.uuid) ? (
+                  <MoreText lead="Deletes the race. Can’t be undone." testId="delete-race-more">
+                    Permanently delete this race, all its riders, and all categories. This cannot be undone.
+                  </MoreText>
+                ) : (
+                  <MoreText lead="Removes the race from your races." testId="delete-race-more">
+                    Only the person who created this race can delete it for everyone. This removes it
+                    from your races only; everyone else keeps it.
+                  </MoreText>
+                )}
               </div>
               <button className={styles.deleteRaceBtn} onClick={() => setShowDeleteRace(true)}>
-                <Trash2 size={14} aria-hidden="true" /> Delete Race
+                <Trash2 size={14} aria-hidden="true" /> {deletesForEveryone(race.uuid) ? "Delete Race" : "Remove from my races"}
               </button>
             </div>
           </div>
@@ -963,8 +970,10 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
 
       {showDeleteRace && onDeleteRace && (
         <DeleteConfirmModal
-          title={`Delete "${race.name}"`}
-          description="This will permanently delete the race and all associated riders, categories, and data. This cannot be undone."
+          title={deletesForEveryone(race.uuid) ? `Delete "${race.name}"` : `Remove "${race.name}" from my races`}
+          description={deletesForEveryone(race.uuid)
+            ? "This will permanently delete the race and all associated riders, categories, and data. This cannot be undone."
+            : "The race stays for everyone else. Only its creator can delete it."}
           onConfirm={async () => {
             AuditLogService.log({
               race,

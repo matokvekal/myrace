@@ -46,6 +46,7 @@ export const ACTION_TYPES = [
   "MemberChanged",
   "Finalized",
   "Amended",
+  "RaceAdmin",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -101,7 +102,17 @@ export interface ActionPayloads {
   Finalized: { version: number; token: string };
   /** `includeActionIds` = not-applied Actions this version accepts. */
   Amended: { version: number; prevToken: string; reason: string; includeActionIds: ActionId[] };
+  /** Server-written audit of an owner/admin operation; changes no race data. Never secrets. */
+  RaceAdmin: RaceAdminPayload;
 }
+
+/** What a `RaceAdmin` audit entry records. Tokens, link secrets and join codes are never stored. */
+export type RaceAdminPayload =
+  | { op: "ownerTransferred"; from: UserId; to: UserId }
+  | { op: "published" | "unpublished" | "deleted" | "hidden" | "joinCodeRotated" }
+  | { op: "invitationCreated"; invitationId: string; email: string | null; userId: UserId | null; link: boolean; roles: MemberRole[]; waves: number[] | null }
+  | { op: "invitationRevoked" | "invitationDeclined"; invitationId: string }
+  | { op: "memberWritesChanged"; enabled: boolean };
 
 /** Stable codes for an Action stored as not applied (same strings as API errors). */
 export const NOT_APPLIED_REASONS = [

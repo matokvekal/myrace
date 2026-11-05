@@ -14,9 +14,10 @@ import { projectCategory, projectRace, projectRider, projectState, waveInScope }
 import { deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
-import { accessSummary, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
+import { accessSummary, isCreatorOf, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
 import { shareTokenFor } from "../public/shareToken.js";
 import { processActions } from "./actions.js";
+import { announceSeq, logServerEvent } from "./audit.js";
 import { insertRace, loadState } from "./repo.js";
 import { newCategory, newRider } from "./schemas.js";
 
@@ -286,7 +287,11 @@ racesRouter.post("/:raceUuid/join-code", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "update"]);
   requireOwner(m);
   const code = randomCode(8);
-  await db.query(`UPDATE races SET "joinCode" = $2 WHERE uuid = $1`, [m.raceUuid, code]);
+  const seq = await tx(async (d) => {
+    await d.query(`UPDATE races SET "joinCode" = $2 WHERE uuid = $1`, [m.raceUuid, code]);
+    return logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "joinCodeRotated" });
+  });
+  await announceSeq(m.raceUuid, seq);
   res.json({ joinCode: code });
 }));
 
@@ -307,10 +312,18 @@ racesRouter.put("/:raceUuid/publication", route(async (req, res) => {
   const { published } = z.object({ published: z.boolean() }).parse(req.body);
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
   requireOwner(m);
-  const r = await db.one<{ publishedAt: Date | null }>(
-    `UPDATE races SET "publishedAt" = CASE WHEN $2::boolean THEN COALESCE("publishedAt", now()) ELSE NULL END WHERE uuid = $1 RETURNING "publishedAt"`,
-    [m.raceUuid, published],
-  );
+  const { r, seq } = await tx(async (d) => {
+    const before = await d.one<{ publishedAt: Date | null }>(`SELECT "publishedAt" FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]);
+    const r = await d.one<{ publishedAt: Date | null }>(
+      `UPDATE races SET "publishedAt" = CASE WHEN $2::boolean THEN COALESCE("publishedAt", now()) ELSE NULL END WHERE uuid = $1 RETURNING "publishedAt"`,
+      [m.raceUuid, published],
+    );
+    // Audit only a real change (publishing a published race again changes nothing).
+    const changed = !!before?.publishedAt !== published;
+    const seq = changed ? await logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: published ? "published" : "unpublished" }) : null;
+    return { r, seq };
+  });
+  if (seq) await announceSeq(m.raceUuid, seq);
   res.json({ token: shareTokenFor(m.raceUuid), published: !!r?.publishedAt, publishedAt: r?.publishedAt ?? null });
 }));
 
@@ -325,6 +338,7 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
     const ok = await d.one(`SELECT 1 FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`, [m.raceUuid, target]);
     if (!ok) throw new ApiError(400, "invalid", "The new owner must be an active member of the race");
     await d.query(`UPDATE races SET "ownerUserId" = $2 WHERE uuid = $1`, [m.raceUuid, target]);
+    await logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "ownerTransferred", from: m.userId, to: target });
     await d.query(
       `INSERT INTO race_members ("raceUuid", "userId", roles, "addedBy") VALUES ($1, $2, '{admin}', $2)
        ON CONFLICT ("raceUuid", "userId") DO UPDATE SET roles = '{admin}', "revokedAt" = NULL, "updatedAt" = now()`,
@@ -333,27 +347,48 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
   });
   await refreshMemberSockets(m.raceUuid, m.userId);
   await refreshMemberSockets(m.raceUuid, target);
+  const last = await db.one<{ lastSeq: number }>(`SELECT "lastSeq" FROM races WHERE uuid = $1`, [m.raceUuid]);
+  if (last) await announceSeq(m.raceUuid, last.lastSeq);
   res.json({ ownerUserId: target });
 }));
 
 /**
  * DELETE /races/:raceUuid — never removes rows (race history stays in PostgreSQL):
- *  - the owner deleting an ACTIVE race soft-deletes it for everyone (deletedAt; it is
- *    also unpublished, and every device holding it is told to remove its copy);
- *  - a FINISHED race, or any race deleted by a member who is not the owner, is only
- *    hidden from the requesting user's lists (race_hidden); everyone else keeps it.
- * Answers { deleted: "race" | "hidden" }.
+ *  - the race's ORIGINAL CREATOR deleting an ACTIVE race soft-deletes it for everyone
+ *    (deletedAt; also unpublished; every device holding it is told to remove its copy).
+ *    Ownership can be transferred; the right to delete can't (011). The creator needs no
+ *    membership for this — a creator removed after a transfer can still delete;
+ *  - a FINISHED race, or a delete by anyone else (the current owner after a transfer
+ *    included), only hides the race from the requesting user's lists (race_hidden).
+ * Both are recorded in the race's audit log. Answers { deleted: "race" | "hidden" }.
  */
 racesRouter.delete("/:raceUuid", route(async (req, res) => {
   const userId = authed(req).userId;
-  const m = await requireMember(db, raceUuidOf(req), userId);
-  const race = await db.one<{ status: string | null }>(`SELECT status FROM races WHERE uuid = $1`, [m.raceUuid]);
-  if (!race) throw raceNotFound();
-  if (m.isOwner && race.status !== "finished") {
-    await db.query(`UPDATE races SET "deletedAt" = now(), "deletedBy" = $2, "publishedAt" = NULL WHERE uuid = $1 AND "deletedAt" IS NULL`, [m.raceUuid, userId]);
-    await closeRace(m.raceUuid);
-    return res.json({ deleted: "race" });
+  const raceUuid = raceUuidOf(req);
+  const race = /^[0-9a-f-]{36}$/i.test(raceUuid)
+    ? await db.one<{ status: string | null; ownerUserId: string; createdByUserId: string | null; deletedAt: Date | null }>(
+      `SELECT status, "ownerUserId", "createdByUserId", "deletedAt" FROM races WHERE uuid = $1`, [raceUuid])
+    : null;
+  if (race && !race.deletedAt && isCreatorOf(race, userId) && race.status !== "finished") {
+    const deleted = await tx(async (d) => {
+      const n = await d.query(
+        `UPDATE races SET "deletedAt" = now(), "deletedBy" = $2, "publishedAt" = NULL
+         WHERE uuid = $1 AND "deletedAt" IS NULL AND status IS DISTINCT FROM 'finished' RETURNING 1`,
+        [raceUuid, userId],
+      );
+      if (n.length) await logServerEvent(d, raceUuid, userId, "RaceAdmin", { op: "deleted" });
+      return n.length > 0;
+    });
+    if (deleted) {
+      await closeRace(raceUuid);
+      return res.json({ deleted: "race" });
+    }
   }
-  await db.query(`INSERT INTO race_hidden ("userId", "raceUuid") VALUES ($1, $2) ON CONFLICT DO NOTHING`, [userId, m.raceUuid]);
+  const m = await requireMember(db, raceUuid, userId);
+  const seq = await tx(async (d) => {
+    const n = await d.query(`INSERT INTO race_hidden ("userId", "raceUuid") VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING 1`, [userId, m.raceUuid]);
+    return n.length ? logServerEvent(d, m.raceUuid, userId, "RaceAdmin", { op: "hidden" }) : null;
+  });
+  if (seq) await announceSeq(m.raceUuid, seq);
   res.json({ deleted: "hidden" });
 }));

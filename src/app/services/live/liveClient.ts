@@ -52,6 +52,10 @@ export interface LiveUser {
 
 export interface AccessSummary {
   isOwner: boolean;
+  /** 0.2: the race's original creator — the only one who deletes it for everyone (absent from older servers). */
+  isCreator?: boolean;
+  /** 0.2: members (judges) may change race data in this race (owner's per-race switch). */
+  memberWrites?: boolean;
   roles: MemberRole[];
   permissions: MemberPermissions;
   screens: EffectiveAccess["screens"];
