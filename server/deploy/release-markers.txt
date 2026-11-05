@@ -13,3 +13,4 @@ projectPublicState
 guestPollingEndsAt
 planFinalization
 already_official
+Cache-Control", "no-store

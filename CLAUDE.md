@@ -485,8 +485,7 @@ still open).
   matched by server uuid, no duplicates) behind `CreateRaceGate` (error + Retry), THEN the form. `saveRace` keeps
   a new race only once the server has it: refused / no connection → `discardUnsavedNewRace` + error, form stays
   (Done = retry); only a slow server (timeout) keeps it queued. Browsing needs an account (guests only open shared links); a build
-  without a server still creates local races. A normal sign-in lands on All Races and syncs once per session in the
-  background; `SharedRacesSection` lists only server races not yet on this device.
+  without a server still creates local races. A normal sign-in lands on My Races, which syncs on every visit (`AccountSync`); `SharedRacesSection` lists only server races not yet on this device.
 - Older local races (created before this): never uploaded automatically. The race page
   badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
   The Info tab opens with the server panel (`live/RaceServerAction.tsx`): orange rail + "Upload Race
@@ -506,6 +505,26 @@ still open).
   through the bridge, which applies the same check and adds the categories to the Action.
 - `tests/race-persistence.spec.ts` and `tests/cloud-sync.spec.ts` (PC ↔ phone sync) need a real API (`E2E_API_URL`); skipped otherwise.
 - Dead-code check: `npx knip` (2026-11-04 cleanup removed 33 unreferenced files and 13 unused deps). Shared-code exports look unused to knip only because `server/` is outside its scan.
+
+### Account isolation on one device (0.1.15 security fix)
+- `public/sw.js` NEVER caches or answers `/api/*` or `/socket.io/*` (`isPrivate`). Before v3 it
+  served same-origin GETs cache-first, so a phone replayed a previous account's `/me` (wrong email
+  shown), race list and snapshots. v3 calls `skipWaiting()` on install (security), and `activate`
+  copies only static entries out of old caches before deleting them. Bump `CACHE_VERSION` on change.
+- Server: every `/api` response is `Cache-Control: no-store` + `Vary: Authorization` (`app.ts`).
+- Client: `api()` fetches with `cache: "no-store"`; `purgeApiCache()` (Cache Storage) runs at
+  start-up `/me`, sign-in, sign-out and before every `syncMyRaces`.
+- The displayed user must be the token's account: `tokenSubject()` (JWT `sub`) — a stored or
+  fetched profile for another id is dropped/refused (`stale_profile`).
+- Signing in as a different account than `commissaire.live.lastUserId` runs `clearAccountState`
+  (per-race access cache, sync, publish errors, open race). Races on the device stay.
+- `raceVisibleToAccount`: an account with no server list yet sees only never-uploaded races, never
+  another account's downloaded ones. `setLink` always records the race for the signed-in account.
+- My Races sync: `live/AccountSync.tsx` on the main screen runs `syncMyRaces` on EVERY visit and on
+  account change (no more once-per-session), shows syncing / synced N / failed + Retry.
+  `syncMyRaces` is single-flight, stops if the account changes, and one failing race doesn't stop the rest.
+- Tests: `services/live/__tests__/accountIsolation.test.ts`, `components/pwa/__tests__/serviceWorker.test.ts`,
+  `server/test/no-store.test.ts`.
 
 ### Race Access Rules (current phase, 2026-11-04)
 - **Owner only writes.** `server/src/races/access.ts` `WRITES_OWNER_ONLY()` (env

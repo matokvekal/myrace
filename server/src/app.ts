@@ -22,6 +22,13 @@ export function createApp() {
   app.use(cors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : true, credentials: true }));
   app.use(express.json({ limit: "10mb" })); // a published start list with course maps
   app.use(pinoHttp({ logger, autoLogging: env.NODE_ENV !== "test" }));
+  // Account data must never be cached (browser, service worker, proxy): an answer
+  // for one account's token must not be replayed to another on the same device.
+  app.use("/api", (_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    res.vary("Authorization");
+    next();
+  });
 
   app.get("/api/v1/health", async (_req, res) => {
     await db.one("SELECT 1");

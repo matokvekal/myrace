@@ -52,9 +52,9 @@ function SignedIn({ next }: { next: string | null }) {
       <div className={styles.inner}>
         <button className={styles.link} onClick={() => navigate("/main")}>← {t("live.back", "Back")}</button>
         <div className={styles.card}>
-          {/* Always here: the way on if the automatic move to All Races didn't happen. */}
+          {/* Always here: the way on if the automatic move to My Races didn't happen. */}
           <button className={styles.button} onClick={() => navigate(ALL_RACES)} data-testid="go-all-races">
-            {t("live.goAllRaces", "Go to All Races")}
+            {t("live.goMyRaces", "Go to My Races")}
           </button>
           <div className={styles.spread}>
             <div>

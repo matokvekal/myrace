@@ -34,7 +34,10 @@ import { applyingRemote, LIVE_ACCESS_EVENT, LIVE_LINKS_KEY, readLinks, setLiveBr
 const SERVER = String(import.meta.env.VITE_SERVER_URL ?? "").replace(/\/$/, "");
 const API = `${SERVER}/api/v1`;
 import { SESSION_EVENT, SESSION_KEY } from "../../live/sessionPresence";
-const ACCESS_KEY = (local: string) => `commissaire.live.access.${local}`;
+const ACCESS_KEY_PREFIX = "commissaire.live.access.";
+const ACCESS_KEY = (local: string) => `${ACCESS_KEY_PREFIX}${local}`;
+/** The account last signed in on this device: a different one clears the per-account state. */
+const LAST_USER_KEY = "commissaire.live.lastUserId";
 const DEVICE_KEY = "commissaire.live.deviceId";
 
 // ---------------------------------------------------------------------------
@@ -102,14 +105,46 @@ interface Session {
   user: LiveUser;
 }
 
+/**
+ * The account the access token was issued to (JWT `sub`): the only identity the
+ * server ever acts as. The displayed user must always be this account; a profile
+ * for any other id is stale (e.g. a cached GET /me from a previous account) and is
+ * never shown. Null when the token is not a JWT (tests) or can't be read.
+ */
+export function tokenSubject(token: string | undefined | null): string | null {
+  try {
+    const part = token?.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "="))) as { sub?: unknown };
+    return typeof json.sub === "string" || typeof json.sub === "number" ? String(json.sub) : null;
+  } catch {
+    return null;
+  }
+}
+/** Does this profile belong to the account the session's token was issued to? */
+const profileMatchesToken = (s: Session | null, u: { id: string } | null | undefined): boolean => {
+  const sub = tokenSubject(s?.accessToken);
+  return !sub || (!!u && String(u.id) === sub);
+};
+
 let session: Session | null = (() => {
   try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null") as Session | null;
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null") as Session | null;
+    // A session whose stored profile is another account's (written from a cached
+    // /me before this fix): keep the tokens, drop the wrong profile; /me refills it.
+    if (s && !profileMatchesToken(s, s.user)) {
+      const fixed: Session = { ...s, user: { id: tokenSubject(s.accessToken)!, email: null, name: "", identities: [] } };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(fixed));
+      return fixed;
+    }
+    return s;
   } catch {
     return null;
   }
 })();
 useLiveStore.setState({ user: session?.user ?? null });
+if (session) localStorage.setItem(LAST_USER_KEY, String(session.user.id));
 
 function saveSession(s: Session | null) {
   session = s;
@@ -158,6 +193,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
       method,
       headers: { "content-type": "application/json", ...(session ? { authorization: `Bearer ${session.accessToken}` } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store", // account data: never from the HTTP cache
     });
   } catch {
     throw new LiveApiError(0, "offline", "No connection to the server");
@@ -181,11 +217,48 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
 type AuthResponse = { accessToken: string; refreshToken: string; user: LiveUser };
 export type CodeSent = { sent: boolean; remainingToday: number; resendAfterSeconds: number };
 const signedIn = (r: AuthResponse) => {
+  // Another account than the last one on this device: drop the previous account's
+  // per-race state (owner flags, sync, upload errors, open race) before anything loads.
+  const prev = localStorage.getItem(LAST_USER_KEY);
+  if (prev && prev !== String(r.user.id)) clearAccountState();
+  localStorage.setItem(LAST_USER_KEY, String(r.user.id));
   saveSession({ accessToken: r.accessToken, refreshToken: r.refreshToken, user: r.user });
+  void purgeApiCache();
   void flushAll();
   void publishPending();
   return r.user;
 };
+
+/**
+ * Removes every cached API response from Cache Storage. The service worker of
+ * 0.1.14 and older cached same-origin GETs, /api/* included, whoever was signed
+ * in (a previous account's /me, race list and snapshots). Run at start-up, sign-in,
+ * sign-out and before every race-list sync, so no account gets another's response.
+ */
+export async function purgeApiCache(): Promise<void> {
+  try {
+    if (typeof caches === "undefined") return;
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      for (const req of await cache.keys()) {
+        if (/\/(api|socket\.io)\//.test(new URL(req.url).pathname)) await cache.delete(req);
+      }
+    }
+  } catch {
+    /* Cache Storage unavailable (private mode): nothing is cached there either */
+  }
+}
+
+/** Per-account state that must not survive a switch to another account. Races on the device stay. */
+function clearAccountState() {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(ACCESS_KEY_PREFIX)) localStorage.removeItem(k);
+  }
+  socket?.disconnect();
+  socket = null;
+  useLiveStore.setState({ access: {}, sync: {}, publishErrors: {}, openRace: null });
+}
 
 export const deviceId = (): string => {
   let id = localStorage.getItem(DEVICE_KEY);
@@ -220,14 +293,19 @@ export const auth = {
     socket?.disconnect();
     socket = null;
     saveSession(null);
+    await purgeApiCache();
   },
+  /** Refreshes the profile: only ever the token's own account (a stale cached /me is refused). */
   me: async () => {
+    await purgeApiCache();
     const u = await api<LiveUser>("GET", "/me");
+    if (!profileMatchesToken(session, u)) throw new LiveApiError(409, "stale_profile", "Profile does not match the signed-in account");
     if (session) saveSession({ ...session, user: u });
     return u;
   },
   updateName: async (name: string) => {
     const u = await api<LiveUser>("PATCH", "/me", { name });
+    if (!profileMatchesToken(session, u)) throw new LiveApiError(409, "stale_profile", "Profile does not match the signed-in account");
     if (session) saveSession({ ...session, user: u });
     return u;
   },
@@ -248,7 +326,7 @@ function setLink(local: string, patch: Partial<LiveLink> & { serverRaceUuid?: st
   writeLinks(links);
   // A race linked while signed in is one of this account's races (created, published or downloaded).
   const known = accountRaces();
-  if (isNew && session && known) rememberAccountRaces([...known, links[local].serverRaceUuid]);
+  if (isNew && session) rememberAccountRaces([...(known ?? []), links[local].serverRaceUuid]);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,8 +357,10 @@ export function raceVisibleToAccount(local: string): boolean {
   if (!session) return false;
   const link = readLinks()[local];
   if (!link) return true; // only on this device (never uploaded)
+  // Unknown (this account never synced here): none of the device's server races,
+  // they may be another account's, until the server's list arrives.
   const mine = accountRaces();
-  return mine === null || mine.includes(link.serverRaceUuid);
+  return mine !== null && mine.includes(link.serverRaceUuid);
 }
 
 export interface ShareInfo {
@@ -1469,10 +1549,31 @@ export function startLive() {
  * downloaded twice and local queued changes are kept. Throws when the list
  * can't be fetched or a race can't be downloaded.
  */
-export async function syncMyRaces(): Promise<{ downloaded: number; updated: number }> {
+export interface SyncResult {
+  downloaded: number;
+  updated: number;
+  /** Races of this account on the server (after removed / pending deletes). */
+  total: number;
+  /** Races that could not be downloaded or caught up (the rest still synced). */
+  failed: { serverRaceUuid: string; name: string; reason: string }[];
+}
+
+let syncing: Promise<SyncResult> | null = null;
+/** One race-list sync at a time (sign-in, main screen and Create Race share it). */
+export function syncMyRaces(): Promise<SyncResult> {
+  syncing ??= syncMyRacesOnce().finally(() => {
+    syncing = null;
+  });
+  return syncing;
+}
+
+async function syncMyRacesOnce(): Promise<SyncResult> {
   if (!session) throw new LiveApiError(401, "signed_out", "Sign in first");
+  const account = session.user.id;
+  await purgeApiCache(); // never a race list cached under another account
   await flushPendingDeletes();
   const { races: all, removed } = await myRacesWithRemoved();
+  if (session?.user.id !== account) throw new LiveApiError(409, "account_changed", "The account changed during sync");
   // Deleted by the owner, or hidden by me: remove this device's copy (never re-download it).
   for (const serverUuid of removed) {
     const local = localUuidOf(serverUuid);
@@ -1481,21 +1582,26 @@ export async function syncMyRaces(): Promise<{ downloaded: number; updated: numb
   const pendingDel = new Set(readPendingDeletes());
   const list = all.filter((r) => !pendingDel.has(r.race.uuid ?? ""));
   rememberAccountRaces(list.map((r) => r.race.uuid).filter((u): u is string => !!u));
-  let downloaded = 0;
-  let updated = 0;
+  const result: SyncResult = { downloaded: 0, updated: 0, total: list.length, failed: [] };
   for (const r of list) {
     const serverRaceUuid = r.race.uuid;
     if (!serverRaceUuid) continue;
+    if (session?.user.id !== account) break; // signed out / switched meanwhile
     const local = localUuidOf(serverRaceUuid);
-    if (local) {
-      await catchUp(local);
-      updated++;
-    } else {
-      await openSharedRace(serverRaceUuid);
-      downloaded++;
+    try {
+      if (local) {
+        // Matched by server uuid: no duplicate; queued local changes are kept and sent.
+        await catchUp(local);
+        result.updated++;
+      } else {
+        await openSharedRace(serverRaceUuid);
+        result.downloaded++;
+      }
+    } catch (e) {
+      result.failed.push({ serverRaceUuid, name: r.race.name ?? "Race", reason: e instanceof Error ? e.message : String(e) });
     }
   }
-  return { downloaded, updated };
+  return result;
 }
 
 /**

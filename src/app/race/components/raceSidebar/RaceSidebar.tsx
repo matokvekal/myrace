@@ -93,7 +93,7 @@ const RaceSidebar: React.FC<{
             }}
           >
             <span className={styles.navIcon}><House aria-hidden="true" /></span>
-            <span>{t("raceNav.allRaces", "All Races")}</span>
+            <span>{t("nav.myRaces", "My Races")}</span>
           </button>
           <div className={styles.navDivider} role="separator" />
           {items.map((it) => {

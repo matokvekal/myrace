@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 // Multi-user (only with a configured server): My shared races and invitations.
 const SharedRacesSection = lazy(() => import("../live/SharedRacesSection"));
+// The signed-in account's races from the server, every visit, with a visible state.
+const AccountSync = lazy(() => import("../live/AccountSync"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 type SortKey = "date" | "name" | "status";
@@ -80,23 +82,13 @@ const MainPage = () => {
     await syncThenCreate();
   };
   // Back from sign-in with ?create=1: continue to Create Race (only when signed in — no loop).
+  // A normal visit syncs through <AccountSync> (every visit, visible state).
   useEffect(() => {
     if (!serverConfigured) return;
-    const wantsCreate = searchParams.get("create") === "1";
+    if (searchParams.get("create") !== "1") return;
     void import("@/services/live/liveClient").then((live) => {
-      if (wantsCreate) {
-        setSearchParams((p) => { p.delete("create"); return p; }, { replace: true });
-        if (live.isSignedIn()) void syncThenCreate();
-        return;
-      }
-      // A normal sign-in: bring this account's races in once per session, in the background.
-      const uid = live.useLiveStore.getState().user?.id;
-      if (!uid) return;
-      const key = `commissaire.racesSynced.${uid}`;
-      try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* private mode */ }
-      void live.syncMyRaces().catch(() => {
-        try { sessionStorage.removeItem(key); } catch { /* ignore */ }
-      });
+      setSearchParams((p) => { p.delete("create"); return p; }, { replace: true });
+      if (live.isSignedIn()) void syncThenCreate();
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [showDownload, setShowDownload] = useState(false);
@@ -216,7 +208,8 @@ const MainPage = () => {
       <CreateRaceGate state={gate} onRetry={() => void syncThenCreate()} onCancel={() => setGate(null)} />
       {serverConfigured && (
         <Suspense fallback={null}>
-          <div style={{ padding: "8px 16px 0" }}>
+          <div style={{ padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+            <AccountSync />
             <SharedRacesSection />
           </div>
         </Suspense>
