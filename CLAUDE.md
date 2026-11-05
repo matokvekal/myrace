@@ -338,6 +338,10 @@ still open).
   started or finished in time, has a bib problem, or its Check-In isn't done;
   otherwise light green. DNF/DNS riders alone don't turn a wave red. Time checks
   use the race date, so a future race isn't judged by today's clock.
+- Running wave card actions: Live is the big solid-green primary button and Finish a small red
+  outline; once everyone is in (started, nobody on course, no start group waiting) "Finish Wave"
+  becomes the big solid-red button and Live goes small. Primary buttons are 30 px tall to fit the
+  fixed `--row-actions` row (34 px) — keep them within it or update `cardHeight`.
 - Diagonal stripes only on the Check-In button (red until done, then green) and on
   a finished wave's card (green).
 

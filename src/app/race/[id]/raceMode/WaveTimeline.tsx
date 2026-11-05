@@ -329,16 +329,36 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                             <Flag size={13} /> Start
                           </button>
                         )}
-                        {it.state === "running" && (
-                          <>
-                            <button type="button" className={`${styles.act} ${styles.actLive}`} onClick={() => onAction(it.wave, "live")} aria-label={`Live, wave ${it.wave}`} data-testid={`wave-act-live-${it.wave}`}>
-                              <Radio size={13} /> Live
-                            </button>
-                            <button type="button" className={styles.act} onClick={() => onAction(it.wave, "finish")} aria-label={`Finish, wave ${it.wave}`} data-testid={`wave-act-finish-${it.wave}`}>
-                              <FlagTriangleRight size={13} /> Finish
-                            </button>
-                          </>
-                        )}
+                        {it.state === "running" && (() => {
+                          // Racing: Live is the big, dominant action; Finish stays small and red.
+                          // Everyone is in (started, nobody on course, no group still waiting):
+                          // Finish becomes the big action and Live goes small.
+                          const allIn = s.started > 0 && s.onCourse === 0 && !it.cats.some((c) => c.status === "upcoming");
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                className={`${styles.act} ${allIn ? styles.actLive : `${styles.actPrimary} ${styles.actLivePrimary}`}`}
+                                onClick={() => onAction(it.wave, "live")}
+                                aria-label={`Live, wave ${it.wave}`}
+                                data-testid={`wave-act-live-${it.wave}`}
+                                data-primary={allIn ? undefined : "true"}
+                              >
+                                <Radio size={allIn ? 13 : 16} /> Live
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.act} ${allIn ? `${styles.actPrimary} ${styles.actFinishPrimary}` : styles.actFinish}`}
+                                onClick={() => onAction(it.wave, "finish")}
+                                aria-label={`Finish, wave ${it.wave}`}
+                                data-testid={`wave-act-finish-${it.wave}`}
+                                data-primary={allIn ? "true" : undefined}
+                              >
+                                <FlagTriangleRight size={allIn ? 16 : 13} /> {allIn ? "Finish Wave" : "Finish"}
+                              </button>
+                            </>
+                          );
+                        })()}
                         </>
                         )}
                       </span>
