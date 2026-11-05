@@ -9,3 +9,4 @@ race_deleted
 race-upload-btn
 account-sync-retry
 stale_profile
+race-publish-status

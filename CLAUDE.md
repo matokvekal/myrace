@@ -489,9 +489,10 @@ still open).
 - Older local races (created before this): never uploaded automatically. The race page
   badge (`LocalOnlyBadge`) offers "Sign in to save" / "Save to server" (`saveRaceToServer`).
   The Info tab opens with the server panel (`live/RaceServerAction.tsx`): orange rail + "Upload Race
-  to Server" while local; green rail + sync state once linked, and (owner) the public link inline —
-  Publish/Unpublish, Copy link, Share. The Share Race modal reuses the same parts (`UploadPrompt`,
-  `PublicLink`): a local race never calls the share API, it shows "Race not uploaded yet" + upload,
+  to Server" while local; green rail + sync state once linked, and (owner) ONE publish status button
+  (`live/PublishControl.tsx`): solid red "Not published" / green "Published"; it opens a small modal
+  with `PublicLink` (Publish/Unpublish, link, Copy, Share). The race header uses the same button (compact). The Share Race modal (local races) reuses `UploadPrompt` and
+  `PublicLink` (`live/PublicLink.tsx`): a local race never calls the share API, it shows "Race not uploaded yet" + upload,
   then the link in place. Share errors go through `shareErrorText` (no bare "Not found").
 - `publishRace` runs once per race at a time (in-tab map + Web Locks across tabs): two
   uploads of an empty race would create two server races.

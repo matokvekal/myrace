@@ -1,0 +1,34 @@
+/* Publish status button: solid red (closed) / solid green (public), squared, one size. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  color: #fff;
+  transition: filter 0.15s;
+}
+.status:hover { filter: brightness(0.93); }
+.status[data-state="off"] { background: #d92d20; border-color: #b42318; }
+.status[data-state="on"] { background: #2a9d4b; border-color: #1f7a3a; }
+.status[data-state="loading"],
+.status[data-state="error"] {
+  background: transparent;
+  color: var(--text-secondary, #5f7ba5);
+  border-color: var(--border-card, #d9e7fb);
+}
+.status[data-compact="true"] {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  margin-inline-start: 8px;
+}
+.spin { animation: publishSpin 0.9s linear infinite; }
+@keyframes publishSpin { to { transform: rotate(360deg); } }

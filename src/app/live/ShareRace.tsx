@@ -15,7 +15,9 @@ import React, { useEffect, useState } from "react";
 import { Share2, X } from "lucide-react";
 import { useLiveStore } from "@/services/live/liveClient";
 import { isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
-import { PublicLink, UploadPrompt } from "./RaceServerAction";
+import { UploadPrompt } from "./RaceServerAction";
+import { PublicLink } from "./PublicLink";
+import PublishControl from "./PublishControl";
 import styles from "./shareRace.module.css";
 
 export default function ShareRace({ raceUuid, raceName }: { raceUuid: string; raceName: string }) {
@@ -31,6 +33,8 @@ export default function ShareRace({ raceUuid, raceName }: { raceUuid: string; ra
   const linked = isLiveRace(raceUuid);
   // A linked race is shared by its owner only; a local race belongs to this device.
   if (linked && !isOwner) return null;
+  // On the server and no upload flow open here: the red / green publish status button.
+  if (linked && !open) return <PublishControl raceUuid={raceUuid} raceName={raceName} compact />;
 
   return (
     <>

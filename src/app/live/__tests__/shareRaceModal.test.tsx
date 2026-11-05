@@ -94,13 +94,33 @@ describe("Share Race modal", () => {
     expect(screen.getByTestId("race-upload-error")).toHaveTextContent("No connection to the server");
   });
 
-  it("linked race, server answers 404: plain message, never 'Not found'", async () => {
+  it("linked race: the button is the red/green publish status; a 404 is explained in the modal", async () => {
     live.linked.add(RACE);
     live.state.access = { [RACE]: { isOwner: true } };
     live.shareLink.mockRejectedValue(Object.assign(new Error("Not found"), { status: 404 }));
-    await open();
+    render(
+      <MemoryRouter>
+        <ShareRace raceUuid={RACE} raceName="Test" />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("share-race-btn")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("race-publish-status")).toHaveAttribute("data-state", "error"));
+    await userEvent.click(screen.getByTestId("race-publish-status"));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("could not open sharing"));
     expect(screen.getByRole("alert")).not.toHaveTextContent("Not found");
+  });
+
+  it("linked race, published: green 'Published'", async () => {
+    live.linked.add(RACE);
+    live.state.access = { [RACE]: { isOwner: true } };
+    live.shareLink.mockResolvedValue({ url: URL1, published: true });
+    render(
+      <MemoryRouter>
+        <ShareRace raceUuid={RACE} raceName="Test" />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("race-publish-status")).toHaveAttribute("data-state", "on"));
+    expect(screen.getByTestId("race-publish-status")).toHaveTextContent("Published");
   });
 
   it("linked race, not the owner: no Share button", () => {
@@ -112,5 +132,6 @@ describe("Share Race modal", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByTestId("share-race-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("race-publish-status")).not.toBeInTheDocument();
   });
 });

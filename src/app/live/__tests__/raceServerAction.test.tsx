@@ -109,37 +109,44 @@ describe("Info server panel: on server + Share Race", () => {
     expect(screen.getByTestId("race-sync-state")).toHaveTextContent("Offline · 2 change(s) waiting");
   });
 
-  it("owner: not published → Copy disabled; Publish → Copy enabled; Unpublish again", async () => {
+  it("owner: one red 'Not published' button; its modal publishes, the button turns green", async () => {
     onServer();
     live.shareLink.mockResolvedValue({ url: URL1, published: false });
     live.setRacePublished.mockImplementation(async (_id: string, p: boolean) => ({ url: URL1, published: p }));
     show();
-    await waitFor(() => expect(screen.getByTestId("race-share-status")).toHaveTextContent("Not published"));
+    const status = await screen.findByTestId("race-publish-status");
+    await waitFor(() => expect(status).toHaveAttribute("data-state", "off"));
+    expect(status).toHaveTextContent("Not published");
+    expect(screen.queryByTestId("race-publish-modal")).not.toBeInTheDocument();
+    await userEvent.click(status);
+    expect(screen.getByTestId("race-publish-modal")).toBeInTheDocument();
+    expect(live.shareLink).toHaveBeenCalledTimes(1); // the modal reuses the loaded state
     expect(screen.getByTestId("race-share-copy")).toBeDisabled();
     await userEvent.click(screen.getByTestId("race-share-publish"));
     await waitFor(() => expect(screen.getByTestId("race-share-status")).toHaveTextContent("Published"));
     expect(live.setRacePublished).toHaveBeenCalledWith(RACE, true);
     expect(screen.getByTestId("race-share-copy")).toBeEnabled();
     expect(screen.getByTestId("race-share-url")).toHaveValue(URL1);
-    expect(screen.getByTestId("race-share-publish")).toHaveTextContent("Unpublish");
+    expect(screen.getByTestId("race-publish-status")).toHaveAttribute("data-state", "on");
+    expect(screen.getByTestId("race-publish-status")).toHaveTextContent("Published");
     await userEvent.click(screen.getByTestId("race-share-publish"));
-    await waitFor(() => expect(screen.getByTestId("race-share-status")).toHaveTextContent("Not published"));
+    await waitFor(() => expect(screen.getByTestId("race-publish-status")).toHaveAttribute("data-state", "off"));
   });
 
-  it("owner: a link error is shown with Retry", async () => {
+  it("owner: status can't be read → neutral button; the modal shows the error with Retry", async () => {
     onServer();
-    live.shareLink.mockRejectedValueOnce(new Error("Server unavailable")).mockResolvedValueOnce({ url: URL1, published: true });
+    live.shareLink.mockRejectedValueOnce(new Error("Server unavailable")).mockResolvedValue({ url: URL1, published: true });
     show();
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Server unavailable"));
-    await userEvent.click(screen.getByText("Retry"));
-    await waitFor(() => expect(screen.getByTestId("race-share-status")).toHaveTextContent("Published"));
+    await waitFor(() => expect(screen.getByTestId("race-publish-status")).toHaveAttribute("data-state", "error"));
+    await userEvent.click(screen.getByTestId("race-publish-status"));
+    await waitFor(() => expect(screen.getByTestId("race-publish-status")).toHaveAttribute("data-state", "on"));
   });
 
   it("member who is not the owner: no Share controls", () => {
     onServer(false);
     show();
     expect(screen.getByTestId("race-server-action")).toHaveAttribute("data-state", "on-server");
-    expect(screen.queryByTestId("race-share")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("race-publish-status")).not.toBeInTheDocument();
     expect(live.shareLink).not.toHaveBeenCalled();
   });
 });
