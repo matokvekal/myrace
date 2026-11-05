@@ -275,6 +275,9 @@ describe("admin delegation (0.2: only the current owner)", () => {
     expect(delegationError(false, { roles: ["counter"] }, { roles: ["counter", "admin"] })).toMatch(/owner/);
     expect(delegationError(false, { roles: ["admin"] }, { roles: ["viewer"] })).toMatch(/owner/);
     expect(delegationError(false, { roles: ["admin"] }, null)).toMatch(/owner/);
+    // "Admin in all but name": a Team write override is protected like the admin role.
+    expect(delegationError(false, { roles: ["viewer"], permissions: { screens: { team: { update: true } } } }, null)).toMatch(/owner/);
+    expect(delegationError(false, { roles: ["viewer"], permissions: { screens: { team: { delete: true } } } }, { roles: ["viewer"] })).toMatch(/owner/);
     for (const op of ["create", "update", "delete"] as const) {
       expect(delegationError(false, null, { roles: ["viewer"], permissions: { screens: { team: { [op]: true } } } })).toMatch(/owner/);
     }

@@ -18,7 +18,7 @@ import { db, type Db, tx } from "../db/pool.js";
 import { ApiError, normalizeEmail, randomToken, route, sha256 } from "../lib/core.js";
 import { sendMail } from "../lib/messaging.js";
 import { refreshMemberSockets } from "../realtime/socket.js";
-import { delegationError, validatePermissions, validateRoles, type MemberPermissions } from "../../../src/shared/race/access.js";
+import { delegationError, isAdminLike, validatePermissions, validateRoles, type MemberPermissions } from "../../../src/shared/race/access.js";
 import { MEMBER_ROLES } from "../../../src/shared/race/roles.js";
 import type { MemberRole } from "../../../src/shared/race/roles.js";
 import { raceNotFound, requireMember } from "../races/access.js";
@@ -87,8 +87,8 @@ membersRouter.delete("/members/:userId", route(async (req, res) => {
   const seq = await tx(async (d) => {
     const race = await d.one<{ ownerUserId: string }>(`SELECT "ownerUserId" FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]);
     if (race!.ownerUserId === target) throw new ApiError(403, "owner_protected", "The race owner cannot be removed");
-    const cur = await d.one<{ roles: MemberRole[] }>(
-      `SELECT roles FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`,
+    const cur = await d.one<{ roles: MemberRole[]; permissions: MemberPermissions }>(
+      `SELECT roles, permissions FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`,
       [m.raceUuid, target],
     );
     const denied = cur ? delegationError(m.isOwner, cur, null) : null;
@@ -197,7 +197,7 @@ membersRouter.get("/invitations", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "view"]);
   const rows = await db.query(
     `SELECT i.id, i.email, i."userId", u.name AS "userName", i.roles, i.permissions, i."maxUses", i."useCount",
-            i."createdAt", i."expiresAt", i."sentAt", i."revokedAt"
+            i."createdAt", i."expiresAt", i."sentAt", i."revokedAt", i."declinedAt"
      FROM invitations i LEFT JOIN users u ON u.id = i."userId" WHERE i."raceUuid" = $1 ORDER BY i."createdAt" DESC`,
     [m.raceUuid],
   );
@@ -208,6 +208,9 @@ membersRouter.delete("/invitations/:id", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "update"]);
   const id = String(req.params.id);
   const seq = await tx(async (d) => {
+    const inv = await d.one<{ roles: MemberRole[]; permissions: MemberPermissions }>(
+      `SELECT roles, permissions FROM invitations WHERE id = $1 AND "raceUuid" = $2 FOR UPDATE`, [id, m.raceUuid]);
+    if (inv && !m.isOwner && isAdminLike(inv)) throw new ApiError(403, "owner_only_admin", "Only the race owner can withdraw an admin invitation");
     const n = await d.query(`UPDATE invitations SET "revokedAt" = now() WHERE id = $1 AND "raceUuid" = $2 AND "revokedAt" IS NULL RETURNING 1`, [id, m.raceUuid]);
     return n.length ? logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "invitationRevoked", invitationId: id }) : null;
   });
@@ -228,16 +231,18 @@ interface InvitationRow {
   useCount: number;
   expiresAt: Date;
   revokedAt: Date | null;
+  declinedAt: Date | null;
+  createdBy: string;
   raceName: string;
   raceDate: string;
   invitedBy: string;
 }
 
 const invitationStatus = (i: InvitationRow) =>
-  i.revokedAt ? "revoked" : i.expiresAt < new Date() ? "expired" : i.useCount >= i.maxUses ? "used" : "valid";
+  i.declinedAt ? "declined" : i.revokedAt ? "revoked" : i.expiresAt < new Date() ? "expired" : i.useCount >= i.maxUses ? "used" : "valid";
 
 const SELECT_INVITATION = `SELECT i.id, i."raceUuid", i.email, i."userId", i.roles, i.permissions, i."maxUses", i."useCount",
-         i."expiresAt", i."revokedAt", r.name AS "raceName", r.date AS "raceDate", u.name AS "invitedBy"
+         i."expiresAt", i."revokedAt", i."declinedAt", i."createdBy", r.name AS "raceName", r.date AS "raceDate", u.name AS "invitedBy"
   FROM invitations i JOIN races r ON r.uuid = i."raceUuid" JOIN users u ON u.id = i."createdBy"`;
 
 /** May this user accept this invitation? Email invitations need that email verified on the account. */
@@ -258,6 +263,15 @@ async function accept(i: InvitationRow, userId: string) {
     const owner = await d.one<{ ownerUserId: string }>(`SELECT "ownerUserId" FROM races WHERE uuid = $1 FOR UPDATE`, [locked.raceUuid]);
     if (!owner) throw raceNotFound();
     if (owner.ownerUserId === userId) return null;
+    // Accepting replaces the invitee's access. Only an invitation from the CURRENT owner may
+    // replace an admin's access or grant admin (0.2: admin delegation is owner-only) — so a
+    // delegated admin can't demote an admin, or hand out admin, through an invitation.
+    const cur = await d.one<{ roles: MemberRole[]; permissions: MemberPermissions }>(
+      `SELECT roles, permissions FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`,
+      [locked.raceUuid, userId],
+    );
+    const denied = delegationError(locked.createdBy === owner.ownerUserId, cur, { roles: locked.roles, permissions: locked.permissions });
+    if (denied) throw new ApiError(403, "owner_only_admin", denied);
     await d.query(
       `INSERT INTO race_members ("raceUuid", "userId", roles, permissions, "invitationId", "addedBy")
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -300,7 +314,7 @@ myInvitationsRouter.get("/", route(async (req, res) => {
   const userId = authed(req).userId;
   const rows = await db.query<InvitationRow>(
     `${SELECT_INVITATION}
-     WHERE i."revokedAt" IS NULL AND i."expiresAt" > now() AND i."useCount" < i."maxUses"
+     WHERE i."revokedAt" IS NULL AND i."declinedAt" IS NULL AND i."expiresAt" > now() AND i."useCount" < i."maxUses"
        AND (i."userId" = $1 OR i.email IN (SELECT email FROM user_identities WHERE "userId" = $1 AND "emailVerified" AND email IS NOT NULL))
        AND NOT EXISTS (SELECT 1 FROM race_members m WHERE m."raceUuid" = i."raceUuid" AND m."userId" = $1 AND m."revokedAt" IS NULL)`,
     [userId],
@@ -317,6 +331,15 @@ myInvitationsRouter.post("/:id/accept", route(async (req, res) => {
 myInvitationsRouter.post("/:id/decline", route(async (req, res) => {
   const i = await db.one<InvitationRow>(`${SELECT_INVITATION} WHERE i.id = $1`, [String(req.params.id)]);
   if (!i || !(await canAccept(db, i, authed(req).userId)) || !(i.userId || i.email)) throw raceNotFound();
-  await db.query(`UPDATE invitations SET "revokedAt" = now() WHERE id = $1`, [i.id]);
+  // Declined (0.2) is its own status — not the organizer's revoke. Audited by the invitee.
+  const seq = await tx(async (d) => {
+    const n = await d.query(
+      `UPDATE invitations SET "declinedAt" = now() WHERE id = $1 AND "declinedAt" IS NULL AND "revokedAt" IS NULL RETURNING "raceUuid"`, [i.id]);
+    return n.length ? logServerEvent(d, i.raceUuid, authed(req).userId, "RaceAdmin", { op: "invitationDeclined", invitationId: i.id }) : null;
+  }).catch((e: { code?: string }) => {
+    if (e?.code === "not_member") return null; // race gone meanwhile: nothing to decline
+    throw e;
+  });
+  if (seq) await announceSeq(i.raceUuid, seq);
   res.status(204).end();
 }));

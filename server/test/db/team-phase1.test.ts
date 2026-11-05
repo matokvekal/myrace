@@ -256,3 +256,85 @@ describe("member writes are per race (decision 1)", () => {
     }
   });
 });
+
+describe("delegation can't be bypassed through invitations (QA T2)", () => {
+  it("an invitation from a delegated admin can't demote an admin; Team-override members are protected; admin invitations are owner's to revoke", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    const u = (path: string) => `/api/v1/races/${race.raceUuid}${path}`;
+    await db.query(`UPDATE races SET "memberWrites" = true WHERE uuid = $1`, [race.raceUuid]);
+    const deputy = await newUser("P1Deputy");
+    const victim = await newUser("P1Victim");
+    const lead = await newUser("P1Lead");
+    await addMember(owner, race.raceUuid, deputy, ["admin"]);
+    await addMember(owner, race.raceUuid, victim, ["admin"]);
+    await addMember(owner, race.raceUuid, lead, ["viewer"], { screens: { team: { update: true, view: true } } });
+
+    // Demotion through an invitation addressed to the admin.
+    const inv = await api().post(u("/invitations")).set(auth(deputy.token)).send({ userIds: [victim.id], roles: ["viewer"], sendEmail: false });
+    expect(inv.status).toBe(201);
+    const token = String(inv.body.invitations[0].url).split("/invite/")[1];
+    const acc = await api().post(`/api/v1/invitations/${token}/accept`).set(auth(victim.token));
+    expect(acc.status).toBe(403);
+    expect(acc.body.error.code).toBe("owner_only_admin");
+    const roles = await db.one<{ roles: string[] }>(`SELECT roles FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2`, [race.raceUuid, victim.id]);
+    expect(roles!.roles).toEqual(["admin"]);
+
+    // A member with a Team write override is "admin in all but name": protected too.
+    expect((await api().delete(u(`/members/${lead.id}`)).set(auth(deputy.token))).status).toBe(403);
+    expect((await api().patch(u(`/members/${lead.id}`)).set(auth(deputy.token)).send({ permissions: {} })).status).toBe(403);
+
+    // The owner's admin invitation can't be withdrawn by the deputy.
+    const ownerInv = await api().post(u("/invitations")).set(auth(owner.token)).send({ link: true, roles: ["admin"], sendEmail: false });
+    expect((await api().delete(u(`/invitations/${ownerInv.body.invitations[0].id}`)).set(auth(deputy.token))).status).toBe(403);
+    expect((await api().delete(u(`/invitations/${ownerInv.body.invitations[0].id}`)).set(auth(owner.token))).status).toBe(204);
+  });
+});
+
+describe("invitation lifecycle", () => {
+  it("declined is its own status: not acceptable afterwards, gone from my list, audited", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    const guest = await newUser("P1Guest");
+    const inv = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token)).send({ userIds: [guest.id], roles: ["counter"], sendEmail: false });
+    const id = inv.body.invitations[0].id;
+    const token = String(inv.body.invitations[0].url).split("/invite/")[1];
+    const mine = await api().get("/api/v1/me/invitations").set(auth(guest.token));
+    expect(mine.body.invitations.map((i: { id: string }) => i.id)).toContain(id);
+    expect((await api().post(`/api/v1/me/invitations/${id}/decline`).set(auth(guest.token))).status).toBe(204);
+    expect((await api().get(`/api/v1/invitations/${token}`).set(auth(guest.token))).body.status).toBe("declined");
+    expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(guest.token))).status).toBe(410);
+    expect((await api().get("/api/v1/me/invitations").set(auth(guest.token))).body.invitations.map((i: { id: string }) => i.id)).not.toContain(id);
+    const list = await api().get(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token));
+    const row = list.body.invitations.find((i: { id: string }) => i.id === id);
+    expect(row.declinedAt).toBeTruthy();
+    expect(row.revokedAt).toBeNull();
+    const declined = (await adminEvents(race.raceUuid)).find((e) => e.payload.op === "invitationDeclined");
+    expect(declined).toMatchObject({ userId: guest.id, payload: { invitationId: id } });
+  });
+
+  it("expired, already used (one-time) and revoked invitations can't be accepted; nobody else can decline mine", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    const a = await newUser("P1A");
+    const b = await newUser("P1B");
+    const mk = async (body: Record<string, unknown>) => {
+      const r = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token)).send({ sendEmail: false, roles: ["viewer"], ...body });
+      return { id: r.body.invitations[0].id as string, token: String(r.body.invitations[0].url).split("/invite/")[1] };
+    };
+    const accept = (t: string, user: TestUser) => api().post(`/api/v1/invitations/${t}/accept`).set(auth(user.token));
+
+    const exp = await mk({ userIds: [a.id] });
+    await db.query(`UPDATE invitations SET "expiresAt" = now() - interval '1 minute' WHERE id = $1`, [exp.id]);
+    expect((await accept(exp.token, a)).status).toBe(410);
+
+    const once = await mk({ link: true, maxUses: 1 });
+    expect((await accept(once.token, a)).status).toBe(200);
+    expect((await accept(once.token, b)).status).toBe(410);
+
+    const rev = await mk({ userIds: [b.id] });
+    await api().delete(`/api/v1/races/${race.raceUuid}/invitations/${rev.id}`).set(auth(owner.token));
+    expect((await accept(rev.token, b)).status).toBe(410);
+
+    const forB = await mk({ userIds: [b.id] });
+    expect((await api().post(`/api/v1/me/invitations/${forB.id}/decline`).set(auth(a.token))).status).toBe(404);
+    expect((await accept(forB.token, a)).status).toBe(403); // wrong account
+  });
+});

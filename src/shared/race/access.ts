@@ -189,16 +189,21 @@ export const can = (access: EffectiveAccess, screen: Screen, op: Operation): boo
  */
 export function delegationError(
   actorIsOwner: boolean,
-  before: { roles: readonly MemberRole[] } | null,
+  before: { roles: readonly MemberRole[]; permissions?: MemberPermissions | null } | null,
   after: { roles: readonly MemberRole[]; permissions?: MemberPermissions | null } | null,
 ): string | null {
   if (actorIsOwner) return null;
-  if (before?.roles.includes("admin")) return "Only the race owner can change or remove an admin";
+  if (before && isAdminLike(before)) return "Only the race owner can change or remove an admin";
   if (after?.roles.includes("admin")) return "Only the race owner can make someone an admin";
-  const team = after?.permissions?.screens?.team;
-  if (team && (team.create || team.update || team.delete)) return "Only the race owner can let someone manage the team";
+  if (after && isAdminLike(after)) return "Only the race owner can let someone manage the team";
   return null;
 }
+
+/** The admin role, or a Team write override (which lets them manage members like an admin). */
+export const isAdminLike = (m: { roles: readonly MemberRole[]; permissions?: MemberPermissions | null }): boolean => {
+  const team = m.permissions?.screens?.team;
+  return m.roles.includes("admin") || !!(team && (team.create || team.update || team.delete));
+};
 
 // ---------------------------------------------------------------------------
 // Data scope
