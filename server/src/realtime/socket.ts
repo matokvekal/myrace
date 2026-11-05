@@ -147,6 +147,14 @@ export async function refreshMemberSockets(raceUuid: string, userId: string): Pr
   logger.info({ raceUuid, userId }, "member sockets refreshed");
 }
 
+/** A race-wide access change (e.g. member writes switched): refresh every joined member's sockets. */
+export async function refreshRaceSockets(raceUuid: string): Promise<void> {
+  if (!io) return;
+  const sockets = await io.of("/race").in(room(raceUuid)).fetchSockets();
+  const users = new Set(sockets.map((s) => (s.data as SocketData).userId));
+  for (const userId of users) await refreshMemberSockets(raceUuid, userId);
+}
+
 /** The race was deleted: every Device drops it. */
 export async function closeRace(raceUuid: string): Promise<void> {
   if (!io) return;

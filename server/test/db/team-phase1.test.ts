@@ -3,7 +3,7 @@
  * (RaceAdmin entries in race_events). Runs against the isolated test database.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { action, addMember, api, auth, newUser, publishRace, send, startServer, stopServer, type TestUser } from "./helpers";
+import { action, addMember, api, auth, collect, newUser, publishRace, send, socketFor, startServer, stopServer, until, type TestUser } from "./helpers";
 import { db } from "../../src/db/pool";
 
 let owner: TestUser, admin: TestUser, counter: TestUser, outsider: TestUser;
@@ -215,5 +215,44 @@ describe("delete and audit edge cases (QA)", () => {
     const inv = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token)).send({ userIds: [outsider.id], roles: ["results"], sendEmail: false });
     expect(inv.status).toBe(201);
     await db.query(`UPDATE race_members SET roles = '{results}' WHERE "raceUuid" = $1 AND "userId" = $2`, [race.raceUuid, owner.id]);
+  });
+});
+
+describe("member writes are per race (decision 1)", () => {
+  it("off by default; owner switches it on/off; open sockets get the new access; other races unaffected", async () => {
+    const a = await publishRace(owner, 1, 2, 2);
+    const b = await publishRace(owner, 1, 2, 2);
+    const judge = await newUser("P1Judge");
+    for (const r of [a, b]) await addMember(owner, r.raceUuid, judge, ["start"]);
+    const set = (u: TestUser, raceUuid: string, enabled: boolean) =>
+      api().put(`/api/v1/races/${raceUuid}/member-writes`).set(auth(u.token)).send({ enabled });
+
+    const s = await socketFor(judge);
+    try {
+      await s.emitWithAck("join", { raceUuid: a.raceUuid });
+      const access = collect(s, "race:access");
+      // Off: read-only, as in 0.1.x.
+      expect((await send(judge, a.raceUuid, action(a.raceUuid, "WaveStarted", { heat: 1 })))[0].reason).toBe("forbidden");
+      // Only the owner may switch it.
+      expect((await set(judge, a.raceUuid, true)).status).toBe(403);
+      expect((await set(owner, a.raceUuid, true)).status).toBe(200);
+      await until(() => access.length > 0);
+      expect(access.at(-1).access).toMatchObject({ memberWrites: true });
+      expect(access.at(-1).access.screens.start.update).toBe(true);
+      expect((await send(judge, a.raceUuid, action(a.raceUuid, "WaveStarted", { heat: 1 })))[0].applied).toBe(true);
+      // The other race of the same owner is still read-only for the judge.
+      expect((await send(judge, b.raceUuid, action(b.raceUuid, "WaveStarted", { heat: 1 })))[0].reason).toBe("forbidden");
+      // Switching off again closes writes at once.
+      const n = access.length;
+      expect((await set(owner, a.raceUuid, false)).status).toBe(200);
+      await until(() => access.length > n);
+      expect((await send(judge, a.raceUuid, action(a.raceUuid, "WaveFinished", { heat: 1 })))[0].reason).toBe("forbidden");
+      // Audited once per real change (repeat = no entry).
+      await set(owner, a.raceUuid, false);
+      const ops = (await adminEvents(a.raceUuid)).filter((e) => e.payload.op === "memberWritesChanged").map((e) => e.payload.enabled);
+      expect(ops).toEqual([true, false]);
+    } finally {
+      s.disconnect();
+    }
   });
 });

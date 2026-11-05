@@ -72,6 +72,14 @@ export default function TeamPanel({ raceUuid }: { raceUuid: string }) {
   const canManage = !!access?.screens.team.update;
   return (
     <div className={styles.inner} style={{ maxWidth: "none" }}>
+      {access?.isOwner && <MemberWritesSwitch raceUuid={raceUuid} enabled={!!access.memberWrites} />}
+      {!access?.isOwner && access && access.memberWrites === false && (
+        <div className={styles.card}>
+          <p className={styles.muted} data-testid="member-writes-off">
+            {t("live.memberWritesOffNote", "The race owner hasn't turned on judging for this race yet — you can view it, not change it.")}
+          </p>
+        </div>
+      )}
       {canManage ? <Members raceUuid={raceUuid} isOwner={!!access?.isOwner} /> : (
         <div className={styles.card}>
           <h2 className={styles.subtitle}>{t("live.teamTitle", "Team")}</h2>
@@ -95,6 +103,48 @@ export default function TeamPanel({ raceUuid }: { raceUuid: string }) {
           {t("live.detach", "Work offline on this phone (stop syncing)")}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Owner only (0.2): judges may record in THIS race. Off by default; the server enforces it. */
+function MemberWritesSwitch({ raceUuid, enabled }: { raceUuid: string; enabled: boolean }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [on, setOn] = useState(enabled);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setOn(enabled), [enabled]);
+  return (
+    <div className={styles.card}>
+      <label className={styles.spread}>
+        <span>
+          <strong>{t("live.memberWrites", "Judges can record in this race")}</strong>
+          <br />
+          <span className={styles.muted}>
+            {t("live.memberWritesHelp", "When on, each member can do what their role allows (start, laps, check-in, results). When off, only you change the race.")}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          data-testid="member-writes-toggle"
+          checked={on}
+          disabled={busy}
+          onChange={async (e) => {
+            const next = e.target.checked;
+            setBusy(true);
+            setError(null);
+            try {
+              await team.setMemberWrites(raceUuid, next);
+              setOn(next);
+            } catch (err) {
+              setError(msg(err));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      </label>
+      {error && <p className={styles.error} dir="auto">{error}</p>}
     </div>
   );
 }

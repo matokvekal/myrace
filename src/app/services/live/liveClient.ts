@@ -1478,6 +1478,9 @@ export const team = {
     api<{ official: Record<string, unknown> }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/amend`, { reason, includeActionIds }),
   official: (local: string) => api<{ versions: Record<string, unknown>[]; publicKey: string | null }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/official`),
   deleteRace: (local: string) => api("DELETE", `/races/${linkOf(local)!.serverRaceUuid}`),
+  /** 0.2: owner switches judges' writes on/off for this race; access arrives over the socket. */
+  setMemberWrites: (local: string, enabled: boolean) =>
+    api<{ memberWrites: boolean }>("PUT", `/races/${linkOf(local)!.serverRaceUuid}/member-writes`, { enabled }),
 };
 
 export interface Member {

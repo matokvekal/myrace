@@ -9,6 +9,9 @@ polling_closed
 race_deleted
 race_hidden
 WRITES_OWNER_ONLY
+/:raceUuid/member-writes
+owner_only_admin
+RaceAdmin
 projectPublicState
 guestPollingEndsAt
 planFinalization

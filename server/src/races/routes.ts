@@ -9,7 +9,7 @@ import { z } from "zod";
 import { authed, requireAuth } from "../auth/auth.js";
 import { db, tx } from "../db/pool.js";
 import { ApiError, randomCode, route } from "../lib/core.js";
-import { closeRace, refreshMemberSockets } from "../realtime/socket.js";
+import { closeRace, refreshMemberSockets, refreshRaceSockets } from "../realtime/socket.js";
 import { projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
 import { deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
@@ -325,6 +325,29 @@ racesRouter.put("/:raceUuid/publication", route(async (req, res) => {
   });
   if (seq) await announceSeq(m.raceUuid, seq);
   res.json({ token: shareTokenFor(m.raceUuid), published: !!r?.publishedAt, publishedAt: r?.publishedAt ?? null });
+}));
+
+/**
+ * PUT /races/:raceUuid/member-writes { enabled } — per race (0.2): let members (judges) change
+ * race data according to their roles. Off by default = only the owner writes. Owner only;
+ * audited; every joined device gets its new access at once.
+ */
+racesRouter.put("/:raceUuid/member-writes", route(async (req, res) => {
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
+  requireOwner(m);
+  const seq = await tx(async (d) => {
+    const before = await d.one<{ memberWrites: boolean }>(`SELECT "memberWrites" FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]);
+    if (!before) throw raceNotFound();
+    if (before.memberWrites === enabled) return null;
+    await d.query(`UPDATE races SET "memberWrites" = $2 WHERE uuid = $1`, [m.raceUuid, enabled]);
+    return logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "memberWritesChanged", enabled });
+  });
+  if (seq) {
+    await refreshRaceSockets(m.raceUuid);
+    await announceSeq(m.raceUuid, seq);
+  }
+  res.json({ memberWrites: enabled });
 }));
 
 /** POST /races/:raceUuid/transfer — hand ownership to another active member (owner only). */
