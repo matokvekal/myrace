@@ -51,6 +51,7 @@ describe("cloud PostgreSQL only", () => {
 
 describe("tests never reach production data", () => {
   const TEST_DB = "postgresql://commissaire_app:pw@db.commissaire.us:5432/commissaire_test?sslmode=require";
+  const LOCAL_TEST_DB = "postgresql://commissaire_test:commissaire_test@127.0.0.1:55432/commissaire_test";
   it("NODE_ENV=test requires skipping server/.env", () => {
     expect(() => parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: TEST_DB, COMMISSAIRE_SKIP_DOTENV: undefined })).toThrow(/must not read server\/\.env/);
   });
@@ -58,6 +59,10 @@ describe("tests never reach production data", () => {
     for (const url of [CLOUD, base.DATABASE_URL, "postgresql://u:p@db.commissaire.us/elnino", "postgresql://u:p@db.commissaire.us/commissaire_testing", "postgresql://u:p@db.commissaire.us/"]) {
       expect(() => parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: url }), url).toThrow(/dedicated test database/);
     }
-    expect(parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: TEST_DB }).DATABASE_URL).toBe(TEST_DB);
+    expect(parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: LOCAL_TEST_DB }).DATABASE_URL).toBe(LOCAL_TEST_DB);
+  });
+  it("a *_test database on another machine needs TEST_DATABASE_ALLOW_REMOTE=1 (a copied URL is never used by accident)", () => {
+    expect(() => parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: TEST_DB })).toThrow(/dedicated test database/);
+    expect(parseEnv({ ...base, NODE_ENV: "test", DATABASE_URL: TEST_DB, TEST_DATABASE_ALLOW_REMOTE: "1" }).DATABASE_URL).toBe(TEST_DB);
   });
 });

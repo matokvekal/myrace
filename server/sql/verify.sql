@@ -32,6 +32,7 @@ SELECT c.table_name, c.is_nullable AS nullable,
        ) AS indexed
 FROM information_schema.columns c
 WHERE c.table_schema = 'public' AND c.column_name = 'raceUuid'
+  AND c.table_name <> 'race_hidden' -- per-user list bookkeeping (010), keyed (userId, raceUuid); not race data
 ORDER BY 1;
 
 -- 5. No triggers or stored functions: rules stay in TypeScript. Expected: 0 and 0.

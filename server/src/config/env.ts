@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { serverRoot } from "../lib/paths.js";
-import { isTestDatabase } from "./testDatabase.js";
-export { isTestDatabase };
+import { isSafeTestDatabase, isTestDatabase } from "./testDatabase.js";
+export { isSafeTestDatabase, isTestDatabase };
 
 /** The database URL in server/.env beats an inherited one: a shell's DATABASE_URL may be El Niño's. */
 const DB_KEYS = ["DATABASE_URL", "COMMISSAIRE_DATABASE_URL"];
@@ -112,8 +112,8 @@ export function parseEnv(vars: NodeJS.ProcessEnv = process.env): Env {
     if (vars.COMMISSAIRE_SKIP_DOTENV !== "1") {
       throw new Error("Invalid server configuration — tests must not read server/.env (run them with vitest)");
     }
-    if (!isTestDatabase(env.DATABASE_URL)) {
-      throw new Error("Invalid server configuration — tests run only against a dedicated test database (name ending in _test)");
+    if (!isSafeTestDatabase(env.DATABASE_URL, vars.TEST_DATABASE_ALLOW_REMOTE === "1")) {
+      throw new Error("Invalid server configuration — tests run only against a dedicated test database (name ending in _test, on this machine unless TEST_DATABASE_ALLOW_REMOTE=1)");
     }
   }
   return env;

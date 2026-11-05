@@ -38,7 +38,9 @@ describe("accounts and sessions", () => {
 
   it("email code: signs in, verifies the email, and is single-use", async () => {
     const spy = vi.spyOn(messaging, "sendMail");
-    const email = `code.${Date.now()}@x.test`;
+    // Codes go only to registered emails (sendEmailCode): an unknown address gets 404, nothing is sent.
+    expect((await api().post("/api/v1/auth/email-code").send({ email: `nobody.${Date.now()}@x.test` })).status).toBe(404);
+    const { email } = await newUser("Code");
     expect((await api().post("/api/v1/auth/email-code").send({ email })).status).toBe(202);
     const code = /code is (\d{6})/.exec(String(spy.mock.calls.at(-1)?.[2]))?.[1];
     const ok = await api().post("/api/v1/auth/email-code/verify").send({ email, code });

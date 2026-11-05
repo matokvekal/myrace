@@ -1,0 +1,27 @@
+# Isolated PostgreSQL for the server's database tests (local dev and CI).
+#
+#   cd server && npm run test:db        # starts this container, runs every server test
+#   cd server && npm run test:db:down   # removes it
+#
+# - Throwaway: data lives in tmpfs, nothing survives `down`. No production data, no
+#   production credentials: the user/password below exist only inside this container.
+# - Bound to 127.0.0.1 only, on port 55432 (not 5432) so it never collides with another
+#   PostgreSQL on the machine.
+# - The test global setup rebuilds the schema from server/sql (001…) on every run.
+services:
+  commissaire-test-db:
+    image: postgres:16-alpine
+    container_name: commissaire-test-db
+    environment:
+      POSTGRES_DB: commissaire_test
+      POSTGRES_USER: commissaire_test
+      POSTGRES_PASSWORD: commissaire_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commissaire_test -d commissaire_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

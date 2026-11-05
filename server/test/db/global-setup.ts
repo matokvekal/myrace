@@ -7,13 +7,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
-import { isTestDatabase } from "../../src/config/testDatabase";
+import { isSafeTestDatabase } from "../../src/config/testDatabase";
 import { migrationFiles } from "../../src/db/migrate";
 import { databaseConnection } from "../../src/db/tls";
 
 export async function setup() {
   const url = process.env.TEST_DATABASE_URL ?? "";
-  if (!isTestDatabase(url)) throw new Error("TEST_DATABASE_URL must name a dedicated database ending in _test (never production)");
+  if (!isSafeTestDatabase(url)) throw new Error("TEST_DATABASE_URL must name a dedicated database ending in _test on this machine (or set TEST_DATABASE_ALLOW_REMOTE=1) — never production");
   const client = new pg.Client(databaseConnection(url, {
     caCertFile: process.env.DATABASE_CA_CERT_FILE,
     caCert: process.env.DATABASE_CA_CERT,

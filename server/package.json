@@ -15,7 +15,9 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "node scripts/test-db.mjs",
+    "test:db:down": "docker compose -f ../docker-compose.test.yml down"
   },
   "dependencies": {
     "cors": "^2.8.5",
