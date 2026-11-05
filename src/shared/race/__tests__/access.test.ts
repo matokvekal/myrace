@@ -3,6 +3,7 @@ import {
   SCREENS,
   authorizeAction,
   can,
+  delegationError,
   effectiveAccess,
   projectRace,
   projectRider,
@@ -230,5 +231,58 @@ describe("stored permissions are validated", () => {
     expect(validateRoles(["counter", "viewer"])).toBeNull();
     expect(validateRoles(["owner"])).not.toBeNull();
     expect(validateRoles(["counter", "counter"])).not.toBeNull();
+  });
+});
+
+describe("Results judge (0.2)", () => {
+  it("corrects lap counts and statuses; records no laps, starts nothing, finalizes nothing", () => {
+    const { state, riders, cats } = race();
+    const a = member(["results"]);
+    const r = riders[0].uuid;
+    expect(authorizeAction(a, makeAction("LapCountCorrection", { riderUuid: r, laps: 2 }), state).ok).toBe(true);
+    expect(authorizeAction(a, makeAction("StatusCorrection", { riderUuid: r, status: "DNF" }), state).ok).toBe(true);
+    for (const act of [
+      makeAction("AddLap", { riderUuid: r }),
+      makeAction("RiderFinished", { riderUuid: r }),
+      makeAction("WaveStarted", { heat: 2 }),
+      makeAction("CategoryFinished", { categoryUuid: cats[0].uuid }),
+      makeAction("RiderEdited", { riderUuid: r, changes: { bibNumber: 9 } }),
+      makeAction("RiderCheckedIn", { riderUuid: r, checked: true }),
+      makeAction("Finalized", { version: 1, token: "t" }),
+      makeAction("Amended", { version: 2, prevToken: "t", reason: "x", includeActionIds: [] }),
+      makeAction("RaceAdmin", { op: "published" }),
+    ]) {
+      expect(authorizeAction(a, act, state), act.type).toEqual({ ok: false, reason: "forbidden" });
+    }
+    expect(can(a, "team", "view")).toBe(false);
+  });
+
+  it("respects its wave scope", () => {
+    const { state, riders } = race();
+    const a = member(["results"], { waves: [1] });
+    expect(authorizeAction(a, makeAction("StatusCorrection", { riderUuid: riders[0].uuid, status: "DSQ" }), state).ok).toBe(true);
+    expect(authorizeAction(a, makeAction("StatusCorrection", { riderUuid: riders[1].uuid, status: "DSQ" }), state)).toEqual({ ok: false, reason: "out_of_scope" });
+  });
+});
+
+describe("admin delegation (0.2: only the current owner)", () => {
+  it("the owner may do anything", () => {
+    expect(delegationError(true, { roles: ["admin"] }, null)).toBeNull();
+    expect(delegationError(true, null, { roles: ["admin"], permissions: { screens: { team: { update: true } } } })).toBeNull();
+  });
+  it("a delegated admin can't grant admin, touch an admin, or open Team writes", () => {
+    expect(delegationError(false, null, { roles: ["admin"] })).toMatch(/owner/);
+    expect(delegationError(false, { roles: ["counter"] }, { roles: ["counter", "admin"] })).toMatch(/owner/);
+    expect(delegationError(false, { roles: ["admin"] }, { roles: ["viewer"] })).toMatch(/owner/);
+    expect(delegationError(false, { roles: ["admin"] }, null)).toMatch(/owner/);
+    for (const op of ["create", "update", "delete"] as const) {
+      expect(delegationError(false, null, { roles: ["viewer"], permissions: { screens: { team: { [op]: true } } } })).toMatch(/owner/);
+    }
+  });
+  it("a delegated admin may still manage ordinary judges", () => {
+    expect(delegationError(false, null, { roles: ["counter", "results"], permissions: { waves: [1] } })).toBeNull();
+    expect(delegationError(false, { roles: ["counter"] }, { roles: ["start"] })).toBeNull();
+    expect(delegationError(false, { roles: ["checkin"] }, null)).toBeNull();
+    expect(delegationError(false, null, { roles: ["viewer"], permissions: { screens: { team: { view: true } } } })).toBeNull();
   });
 });

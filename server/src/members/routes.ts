@@ -18,12 +18,13 @@ import { db, type Db, tx } from "../db/pool.js";
 import { ApiError, normalizeEmail, randomToken, route, sha256 } from "../lib/core.js";
 import { sendMail } from "../lib/messaging.js";
 import { refreshMemberSockets } from "../realtime/socket.js";
-import { validatePermissions, validateRoles, type MemberPermissions } from "../../../src/shared/race/access.js";
+import { delegationError, validatePermissions, validateRoles, type MemberPermissions } from "../../../src/shared/race/access.js";
+import { MEMBER_ROLES } from "../../../src/shared/race/roles.js";
 import type { MemberRole } from "../../../src/shared/race/roles.js";
 import { raceNotFound, requireMember } from "../races/access.js";
 import { announceSeq, logServerEvent } from "../races/audit.js";
 
-const rolesSchema = z.array(z.string()).max(5).superRefine((v, c) => {
+const rolesSchema = z.array(z.string()).max(MEMBER_ROLES.length).superRefine((v, c) => {
   const e = validateRoles(v);
   if (e) c.addIssue({ code: "custom", message: e });
 });
@@ -67,6 +68,8 @@ membersRouter.patch("/members/:userId", route(async (req, res) => {
     if (!cur) throw new ApiError(404, "not_found", "No such member");
     const roles = (body.roles as MemberRole[] | undefined) ?? cur.roles;
     const permissions = (body.permissions as MemberPermissions | undefined) ?? cur.permissions;
+    const denied = delegationError(m.isOwner, cur, { roles, permissions });
+    if (denied) throw new ApiError(403, "owner_only_admin", denied);
     await d.query(
       `UPDATE race_members SET roles = $3, permissions = $4, "updatedAt" = now() WHERE "raceUuid" = $1 AND "userId" = $2`,
       [m.raceUuid, target, roles, JSON.stringify(permissions)],
@@ -84,6 +87,12 @@ membersRouter.delete("/members/:userId", route(async (req, res) => {
   const seq = await tx(async (d) => {
     const race = await d.one<{ ownerUserId: string }>(`SELECT "ownerUserId" FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]);
     if (race!.ownerUserId === target) throw new ApiError(403, "owner_protected", "The race owner cannot be removed");
+    const cur = await d.one<{ roles: MemberRole[] }>(
+      `SELECT roles FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`,
+      [m.raceUuid, target],
+    );
+    const denied = cur ? delegationError(m.isOwner, cur, null) : null;
+    if (denied) throw new ApiError(403, "owner_only_admin", denied);
     const n = await d.query(
       `UPDATE race_members SET "revokedAt" = now(), "updatedAt" = now() WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL RETURNING 1`,
       [m.raceUuid, target],
@@ -118,6 +127,8 @@ const inviteUrl = (secret: string) => `${env.APP_URL.replace(/\/$/, "")}/invite/
 membersRouter.post("/invitations", route(async (req, res) => {
   const body = inviteBody.parse(req.body);
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "update"]);
+  const denied = delegationError(m.isOwner, null, { roles: body.roles as MemberRole[], permissions: body.permissions as MemberPermissions });
+  if (denied) throw new ApiError(403, "owner_only_admin", denied);
   const me = await loadUser(db, m.userId);
   const race = await db.one<{ name: string; date: string }>(`SELECT name, date FROM races WHERE uuid = $1`, [m.raceUuid]);
 

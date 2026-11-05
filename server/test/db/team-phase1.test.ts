@@ -134,3 +134,86 @@ describe("audit: sensitive operations write one RaceAdmin entry each", () => {
     expect(r[0]).toMatchObject({ applied: false, reason: "invalid" });
   });
 });
+
+describe("admin delegation: only the current owner", () => {
+  it("a delegated admin can't grant admin, change/remove an admin, or open Team writes; the owner can", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    const u = (path: string) => `/api/v1/races/${race.raceUuid}${path}`;
+    await addMember(owner, race.raceUuid, admin, ["admin"]);
+    await addMember(owner, race.raceUuid, counter, ["counter"]);
+    const other = await newUser("P1Admin2");
+    await addMember(owner, race.raceUuid, other, ["admin"]);
+    // Delegated admins manage members only where the owner turned member writes on (per race).
+    await db.query(`UPDATE races SET "memberWrites" = true WHERE uuid = $1`, [race.raceUuid]);
+
+    const refused = async (r: { status: number; body: { error?: { code?: string } } }) => {
+      expect(r.status).toBe(403);
+      expect(r.body.error?.code).toBe("owner_only_admin");
+    };
+    await refused(await api().patch(u(`/members/${counter.id}`)).set(auth(admin.token)).send({ roles: ["admin"] }));
+    await refused(await api().patch(u(`/members/${counter.id}`)).set(auth(admin.token)).send({ permissions: { screens: { team: { update: true } } } }));
+    await refused(await api().patch(u(`/members/${other.id}`)).set(auth(admin.token)).send({ roles: ["viewer"] }));
+    await refused(await api().delete(u(`/members/${other.id}`)).set(auth(admin.token)));
+    await refused(await api().post(u("/invitations")).set(auth(admin.token)).send({ link: true, roles: ["admin"], sendEmail: false }));
+    // Ordinary judges stay manageable by a delegated admin.
+    expect((await api().patch(u(`/members/${counter.id}`)).set(auth(admin.token)).send({ roles: ["counter", "results"] })).status).toBe(200);
+    expect((await api().post(u("/invitations")).set(auth(admin.token)).send({ link: true, roles: ["results"], sendEmail: false })).status).toBe(201);
+    // The owner can do all of it.
+    expect((await api().patch(u(`/members/${counter.id}`)).set(auth(owner.token)).send({ roles: ["admin"] })).status).toBe(200);
+    expect((await api().delete(u(`/members/${other.id}`)).set(auth(owner.token))).status).toBe(204);
+  });
+});
+
+describe("Results judge", () => {
+  it("corrects laps and statuses; can't record laps, start, finalize or amend", async () => {
+    const race = await publishRace(owner, 1, 2, 2);
+    const judge = await newUser("P1Results");
+    await addMember(owner, race.raceUuid, judge, ["results"]);
+    await db.query(`UPDATE races SET "memberWrites" = true WHERE uuid = $1`, [race.raceUuid]); // per-race switch (route comes in T3)
+    await send(owner, race.raceUuid, action(race.raceUuid, "WaveStarted", { heat: 1 }));
+    const r = race.riders[0].uuid;
+    const res = await send(judge, race.raceUuid,
+      action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 1 }),
+      action(race.raceUuid, "StatusCorrection", { riderUuid: r, status: "DSQ" }),
+      action(race.raceUuid, "AddLap", { riderUuid: race.riders[1].uuid }),
+      action(race.raceUuid, "WaveFinished", { heat: 1 }),
+    );
+    expect(res.map((x) => x.reason)).toEqual([null, null, "forbidden", "forbidden"]);
+    expect((await api().post(`/api/v1/races/${race.raceUuid}/finalize`).set(auth(judge.token))).status).toBe(403);
+    expect((await api().post(`/api/v1/races/${race.raceUuid}/amend`).set(auth(judge.token)).send({ reason: "late lap", includeActionIds: [] })).status).toBe(403);
+  });
+});
+
+describe("delete and audit edge cases (QA)", () => {
+  it("a finished race deleted by its creator is only hidden; a repeated delete after a soft delete is 410", async () => {
+    const fin = await publishRace(owner, 1, 1, 2);
+    await db.query(`UPDATE races SET status = 'finished' WHERE uuid = $1`, [fin.raceUuid]);
+    expect((await api().delete(`/api/v1/races/${fin.raceUuid}`).set(auth(owner.token))).body.deleted).toBe("hidden");
+    const act = await publishRace(owner, 1, 1, 2);
+    expect((await api().delete(`/api/v1/races/${act.raceUuid}`).set(auth(owner.token))).body.deleted).toBe("race");
+    expect((await api().delete(`/api/v1/races/${act.raceUuid}`).set(auth(owner.token))).status).toBe(410);
+  });
+
+  it("unpublishing an unpublished race writes no audit entry", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    expect((await api().put(`/api/v1/races/${race.raceUuid}/publication`).set(auth(owner.token)).send({ published: false })).status).toBe(200);
+    expect(await adminEvents(race.raceUuid)).toEqual([]);
+  });
+
+  it("a transfer announces its own audit seq to joined devices", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    await addMember(owner, race.raceUuid, admin, ["admin"]);
+    const r = await api().post(`/api/v1/races/${race.raceUuid}/transfer`).set(auth(owner.token)).send({ userId: admin.id });
+    expect(r.status).toBe(200);
+    const ev = (await adminEvents(race.raceUuid)).find((e) => e.payload.op === "ownerTransferred")!;
+    const last = await db.one<{ lastSeq: number }>(`SELECT "lastSeq" FROM races WHERE uuid = $1`, [race.raceUuid]);
+    expect(ev.seq).toBe(Number(last!.lastSeq));
+  });
+
+  it("the results role is accepted by both role CHECK constraints", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    const inv = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token)).send({ userIds: [outsider.id], roles: ["results"], sendEmail: false });
+    expect(inv.status).toBe(201);
+    await db.query(`UPDATE race_members SET roles = '{results}' WHERE "raceUuid" = $1 AND "userId" = $2`, [race.raceUuid, owner.id]);
+  });
+});

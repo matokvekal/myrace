@@ -108,7 +108,7 @@ export const WRITES_OWNER_ONLY = () => process.env.COMMISSAIRE_MEMBER_WRITES !==
 /** Requires a membership allowed to change race data (the owner in this phase). */
 export async function requireWriter(d: Db, raceUuid: string, userId: string): Promise<Membership> {
   const m = await requireMember(d, raceUuid, userId);
-  if (WRITES_OWNER_ONLY()) requireOwner(m);
+  if (WRITES_OWNER_ONLY() && !m.memberWrites) requireOwner(m);
   return m;
 }
 

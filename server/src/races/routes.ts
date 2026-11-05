@@ -332,23 +332,24 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
   const { userId: target } = z.object({ userId: z.string().uuid() }).parse(req.body);
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
   requireOwner(m);
-  await tx(async (d) => {
+  const seq = await tx(async (d) => {
     // Race row lock first: a concurrent delete either finishes before (404) or waits.
     if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]))) throw raceNotFound();
     const ok = await d.one(`SELECT 1 FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`, [m.raceUuid, target]);
     if (!ok) throw new ApiError(400, "invalid", "The new owner must be an active member of the race");
     await d.query(`UPDATE races SET "ownerUserId" = $2 WHERE uuid = $1`, [m.raceUuid, target]);
-    await logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "ownerTransferred", from: m.userId, to: target });
+    const auditSeq = await logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "ownerTransferred", from: m.userId, to: target });
     await d.query(
       `INSERT INTO race_members ("raceUuid", "userId", roles, "addedBy") VALUES ($1, $2, '{admin}', $2)
        ON CONFLICT ("raceUuid", "userId") DO UPDATE SET roles = '{admin}', "revokedAt" = NULL, "updatedAt" = now()`,
       [m.raceUuid, m.userId],
     );
+    return auditSeq;
   });
   await refreshMemberSockets(m.raceUuid, m.userId);
   await refreshMemberSockets(m.raceUuid, target);
-  const last = await db.one<{ lastSeq: number }>(`SELECT "lastSeq" FROM races WHERE uuid = $1`, [m.raceUuid]);
-  if (last) await announceSeq(m.raceUuid, last.lastSeq);
+  // Announce exactly this entry's seq (never a later one read after commit: a device would skip it).
+  await announceSeq(m.raceUuid, seq);
   res.json({ ownerUserId: target });
 }));
 
@@ -373,7 +374,8 @@ racesRouter.delete("/:raceUuid", route(async (req, res) => {
     const deleted = await tx(async (d) => {
       const n = await d.query(
         `UPDATE races SET "deletedAt" = now(), "deletedBy" = $2, "publishedAt" = NULL
-         WHERE uuid = $1 AND "deletedAt" IS NULL AND status IS DISTINCT FROM 'finished' RETURNING 1`,
+         WHERE uuid = $1 AND "deletedAt" IS NULL AND status IS DISTINCT FROM 'finished'
+           AND COALESCE("createdByUserId", "ownerUserId") = $2 RETURNING 1`,
         [raceUuid, userId],
       );
       if (n.length) await logServerEvent(d, raceUuid, userId, "RaceAdmin", { op: "deleted" });

@@ -97,6 +97,12 @@ export const ROLE_DEFAULTS: Readonly<Record<MemberRole, Partial<Record<Screen, S
     checkin: { view: true, create: false, update: true, delete: false },
     riders: { view: true, create: true, update: true, delete: false },
   },
+  // Results judge (0.2): corrects lap counts and rider statuses (LapCountCorrection,
+  // StatusCorrection accept results.update). No laps, starts, riders or finalize.
+  results: {
+    ...screensWith(VIEW, ALL_SCREENS_EXCEPT_TEAM),
+    results: { view: true, create: false, update: true, delete: false },
+  },
   viewer: screensWith(VIEW, ["live", "board", "status", "results", "map", "info"]),
 };
 
@@ -174,6 +180,25 @@ export const validateRoles = (value: unknown): string | null =>
       : `roles must be some of ${MEMBER_ROLES.join(", ")}`;
 
 export const can = (access: EffectiveAccess, screen: Screen, op: Operation): boolean => access.screens[screen][op];
+
+/**
+ * Admin delegation (0.2): only the race's current owner may make someone an admin, change or
+ * remove an admin, or give anyone write access to the Team screen (which would make them an
+ * admin in all but name). `before` = the member's current access (null for an invitation),
+ * `after` = the new access (null = removing the member). Returns an error message, or null.
+ */
+export function delegationError(
+  actorIsOwner: boolean,
+  before: { roles: readonly MemberRole[] } | null,
+  after: { roles: readonly MemberRole[]; permissions?: MemberPermissions | null } | null,
+): string | null {
+  if (actorIsOwner) return null;
+  if (before?.roles.includes("admin")) return "Only the race owner can change or remove an admin";
+  if (after?.roles.includes("admin")) return "Only the race owner can make someone an admin";
+  const team = after?.permissions?.screens?.team;
+  if (team && (team.create || team.update || team.delete)) return "Only the race owner can let someone manage the team";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Data scope

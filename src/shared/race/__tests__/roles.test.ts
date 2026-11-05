@@ -13,29 +13,29 @@ type Row = [label: string, permission: Permission, expected: Record<Role, Grant 
 
 const FR10: Row[] = [
   ["See the live race, boards, results", "viewRace",
-    { owner: "all", admin: "all", start: "all", counter: "all", checkin: "all", viewer: "all" }],
+    { owner: "all", admin: "all", start: "all", counter: "all", checkin: "all", results: "all", viewer: "all" }],
   ["Edit race setup (categories, laps, start times)", "editSetup",
-    { owner: "all", admin: "all", start: "startTimesOnly", counter: null, checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: "startTimesOnly", counter: null, checkin: null, results: null, viewer: null }],
   ["Add/edit riders, bibs, late entries", "editRiders",
-    { owner: "all", admin: "all", start: null, counter: null, checkin: "all", viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: null, checkin: "all", results: null, viewer: null }],
   ["Check riders in, set DNS before start", "checkIn",
-    { owner: "all", admin: "all", start: null, counter: null, checkin: "all", viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: null, checkin: "all", results: null, viewer: null }],
   ["Start / finish waves and categories, countdown", "runWaves",
-    { owner: "all", admin: "all", start: "all", counter: null, checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: "all", counter: null, checkin: null, results: null, viewer: null }],
   ["Add Lap, Undo, resolve Jokers", "recordLaps",
-    { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, results: null, viewer: null }],
   ["Correct a rider's lap count", "correctLapCount",
-    { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, results: "inScope", viewer: null }],
   ["Set DNF / DSQ during the race", "setRaceStatus",
-    { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, results: "inScope", viewer: null }],
   ["Race settings (first-finish-all-finish etc.)", "raceSettings",
-    { owner: "all", admin: "all", start: "raceOperationOnly", counter: null, checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: "raceOperationOnly", counter: null, checkin: null, results: null, viewer: null }],
   ["Manage members, view the Audit history", "manageMembers",
-    { owner: "all", admin: "all", start: null, counter: null, checkin: null, viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: null, checkin: null, results: null, viewer: null }],
   ["Finalize, Amend", "finalize",
-    { owner: "all", admin: null, start: null, counter: null, checkin: null, viewer: null }],
+    { owner: "all", admin: null, start: null, counter: null, checkin: null, results: null, viewer: null }],
   ["Delete race, transfer ownership", "deleteRace",
-    { owner: "all", admin: null, start: null, counter: null, checkin: null, viewer: null }],
+    { owner: "all", admin: null, start: null, counter: null, checkin: null, results: null, viewer: null }],
 ];
 
 describe("FR-10 permission matrix", () => {
@@ -49,7 +49,7 @@ describe("FR-10 permission matrix", () => {
   });
 
   it("member roles are the five commissaire roles' four plus viewer; owner comes from the race", () => {
-    expect(MEMBER_ROLES).toEqual(["admin", "start", "counter", "checkin", "viewer"]);
+    expect(MEMBER_ROLES).toEqual(["admin", "start", "counter", "checkin", "results", "viewer"]); // results: 0.2 (migration 011)
     expect(isMemberRole("owner")).toBe(false);
     expect(isMemberRole("viewer")).toBe(true);
   });

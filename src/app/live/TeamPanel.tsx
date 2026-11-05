@@ -72,7 +72,7 @@ export default function TeamPanel({ raceUuid }: { raceUuid: string }) {
   const canManage = !!access?.screens.team.update;
   return (
     <div className={styles.inner} style={{ maxWidth: "none" }}>
-      {canManage ? <Members raceUuid={raceUuid} /> : (
+      {canManage ? <Members raceUuid={raceUuid} isOwner={!!access?.isOwner} /> : (
         <div className={styles.card}>
           <h2 className={styles.subtitle}>{t("live.teamTitle", "Team")}</h2>
           <p className={styles.muted} dir="auto">
@@ -81,7 +81,7 @@ export default function TeamPanel({ raceUuid }: { raceUuid: string }) {
           </p>
         </div>
       )}
-      {canManage && <Invite raceUuid={raceUuid} />}
+      {canManage && <Invite raceUuid={raceUuid} isOwner={!!access?.isOwner} />}
       <div className={styles.card}>
         <button
           className={styles.danger}
@@ -99,7 +99,7 @@ export default function TeamPanel({ raceUuid }: { raceUuid: string }) {
   );
 }
 
-function Members({ raceUuid }: { raceUuid: string }) {
+function Members({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
   const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -125,7 +125,10 @@ function Members({ raceUuid }: { raceUuid: string }) {
                 {m.permissions.waves ? ` · ${t("live.waves", "waves")} ${m.permissions.waves.join(",")}` : ""}
               </span>
             </div>
-            {!m.isOwner && editing !== m.userId && (
+            {!m.isOwner && !isOwner && m.roles.includes("admin") && (
+              <p className={styles.muted}>{t("live.adminOwnerOnly", "Only the race owner can change an admin.")}</p>
+            )}
+            {!m.isOwner && (isOwner || !m.roles.includes("admin")) && editing !== m.userId && (
               <div className={styles.row}>
                 <button className={styles.secondary} onClick={() => setEditing(m.userId)}>{t("live.editAccess", "Edit access")}</button>
                 <button
@@ -149,6 +152,7 @@ function Members({ raceUuid }: { raceUuid: string }) {
                 raceUuid={raceUuid}
                 initialRoles={m.roles}
                 initialPermissions={m.permissions}
+                ownerChoices={isOwner}
                 onCancel={() => setEditing(null)}
                 onSave={async (roles, permissions) => {
                   try {
@@ -173,6 +177,7 @@ const ROLE_LABEL = (t: (k: string, d: string) => string): Record<MemberRole, str
   start: t("live.roleStart", "Start"),
   counter: t("live.roleCounter", "Laps (counter)"),
   checkin: t("live.roleCheckin", "Check-in"),
+  results: t("live.roleResults", "Results (corrections)"),
   viewer: t("live.roleViewerTitle", "Viewer (read-only)"),
 });
 
@@ -191,8 +196,11 @@ function AccessEditor({
   onSave,
   onCancel,
   saveLabel,
+  ownerChoices = true,
 }: {
   raceUuid: string;
+  /** false (not the owner): no admin role and no Team write access on offer — the server refuses them too. */
+  ownerChoices?: boolean;
   initialRoles: MemberRole[];
   initialPermissions: MemberPermissions;
   onSave: (roles: MemberRole[], permissions: MemberPermissions) => void;
@@ -233,7 +241,7 @@ function AccessEditor({
     <div className={styles.item}>
       <span className={styles.muted}>{t("live.roles", "Roles (any combination)")}</span>
       <div className={styles.row}>
-        {MEMBER_ROLES.map((r) => (
+        {MEMBER_ROLES.filter((r) => ownerChoices || r !== "admin").map((r) => (
           <button key={r} className={roles.includes(r) ? styles.chipOn : styles.chip} onClick={() => toggleRole(r)}>{labels[r]}</button>
         ))}
       </div>
@@ -256,6 +264,7 @@ function AccessEditor({
             <React.Fragment key={s}>
               <span>{t(`live.screen.${s}`, SCREEN_LABEL[s])}</span>
               {OPERATIONS.map((op) => {
+                if (!ownerChoices && s === "team" && op !== "view") return <span key={op} />;
                 const v = screens?.[s]?.[op];
                 // Three states: default (from roles) → allow → deny → default
                 const next = v === undefined ? true : v ? false : undefined;
@@ -282,7 +291,7 @@ function AccessEditor({
   );
 }
 
-function Invite({ raceUuid }: { raceUuid: string }) {
+function Invite({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
   const { t } = useTranslation();
   const [emails, setEmails] = useState("");
   const [groups, setGroups] = useState<{ id: string; name: string; contactIds: string[] }[]>([]);
@@ -352,8 +361,8 @@ function Invite({ raceUuid }: { raceUuid: string }) {
       )}
       {error && <p className={styles.error} dir="auto">{error}</p>}
       {sent !== null && <p className={styles.muted}>{t("live.invitesSent", "{{n}} invitation(s) sent", { n: sent })}</p>}
-      <AccessEditor raceUuid={raceUuid} initialRoles={["counter"]} initialPermissions={{}} saveLabel={t("live.sendInvites", "Send invitations")} onSave={(r, p) => void send(r, p, false)} />
-      <AccessEditor raceUuid={raceUuid} initialRoles={["viewer"]} initialPermissions={{}} saveLabel={t("live.makeLink", "Create link + QR")} onSave={(r, p) => void send(r, p, true)} />
+      <AccessEditor raceUuid={raceUuid} initialRoles={["counter"]} initialPermissions={{}} ownerChoices={isOwner} saveLabel={t("live.sendInvites", "Send invitations")} onSave={(r, p) => void send(r, p, false)} />
+      <AccessEditor raceUuid={raceUuid} initialRoles={["viewer"]} initialPermissions={{}} ownerChoices={isOwner} saveLabel={t("live.makeLink", "Create link + QR")} onSave={(r, p) => void send(r, p, true)} />
       {link && (
         <div className={styles.item}>
           <div className={styles.qr} dangerouslySetInnerHTML={{ __html: link.qrSvg }} />

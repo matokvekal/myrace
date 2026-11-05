@@ -7,8 +7,11 @@
  * Pure TypeScript: no React, IndexedDB, DOM or Node APIs.
  */
 
-/** Roles a race membership can hold. "viewer" is read-only. */
-export const MEMBER_ROLES = ["admin", "start", "counter", "checkin", "viewer"] as const;
+/**
+ * Roles a race membership can hold. "viewer" is read-only. "results" (0.2): Results judge —
+ * lap-count and status corrections only; finalize/amend stay owner-only.
+ */
+export const MEMBER_ROLES = ["admin", "start", "counter", "checkin", "results", "viewer"] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 
 /** Every role, including the owner (the race's `ownerUserId`). */
@@ -47,7 +50,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 /** FR-10. A role missing from a row has no access to it. */
 export const PERMISSION_MATRIX: Readonly<Record<Permission, Readonly<Partial<Record<Role, Grant>>>>> = {
   // See the live race, boards, results
-  viewRace: { owner: "all", admin: "all", start: "all", counter: "all", checkin: "all", viewer: "all" },
+  viewRace: { owner: "all", admin: "all", start: "all", counter: "all", checkin: "all", results: "all", viewer: "all" },
   // Edit race setup (categories, laps, start times)
   editSetup: { owner: "all", admin: "all", start: "startTimesOnly" },
   // Add/edit riders, bibs, late entries
@@ -59,9 +62,9 @@ export const PERMISSION_MATRIX: Readonly<Record<Permission, Readonly<Partial<Rec
   // Add Lap, Undo, resolve Jokers
   recordLaps: { owner: "all", admin: "all", counter: "inScope" },
   // Correct a rider's lap count
-  correctLapCount: { owner: "all", admin: "all", counter: "inScope" },
+  correctLapCount: { owner: "all", admin: "all", counter: "inScope", results: "inScope" },
   // Set DNF / DSQ during the race
-  setRaceStatus: { owner: "all", admin: "all", counter: "inScope" },
+  setRaceStatus: { owner: "all", admin: "all", counter: "inScope", results: "inScope" },
   // Race settings (first-finish-all-finish etc.)
   raceSettings: { owner: "all", admin: "all", start: "raceOperationOnly" },
   // Manage members, view the Audit history

@@ -272,7 +272,11 @@ const Race: React.FC = () => {
                       // hides it for this user. Offline, the delete is queued; the copy goes now.
                       const live = await import("@/services/live/liveClient");
                       try {
-                        await live.deleteSharedRace(raceUuid);
+                        const outcome = await live.deleteSharedRace(raceUuid);
+                        if (outcome === "hidden") {
+                          // Not the creator (0.2) or a finished race: only this user's list changed.
+                          alert("Removed from your races. It stays for everyone else — only its creator can delete it.");
+                        }
                       } catch (e) {
                         alert(`Could not delete the race: ${e instanceof Error ? e.message : String(e)}`);
                         return;
