@@ -1,5 +1,11 @@
 .main {
-  background: transparent;
+  /* Same backdrop as the live screen: faint speed-lines + colour glows */
+  background:
+    repeating-linear-gradient(115deg, rgba(22, 48, 94, 0.035) 0 2px, transparent 2px 28px),
+    radial-gradient(900px 480px at 85% -10%, rgba(52, 161, 255, 0.22), transparent 60%),
+    radial-gradient(700px 420px at -10% 35%, rgba(124, 232, 60, 0.16), transparent 60%),
+    radial-gradient(800px 500px at 50% 110%, rgba(255, 166, 61, 0.13), transparent 60%),
+    linear-gradient(180deg, #eef5fd 0%, #dfeaf7 100%);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -209,14 +215,14 @@
 }
 
 .section {
-  padding-top: 20px;
+  padding-top: 21px;
 }
 
 .sectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px 10px;
+  padding: 0 16px 8px;
 }
 
 .sectionLeft {
@@ -226,9 +232,35 @@
 }
 
 .sectionTitle {
-  font-size: 17px;
+  font-size: var(--fs-md); /* 21px — one golden step above the 13px meta text */
   font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
+}
+
+/* ═══ PRO skin: arcade section headers on the golden scale.
+   Gold underline is a Fibonacci bar — 34 × 3px. ═══ */
+:root[data-skin="gaming"] .sectionTitle {
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+:root[data-skin="gaming"] .sectionTitle::after {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #e0a92c, rgba(224, 169, 44, 0));
+}
+
+:root[data-skin="gaming"] .sectionCount {
+  font-weight: 900;
+  font-style: italic;
+  border: 1px solid rgba(224, 169, 44, 0.45);
 }
 
 .sectionCount {
@@ -285,9 +317,9 @@
 .tileRow {
   display: flex;
   flex-direction: row;
-  gap: 12px;
+  gap: 13px;
   overflow-x: auto;
-  padding: 4px 16px 12px;
+  padding: 4px 16px 13px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -368,8 +400,54 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 8px 16px 32px;
+  gap: 13px;
+  padding: 8px 16px 34px;
+}
+
+.noResults {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-secondary, #888);
+  font-size: 0.9rem;
+}
+
+/* ── Overture: cards arrive one by one on an 89ms Fibonacci beat.
+   Only the first five (one phone-screen's worth) are staggered; the
+   rest appear together so long lists never feel slow. ── */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.list > *,
+.tileRow > * {
+  animation: riseIn var(--beat-3) ease-out backwards;
+}
+
+.list > *:nth-child(2),
+.tileRow > *:nth-child(2) {
+  animation-delay: var(--stagger);
+}
+
+.list > *:nth-child(3),
+.tileRow > *:nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+.list > *:nth-child(4),
+.tileRow > *:nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+.list > *:nth-child(5),
+.tileRow > *:nth-child(5) {
+  animation-delay: calc(var(--stagger) * 4);
 }
 
 .version {

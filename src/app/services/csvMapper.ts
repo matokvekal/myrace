@@ -12,7 +12,14 @@ import type {
    ColumnMappingMemory,
    MappingHistory
 } from '@/types/csv.types';
-import { FIELD_KEYWORDS } from '@/types/csv.types';
+import {
+   FIELD_KEYWORDS,
+   AMBIGUOUS_ALIASES,
+   AMBIGUOUS_ALIAS_CAP,
+   SEED_ORDER_ALIASES,
+   OPT_IN_FIELDS,
+   isIdColumnHeader
+} from '@/types/csv.types';
 import { fuzzyMatchScore, normalize, contains } from '@/utils/levenshtein';
 import { detectFieldForHeader } from '@/utils/csvFieldDetector';
 import { openDB, IDBPDatabase } from 'idb';
@@ -189,8 +196,18 @@ function findBestFieldMatch(
    const normalized = normalize(columnName);
    const language = detectLanguage(columnName);
 
+   const isSeedOrderHeader = SEED_ORDER_ALIASES.has(normalized);
+   const isAmbiguousHeader = AMBIGUOUS_ALIASES.has(normalized);
+   const isRankingHeader = /דירוג|rank/i.test(columnName);
+
    for (const fieldKeywords of FIELD_KEYWORDS) {
       if (usedFields.has(fieldKeywords.field)) continue;
+
+      // A serial/seed-order column is the pre-race standing, never the bib.
+      if (isSeedOrderHeader && fieldKeywords.field === 'bibNumber') continue;
+
+      // A ranking column ("דירוג UCI", "UCI ranking") is a ranking, never the rider's UCI ID.
+      if (isRankingHeader && fieldKeywords.field === 'uciNumber') continue;
 
       // For mixed-language columns try all keywords; otherwise restrict to detected language
       const keywords = language === 'mixed'
@@ -221,7 +238,13 @@ function findBestFieldMatch(
       }
 
       const priorityBoost = fieldKeywords.priority * 2;
-      const finalScore = Math.min(100, bestScore + (bestScore > 50 ? priorityBoost : 0));
+      let finalScore = Math.min(100, bestScore + (bestScore > 50 ? priorityBoost : 0));
+
+      // "מס'"/"no" name the field too weakly to claim it outright — capped after
+      // the priority boost so a specific header ("מספר רוכב") wins bibNumber.
+      if (isAmbiguousHeader) {
+         finalScore = Math.min(finalScore, AMBIGUOUS_ALIAS_CAP);
+      }
 
       if (finalScore > 40) {
          suggestions.push({
@@ -236,74 +259,182 @@ function findBestFieldMatch(
    return suggestions;
 }
 
+/** Headers that name a wave outright ("גל", "wave", "heat" and their compounds). */
+export function isExplicitWaveHeader(header: string): boolean {
+   const h = normalize(header);
+   return /(^|\s)גל($|\s|')|wave|heat/.test(h);
+}
+
+/** "Start" alone: start time, or a start group / parent category — never decided by name. */
+export const START_ONLY_HEADERS = new Set<string>(['זינוק', 'start', 'הזינוק']);
+
+/** Most non-empty values of the column are clock times (08:20, 8:20:30, 08.20). */
+export function columnLooksLikeTimes(rows: string[][], col: number): boolean {
+   const values = rows.map((r) => String(r[col] ?? '').trim()).filter(Boolean).slice(0, 50);
+   if (values.length === 0) return false;
+   const times = values.filter((v) => /^\d{1,2}[:.]\d{2}([:.]\d{2})?$/.test(v) || /^0?\.\d+$/.test(v));
+   return times.length / values.length >= 0.8;
+}
+
 /**
  * Auto-map CSV columns to app fields
  * Returns array of column mappings with confidence scores
  */
 export async function autoMapColumns(
-   headers: string[]
+   headers: string[],
+   /** Data rows (no header), when known: lets a vague header be judged by its values. */
+   sampleRows?: string[][]
 ): Promise<ColumnMapping[]> {
-   const mappings: ColumnMapping[] = [];
-   const usedFields = new Set<RiderFieldKey>();
+   // Collect every candidate (column → field) BEFORE claiming anything.
+   // Assigning left-to-right let a leading seeding column headed "מס'" claim
+   // bibNumber and lock the real bib column out of it (BUGS.md #3), so each
+   // field now goes to the column that matches it best anywhere in the row.
+   type Candidate = {
+      columnIndex: number;
+      field: RiderFieldKey;
+      confidence: number;
+      /** Learned mappings outrank fresh guesses at equal confidence. */
+      fromMemory: boolean;
+   };
 
-   for (const header of headers) {
-      // Check memory first
+   const candidates: Candidate[] = [];
+   const noneUsed = new Set<RiderFieldKey>();
+
+   for (let i = 0; i < headers.length; i++) {
+      const header = headers[i];
+
+      // National ID / passport columns are never imported (PRD FR-45): no
+      // candidate at all, not even a learned mapping, so the column stays
+      // unmapped and can't steal another field by fuzzy match.
+      if (isIdColumnHeader(header)) continue;
+
       const memory = await getMappingFromMemory(header);
-
-      if (memory && !usedFields.has(memory.targetField)) {
-         // Use learned mapping
-         mappings.push({
-            sourceColumn: header,
-            targetField: memory.targetField,
+      if (memory) {
+         candidates.push({
+            columnIndex: i,
+            field: memory.targetField,
             confidence: memory.confidence,
-            isAutoMapped: true,
-            needsConfirmation: memory.confidence < 85
+            fromMemory: true
          });
-         usedFields.add(memory.targetField);
-         continue;
       }
 
-      // Try dictionary-based detection first
       const dictDetection = detectFieldForHeader(header);
-      if (dictDetection && !usedFields.has(dictDetection.field) && dictDetection.confidence >= 60) {
-         mappings.push({
-            sourceColumn: header,
-            targetField: dictDetection.field,
+      if (dictDetection && dictDetection.confidence >= 60) {
+         candidates.push({
+            columnIndex: i,
+            field: dictDetection.field,
             confidence: dictDetection.confidence,
-            isAutoMapped: true,
-            needsConfirmation: dictDetection.confidence < 85
+            fromMemory: false
          });
-         usedFields.add(dictDetection.field);
-         continue;
       }
 
-      // Fall back to keyword-based matching
-      const suggestions = findBestFieldMatch(header, usedFields);
+      // Keyword matching supplies the fallbacks for fields the dictionary missed
+      for (const suggestion of findBestFieldMatch(header, noneUsed)) {
+         if (suggestion.confidence >= 60) {
+            candidates.push({
+               columnIndex: i,
+               field: suggestion.field,
+               confidence: suggestion.confidence,
+               fromMemory: false
+            });
+         }
+      }
 
-      if (suggestions.length > 0 && suggestions[0].confidence >= 60) {
-         // Auto-map if confidence >= 60%
-         const best = suggestions[0];
-         mappings.push({
-            sourceColumn: header,
-            targetField: best.field,
-            confidence: best.confidence,
-            isAutoMapped: true,
-            needsConfirmation: best.confidence < 85
-         });
-         usedFields.add(best.field);
-      } else {
-         // No good match, leave unmapped
-         mappings.push({
+      // Waves: only an explicit wave column is a wave. "מקצה" (the race class),
+      // "זינוק"/"שעת זינוק" (the start / its time) and start groups fuzzy-match the
+      // wave keywords, but waves come from start times unless a column says "wave".
+      // Before the vague-header step below, so "מקצה" keeps Category as its best guess.
+      if (!isExplicitWaveHeader(header)) {
+         for (let k = candidates.length - 1; k >= 0; k--) {
+            const c = candidates[k];
+            if (c.columnIndex === i && c.field === 'heat' && !c.fromMemory) candidates.splice(k, 1);
+         }
+      }
+
+      // A vague header ("מס'", "No.") scores the same low cap against every
+      // field it brushes, so letting it fall through to runner-up fields drops
+      // a serial column onto something unrelated like heat. Keep only its best
+      // guess — if a stronger column claims that field, leave this one for the
+      // user to map by hand.
+      if (AMBIGUOUS_ALIASES.has(normalize(header))) {
+         const mine = candidates.filter(c => c.columnIndex === i);
+         if (mine.length > 1) {
+            const best = mine.reduce((a, b) => (b.confidence > a.confidence ? b : a));
+            for (let k = candidates.length - 1; k >= 0; k--) {
+               if (candidates[k].columnIndex === i && candidates[k] !== best) {
+                  candidates.splice(k, 1);
+               }
+            }
+         }
+      }
+   }
+
+   // A bare "זינוק"/"start" header can be the start time or a start group (a parent
+   // category). Auto-map it only when its values really are clock times; otherwise
+   // leave it for the user to map (Category, Keep as info, ...).
+   for (let i = 0; i < headers.length; i++) {
+      if (!START_ONLY_HEADERS.has(normalize(headers[i]))) continue;
+      const looksLikeTimes = !!sampleRows && columnLooksLikeTimes(sampleRows, i);
+      for (let k = candidates.length - 1; k >= 0; k--) {
+         const c = candidates[k];
+         if (c.columnIndex !== i || c.fromMemory) continue;
+         if (!(looksLikeTimes && c.field === 'startTime')) candidates.splice(k, 1);
+      }
+   }
+
+   // Strongest match first; each column and each field may be claimed once.
+   candidates.sort((a, b) => {
+      if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+      if (a.fromMemory !== b.fromMemory) return a.fromMemory ? -1 : 1;
+      return a.columnIndex - b.columnIndex;
+   });
+
+   const usedFields = new Set<RiderFieldKey>();
+   const claimed = new Map<number, Candidate>();
+
+   for (const candidate of candidates) {
+      if (usedFields.has(candidate.field)) continue;
+      if (claimed.has(candidate.columnIndex)) continue;
+      claimed.set(candidate.columnIndex, candidate);
+      if (!OPT_IN_FIELDS.has(candidate.field)) usedFields.add(candidate.field);
+   }
+
+   return headers.map((header, i) => {
+      const winner = claimed.get(i);
+      if (!winner || OPT_IN_FIELDS.has(winner.field)) {
+         return {
             sourceColumn: header,
             targetField: null,
             confidence: 0,
             isAutoMapped: false,
             needsConfirmation: true
-         });
+         };
       }
-   }
+      return {
+         sourceColumn: header,
+         targetField: winner.field,
+         confidence: winner.confidence,
+         isAutoMapped: true,
+         needsConfirmation: winner.confidence < 85
+      };
+   });
+}
 
-   return mappings;
+/**
+ * Effective "required" / "unique" rules for a mapped column. Unset flags fall
+ * back to the defaults: required unless the column is empty in every row (then
+ * demanding it would flag the whole file), and not unique.
+ */
+export function resolveColumnRules(
+   mapping: ColumnMapping,
+   colIdx: number,
+   rows: string[][]
+): { required: boolean; unique: boolean } {
+   const hasData = rows.some((r) => String(r[colIdx] ?? '').trim() !== '');
+   return {
+      required: mapping.required ?? hasData,
+      unique: mapping.unique ?? false
+   };
 }
 
 /**

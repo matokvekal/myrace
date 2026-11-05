@@ -1,0 +1,17 @@
+.page {
+  min-height: calc(100vh - 52px);
+  padding: 8px 16px 24px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 1600px; /* the board uses the full width it gets, never more */
+  margin: 0 auto;
+}
+
+.note {
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary, #14243c);
+}

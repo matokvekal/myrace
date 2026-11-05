@@ -56,14 +56,51 @@ will show a "not properly configured" warning in Settings → Pages.
 
 1. Push (or merge) to `main`.
 2. The `build` job checks out the repo, sets up Node 20 (with npm cache),
-   runs `npm ci` then `npm run build` (`tsc && vite build`), and uploads
-   `dist/` as a Pages artifact.
+   runs `npm ci` then `npm run build`, validates the output (see below),
+   and uploads `./dist` as a Pages artifact.
 3. The `deploy` job publishes that artifact via `actions/deploy-pages`.
 4. GitHub Pages serves the new build at `https://commissaire.us` within
    a minute or two of the workflow finishing.
 
 You can also trigger a deploy manually from the Actions tab
 (`workflow_dispatch` is enabled) without needing a new commit.
+
+## What gets published (and what must not)
+
+Only `./dist` is uploaded — the repo itself is never published, so `src/`,
+`tests/`, `docs/`, `.github/`, `.claude/` and the root `*.md` files are out
+of reach by construction.
+
+The one leak path is **`public/`**: Vite copies it verbatim into `dist/`, so
+anything dropped there is served at `https://commissaire.us/<that file>`.
+That is how `public/AGENT.md` and `public/data/DICTIONARY_GUIDE.md` ended up
+publicly readable; both now live in `docs/` (`docs/public-assets.md`,
+`docs/dictionary-guide.md`). **`public/` is for runtime assets only — put
+documentation in `docs/`.**
+
+Two guards enforce this:
+
+| Guard | Where | Behaviour |
+|---|---|---|
+| `node scripts/verify-dist.mjs --prune` | end of `npm run build` | deletes forbidden files from `dist/`, printing each one |
+| `npm run verify:dist` | "Validate deployment artifact" workflow step | read-only; **exits 1** and fails the deploy if any survived |
+
+Forbidden in the published output: `*.md`/`*.markdown`/`*.mdx`, agent files
+(`AGENTS.*`, `CLAUDE.*`), `*.spec.*` / `*.test.*`, source maps (`*.map`),
+TypeScript sources, build/tooling config (`tsconfig*`, `package*.json`,
+`*.config.*`), `.env*`, logs — plus anything inside a `tests/`, `docs/`,
+`scripts/`, `src/`, `.github/`, `.claude/`, `.vscode/`, `agents/`,
+`test-results/` or `coverage/` folder.
+
+`ALWAYS_KEEP` in that script exempts the deploy-critical root files —
+`index.html`, `404.html`, `CNAME`, `manifest.json`, `sw.js`, `favicon.ico`,
+`.nojekyll` — so no future rule can accidentally break Pages, SPA routing or
+the PWA. Edit that list if you add another such file.
+
+Source maps are disabled explicitly via `build.sourcemap: false` in
+`vite.config.ts` (Vite's default, pinned so it can't be flipped on by a
+`--sourcemap` flag or a config edit) — they would otherwise embed the full
+original TypeScript in a public artifact.
 
 ## SPA routing on GitHub Pages
 

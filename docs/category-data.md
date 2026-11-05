@@ -5,7 +5,7 @@
 
 ```typescript
 interface CategoryProps {
-  id: number;            // Date.now()-based (collision risk if creating fast — see app-review.md BUG-08)
+  id: number;            // Date.now()-based (collision risk if creating fast — see BUGS.md BUG-08)
   raceUuid: string;      // Links to parent race
   name: string;          // e.g. "גברים מאסטרס"
   subCategory?: string | null;  // e.g. "30-39", "40-49" — optional age/gender sub-group
@@ -64,7 +64,7 @@ When categories are missing, `createCategoriesFromRiders` runs:
 
 ## Important Notes
 
-- Category `id` is `Date.now()` based — risk of collision if created within 1ms (BUG-08 in app-review.md)
+- Category `id` is `Date.now()` based — risk of collision if created within 1ms (BUG-08 in BUGS.md)
 - `startTime` is "HH:MM" string, not a Date object
 - `lapsCounter` on CategoryProps is not incremented — lap counting happens on `RiderProps.lapsCounter`
 - `finishedAt` is epoch ms, used only for sorting finished categories in LiveBoard (most recently finished = top)

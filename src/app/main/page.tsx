@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, Suspense, lazy } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import CreateRaceGate, { type GateState } from "./components/createRaceGate/CreateRaceGate";
+import { useTranslation } from "react-i18next";
 import styles from "./main.module.css";
 import AddRace from "./addRace/AddRace";
 import HeaderMain from "./components/headerMain/HeaderMain";
@@ -10,6 +12,7 @@ import DownloadRace from "./components/downloadRace/DownloadRace";
 import CloudRacesSection from "@/components/cloud/CloudRacesSection";
 import Button from "@/components/ui/Button";
 import useRaceStore from "@/stores/racesStore";
+import useRiderStore from "@/stores/ridersStore";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import { seedDemoRace, DEMO_RACE_UUID } from "@/utils/demoSeed";
 import {
@@ -20,17 +23,74 @@ import {
   Plus,
   Search
 } from "lucide-react";
+// Multi-user (only with a configured server): My shared races and invitations.
+const SharedRacesSection = lazy(() => import("../live/SharedRacesSection"));
+// The signed-in account's races from the server, every visit, with a visible state.
+const AccountSync = lazy(() => import("../live/AccountSync"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
-type SortKey = "date" | "status";
+type SortKey = "date" | "name" | "status";
+const SORT_CYCLE: SortKey[] = ["date", "name", "status"];
 const STATUS_ORDER: Record<string, number> = {
   running: 0,
   upcoming: 1,
   finished: 2
 };
 
+// Race dates are stored as "DD/MM/YYYY" (demo/new races) but tolerate ISO too.
+const parseRaceDate = (d: string | null | undefined): number => {
+  if (!d) return 0;
+  const dm = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dm) return new Date(+dm[3], +dm[2] - 1, +dm[1]).getTime();
+  const t = Date.parse(d);
+  return Number.isNaN(t) ? 0 : t;
+};
+
+// How many recent races the home row shows before "See All" takes over
+const HOME_ROW_LIMIT = 10;
+
 const MainPage = () => {
+  // Back on the race list: leave the open shared race's live room (its queue keeps syncing).
+  useEffect(() => {
+    if (serverConfigured) void import("@/services/live/liveClient").then((m) => m.openLiveRace(null));
+  }, []);
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [addNewRace, setAddNewRace] = useState(false);
+  // Create Race needs an account (races live in the cloud): signed out → sign in
+  // first; signed in → this account's races are synced, THEN the form opens.
+  const [gate, setGate] = useState<GateState>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const syncThenCreate = async () => {
+    const live = await import("@/services/live/liveClient");
+    setGate({ kind: "syncing" });
+    try {
+      await live.syncMyRaces();
+      setGate(null);
+      setAddNewRace(true);
+    } catch (e) {
+      setGate({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  const requestCreate = async () => {
+    if (!serverConfigured) return setAddNewRace(true); // a build without a server: local app
+    const live = await import("@/services/live/liveClient");
+    if (!live.isSignedIn()) {
+      navigate(`/account?reason=create&next=${encodeURIComponent("/main?create=1")}`);
+      return;
+    }
+    await syncThenCreate();
+  };
+  // Back from sign-in with ?create=1: continue to Create Race (only when signed in — no loop).
+  // A normal visit syncs through <AccountSync> (every visit, visible state).
+  useEffect(() => {
+    if (!serverConfigured) return;
+    if (searchParams.get("create") !== "1") return;
+    void import("@/services/live/liveClient").then((live) => {
+      setSearchParams((p) => { p.delete("create"); return p; }, { replace: true });
+      if (live.isSignedIn()) void syncThenCreate();
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [showDownload, setShowDownload] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
@@ -39,7 +99,24 @@ const MainPage = () => {
   const [riderCounts, setRiderCounts] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const [loadingDemo, setLoadingDemo] = useState(false);
-  const { races, getRaces, updateRace } = useRaceStore();
+  const { races: deviceRaces, getRaces, updateRace, deleteRace } = useRaceStore();
+  // Race Access Rules: list only the signed-in account's races (a device can be
+  // shared by accounts) plus races never uploaded. Local builds list everything.
+  const [visibleToAccount, setVisibleToAccount] = useState<{ fn: (uuid: string) => boolean } | null>(null);
+  useEffect(() => {
+    if (!serverConfigured) return;
+    let unsub = () => {};
+    void import("@/services/live/liveClient").then((live) => {
+      const refresh = () => setVisibleToAccount({ fn: live.raceVisibleToAccount });
+      refresh();
+      unsub = live.useLiveStore.subscribe((s, prev) => {
+        if (s.accountRacesVersion !== prev.accountRacesVersion || s.user?.id !== prev.user?.id) refresh();
+      });
+    });
+    return () => unsub();
+  }, []);
+  const races = !serverConfigured ? deviceRaces : visibleToAccount ? deviceRaces.filter((r) => visibleToAccount.fn(r.uuid)) : [];
+  const deleteRidersByRace = useRiderStore((s) => s.deleteRidersByRace);
 
   useEffect(() => {
     getRaces().then(() => setLoaded(true));
@@ -64,33 +141,62 @@ const MainPage = () => {
     if (race) updateRace({ ...race, isFavorite: !race.isFavorite });
   };
 
+  // Light delete for downloaded view-only races, straight from the list
+  // (BUGS.md #8). Same data cleanup as the Info Danger Zone, no heavy modal.
+  const handleDeleteRace = async (uuid: string) => {
+    // Race first, then its riders — the same order as the race page. Removing the
+    // race lifts a finalized race's write lock, so the rider cleanup is allowed;
+    // the reverse order left orphan riders behind for finalized downloads.
+    await deleteRace(uuid);
+    await deleteRidersByRace(uuid);
+    await getRaces();
+  };
+
   const handleLoadDemo = async () => {
     setLoadingDemo(true);
     try {
-      await seedDemoRace();
+      await seedDemoRace(true);
       navigate(`/race/${DEMO_RACE_UUID}`);
     } finally {
       setLoadingDemo(false);
     }
   };
 
+  const SORT_LABEL: Record<SortKey, string> = {
+    date: t("main.sortDate", "Date"),
+    name: t("main.sortName", "Name"),
+    status: t("main.sortStatus", "Status")
+  };
+
   const isEmpty = loaded && races.length === 0;
 
-  // Sorted newest-first
-  const myRaces = [...races].sort((a, b) => b.id - a.id);
+  // Home row: most recent races only — the full list lives behind "See All"
+  const myRaces = [...races]
+    .sort((a, b) => (parseRaceDate(b.date) - parseRaceDate(a.date)) || (b.id - a.id))
+    .slice(0, HOME_ROW_LIMIT);
 
-  // Filtered + sorted for "See All" list
+  // Filtered + sorted for "See All" list — search matches name, location or date
+  const q = search.trim().toLowerCase();
   const allFiltered = races
     .filter((r) => {
       if (showFavoritesOnly && !r.isFavorite) return false;
-      return r.name.toLowerCase().includes(search.toLowerCase());
+      if (!q) return true;
+      return (
+        r.name.toLowerCase().includes(q) ||
+        (r.location ?? "").toLowerCase().includes(q) ||
+        (r.date ?? "").includes(q)
+      );
     })
-    .sort((a, b) =>
-      sortBy === "date"
-        ? b.id - a.id
-        : (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) -
-          (STATUS_ORDER[b.status ?? "upcoming"] ?? 1)
-    );
+    .sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "status")
+        return (
+          (STATUS_ORDER[a.status ?? "upcoming"] ?? 1) -
+            (STATUS_ORDER[b.status ?? "upcoming"] ?? 1) ||
+          parseRaceDate(b.date) - parseRaceDate(a.date)
+        );
+      return (parseRaceDate(b.date) - parseRaceDate(a.date)) || (b.id - a.id);
+    });
 
   if (addNewRace) {
     return <AddRace setAddNewwRace={setAddNewRace} />;
@@ -99,13 +205,22 @@ const MainPage = () => {
   return (
     <div className={styles.main}>
       <HeaderMain />
+      <CreateRaceGate state={gate} onRetry={() => void syncThenCreate()} onCancel={() => setGate(null)} />
+      {serverConfigured && (
+        <Suspense fallback={null}>
+          <div style={{ padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+            <AccountSync />
+            <SharedRacesSection />
+          </div>
+        </Suspense>
+      )}
 
       {isEmpty ? (
         <>
           {/* invited users land here with no local races yet */}
           <CloudRacesSection />
           <EmptyRaces
-            onCreateRace={() => setAddNewRace(true)}
+            onCreateRace={() => void requestCreate()}
             onLoadDemo={handleLoadDemo}
             loadingDemo={loadingDemo}
           />
@@ -117,16 +232,16 @@ const MainPage = () => {
             <div className={styles.toolbarTop}>
               <button className={styles.backBtn} onClick={() => setShowAll(false)}>
                 <ArrowLeft width={16} height={16} />
-                My Races
+                {t("main.myRaces", "My Races")}
               </button>
               <Button
                 variant="success"
                 size="md"
                 className={styles.addBtn}
-                onClick={() => setAddNewRace(true)}
+                onClick={() => void requestCreate()}
               >
                 <Plus width={15} height={15} />
-                Add
+                {t("main.add", "Add")}
               </Button>
             </div>
 
@@ -134,7 +249,8 @@ const MainPage = () => {
               <Search className={styles.searchIcon} aria-hidden="true" />
               <input
                 className={styles.search}
-                placeholder="Search races..."
+                dir="auto"
+                placeholder={t("main.searchPlaceholder", "Search by name, date or location...")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -146,10 +262,15 @@ const MainPage = () => {
                   variant="secondary"
                   size="md"
                   className={styles.iconBtn}
-                  onClick={() => setSortBy(sortBy === "date" ? "status" : "date")}
+                  onClick={() =>
+                    setSortBy(
+                      SORT_CYCLE[(SORT_CYCLE.indexOf(sortBy) + 1) % SORT_CYCLE.length]
+                    )
+                  }
+                  title={t("main.sortTooltip", "Sort by date / name / status")}
                 >
                   <ArrowUpDown className={styles.iconGlyph} aria-hidden="true" />
-                  <span>{sortBy === "date" ? "Date" : "Status"}</span>
+                  <span>{SORT_LABEL[sortBy]}</span>
                 </Button>
                 <Button
                   variant="icon"
@@ -157,7 +278,7 @@ const MainPage = () => {
                   iconOnly
                   className={`${styles.iconBtn} ${showFavoritesOnly ? styles.heartActive : ""}`}
                   onClick={() => setShowFavoritesOnly((v) => !v)}
-                  aria-label="Show favorites"
+                  aria-label={t("main.showFavorites", "Show favorites")}
                 >
                   <Heart
                     className={styles.heartIcon}
@@ -173,12 +294,17 @@ const MainPage = () => {
                 onClick={() => setShowDownload(true)}
               >
                 <Download className={styles.iconGlyph} aria-hidden="true" />
-                Download
+                {t("main.download", "Download")}
               </Button>
             </div>
           </div>
 
           <div className={styles.list}>
+            {allFiltered.length === 0 && (
+              <div className={styles.noResults} dir="auto">
+                {t("main.noResults", 'No races match "{{search}}"', { search })}
+              </div>
+            )}
             {allFiltered.map((race) => (
               <RaceCard
                 key={race.uuid}
@@ -194,6 +320,9 @@ const MainPage = () => {
                 curentHeat={race.heat}
                 isFavorite={race.isFavorite}
                 onToggleFavorite={handleToggleFavorite}
+                viewOnly={race.viewOnly}
+                finalized={Boolean(race.finalized)}
+                onDelete={handleDeleteRace}
               />
             ))}
           </div>
@@ -206,16 +335,16 @@ const MainPage = () => {
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <div className={styles.sectionLeft}>
-                <span className={styles.sectionTitle}>My Races</span>
+                <span className={styles.sectionTitle}>{t("main.myRaces", "My Races")}</span>
                 <span className={styles.sectionCount}>{races.length}</span>
               </div>
               <div className={styles.sectionActions}>
                 <button className={styles.seeAllBtn} onClick={() => setShowAll(true)}>
-                  See All
+                  {t("main.seeAll", "See All")}
                 </button>
-                <button className={styles.addTileBtn} onClick={() => setAddNewRace(true)}>
+                <button className={styles.addTileBtn} onClick={() => void requestCreate()}>
                   <Plus width={13} height={13} />
-                  Add
+                  {t("main.add", "Add")}
                 </button>
               </div>
             </div>
@@ -235,6 +364,7 @@ const MainPage = () => {
                   status={race.status}
                   curentHeat={race.heat}
                   isFavorite={race.isFavorite}
+                  finalized={Boolean(race.finalized)}
                   onToggleFavorite={handleToggleFavorite}
                 />
               ))}
@@ -248,15 +378,15 @@ const MainPage = () => {
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <div className={styles.sectionLeft}>
-                <span className={styles.sectionTitle}>Other Bike Races</span>
+                <span className={styles.sectionTitle}>{t("main.otherBikeRaces", "Other Bike Races")}</span>
               </div>
             </div>
 
             <div className={styles.discoverCard} onClick={() => setShowDownload(true)}>
               <Download width={22} height={22} className={styles.discoverIcon} />
               <div className={styles.discoverText}>
-                <div className={styles.discoverTitle}>Download a Race</div>
-                <div className={styles.discoverSub}>Get race data from the server</div>
+                <div className={styles.discoverTitle}>{t("main.downloadRace", "Download a Race")}</div>
+                <div className={styles.discoverSub}>{t("main.downloadRaceSub", "Get race data from the server")}</div>
               </div>
             </div>
           </div>

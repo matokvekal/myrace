@@ -51,6 +51,42 @@
   margin-top: 12px;
 }
 
+.fieldsNote {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #666;
+}
+
+.exampleLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  background: white;
+  color: #667eea;
+  border: 1.5px solid #667eea;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.exampleLink:hover {
+  background: #f5f3ff;
+  transform: translateY(-1px);
+}
+
+.exampleHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #666;
+}
+
 .dropZone {
   order: 1;
   border: 3px dashed #ccc;
@@ -159,6 +195,30 @@
 .scanButton:hover {
   background: #f5f3ff;
   transform: translateY(-2px);
+}
+
+.scanButton:disabled {
+  cursor: not-allowed;
+  color: #a9a9c0;
+  border-color: #d8d8ea;
+  background: #fafaff;
+  transform: none;
+}
+
+.scanButton:disabled:hover {
+  background: #fafaff;
+  transform: none;
+}
+
+.comingSoonBadge {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #7a5b0e;
+  background: #ffe9b3;
+  border-radius: 999px;
 }
 
 .dropZoneWithTemplate {

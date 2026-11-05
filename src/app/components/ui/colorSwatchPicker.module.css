@@ -1,0 +1,80 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 40px);
+  gap: 8px;
+  justify-content: center;
+}
+.swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.swatch:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+.selected {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px #111827;
+}
+.check {
+  color: #fff;
+  font-weight: 900;
+  font-size: 18px;
+  text-shadow: 0 0 3px #000, 0 0 2px #000;
+}
+.customCurrent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  font-size: 13px;
+}
+.customCurrent .swatch {
+  width: 28px;
+  height: 28px;
+  cursor: default;
+}
+.footer,
+.customRow {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.customInput {
+  width: 56px;
+  height: 40px;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+.customBtn,
+.cancelBtn,
+.saveBtn {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.saveBtn {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #fff;
+  font-weight: 700;
+}

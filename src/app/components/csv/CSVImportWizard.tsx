@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import type {
   CSVParseResult,
   ColumnMapping,
@@ -10,8 +10,11 @@ import type {
 } from "@/types/csv.types";
 import type { RiderProps, RaceProps } from "@/types/types";
 import { parseCSVFile } from "@/utils/csvParser";
-import { parseXLSXFile } from "@/utils/xlsxParser";
-import { autoMapColumns, splitFullName } from "@/services/csvMapper";
+// parseXLSXFile pulls in xlsx (~430 kB) — loaded only when an Excel file is
+// actually uploaded (BUGS.md #1). CSV uploads never touch it.
+import { autoMapColumns } from "@/services/csvMapper";
+import { buildHeatNameMap, filterImportRows, importSkipReason, rowToRider } from "@/services/riderRowMapper";
+import { isLiveRace } from "@/services/live/liveBridge";
 import { touchTemplate } from "@/services/templateStorage";
 import useRiderStore from "@/stores/ridersStore";
 import useCategoryStore from "@/stores/categoryStore";
@@ -22,8 +25,11 @@ import ColumnMappingStep from "./ColumnMappingStep";
 import PreviewStep from "./PreviewStep";
 import ImportProgressStep from "./ImportProgressStep";
 import MultiDayDialog from "./MultiDayDialog";
-import ImageCapture from "@/components/importImage/ImageCapture";
+// The photo-OCR capture pulls in tesseract.js — load it only when the user
+// actually chooses "scan" (BUGS.md #1).
+const ImageCapture = lazy(() => import("@/components/importImage/ImageCapture"));
 import styles from "./csvImportWizard.module.css";
+import { newLocalId } from "@/utils/localId";
 
 type WizardStep = "upload" | "mapping" | "preview" | "importing";
 
@@ -37,160 +43,6 @@ interface CSVImportWizardProps {
 
 const STEP_ORDER: WizardStep[] = ["upload", "mapping", "preview", "importing"];
 
-function rowToRider(
-  row: string[],
-  mappings: ColumnMapping[],
-  raceUuid: string,
-  index: number,
-  heatNameToNumber: Map<string, number> = new Map(),
-  clubDictionary?: typeof useClubDictionaryStore
-): RiderProps {
-  const data: Record<string, any> = {};
-
-  mappings.forEach((mapping, colIdx) => {
-    if (!mapping.targetField) return;
-    const value = row[colIdx]?.trim() || "";
-
-    switch (mapping.targetField) {
-      case "bibNumber":
-        data.bibNumber = parseInt(value) || 0;
-        break;
-      case "firstName":
-        data.firstName = value;
-        break;
-      case "middleName":
-        data.middleName = value || null;
-        break;
-      case "lastName":
-        data.lastName = value;
-        break;
-      case "fullName": {
-        const { firstName, lastName } = splitFullName(value);
-        data.firstName = firstName;
-        data.lastName = lastName;
-        break;
-      }
-      case "category":
-        data.category = value;
-        break;
-      case "subCategory":
-        data.subCategory = value || null;
-        break;
-      case "team": {
-        let teamValue = value || null;
-        // Apply club dictionary mapping if available
-        if (clubDictionary && teamValue) {
-          const getStandardName = clubDictionary.getState().getStandardName;
-          const standardName = getStandardName(teamValue);
-          if (standardName) {
-            teamValue = standardName;
-            const incrementUsageCount = clubDictionary.getState().incrementUsageCount;
-            // Find the matching entry to increment usage
-            const entries = clubDictionary.getState().getAllEntries();
-            const entry = entries.find(e =>
-              e.hebrewName.toLowerCase() === value.toLowerCase() ||
-              e.alternateNames.some(alt => alt.toLowerCase() === value.toLowerCase())
-            );
-            if (entry) incrementUsageCount(entry.id);
-          }
-        }
-        data.team = teamValue;
-        break;
-      }
-      case "heat": {
-        const numVal = parseInt(value);
-        // Use numeric value if available, otherwise look up from name map
-        data.heat = !isNaN(numVal) ? numVal : (heatNameToNumber.get(value) ?? 0);
-        break;
-      }
-      case "startTime":
-        data.timeStartRace = value || null;
-        break;
-      case "totalLaps":
-        data.totalLaps = parseInt(value) || 0;
-        break;
-      case "position":
-        data.position_start = parseInt(value) || null;
-        break;
-      case "standing":
-        data.standing = parseInt(value) || null;
-        break;
-      case "points":
-        data.points = parseFloat(value) || null;
-        break;
-      case "federation":
-        data.federation = value || null;
-        break;
-      case "firstNameEnglish":
-        data.firstNameEnglish = value || null;
-        break;
-      case "lastNameEnglish":
-        data.lastNameEnglish = value || null;
-        break;
-      case "uciNumber":
-        data.uciNumber = value || null;
-        break;
-      case "idNumber":
-        data.idNumber = value || null;
-        break;
-      case "birthDate":
-        data.birthDate = value || null;
-        break;
-      case "federationNumber":
-        data.federationNumber = value || null;
-        break;
-      case "federationChip":
-        data.federationChip = value || null;
-        break;
-      case "roadNumber":
-        data.roadNumber = value || null;
-        break;
-      case "chip":
-        data.chip = value || null;
-        break;
-      case "notes":
-        data.notes = value || null;
-        break;
-      case "raceDay":
-        // grouping only — not stored on rider
-        break;
-    }
-  });
-
-  return {
-    id: Date.now() + index,
-    raceUuid,
-    bibNumber: data.bibNumber ?? 0,
-    firstName: data.firstName ?? "",
-    middleName: data.middleName ?? null,
-    lastName: data.lastName ?? "",
-    category: data.category ?? "",
-    team: data.team ?? null,
-    heat: data.heat ?? 0,
-    totalLaps: data.totalLaps ?? 0,
-    timeStartRace: data.timeStartRace ?? null,
-    position_start: data.position_start ?? null,
-    lapsCounter: 0,
-    lapsDetails: [],
-    checked: false,
-    distance: 0,
-    elapsedTimeFromStart: "0",
-    timeArrive: null,
-    flag: null,
-    position_category: 0,
-    position_race: 0,
-    raceStatus: "upcoming",
-    status: "standing",
-    viewOrder: 0,
-    color: null,
-    elapsedLastLap: null,
-    image: null,
-    comment: null,
-    points: data.points ?? null,
-    federation: data.federation ?? null
-  };
-}
-
 export default function CSVImportWizard({
   raceUuid,
   onClose,
@@ -203,6 +55,8 @@ export default function CSVImportWizard({
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [skippedIssues, setSkippedIssues] = useState<import("@/types/csv.types").ValidationIssue[]>([]);
+  // A shared race's import that was refused as a whole (nothing imported), with the rows to fix.
+  const [refusal, setRefusal] = useState<{ message: string; problems: string[] } | null>(null);
   const [suggestedName, setSuggestedName] = useState("");
   const [showMultiDayDialog, setShowMultiDayDialog] = useState(false);
   const [multiDayValues, setMultiDayValues] = useState<string[]>([]);
@@ -218,9 +72,11 @@ export default function CSVImportWizard({
   const handleFileUpload = async (file: File, template?: MappingTemplate) => {
     try {
       const isExcel = /\.(xlsx|xls)$/i.test(file.name);
-      const result = isExcel ? await parseXLSXFile(file) : await parseCSVFile(file);
+      const result = isExcel
+        ? await (await import("@/utils/xlsxParser")).parseXLSXFile(file)
+        : await parseCSVFile(file);
       setParseResult(result);
-      const autoMappings = await autoMapColumns(result.headers);
+      const autoMappings = await autoMapColumns(result.headers, result.rows);
       setSuggestedName(file.name.replace(/\.(xlsx?|csv)$/i, ""));
 
       if (template) {
@@ -250,7 +106,7 @@ export default function CSVImportWizard({
   // Photo-OCR source: same handoff as handleFileUpload, minus file parsing
   const handleOcrParsed = async (result: CSVParseResult) => {
     setParseResult(result);
-    const autoMappings = await autoMapColumns(result.headers);
+    const autoMappings = await autoMapColumns(result.headers, result.rows);
     setSuggestedName("Scanned start list");
     setColumnMappings(autoMappings);
     setScanMode(false);
@@ -321,7 +177,7 @@ export default function CSVImportWizard({
         const newUuid = crypto.randomUUID();
         const newRace: RaceProps = {
           ...currentRace,
-          id: Date.now() + i,
+          id: newLocalId(),
           uuid: newUuid,
           name: `${currentRace.name} - ${day}`,
           createdAt: new Date(),
@@ -331,20 +187,11 @@ export default function CSVImportWizard({
         targetRaceUuid = newUuid;
       }
 
-      // Build heat name → number map
-      const heatNameToNumber = new Map<string, number>();
-      const heatColIdx = columnMappings.findIndex((m) => m.targetField === "heat");
-      if (heatColIdx >= 0) {
-        let nextHeatNum = 1;
-        for (const row of rows) {
-          const val = row[heatColIdx]?.trim();
-          if (val && isNaN(Number(val)) && !heatNameToNumber.has(val)) {
-            heatNameToNumber.set(val, nextHeatNum++);
-          }
-        }
-      }
+      // Header / blank / invalid rows never become riders or number a wave.
+      const dataRows = filterImportRows(rows, parseResult.headers, columnMappings).rows;
+      const heatNameToNumber = buildHeatNameMap(dataRows, columnMappings);
 
-      const riders = rows.map((row, idx) =>
+      const riders = dataRows.map((row, idx) =>
         rowToRider(row, columnMappings, targetRaceUuid, totalSuccessful + idx, heatNameToNumber, clubDictionary)
       );
       await insertRiders(riders);
@@ -365,6 +212,7 @@ export default function CSVImportWizard({
   const handleStartImport = async (validation: ValidationResult) => {
     if (!parseResult) return;
     setCurrentStep("importing");
+    setRefusal(null);
 
     const errorIssues = validation.issues.filter((i) => i.severity === "error");
     const errorRowIndices = new Set(
@@ -372,8 +220,14 @@ export default function CSVImportWizard({
     );
 
     const totalInFile = parseResult.rows.length;
-    const validRows = parseResult.rows.filter((_, i) => !errorRowIndices.has(i));
-    const failedCount = errorRowIndices.size;
+    // Rows with validation errors, repeated header rows, blank rows and rows
+    // without a bib or a name are all skipped — before text waves are numbered.
+    const { rows: validRows } = filterImportRows(
+      parseResult.rows.filter((_, i) => !errorRowIndices.has(i)),
+      parseResult.headers,
+      columnMappings
+    );
+    const failedCount = totalInFile - validRows.length;
 
     setSkippedIssues(errorIssues);
     setImportProgress({
@@ -384,25 +238,34 @@ export default function CSVImportWizard({
       status: "importing"
     });
 
-    // Build text-heat → number map if heat column contains non-numeric strings
-    const heatColIdx = columnMappings.findIndex((m) => m.targetField === "heat");
-    const heatNameToNumber = new Map<string, number>();
-    if (heatColIdx >= 0) {
-      let nextHeatNum = 1;
-      for (const row of parseResult.rows) {
-        const val = row[heatColIdx]?.trim();
-        if (val && isNaN(Number(val)) && !heatNameToNumber.has(val)) {
-          heatNameToNumber.set(val, nextHeatNum++);
-        }
-      }
-    }
+    // Text heats → numbers, from the rows that become riders only.
+    const heatNameToNumber = buildHeatNameMap(validRows, columnMappings);
 
     try {
       const riders = validRows.map((row, i) =>
         rowToRider(row, columnMappings, raceUuid, i, heatNameToNumber, clubDictionary)
       );
-      await insertRiders(riders);
-      await rebuildCategoriesFromRiders(raceUuid);
+      if (isLiveRace(raceUuid)) {
+        // Shared race: riders AND categories go to the server in one Action, and
+        // nothing is saved here until the server confirmed it (no half import).
+        const headerRow = parseResult.detection.headerRow;
+        const rowNumbers = parseResult.rows
+          .map((row, i) => ({ row, i }))
+          .filter(({ row, i }) => !errorRowIndices.has(i) && !importSkipReason(row, parseResult.headers, columnMappings))
+          .map(({ i }) => i + headerRow + 1);
+        const live = await import("@/services/live/liveClient");
+        try {
+          await live.importIntoSharedRace(raceUuid, riders, rowNumbers);
+        } catch (err) {
+          if (!(err instanceof live.ImportRefused)) throw err;
+          setRefusal({ message: err.message, problems: err.problems.map((p) => p.message) });
+          setImportProgress({ total: totalInFile, processed: totalInFile, successful: 0, failed: totalInFile, status: "error" });
+          return;
+        }
+      } else {
+        await insertRiders(riders);
+        await rebuildCategoriesFromRiders(raceUuid);
+      }
       setImportProgress({
         total: totalInFile,
         processed: totalInFile,
@@ -433,6 +296,7 @@ export default function CSVImportWizard({
     setColumnMappings([]);
     setImportProgress(null);
     setSkippedIssues([]);
+    setRefusal(null);
     setSuggestedName("");
     setShowMultiDayDialog(false);
     setMultiDayValues([]);
@@ -484,14 +348,15 @@ export default function CSVImportWizard({
       <div className={styles.content}>
         {currentStep === "upload" &&
           (scanMode ? (
-            <ImageCapture
-              onComplete={handleOcrParsed}
-              onCancel={() => setScanMode(false)}
-            />
+            <Suspense fallback={<div className={styles.content}>Loading camera…</div>}>
+              <ImageCapture
+                onComplete={handleOcrParsed}
+                onCancel={() => setScanMode(false)}
+              />
+            </Suspense>
           ) : (
             <UploadStep
               onFileUpload={(file, tpl) => handleFileUpload(file, tpl)}
-              onScanClick={() => setScanMode(true)}
             />
           ))}
         {currentStep === "mapping" && parseResult && (
@@ -499,6 +364,7 @@ export default function CSVImportWizard({
             headers={parseResult.headers}
             mappings={columnMappings}
             sampleRows={parseResult.rows.slice(0, 3)}
+            allRows={parseResult.rows}
             onConfirm={handleMappingConfirm}
             onBack={handleBack}
             suggestedName={suggestedName}
@@ -510,13 +376,13 @@ export default function CSVImportWizard({
             mappings={columnMappings}
             onStartImport={handleStartImport}
             onBack={handleBack}
-            onClose={handleClose}
           />
         )}
         {currentStep === "importing" && importProgress && (
           <ImportProgressStep
             progress={importProgress}
             skippedIssues={skippedIssues}
+            refusal={refusal}
             onClose={handleClose}
           />
         )}

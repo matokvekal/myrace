@@ -1,26 +1,42 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2 } from "lucide-react";
+import BibBadge from "@/components/ui/BibBadge";
+import { useTranslation } from "react-i18next";
+import { LayoutList, LayoutGrid, Layers, Play, Flag, Trash2, Pencil, Upload, Plus, Search, X, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Settings, UserRoundPlus } from "lucide-react";
 import styles from "./riders.module.css";
-import Button from "@/components/ui/Button";
 import useRiderStore from "@/stores/ridersStore";
+import useRaceStore from "@/stores/racesStore";
 import { CategoryProps, RiderProps } from "@/types/types";
 import RiderCard from "../../components/riderCard/RiderCard";
+import RiderFlag from "../../components/riderFlag/RiderFlag";
 import Icons from "@/constants/Icons";
 import { shallow } from "zustand/shallow";
-import { debounce } from "lodash";
+import { debounce } from "@/utils/debounce";
 import CSVImportWizard from "@/components/csv/CSVImportWizard";
-import ScanDocumentButton from "@/components/importImage/ScanDocumentButton";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
-import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
+import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey } from "../schedule/Schedule";
+import QuickAddRider, { canAddRider } from "../raceMode/QuickAddRider";
+import { matchesRiderSearch, groupRidersByWaveAndCategory } from "@/utils/riderList";
+import { riderIssues, RIDER_ISSUE_LABEL } from "@/utils/bibIssues";
 
 interface ManageHeatProps {
   raceUuid: string;
   categories: CategoryProps[];
+  onEditMode?: () => void;
+  /**
+   * Finalized race — the start list is part of a signed result, so every way
+   * of changing it (import, edit, delete-all) is removed. The stores reject
+   * these writes anyway; hiding them keeps the screen honest.
+   */
+  readOnly?: boolean;
 }
 
-type SortKey = "name" | "bib" | "club" | "category";
-type WaveFilter = "all" | "now" | number;
+type SortKey = "name" | "bib" | "club" | "category" | "status";
+
+// Status ordering for the sortable Status column (active first, out last).
+const STATUS_ORDER: Record<string, number> = {
+  running: 0, standing: 1, finished: 2, DNF: 3, DNS: 4, DSQ: 5,
+};
 
 function formatElapsed(now: Date, startTimeStr: string | null | undefined): string {
   if (!startTimeStr) return "--:--";
@@ -35,45 +51,52 @@ function formatElapsed(now: Date, startTimeStr: string | null | undefined): stri
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function getNowWave(categories: CategoryProps[], catWaveMap: Map<string, number>): number | null {
-  const now = new Date();
-  const todayPrefix = now.toISOString().slice(0, 10);
-  const waveTimeMap = new Map<number, Date>();
-  categories.forEach((cat) => {
-    const waveNum = catWaveMap.get(cat.name);
-    if (waveNum == null || !cat.startTime) return;
-    const dt = new Date(`${todayPrefix}T${cat.startTime}`);
-    if (!waveTimeMap.has(waveNum) || dt < waveTimeMap.get(waveNum)!) {
-      waveTimeMap.set(waveNum, dt);
-    }
-  });
-  if (waveTimeMap.size === 0) return null;
-  let closest: number | null = null;
-  let minDiff = Infinity;
-  waveTimeMap.forEach((dt, waveNum) => {
-    const diff = Math.abs(dt.getTime() - now.getTime());
-    if (diff < minDiff) { minDiff = diff; closest = waveNum; }
-  });
-  return closest;
-}
-
-const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
+const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories, onEditMode, readOnly = false }) => {
+  const waveColors = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid)?.waveColors);
+  const { t } = useTranslation();
   const previousRaceUuid = useRef<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("name");
-  const [waveFilter, setWaveFilter] = useState<WaveFilter>("all");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  // Only riders that still need fixing (no name / no bib / duplicate bib).
+  const [invalidOnly, setInvalidOnly] = useState(false);
+  const [showAddRider, setShowAddRider] = useState(false);
+  // Category the Add Rider form was opened from (preset, picker hidden); null = pick one.
+  const [addFor, setAddFor] = useState<CategoryProps | null>(null);
+  const openAddRider = (cat: CategoryProps | null) => { setAddFor(cat); setShowAddRider(true); };
+  const canAdd = !readOnly && canAddRider(raceUuid);
+  // Occasional actions (add, import, edit, delete) and view options live behind the gear.
+  const [manageOpen, setManageOpen] = useState(false);
   const [importMode, setImportMode] = useState<"file" | "scan">("file");
   const [showDeleteRiders, setShowDeleteRiders] = useState(false);
   const [selectedRider, setSelectedRider] = useState<RiderProps | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  // Collapsed rider groups — display state only (never rider data, filters or
+  // sorting). Empty on entry: every group expanded.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (!manageOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setManageOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [manageOpen]);
 
   const { getRiders, riders, deleteRidersByRace } = useRiderStore(
     (state) => ({
@@ -105,7 +128,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
     const schedule = buildSchedule(categories, DEFAULT_WAVE_GAP_MINUTES);
     const map = new Map<string, number>();
     schedule.forEach((startMap, waveNum) => {
-      startMap.forEach((cats) => cats.forEach((cat) => map.set(cat.name, waveNum)));
+      startMap.forEach((cats) => cats.forEach((cat) => map.set(catWaveKey(cat.name, cat.subCategory), waveNum)));
     });
     return {
       waves: [...schedule.keys()].sort((a, b) => a - b),
@@ -113,30 +136,55 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
     };
   }, [categories]);
 
+  // Validation over the whole race (not the search), so counts never depend on the filter.
+  const issues = useMemo(() => riderIssues(riders, raceUuid), [riders, raceUuid]);
+  const raceRiderCount = useMemo(() => riders.filter((r) => r.raceUuid === raceUuid).length, [riders, raceUuid]);
+  const invalidCount = issues.size;
+  useEffect(() => {
+    if (invalidCount === 0) setInvalidOnly(false);
+  }, [invalidCount]);
+  const issueText = (id: number) => (issues.get(id) ?? []).map((i) => RIDER_ISSUE_LABEL[i]).join(" · ");
+
   const filteredAndSorted = useMemo(() => {
-    const activeHeat =
-      waveFilter === "now"
-        ? getNowWave(categories, catWaveMap)
-        : typeof waveFilter === "number"
-          ? waveFilter
-          : null;
-
     let list = riders.filter((r) => r.raceUuid === raceUuid);
-    if (activeHeat != null) list = list.filter((r) => catWaveMap.get(r.category) === activeHeat);
+    if (invalidOnly) list = list.filter((r) => issues.has(r.id));
+    if (searchTerm.trim()) list = list.filter((r) => matchesRiderSearch(r, searchTerm));
 
-    return [...list].sort((a, b) => {
-      if (sortBy === "name")
-        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
-      if (sortBy === "bib") return a.bibNumber - b.bibNumber;
-      if (sortBy === "club") return (a.team ?? "").localeCompare(b.team ?? "");
-      if (sortBy === "category") {
-        const catCmp = a.category.localeCompare(b.category);
-        if (catCmp !== 0) return catCmp;
-        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+    const byName = (a: RiderProps, b: RiderProps) =>
+      `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+
+    const sorted = [...list].sort((a, b) => {
+      let base = 0;
+      if (sortBy === "name") base = byName(a, b);
+      else if (sortBy === "bib") base = a.bibNumber - b.bibNumber;
+      else if (sortBy === "club") base = (a.team ?? "").localeCompare(b.team ?? "");
+      else if (sortBy === "category") {
+        base = a.category.localeCompare(b.category);
+        if (base === 0) base = (a.subCategory ?? "").localeCompare(b.subCategory ?? "");
+        if (base === 0) base = byName(a, b);
+      } else if (sortBy === "status") {
+        base = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+        if (base === 0) base = a.bibNumber - b.bibNumber;
       }
-      return 0;
+      return sortDir === "asc" ? base : -base;
     });
-  }, [riders, raceUuid, waveFilter, sortBy, categories, catWaveMap]);
+    return sorted;
+  }, [riders, raceUuid, sortBy, sortDir, searchTerm, invalidOnly, issues]);
+
+  const hasRiders = riders.some((r) => r.raceUuid === raceUuid);
+  const anyFlag = filteredAndSorted.some((r) => r.flag);
+
+  const waveGroups = useMemo(
+    () => groupRidersByWaveAndCategory(filteredAndSorted, categories),
+    [filteredAndSorted, categories]
+  );
+
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortBy(key); setSortDir("asc"); }
+  };
+
+  const sortArrow = (key: SortKey) => (sortBy === key ? (sortDir === "asc" ? " ▲" : " ▼") : "");
 
   const grouped = useMemo((): Map<string, RiderProps[]> | null => {
     if (!groupByCategory) return null;
@@ -148,117 +196,126 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
     return map;
   }, [filteredAndSorted, groupByCategory]);
 
+  // Every group currently shown: category groups in the table, categories in "group by category".
+  const groupKeys = useMemo((): string[] => {
+    if (viewMode === "table") return waveGroups.flatMap((wg) => wg.categories.map((cg) => `t:${wg.wave ?? "none"}:${cg.key}`));
+    if (grouped) return [...grouped.keys()].map((name) => `g:${name}`);
+    return [];
+  }, [viewMode, waveGroups, grouped]);
+  // Global resets: they override every individual choice.
+  const collapseAll = () => setCollapsedGroups(new Set(groupKeys));
+  const expandAll = () => setCollapsedGroups(new Set());
+  const allCollapsed = groupKeys.length > 0 && groupKeys.every((k) => collapsedGroups.has(k));
+  /** Close the gear menu and run the action it offered. */
+  const fromManage = (action: () => void) => () => { setManageOpen(false); action(); };
+
+  /** "+" on a category header: add a rider straight into that category. */
+  const catAddBtn = (cat: CategoryProps | undefined, name: string) =>
+    !canAdd ? null : (
+      <button
+        type="button"
+        className={styles.catAddBtn}
+        aria-label={`Add rider to ${name}`}
+        title={`Add rider to ${name}`}
+        data-testid={`add-rider-${name}`}
+        onClick={(e) => { e.stopPropagation(); openAddRider(cat ?? null); }}
+      >
+        <UserRoundPlus size={16} />
+      </button>
+    );
+
+  const groupToggle = (key: string, label: string) => {
+    const open = !collapsedGroups.has(key);
+    return (
+      <button
+        type="button"
+        className={styles.groupToggle}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+        title={open ? "Collapse" : "Expand"}
+        onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
+      >
+        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+      </button>
+    );
+  };
+
   const sortOptions = [
     { key: "name" as SortKey, label: "Name A–Z" },
-    { key: "bib" as SortKey, label: "Bib #" },
+    { key: "bib" as SortKey, label: "Bib" },
     { key: "club" as SortKey, label: "Club A–Z" },
     { key: "category" as SortKey, label: "Category" },
   ];
 
   return (
     <div className={styles.riders}>
-      <div className={styles.topBar}>
-        <div className={styles.leftControls}>
-          {/* Sort dropdown */}
-          <div className={styles.sortDropdownWrapper}>
-            <label className={styles.sortLabel}>Sort:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className={styles.sortDropdown}
-            >
-              {sortOptions.map((opt) => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+      {/* Always on screen: find a rider, see the list. Everything occasional is behind the gear. */}
+      {hasRiders && (
+        <div className={styles.topBar}>
+          <div className={styles.searchBox}>
+            <Search size={15} aria-hidden="true" />
+            <input
+              type="search"
+              dir="auto"
+              className={styles.searchInput}
+              data-testid="rider-search"
+              placeholder="Search name or bib"
+              aria-label="Search riders"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button type="button" className={styles.searchClear} aria-label="Clear search" onClick={() => setSearchTerm("")}>
+                <X size={14} />
+              </button>
+            )}
           </div>
-
-          {/* View mode buttons */}
-          <div className={styles.viewModeGroup}>
-            <button
-              className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
-              onClick={() => setViewMode("table")}
-              title="Table view"
-            >
-              <LayoutList size={16} />
-            </button>
-            <button
-              className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
-              onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
-              title="Cards view"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
-              onClick={() => { setViewMode("cards"); setGroupByCategory((v) => !v); }}
-              title="Group by category"
-            >
-              <Layers size={16} />
-            </button>
-          </div>
-
-          {/* Import buttons */}
-          <Button
-            variant="secondary"
-            size="sm"
-            className={styles.importBtn}
-            onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+          <button
+            type="button"
+            className={styles.iconBtn}
+            aria-label="Manage riders"
+            title="Manage riders"
+            onClick={() => setManageOpen(true)}
+            data-testid="rider-manage-btn"
           >
-            Import CSV
-          </Button>
-          <ScanDocumentButton
-            variant="bar"
-            onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
-          />
+            <Settings size={17} />
+          </button>
         </div>
-      </div>
+      )}
 
-      {(waves.length > 1 || riders.some((r) => r.raceUuid === raceUuid)) && (
-        <div className={styles.filterBar}>
-          {waves.length > 1 && (
-            <div className={styles.waveFilterSection}>
-              <label className={styles.waveLabel}>Wave:</label>
-              <select
-                value={typeof waveFilter === "number" ? waveFilter : waveFilter === "now" ? "now" : "all"}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "all") setWaveFilter("all");
-                  else if (val === "now") setWaveFilter("now");
-                  else setWaveFilter(parseInt(val, 10));
-                }}
-                className={styles.waveDropdown}
-              >
-                <option value="all">All Waves</option>
-                {waves.map((w) => (
-                  <option key={w} value={w}>
-                    Wave {w}
-                  </option>
-                ))}
-                <option value="now">NOW (Active)</option>
-              </select>
-            </div>
-          )}
-
-          {/* Delete All button - right side */}
-          {riders.some((r) => r.raceUuid === raceUuid) && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className={`${styles.deleteBtn}`}
-              onClick={() => setShowDeleteRiders(true)}
-            >
-              <Trash2 size={14} /> Delete All
-            </Button>
-          )}
+      {hasRiders && invalidCount > 0 && (
+        <div className={styles.invalidBanner} role="alert" data-testid="riders-invalid-banner">
+          <span dir="auto">
+            ⚠ {invalidCount} rider{invalidCount === 1 ? "" : "s"} need{invalidCount === 1 ? "s" : ""} fixing: missing name, missing bib or
+            duplicate bib. Tap a red row to correct it. A wave with bib problems can't start.
+          </span>
+          <button type="button" className={styles.invalidToggle} onClick={() => setInvalidOnly((v) => !v)} data-testid="riders-invalid-only">
+            {invalidOnly ? "Show all" : "Show invalid only"}
+          </button>
         </div>
       )}
 
       {filteredAndSorted.length > 0 && (
         <div className={styles.tabCount}>
-          Riders ({filteredAndSorted.length})
+          <span>Riders ({filteredAndSorted.length})</span>
+          <span className={styles.validityCounts} data-testid="riders-validity">
+            <span className={styles.validCount} data-testid="riders-valid-count">✓ {raceRiderCount - invalidCount} valid</span>
+            {invalidCount > 0 && (
+              <span className={styles.invalidCount} data-testid="riders-invalid-count">⚠ {invalidCount} invalid</span>
+            )}
+          </span>
+          {groupKeys.length > 0 && (
+            <button
+              type="button"
+              className={styles.groupBulkBtn}
+              onClick={allCollapsed ? expandAll : collapseAll}
+              data-testid={allCollapsed ? "expand-all" : "collapse-all"}
+              aria-label={allCollapsed ? "Expand all" : "Collapse all"}
+              title={allCollapsed ? "Expand all" : "Collapse all"}
+            >
+              {allCollapsed ? <ChevronsDown size={16} /> : <ChevronsUp size={16} />}
+            </button>
+          )}
         </div>
       )}
 
@@ -267,80 +324,89 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
           {viewMode === "table" ? (
             <div className={styles.dataTable}>
               <div className={styles.dataTableHeader}>
-                <span className={styles.colRow}>#</span>
-                <span className={styles.colDot} />
-                <span className={styles.colFlag} />
-                <span className={styles.colBib}>Bib</span>
-                <span className={styles.colName}>Name</span>
-                <span className={styles.colCat}>Category</span>
-                <span className={styles.colWave}>Wave</span>
-                <span className={styles.colStatus}>Status</span>
+                {anyFlag && <span className={styles.colFlag} />}
+                <span className={styles.colBib} style={{ cursor: "pointer" }} onClick={() => handleSort("bib")} title="Sort by bib">Bib{sortArrow("bib")}</span>
+                <span className={styles.colName} style={{ cursor: "pointer" }} onClick={() => handleSort("name")} title="Sort by name">Name{sortArrow("name")}</span>
+                <span className={styles.colStatus} style={{ cursor: "pointer" }} onClick={() => handleSort("status")} title="Sort by status">Status{sortArrow("status")}</span>
               </div>
-              {(() => {
-                let lastCat = "";
-                let catIdx = 0;
-                return filteredAndSorted.map((rider, idx) => {
-                  const isOut = ["DNS","DNF","DSQ"].includes(rider.status);
-                  const isRunning = rider.raceStatus === "running" && !isOut;
-                  const isFinished = rider.raceStatus === "finished" && !isOut;
-                  const showCatHeader = sortBy === "category" && rider.category !== lastCat;
-                  if (showCatHeader) { lastCat = rider.category; catIdx = 0; } else { catIdx++; }
-                  const catColor = categories.find((c) => c.name === rider.category)?.color ?? rider.color ?? "#ddd";
-                  return (
-                    <React.Fragment key={rider.id}>
-                      {showCatHeader && (
-                        <div className={styles.catSeparator} style={{ borderLeftColor: catColor }}>
-                          <span className={styles.catSepDot} style={{ background: catColor }} />
-                          {rider.category}
+              {waveGroups.map((wg) => (
+                <div key={wg.wave ?? "none"} className={styles.waveGroup} data-testid={`wave-group-${wg.wave ?? "none"}`}>
+                  <div
+                    className={styles.waveGroupHeader}
+                    style={wg.wave != null && waveColors?.[String(wg.wave)] ? { borderLeft: `6px solid ${waveColors[String(wg.wave)]}` } : undefined}
+                  >
+                    {groupToggle(`w:${wg.wave ?? "none"}`, wg.wave != null ? `Wave ${wg.wave}` : "No wave")}
+                    {wg.wave != null ? `Wave ${wg.wave}` : "No wave"}
+                    <span className={styles.groupCount}>{wg.count}</span>
+                  </div>
+                  {!collapsedGroups.has(`w:${wg.wave ?? "none"}`) && wg.categories.map((cg) => {
+                    const catColor = cg.category?.color ?? cg.riders[0]?.color ?? "#ddd";
+                    const gKey = `t:${wg.wave ?? "none"}:${cg.key}`;
+                    return (
+                      <React.Fragment key={cg.key}>
+                        <div className={styles.catSeparator} style={{ borderLeftColor: catColor }} data-testid="rider-category-header">
+                          {groupToggle(gKey, cg.name)}
+                          {cg.name}
+                          <span className={styles.groupCount}>{cg.riders.length}</span>
+                          {catAddBtn(cg.category ?? undefined, cg.name)}
                         </div>
-                      )}
-                      <div
-                        className={`${styles.dataRow} ${isRunning ? styles.rowRunning : ""} ${isOut ? styles.rowOut : ""}`}
-                        onClick={() => setSelectedRider(rider)}
-                      >
-                        <span className={styles.colRow}>{idx + 1}</span>
-                        <span className={styles.colDot} style={{ background: rider.color ?? "#ddd" }} />
-                        <span className={styles.colFlag}>
-                          <img
-                            src={`/international/${rider.flag || "il"}.svg`}
-                            alt={rider.flag || "il"}
-                            className={styles.flagIcon}
-                          />
-                        </span>
-                        <span className={styles.colBib}><strong>#{rider.bibNumber || "—"}</strong></span>
-                        <span className={styles.colName} dir="auto">
-                          {rider.lastName || rider.firstName
-                            ? `${rider.lastName} ${rider.firstName}`.trim()
-                            : "—"}
-                        </span>
-                        <span className={styles.colCat} dir="auto">
-                          {rider.category || "—"}
-                          {rider.subCategory && <span className={styles.subCatLabel}> · {rider.subCategory}</span>}
-                        </span>
-                        <span className={styles.colWave}>{catWaveMap.get(rider.category) ?? rider.heat ?? "—"}</span>
-                        <span className={styles.colStatus}>
-                          {isOut ? (
-                            <span className={`${styles.statusTag} ${styles[rider.status.toLowerCase() + "Tag"]}`}>
-                              {rider.status}
-                            </span>
-                          ) : isRunning ? (
-                            <span className={styles.statusRunning}><Play size={11} fill="currentColor" /> {formatElapsed(currentTime, rider.timeStartRace)}</span>
-                          ) : isFinished ? (
-                            <span className={styles.statusFinished}><Flag size={14} /></span>
-                          ) : null}
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  );
-                });
-              })()}
+                        {!collapsedGroups.has(gKey) && cg.riders.map((rider) => {
+                          const isOut = ["DNS", "DNF", "DSQ"].includes(rider.status);
+                          const isRunning = rider.raceStatus === "running" && !isOut;
+                          const isFinished = rider.raceStatus === "finished" && !isOut;
+                          const invalid = issues.has(rider.id);
+                          return (
+                            <div
+                              key={rider.id}
+                              className={`${styles.dataRow} ${isRunning ? styles.rowRunning : ""} ${isOut ? styles.rowOut : ""} ${invalid ? styles.rowInvalid : ""}`}
+                              data-category={rider.category}
+                              data-invalid={invalid || undefined}
+                              title={invalid ? issueText(rider.id) : undefined}
+                              onClick={() => setSelectedRider(rider)}
+                            >
+                              {anyFlag && (
+                                <span className={styles.colFlag}>
+                                  <RiderFlag flag={rider.flag} className={styles.flagIcon} />
+                                </span>
+                              )}
+                              <span className={styles.colBib}><strong><BibBadge rider={rider} category={cg.category ?? null} /></strong></span>
+                              <span className={styles.colName} dir="auto">
+                                {rider.lastName || rider.firstName
+                                  ? `${rider.lastName} ${rider.firstName}`.trim()
+                                  : "—"}
+                                {invalid && <span className={styles.invalidReason}>{issueText(rider.id)}</span>}
+                              </span>
+                              <span className={styles.colStatus}>
+                                {isOut ? (
+                                  <span className={`${styles.statusTag} ${styles[rider.status.toLowerCase() + "Tag"]}`}>
+                                    {rider.status}
+                                  </span>
+                                ) : isRunning ? (
+                                  <span className={styles.statusRunning}><Play size={11} fill="currentColor" /> {formatElapsed(currentTime, rider.timeStartRace)}</span>
+                                ) : isFinished ? (
+                                  <span className={styles.statusFinished}><Flag size={14} /></span>
+                                ) : null}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           ) : groupByCategory && grouped ? (
             [...grouped.entries()].map(([catName, catRiders]) => (
               <div key={catName} className={styles.catGroup}>
-                <div className={styles.catGroupHeader}>{catName}</div>
-                {catRiders.map((rider) => (
-                  <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
+                <div className={styles.catGroupHeader} data-testid="rider-category-header">
+                  {groupToggle(`g:${catName}`, catName)}
+                  {catName}
+                  <span className={styles.groupCount}>{catRiders.length}</span>
+                  {catAddBtn(categories.find((c) => c.name === catName), catName)}
+                </div>
+                {!collapsedGroups.has(`g:${catName}`) && catRiders.map((rider) => (
+                  <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }} className={issues.has(rider.id) ? styles.cardInvalid : undefined} data-invalid={issues.has(rider.id) || undefined} title={issues.has(rider.id) ? issueText(rider.id) : undefined}>
                     <RiderCard {...rider} />
                   </div>
                 ))}
@@ -348,7 +414,7 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
             ))
           ) : (
             filteredAndSorted.map((rider) => (
-              <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }}>
+              <div key={rider.id} onClick={() => setSelectedRider(rider)} style={{ cursor: "pointer" }} className={issues.has(rider.id) ? styles.cardInvalid : undefined} data-invalid={issues.has(rider.id) || undefined} title={issues.has(rider.id) ? issueText(rider.id) : undefined}>
                 <RiderCard {...rider} />
               </div>
             ))
@@ -366,20 +432,110 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
             />
           </div>
         </>
+      ) : hasRiders ? (
+        <p className={styles.empty}>No riders match “{searchTerm.trim()}”.</p>
       ) : (
         <div className={styles.emptyState}>
           <p className={styles.empty}>No riders yet.</p>
-          <div className={styles.emptyActions}>
-            <button
-              className={styles.emptyImportBtn}
-              onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+          {canAdd && (
+            <div className={styles.emptyActions}>
+              <button
+                className={styles.emptyImportBtn}
+                data-testid="add-rider-btn"
+                onClick={() => openAddRider(null)}
+              >
+                <Plus size={14} /> Add Rider
+              </button>
+              <button
+                className={styles.emptyImportBtn}
+                onClick={() => { setImportMode("file"); setShowImportWizard(true); }}
+              >
+                Import CSV
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {manageOpen && (
+        <div className={styles.wizardOverlay} onClick={() => setManageOpen(false)}>
+          <div
+            className={styles.manageModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Manage riders"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="rider-manage-modal"
+          >
+            <div className={styles.manageHead}>
+              <span>Manage riders</span>
+              <button type="button" className={styles.iconBtn} aria-label="Close" onClick={() => setManageOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {!readOnly && (
+              <div className={styles.manageList}>
+                {canAdd && (
+                  <button type="button" className={styles.manageItem} data-testid="add-rider-btn" onClick={fromManage(() => openAddRider(null))}>
+                    <Plus size={16} aria-hidden="true" /> Add rider
+                  </button>
+                )}
+                <button type="button" className={styles.manageItem} onClick={fromManage(() => { setImportMode("file"); setShowImportWizard(true); })}>
+                  <Upload size={16} aria-hidden="true" /> Import CSV
+                </button>
+                {onEditMode && (
+                  <button type="button" className={styles.manageItem} onClick={fromManage(onEditMode)}>
+                    <Pencil size={16} aria-hidden="true" /> Edit Riders
+                  </button>
+                )}
+                <button type="button" className={`${styles.manageItem} ${styles.manageDanger}`} onClick={fromManage(() => setShowDeleteRiders(true))}>
+                  <Trash2 size={16} aria-hidden="true" /> Delete All
+                </button>
+              </div>
+            )}
+
+            <div className={styles.manageLabel}>View</div>
+            <div className={styles.viewModeGroup} role="group" aria-label="Riders view">
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${viewMode === "table" ? styles.active : ""}`}
+                aria-pressed={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+              >
+                <LayoutList size={15} aria-hidden="true" /> Table
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${viewMode === "cards" && !groupByCategory ? styles.active : ""}`}
+                aria-pressed={viewMode === "cards" && !groupByCategory}
+                onClick={() => { setViewMode("cards"); setGroupByCategory(false); }}
+              >
+                <LayoutGrid size={15} aria-hidden="true" /> Cards
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewModeBtn} ${groupByCategory && viewMode === "cards" ? styles.active : ""}`}
+                aria-pressed={groupByCategory && viewMode === "cards"}
+                onClick={() => { setViewMode("cards"); setGroupByCategory(true); }}
+              >
+                <Layers size={15} aria-hidden="true" /> Category
+              </button>
+            </div>
+
+            <label className={styles.manageLabel} htmlFor="riders-sort">Sort</label>
+            <select
+              id="riders-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className={styles.sortDropdown}
             >
-              Import CSV
-            </button>
-            <ScanDocumentButton
-              variant="empty"
-              onClick={() => { setImportMode("scan"); setShowImportWizard(true); }}
-            />
+              {sortOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}
@@ -396,9 +552,26 @@ const Riders: React.FC<ManageHeatProps> = ({ raceUuid, categories }) => {
         />
       )}
 
+      {showAddRider && (
+        <div className={styles.wizardOverlay} onClick={() => setShowAddRider(false)}>
+          <div className={styles.addRiderModal} onClick={(e) => e.stopPropagation()} data-testid="add-rider-modal">
+            <QuickAddRider
+              raceUuid={raceUuid}
+              waveNum={waves[0] ?? 1}
+              waveOf={(c) => catWaveMap.get(catWaveKey(c.name, c.subCategory)) ?? waves[0] ?? 1}
+              categories={categories}
+              fixedCategory={addFor ?? undefined}
+              essential
+              onDone={() => setShowAddRider(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {selectedRider && (
         <RiderDetailModal
           rider={selectedRider}
+          wave={catWaveMap.get(catWaveKey(selectedRider.category, selectedRider.subCategory)) ?? null}
           onClose={() => setSelectedRider(null)}
         />
       )}

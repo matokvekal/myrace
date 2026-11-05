@@ -8,18 +8,28 @@ interface DeleteConfirmModalProps {
   description: string;
   onConfirm: () => Promise<void> | void;
   onCancel: () => void;
+  /** Ask the user to type the confirm word (bulk deletes). Off: a plain confirm button, for one item. */
+  requireTyping?: boolean;
+  /** The word to type (default DELETE), and the button labels. */
+  confirmWord?: string;
+  confirmLabel?: string;
+  busyLabel?: string;
 }
 
 export default function DeleteConfirmModal({
   title,
   description,
   onConfirm,
-  onCancel
+  onCancel,
+  requireTyping = true,
+  confirmWord = "DELETE",
+  confirmLabel = "Confirm Delete",
+  busyLabel = "Deleting…"
 }: DeleteConfirmModalProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isValid = input.toUpperCase() === "DELETE";
+  const isValid = !requireTyping || input.trim().toUpperCase() === confirmWord;
 
   const handleConfirm = async () => {
     if (!isValid || loading) return;
@@ -33,14 +43,15 @@ export default function DeleteConfirmModal({
 
   return (
     <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className={styles.icon}>⚠️</div>
         <h3 className={styles.title}>{title}</h3>
         <p className={styles.description}>{description}</p>
 
+        {requireTyping && (
         <div className={styles.confirmGroup}>
           <label className={styles.label}>
-            Type <strong>DELETE</strong> to confirm
+            Type <strong>{confirmWord}</strong> to confirm
           </label>
           <input
             className={styles.input}
@@ -48,10 +59,11 @@ export default function DeleteConfirmModal({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
-            placeholder="DELETE"
+            placeholder={confirmWord}
             autoFocus
           />
         </div>
+        )}
 
         <div className={styles.actions}>
           <button className={styles.cancelBtn} onClick={onCancel} disabled={loading}>
@@ -62,7 +74,7 @@ export default function DeleteConfirmModal({
             onClick={handleConfirm}
             disabled={!isValid || loading}
           >
-            {loading ? "Deleting…" : "Confirm Delete"}
+            {loading ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

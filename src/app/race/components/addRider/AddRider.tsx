@@ -8,6 +8,7 @@ import { useDropzone } from "react-dropzone";
 import * as z from "zod";
 import { RiderProps } from "@/types/types";
 import CategoryModal from "../../components/modals/CategoryModal";
+import { newLocalId } from "@/utils/localId";
 
 interface AddRiderModalProps {
   raceUuid: string;
@@ -95,8 +96,15 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
         ? categoryRiders[categoryRiders.length - 1]
         : null;
 
+    // The category owns the lap count — copying it off a sibling rider means a
+    // rider added before laps were set (or whose siblings came from a file with
+    // no laps column) is stuck on 0/0 (BUGS.md #7).
+    const riderCategory = categories.find(
+      (cat) => cat.name === category && cat.heat === heatId
+    );
+
     const newRider: RiderProps = {
-      id: Date.now() + Math.random(), // Ensure uniqueness
+      id: newLocalId(),
       raceUuid,
       heat: heatId,
       bibNumber: parseInt(bibNumber),
@@ -106,7 +114,7 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
       team: team || null,
       image, // Store image URL
       lapsCounter: 0,
-      totalLaps: maxStandingRider?.totalLaps || 0,
+      totalLaps: riderCategory?.laps || maxStandingRider?.totalLaps || 0,
       lapsDetails: [],
       checked: false,
       distance: 0,
@@ -127,13 +135,10 @@ const AddRider: React.FC<AddRiderModalProps> = ({ raceUuid, heatId }) => {
       color: maxStandingRider?.color || "#000000"
     };
     insertRider(newRider);
-    const updatedCategory = categories.find(
-      (cat) => cat.name === category && cat.heat === heatId
-    );
 
-    if (updatedCategory) {
+    if (riderCategory) {
       const totalRiders = categoryRiders.length + 1;
-      updateCategory({ ...updatedCategory, riders: totalRiders });
+      updateCategory({ ...riderCategory, riders: totalRiders });
     }
 
     closeModal("modalAddRider");

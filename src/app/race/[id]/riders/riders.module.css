@@ -5,170 +5,161 @@
   padding-bottom: 32px;
 }
 
-/* ── Top control bar ── */
+/* Always-visible bar: search + gear */
 .topBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: linear-gradient(180deg, #ffffff, #f2f7ff);
-  border: 1px solid #c9defc;
-  border-radius: 14px;
-  padding: 12px 16px;
-  box-shadow: 0 10px 18px rgba(99, 166, 252, 0.14);
-}
-
-.leftControls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* Sort dropdown */
-.sortDropdownWrapper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sortLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: #3a5080;
-  margin: 0;
-}
-
-.sortDropdown {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
-  background: white;
-  color: #1a304f;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.sortDropdown:hover {
-  border-color: #a8c5f8;
-  background: #f8fbff;
-}
-
-.sortDropdown:focus {
-  outline: none;
-  border-color: #63a6fc;
-  box-shadow: 0 0 0 2px rgba(99, 166, 252, 0.2);
-}
-
-/* View mode buttons */
-.viewModeGroup {
-  display: flex;
-  gap: 2px;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
-  padding: 2px;
-  background: white;
-}
-
-.viewModeBtn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  color: #6b7fa8;
-}
-
-.viewModeBtn:hover {
-  background: rgba(99, 166, 252, 0.08);
-  color: #3a5080;
-}
-
-.viewModeBtn.active {
-  background: #63a6fc;
-  color: white;
-}
-
-/* Import button */
-.importBtn {
-  font-size: 12px;
-}
-
-/* Delete button */
-.deleteBtn {
-  color: #c62828 !important;
-  border-color: #ffcdd2 !important;
-  background: #ffebee !important;
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.deleteBtn:hover {
-  background: #ffcdd2 !important;
-}
-
-.sortActive {
-  letter-spacing: 0.01em;
-}
-
-/* ── Filter bar (wave + delete) ── */
-.filterBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-}
-
-.waveFilterSection {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.waveLabel {
+.sortDropdown {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary, #14243c);
+  background-color: var(--surface-1, #fff);
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* View modes: segmented control in the gear menu */
+.viewModeGroup {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+}
+
+.viewModeBtn {
+  flex: 1 1 0;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 1px;
+  background: transparent;
+  color: #5b5e66;
   font-size: 12px;
   font-weight: 600;
-  color: #3a5080;
-  margin: 0;
-}
-
-.waveDropdown {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #d5e4fb;
-  border-radius: 8px;
-  background: white;
-  color: #1a304f;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.waveDropdown:hover {
-  border-color: #a8c5f8;
-  background: #f8fbff;
+.viewModeBtn.active {
+  background: #1d3d78;
+  color: #fff;
 }
 
-.waveDropdown:focus {
-  outline: none;
-  border-color: #63a6fc;
-  box-shadow: 0 0 0 2px rgba(99, 166, 252, 0.2);
+.iconBtn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  background: #fff;
+  color: #0a0a0b;
+  cursor: pointer;
 }
 
-.tabCount {
-  font-weight: 700;
+.iconBtn:hover {
+  border-color: #0a0a0b;
+}
+
+/* PRO skin: keep the bar and gear menu flat */
+:root[data-skin="gaming"] .topBar button:not(:disabled),
+:root[data-skin="gaming"] .manageModal button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 2px !important;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Gear menu: occasional actions and view options */
+.manageModal {
+  width: 100%;
+  max-width: 400px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  margin: auto;
+  padding: 12px 16px 16px;
+  border-radius: 4px;
+  background: #fff;
+  color: #0a0a0b;
+}
+
+.manageHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.manageHead .iconBtn {
+  border-color: transparent;
+}
+
+.manageList {
+  margin-top: 4px;
+  border-top: 1px solid #e4e5e8;
+}
+
+.manageItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 4px;
+  border: none;
+  border-bottom: 1px solid #e4e5e8;
+  background: none;
+  color: #0a0a0b;
   font-size: 14px;
-  color: #1a304f;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.manageItem:hover {
+  background: #f3f4f6;
+}
+
+.manageDanger {
+  color: #b3261e;
+}
+
+.manageLabel {
+  display: block;
+  margin: 14px 0 6px;
+  color: #5b5e66;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Rider count + collapse all */
+.tabCount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5b5e66;
 }
 
 .catGroup {
@@ -177,41 +168,31 @@
   gap: 4px;
 }
 
-/* ── Category separator row in table view ── */
+/* Category row inside a wave: light band, category colour on the edge */
 .catSeparator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  min-height: 36px;
+  padding: 2px 8px 2px 4px;
+  border-left: 4px solid #ddd;
+  border-bottom: 1px solid #e4e5e8;
+  background: #f3f4f6;
+  color: #0a0a0b;
   font-size: 13px;
   font-weight: 700;
-  color: #1a304f;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, #f2f7ff, #eef4ff);
-  border: 1px solid #d5e4fb;
-  border-left: 3px solid #63a6fc;
-  border-radius: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-top: 6px;
-}
-
-.catSepDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
-  flex-shrink: 0;
 }
 
 .catGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 2px 8px 2px 4px;
+  background: #f3f4f6;
+  color: #0a0a0b;
   font-size: 13px;
-  font-weight: 600;
-  color: #1a304f;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, #f2f7ff, #eef4ff);
-  border: 1px solid #d5e4fb;
-  border-radius: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-weight: 700;
 }
 
 .empty {
@@ -237,48 +218,46 @@
 }
 
 .emptyImportBtn {
-  background: #667eea;
+  background: #1d3d78;
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 10px 24px;
+  border-radius: 2px;
+  padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
-/* ── Data table view ── */
+/* Rider table: bib, name, status — the group headers carry wave and category */
 .dataTable {
   display: flex;
   flex-direction: column;
-  border: 1px solid #e4eaf4;
-  border-radius: 10px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
   overflow: hidden;
   font-size: 13px;
+  background: #fff;
 }
 
 .dataTableHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #f2f6ff;
-  border-bottom: 1px solid #dce8fb;
-  font-size: 11px;
-  font-weight: 700;
-  color: #6b7fa8;
+  padding: 6px 12px;
+  border-bottom: 1px solid #d3d5da;
+  font-size: 10px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
 .dataRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
-  border-bottom: 1px solid #f0f4fc;
+  min-height: 40px;
+  padding: 4px 12px;
+  border-bottom: 1px solid #eeeff1;
   cursor: pointer;
-  transition: background 0.1s;
 }
 
 .dataRow:last-child {
@@ -286,23 +265,7 @@
 }
 
 .dataRow:hover {
-  background: #f7f9ff;
-}
-
-.colRow {
-  width: 28px;
-  flex-shrink: 0;
-  color: #b0bcd4;
-  font-size: 11px;
-  text-align: right;
-}
-
-.colDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  background: #ddd;
+  background: #f7f7f8;
 }
 
 .colFlag {
@@ -321,54 +284,30 @@
   display: block;
 }
 
+/* Bib reads like a race number */
 .colBib {
   width: 48px;
   flex-shrink: 0;
-  font-size: 13px;
-  color: #3a5080;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0a0a0b;
+  font-variant-numeric: tabular-nums;
 }
 
+/* The name is what people look for — let it wrap to two lines instead of
+   being cut to "…" on a phone. */
 .colName {
   flex: 4;
+  font-size: 14px;
   font-weight: 600;
-  color: #1a304f;
-  min-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.colCat {
-  flex: 2;
-  color: #3a5080;
-  min-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.subCatLabel {
-  font-size: 11px;
-  color: #8aa0c4;
-  font-weight: 400;
-}
-
-.colWave {
-  width: 45px;
-  flex-shrink: 0;
-  text-align: center;
-  color: #667eea;
-  font-weight: 600;
-}
-
-.colClub {
-  flex: 2;
-  color: #7a8faa;
+  line-height: 1.25;
+  color: #0a0a0b;
   min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
 }
 
 .colStatus {
@@ -380,12 +319,7 @@
 
 /* Row state highlights */
 .rowRunning {
-  background: rgba(62, 221, 164, 0.05);
-  border-left: 3px solid #3edda4;
-}
-
-.rowRunning:hover {
-  background: rgba(62, 221, 164, 0.09) !important;
+  box-shadow: inset 3px 0 0 #2fbf71;
 }
 
 .rowOut {
@@ -458,6 +392,10 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
+  /* Rescue scroll for tablets where real visible height < vh (browser
+     chrome/keyboard) — otherwise the wizard's step nav/footer can render
+     off-screen with nothing able to scroll it into view. */
+  overflow-y: auto;
 }
 
 .wizardModal {
@@ -466,14 +404,207 @@
   width: 100%;
   max-width: 95vw;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  margin: auto;
 }
 
 @media (min-width: 768px) {
   .wizardModal {
     max-width: 90vw;
   }
+}
+
+.searchBox {
+  flex: 1 1 200px; /* takes the free width; wraps onto its own row on phones */
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 40px;
+  border-radius: 2px;
+  border: 1px solid #d3d5da;
+  background: #fff;
+  color: #5b5e66;
+}
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font: inherit;
+  font-size: 16px;
+}
+.searchClear { background: none; border: 0; color: inherit; cursor: pointer; display: inline-flex; padding: 4px; }
+.waveGroup:not(:last-child) { border-bottom: 1px solid #1d3d78; }
+.waveGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding: 2px 12px 2px 4px;
+  border-bottom: 1px solid #c9a24a;
+  background: #1d3d78;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.groupCount { margin-inline-start: auto; font-size: 11px; font-weight: 700; opacity: 0.7; }
+.addRiderModal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #14243c);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+/* Collapse / expand rider groups (display only) */
+.groupBulkBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  background: #fff;
+  color: #0a0a0b;
+  cursor: pointer;
+}
+.groupToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Header labels stay muted */
+.dataTableHeader span {
+  color: #5b5e66;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Quiet add-rider icon on each category header */
+.catAddBtn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #5b5e66;
+  cursor: pointer;
+}
+
+.catAddBtn:hover {
+  color: #0a0a0b;
+}
+
+:root[data-skin="gaming"] .catAddBtn:not(:disabled),
+:root[data-skin="gaming"] .groupToggle:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 2px !important;
+}
+
+/* Category header: count right before the add icon */
+.catSeparator .groupCount,
+.catGroupHeader .groupCount {
+  margin-inline-start: auto;
+  color: #5b5e66;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 1;
+}
+
+/* Validation: rows that need fixing stay red until corrected */
+.rowInvalid {
+  background: #fde8e8;
+  box-shadow: inset 4px 0 0 #dc2626;
+}
+.rowInvalid:hover {
+  background: #fbd5d5;
+}
+.rowInvalid .colName {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.invalidReason {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b91c1c;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.cardInvalid {
+  border-radius: 12px;
+  outline: 2px solid #dc2626;
+  outline-offset: 1px;
+  background: #fde8e8;
+}
+.validityCounts {
+  display: inline-flex;
+  gap: 8px;
+  margin-inline-start: auto;
+  margin-inline-end: 8px;
+  letter-spacing: 0.02em;
+}
+.validCount {
+  color: #15803d;
+}
+.invalidCount {
+  color: #b91c1c;
+}
+.invalidBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.invalidBanner > span {
+  flex: 1 1 220px;
+}
+.invalidToggle {
+  border: 1px solid #dc2626;
+  background: #fff;
+  color: #b91c1c;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
 }

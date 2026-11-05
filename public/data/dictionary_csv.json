@@ -72,7 +72,9 @@
     "race class",
     "age group",
     "cat",
-    "קטגוריה"
+    "קטגוריה",
+    "מקצה",
+    "מקצה תחרות"
   ],
 
   "gender": [
@@ -85,14 +87,7 @@
     "מין"
   ],
 
-  "heat": [
-    "heat",
-    "race",
-    "wave",
-    "start wave",
-    "flight",
-    "מקצה"
-  ],
+  "heat": ["heat", "wave", "start wave"],
 
   "total_laps": [
     "laps",

@@ -1,6 +1,11 @@
 /* Commissire service worker — app-shell caching for installability + offline.
- * Bump CACHE_VERSION to force clients onto a fresh cache after a deploy. */
-const CACHE_VERSION = 'commissire-v2';
+ * Bump CACHE_VERSION to force clients onto a fresh cache after a deploy.
+ *
+ * SECURITY: account data is NEVER cached here. The API (/api/*) and Socket.IO
+ * (/socket.io/*) are same-origin in production; caching them served one account's
+ * /me, race list and snapshots to the next account on the same device (v2 bug,
+ * fixed in v3). Only static, non-personal files are cached. */
+const CACHE_VERSION = 'commissire-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -19,6 +24,9 @@ const APP_SHELL = [
   '/ocr/lang/eng.traineddata',
 ];
 
+/** Never cached, never answered from a cache: account data and live traffic. */
+const isPrivate = (url) => /\/(api|socket\.io)\//.test(url.pathname);
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) =>
@@ -26,14 +34,39 @@ self.addEventListener('install', (event) => {
       Promise.allSettled(APP_SHELL.map((url) => cache.add(url)))
     )
   );
+  // v3 activates at once (security fix): the v2 worker answered /api/* from its
+  // cache, so it must stop controlling pages now, not after an "Update now" tap.
+  // The page is NOT reloaded (the app reloads only from applyUpdate), and static
+  // files of the running version are carried over into v3 on activate.
   self.skipWaiting();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    (async () => {
+      const current = await caches.open(CACHE_VERSION);
+      for (const key of await caches.keys()) {
+        if (key === CACHE_VERSION) continue;
+        const old = await caches.open(key);
+        // Keep the running version's static files (offline), drop every API response.
+        for (const req of await old.keys()) {
+          if (isPrivate(new URL(req.url))) continue;
+          if (await current.match(req)) continue;
+          const res = await old.match(req);
+          if (res) await current.put(req, res);
+        }
+        await caches.delete(key);
+      }
+      // Belt and braces: nothing private in the current cache either.
+      for (const req of await current.keys()) {
+        if (isPrivate(new URL(req.url))) await current.delete(req);
+      }
+      await self.clients.claim();
+    })()
   );
 });
 
@@ -43,6 +76,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // don't touch cross-origin
+  if (isPrivate(url)) return; // straight to the network, never cached
 
   // Navigations: network-first so the app stays up to date, fall back to
   // cached shell when offline so the installed app still opens.
@@ -61,7 +95,8 @@ self.addEventListener('fetch', (event) => {
       (cached) =>
         cached ||
         fetch(request).then((response) => {
-          if (response.ok && response.type === 'basic') {
+          const noStore = /no-store|private/i.test(response.headers.get('cache-control') || '');
+          if (response.ok && response.type === 'basic' && !noStore) {
             const copy = response.clone();
             caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
           }

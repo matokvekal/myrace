@@ -80,3 +80,18 @@
     height: 48px;
   }
 }
+
+/* Centre microphone: grey when voice is off, green while it's on */
+.micIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.container.active .micIcon {
+  color: #10b981;
+}

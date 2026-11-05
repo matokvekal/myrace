@@ -1,0 +1,214 @@
+/* Info tab server panel: one flat card, a 3 px status rail on the start edge
+   (orange = action needed, green = on the server). Squared 6–8 px corners, no pills. */
+.panel {
+  --tone: #e8770e;
+  --tone-ink: #b85a00;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  padding-inline-start: 17px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  color: var(--text-primary, #14243c);
+}
+.panel::before {
+  content: "";
+  position: absolute;
+  inset-block: -1px;
+  inset-inline-start: -1px;
+  width: 4px;
+  border-start-start-radius: 8px;
+  border-end-start-radius: 8px;
+  background: var(--tone);
+}
+.panel[data-tone="ok"] {
+  --tone: #2a9d4b;
+  --tone-ink: #1f7a3a;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.icon {
+  flex: none;
+  color: var(--tone);
+}
+.text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--tone-ink);
+}
+.sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary, #5f7ba5);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+/* Buttons: 36 px, squared, one solid colour each */
+.btnAction,
+.btnPrimary,
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btnAction {
+  color: #fff;
+  background: #e8770e;
+  border: 1px solid #d06a0b;
+}
+.btnAction:hover:not(:disabled) { background: #d06a0b; }
+.btnPrimary {
+  color: #fff;
+  background: var(--brand-strong, #3f86e7);
+  border: 1px solid var(--brand-strong, #3f86e7);
+}
+.btnPrimary:hover:not(:disabled) { filter: brightness(0.94); }
+.btnSecondary {
+  color: var(--text-primary, #14243c);
+  background: transparent;
+  border: 1px solid var(--border-card, #c9d8ee);
+}
+.btnSecondary:hover:not(:disabled) { background: var(--bg-card-2, #f7fbff); }
+.btnAction:disabled,
+.btnPrimary:disabled,
+.btnSecondary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b42318;
+  background: rgba(220, 38, 38, 0.08);
+}
+.linkBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  color: var(--brand-strong, #3f86e7);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Share Race block, under a hairline */
+.share {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-card, #d9e7fb);
+}
+/* Inside the Share Race modal: no hairline, the modal is the frame */
+.share[data-embedded="true"] {
+  padding-top: 0;
+  border-top: none;
+}
+.shareHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shareLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary, #5f7ba5);
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary, #5f7ba5);
+}
+.status[data-on="true"] { color: #1f7a3a; }
+
+.url {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+  background: var(--bg-card-2, #f7fbff);
+  color: var(--text-primary, #14243c);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+.url[data-off="true"] {
+  color: var(--text-muted, #8498ba);
+  text-decoration: line-through;
+}
+.shareActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-muted, #8498ba);
+}
+
+.spin { animation: rsaSpin 0.9s linear infinite; }
+@keyframes rsaSpin { to { transform: rotate(360deg); } }
+
+/* Phones: actions take the full width, the upload button spans it */
+@media (max-width: 520px) {
+  .actions { flex: 1 1 100%; }
+  .actions .btnAction { flex: 1; }
+  .shareActions > * { flex: 1 1 0; }
+}
+
+/* The app's dark theme (data-theme on <html>), not the OS setting */
+:global([data-theme="dark"]) .panel { --tone-ink: #ffa24d; }
+:global([data-theme="dark"]) .panel[data-tone="ok"] { --tone-ink: #4cc771; }
+:global([data-theme="dark"]) .status[data-on="true"] { color: #4cc771; }
+:global([data-theme="dark"]) .error { color: #ff8a80; background: rgba(255, 82, 82, 0.12); }

@@ -7,7 +7,6 @@ import { RaceProps } from '@/types/types';
 
 export const fetchRaces = async (): Promise<RaceProps[]> => {
   try {
-    console.log('fetch Race Simulated Data');
     // Simulate a delay for fetching data, if needed
     return new Promise((resolve) => {
       setTimeout(() => resolve([] as RaceProps[]), 0); // Simulate a 500ms fetch delay

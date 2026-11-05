@@ -22,6 +22,10 @@ export function getWaveStatusInfo(categoryStatuses: CategoryChipStatus[]): Statu
   if (categoryStatuses.length === 0) return getCategoryStatusInfo("upcoming");
   if (categoryStatuses.every((s) => s === "finished")) return getCategoryStatusInfo("finished");
   if (categoryStatuses.some((s) => s === "running")) return getCategoryStatusInfo("running");
+  // Some categories finished, none running, rest never started: the wave is
+  // partly done — never call it "Not Started" once races have been run.
+  if (categoryStatuses.some((s) => s === "finished"))
+    return { label: "Partly Finished", color: "#ffc107" };
   return getCategoryStatusInfo("upcoming");
 }
 

@@ -10,10 +10,13 @@ CSVImportWizard (main orchestrator)
 ├── UploadStep (step 1)
 │   ├── File upload (drag & drop)
 │   ├── Template selection
-│   └── Scan Start List → ImageCapture (photo OCR — see docs/local-ocr.md)
+│   └── Scan Start List → ImageCapture (photo OCR, see docs/local-ocr.md): hidden, no entry point in the UI
 ├── ColumnMappingStep (step 2)
 │   ├── Auto-detect columns using dictionary_csv.json
-│   ├── Manual mapping adjustment
+│   ├── Two lists: Imported on top (red X removes), Not imported below (red names; + opens the field picker)
+│   ├── A field feeds from one column: picking it frees the previous one ("Keep as info" is multi-use)
+│   ├── Birth date, UCI ID and bib colours are never auto-selected (OPT_IN_FIELDS); national ID / passport can't be imported at all
+│   ├── Chevron on every row: filled count, examples, and Required / Unique rules when imported
 │   ├── Club Dictionary Manager
 │   └── Template save
 ├── PreviewStep (step 3)

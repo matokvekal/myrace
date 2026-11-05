@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import type {
   CSVParseResult,
   ColumnMapping,
@@ -8,7 +9,7 @@ import type {
   ValidationIssue,
   RiderFieldKey
 } from "@/types/csv.types";
-import { splitFullName } from "@/services/csvMapper";
+import { splitFullName, resolveColumnRules } from "@/services/csvMapper";
 import styles from "./previewStep.module.css";
 
 interface PreviewStepProps {
@@ -16,7 +17,6 @@ interface PreviewStepProps {
   mappings: ColumnMapping[];
   onStartImport: (validation: ValidationResult) => void;
   onBack: () => void;
-  onClose?: () => void;
 }
 
 interface ParsedRider {
@@ -24,7 +24,7 @@ interface ParsedRider {
 }
 
 const FIELD_LABELS: Record<RiderFieldKey, string> = {
-  bibNumber: "Bib #",
+  bibNumber: "Bib",
   firstName: "First Name",
   middleName: "Middle Name",
   lastName: "Last Name",
@@ -42,23 +42,25 @@ const FIELD_LABELS: Record<RiderFieldKey, string> = {
   standing: "Standing",
   raceDay: "Race Day",
   points: "Points",
+  uciPoints: "UCI Points",
   federation: "Federation",
-  uciNumber: "UCI Number",
-  idNumber: "ID Number",
+  uciNumber: "UCI ID",
+  bibColor: "Bib Background Color",
+  bibTextColor: "Bib Text Color",
   birthDate: "Birth Date",
   federationNumber: "Fed. Number",
   federationChip: "Fed. Chip",
   roadNumber: "Road Number",
   chip: "Chip",
   notes: "Notes",
+  infoField: "Info (on card)",
 };
 
 export default function PreviewStep({
   parseResult,
   mappings,
   onStartImport,
-  onBack,
-  onClose
+  onBack
 }: PreviewStepProps) {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
@@ -87,23 +89,40 @@ export default function PreviewStep({
 
   const validateData = () => {
     const issues: ValidationIssue[] = [];
-    const bibNumbers = new Set<string>();
+
+    // Per-column rules chosen in the mapping step (defaults if it was skipped).
+    // Violations are warnings: a rider with a blank or repeated value is still a
+    // rider and is imported — the manager fixes it before the start (StartManager).
+    const rules = mappings.map((m, i) =>
+      m.targetField && m.targetField !== "infoField"
+        ? resolveColumnRules(m, i, parseResult.rows)
+        : null
+    );
+    const seen = mappings.map(() => new Set<string>());
 
     parseResult.rows.forEach((row, rowIndex) => {
       const rider = parseRowToRider(row);
       const lineNumber = rowIndex + 1 + parseResult.detection.headerRow;
 
-      if (!rider.bibNumber) {
-        issues.push({ row: lineNumber, field: "bibNumber", message: "Bib number is required", severity: "error", value: "" });
-      } else if (bibNumbers.has(rider.bibNumber)) {
-        issues.push({ row: lineNumber, field: "bibNumber", message: "Duplicate bib number", severity: "error", value: rider.bibNumber });
-      } else {
-        bibNumbers.add(rider.bibNumber);
-      }
-
-      if (!rider.firstName && !rider.fullName) {
-        issues.push({ row: lineNumber, field: "firstName", message: "First name is required", severity: "warning", value: "" });
-      }
+      mappings.forEach((m, i) => {
+        const rule = rules[i];
+        if (!rule || !m.targetField) return;
+        const value = String(row[i] ?? "").trim();
+        const label = m.sourceColumn || m.targetField;
+        if (!value) {
+          if (rule.required) {
+            issues.push({ row: lineNumber, field: m.targetField, message: `${label} is empty (required)`, severity: "warning", value: "" });
+          }
+          return;
+        }
+        if (rule.unique) {
+          if (seen[i].has(value)) {
+            issues.push({ row: lineNumber, field: m.targetField, message: `${label} "${value}" is not unique`, severity: "warning", value });
+          } else {
+            seen[i].add(value);
+          }
+        }
+      });
 
       if (rider.heat) {
         const heatNum = parseInt(rider.heat);
@@ -177,35 +196,18 @@ export default function PreviewStep({
     <div className={styles.previewStep}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <button onClick={onBack} className={styles.backButtonTop}>← Back</button>
-          <h3>Preview & Validate</h3>
-        </div>
-        <div className={styles.headerRight}>
-          {validation && (
-            <div className={styles.validationSummary}>
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Total:</span>
-                <span className={styles.summaryValue}>{validation.summary.total}</span>
-              </div>
-              {validation.summary.errors > 0 && (
-                <div className={`${styles.summaryItem} ${styles.error}`}>
-                  <span className={styles.summaryLabel}>Errors:</span>
-                  <span className={styles.summaryValue}>{validation.summary.errors}</span>
-                </div>
-              )}
-              {validation.summary.warnings > 0 && (
-                <div className={`${styles.summaryItem} ${styles.warning}`}>
-                  <span className={styles.summaryLabel}>Warnings:</span>
-                  <span className={styles.summaryValue}>{validation.summary.warnings}</span>
-                </div>
-              )}
-            </div>
-          )}
-          {onClose && (
-            <button onClick={onClose} className={styles.closeButton} title="Close wizard">✕</button>
-          )}
-        </div>
+        <h3>Preview</h3>
+        {validation && (
+          <span className={styles.stat} data-testid="preview-summary">
+            {validation.summary.total} rows
+            {validation.summary.errors > 0 && (
+              <span className={styles.statError}> · {validation.summary.errors} errors</span>
+            )}
+            {validation.summary.warnings > 0 && (
+              <span className={styles.statWarning}> · {validation.summary.warnings} warnings</span>
+            )}
+          </span>
+        )}
       </div>
 
       {/* Tabs */}
@@ -294,7 +296,13 @@ export default function PreviewStep({
                                   className={`${styles.issue} ${styles[issue.severity]}`}
                                   title={issue.message}
                                 >
-                                  {issue.severity === "error" ? "❌" : issue.severity === "warning" ? "⚠️" : "ℹ️"}
+                                  {issue.severity === "error" ? (
+                                    <AlertCircle size={15} aria-label={issue.message} />
+                                  ) : issue.severity === "warning" ? (
+                                    <AlertTriangle size={15} aria-label={issue.message} />
+                                  ) : (
+                                    <Info size={15} aria-label={issue.message} />
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -361,17 +369,18 @@ export default function PreviewStep({
 
       {/* Actions */}
       <div className={styles.actions}>
-        <button onClick={onBack} className={styles.backButton}>← Back to Mapping</button>
+        <button onClick={onBack} className={styles.backButton}>Back</button>
         <button
           onClick={handleStartImport}
           className={styles.importButton}
+          data-testid="preview-import"
           disabled={
             !validation ||
             mappedFields.length === 0 ||
             (validation.summary.errors > 0 && validation.summary.errors === validation.summary.total)
           }
         >
-          Import {validation && validation.summary.total - validation.summary.errors} Riders →
+          Import {validation && validation.summary.total - validation.summary.errors} Riders
         </button>
       </div>
     </div>

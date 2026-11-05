@@ -3,7 +3,7 @@
   "name": "Commissire - Bike Race",
   "short_name": "Commissire",
   "description": "Simple bike race management",
-  "start_url": "/",
+  "start_url": "/main",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

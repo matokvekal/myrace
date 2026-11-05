@@ -15,8 +15,12 @@ export interface UIState {
 
   activeTab: string;
   setActiveTab?: (tab: string) => void;
-  isRaceMode: boolean;
-  setRaceMode: (v: boolean) => void;
+  /** The race currently in Race mode. Per race, so a new race never opens on another race's mode. */
+  raceModeRace: string | null;
+  setRaceModeRace: (raceUuid: string | null) => void;
+  /** Wave shared across Race and Live phases so the mode switcher opens the right heat */
+  selectedWave: number;
+  setSelectedWave: (w: number) => void;
   openFilters: (filter: any) => void;
   closeFilters: (filter: any) => void;
 
@@ -39,8 +43,10 @@ const useUIStore = create<UIState>((set) => ({
     filterStandingCategory: false,
   },
   activeTab: 'schedule',
-  isRaceMode: false,
-  setRaceMode: (v) => set({ isRaceMode: v }),
+  raceModeRace: null,
+  setRaceModeRace: (raceUuid) => set({ raceModeRace: raceUuid }),
+  selectedWave: 1,
+  setSelectedWave: (w) => set({ selectedWave: w }),
   openFilters: (filter: keyof UIState["filters"]) =>
     set((state) => ({
       filters: { ...state.filters, [filter]: true },

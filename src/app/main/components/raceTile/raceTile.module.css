@@ -116,3 +116,38 @@
   font-weight: 600;
   color: #9eb5d4;
 }
+
+/* ═══ PRO skin: golden-rectangle tile.
+   Tile is 136px wide; image height 84px = 136 / φ, so the photo is an
+   exact golden rectangle and the info strip below is the minor segment. ═══ */
+:root[data-skin="gaming"] .tile {
+  border-radius: 13px;
+  border: 2px solid rgba(16, 48, 94, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 4px 0 rgba(16, 48, 94, 0.16),
+    0 8px 14px var(--shadow-sm);
+}
+
+:root[data-skin="gaming"] .tile:active {
+  transform: translateY(3px) scale(0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 1px 0 rgba(16, 48, 94, 0.16),
+    0 4px 8px var(--shadow-sm);
+}
+
+:root[data-skin="gaming"] .imgWrap {
+  height: 84px; /* 136 / 1.618 */
+}
+
+:root[data-skin="gaming"] .info {
+  padding: 8px 8px 8px;
+  gap: 3px;
+}
+
+:root[data-skin="gaming"] .name {
+  font-size: 13px;
+  font-weight: 900;
+  font-style: italic;
+}

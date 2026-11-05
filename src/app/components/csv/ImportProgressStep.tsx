@@ -7,6 +7,8 @@ import styles from "./importProgressStep.module.css";
 interface ImportProgressStepProps {
   progress: ImportProgress;
   skippedIssues: ValidationIssue[];
+  /** A shared race's import refused as a whole: nothing was imported; the rows to fix. */
+  refusal?: { message: string; problems: string[] } | null;
   onClose: () => void;
 }
 
@@ -21,7 +23,7 @@ function groupByRow(issues: ValidationIssue[]): Map<number, ValidationIssue[]> {
 }
 
 const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
-  bibNumber: "Bib #",
+  bibNumber: "Bib",
   firstName: "First Name",
   middleName: "Middle Name",
   lastName: "Last Name",
@@ -39,24 +41,52 @@ const FIELD_LABELS: Record<RiderFieldKey | "general", string> = {
   standing: "Standing",
   raceDay: "Race Day",
   points: "Points",
+  uciPoints: "UCI Points",
   federation: "Federation",
-  uciNumber: "UCI #",
-  idNumber: "ID #",
+  uciNumber: "UCI ID",
+  bibColor: "Bib Color",
+  bibTextColor: "Bib Text Color",
   birthDate: "Birth Date",
   federationNumber: "Federation #",
   federationChip: "Federation Chip",
   roadNumber: "Road #",
   chip: "Chip",
   notes: "Notes",
+  infoField: "Info (on card)",
   general: "General"
 };
 
 export default function ImportProgressStep({
   progress,
   skippedIssues,
+  refusal,
   onClose
 }: ImportProgressStepProps) {
   const [showLog, setShowLog] = useState(false);
+
+  if (refusal) {
+    return (
+      <div className={styles.progressStep} data-testid="import-refused" role="alert">
+        <div className={styles.completedHeader}>
+          <div className={styles.successIcon}>⛔</div>
+          <h3 className={styles.headlineWarn}>Nothing was imported</h3>
+        </div>
+        {refusal.problems.length > 0 ? (
+          <ul className={styles.refusalList}>
+            {refusal.problems.map((p, i) => (
+              <li key={i} dir="auto">{p}</li>
+            ))}
+          </ul>
+        ) : (
+          <p dir="auto">{refusal.message}</p>
+        )}
+        <p className={styles.refusalHint}>Fix these rows in the file and import it again.</p>
+        <div className={styles.completedActions}>
+          <button onClick={onClose} className={styles.closeButton}>Close</button>
+        </div>
+      </div>
+    );
+  }
 
   const isComplete = progress.status === "completed";
   const hasSkipped = progress.failed > 0;

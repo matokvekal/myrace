@@ -1,0 +1,192 @@
+/* Full-screen route drawing (DrawRoute). Map takes the screen; one thin bar. */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1, #fff);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 52px;
+  padding: 0 8px;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  font-weight: 400;
+  color: var(--text-muted, #8498ba);
+}
+
+.iconBtn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  cursor: pointer;
+}
+
+.iconBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.iconBtnOn {
+  background: var(--bg-surface, #f5f8ff);
+  color: var(--brand-strong, #3f86e7);
+}
+
+.modes {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
+}
+
+.modeBtn {
+  width: 40px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.modeOn {
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  filter: none;
+  opacity: 1;
+}
+
+.map {
+  flex: 1;
+  min-height: 0;
+  isolation: isolate;
+}
+
+.hint {
+  position: absolute;
+  top: calc(60px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.82);
+  color: #fff;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.list {
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.num {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.numStart {
+  background: #16a34a;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-size: 16px; /* no iOS zoom */
+}
+
+.empty {
+  padding: 8px;
+  font-size: 13px;
+  color: var(--text-muted, #8498ba);
+}
+
+/* Map pins */
+.startPin {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.pointPin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #dc2626;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-skin="gaming"] .screen button:not(:disabled) {
+  box-shadow: none !important;
+  text-transform: none;
+}

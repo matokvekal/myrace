@@ -4,46 +4,77 @@ import { Role, User } from "@/types/rbac.types";
 import type { RaceEvent, SyncStatus } from "@/types/cloud.types";
 
 const DB_NAME = "commissireDb";
-const DB_VERSION = 9; // v9: race_events store for cloud sync
+const DB_VERSION = 10; // v10: live_outbox for shared (multi-user) races
+
+// Every store the app reads/writes. Used to sanity-check a recovered DB.
+const REQUIRED_STORES = ["riders", "categories", "races", "roles", "users", "race_events", "live_outbox"];
+
+function createStores(db: IDBPDatabase) {
+  if (!db.objectStoreNames.contains("riders")) db.createObjectStore("riders", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("categories")) db.createObjectStore("categories", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("races")) db.createObjectStore("races", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("roles")) db.createObjectStore("roles", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("users")) db.createObjectStore("users", { keyPath: "id" });
+  if (!db.objectStoreNames.contains("race_events")) {
+    const store = db.createObjectStore("race_events", { keyPath: "id" });
+    store.createIndex("byRace", "raceId");
+    store.createIndex("bySyncStatus", "syncStatus");
+  }
+  // Shared races: Actions written here BEFORE the UI shows them, removed once
+  // the server acknowledges them (AD-4). Each entry keeps its race (AD-20).
+  if (!db.objectStoreNames.contains("live_outbox")) {
+    const store = db.createObjectStore("live_outbox", { keyPath: "actionId" });
+    store.createIndex("byRace", "localRaceUuid");
+  }
+}
+
+/**
+ * Health of the local database as seen by this app version.
+ * "needs-update" = the saved database is newer than this app and is missing a
+ * store this version expects, or could not be opened. Data is never deleted in
+ * that case; the user is asked to update the app (see DbUpdateNotice).
+ */
+export type DbHealth = "ok" | "needs-update";
+
+let dbHealth: DbHealth = "ok";
+const dbHealthListeners = new Set<() => void>();
+
+export const getDbHealth = (): DbHealth => dbHealth;
+
+export const subscribeDbHealth = (listener: () => void): (() => void) => {
+  dbHealthListeners.add(listener);
+  return () => {
+    dbHealthListeners.delete(listener);
+  };
+};
+
+function markDbNeedsUpdate() {
+  if (dbHealth === "needs-update") return;
+  dbHealth = "needs-update";
+  dbHealthListeners.forEach((listener) => listener());
+}
 
 export const initIndexedDB = async (): Promise<IDBPDatabase> => {
   try {
-    return await openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("riders")) {
-          db.createObjectStore("riders", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("categories")) {
-          db.createObjectStore("categories", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("races")) {
-          db.createObjectStore("races", { keyPath: "id" });
-        }
-        // RBAC stores
-        if (!db.objectStoreNames.contains("roles")) {
-          db.createObjectStore("roles", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("users")) {
-          db.createObjectStore("users", { keyPath: "id" });
-        }
-        // Cloud sync event log (v9)
-        if (!db.objectStoreNames.contains("race_events")) {
-          const store = db.createObjectStore("race_events", { keyPath: "id" });
-          store.createIndex("byRace", "raceId");
-          store.createIndex("bySyncStatus", "syncStatus");
-        }
-      },
-    });
+    return await openDB(DB_NAME, DB_VERSION, { upgrade: createStores });
   } catch (err: any) {
-    if (err.name === "VersionError") {
-      await new Promise<void>((resolve, reject) => {
-        const del = indexedDB.deleteDatabase(DB_NAME);
-        del.onerror = () => reject(del.error);
-        del.onsuccess = () => resolve();
-      });
-      return initIndexedDB();
+    if (err?.name !== "VersionError") throw err;
+    // The stored DB is NEWER than this bundle — happens when an older cached
+    // build loads after a newer deploy. Open it at whatever version is on disk
+    // and keep every byte of race data (BUG-02; AGENTS.md policy: never delete or
+    // reset a database holding race data as a recovery mechanism). If it lacks a
+    // store this version expects, reads from that store fail (callers already
+    // treat that as empty) and the user is asked to update the app.
+    let existing: IDBPDatabase;
+    try {
+      existing = await openDB(DB_NAME);
+    } catch (openErr) {
+      markDbNeedsUpdate();
+      throw openErr;
     }
-    throw err;
+    const hasAll = REQUIRED_STORES.every((s) => existing.objectStoreNames.contains(s));
+    if (!hasAll) markDbNeedsUpdate();
+    return existing;
   }
 };
 // Fetch all races from IndexedDB

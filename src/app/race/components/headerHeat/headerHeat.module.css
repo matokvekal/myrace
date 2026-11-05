@@ -1,62 +1,34 @@
-.headerRace {
-  height: 64px;
-  display: flex;
-  justify-content: space-between;
+/* Live controls in the shared race top bar's right-hand slot
+   (raceSidebar/RaceTopBar). Theme tokens only, so they follow Light/Dark/Sun. */
+
+.raceLiveLabel,
+.racePastLabel {
+  display: inline-flex;
   align-items: center;
-  background: linear-gradient(135deg, #1f3558 0%, #162640 100%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 0 16px;
-  gap: 16px;
-}
-
-/* Left section: back button + race info */
-.leftSection {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.backBtn {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: white;
-  flex-shrink: 0;
-}
-
-.backBtn:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.backBtn:active {
-  transform: scale(0.95);
-}
-
-/* Race info section */
-.raceInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .raceLiveLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.4);
+  background: rgba(22, 163, 74, 0.08);
+}
+
+:global([data-theme="dark"]) .raceLiveLabel {
   color: #3edda4;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+}
+
+.racePastLabel {
+  color: var(--text-muted);
+  border: 1px solid var(--border-card);
 }
 
 .liveDot {
@@ -73,106 +45,60 @@
   }
 }
 
-.raceName {
-  font-size: 18px;
-  font-weight: 800;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.waveLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: #bfd1ea;
-}
-
-/* Right section: time + settings */
-.rightSection {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
 .timeDisplay {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  border: 1px solid var(--border-card);
   border-radius: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.timeLabel {
-  font-size: 10px;
-  font-weight: 700;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.time {
-  font-size: 16px;
-  font-weight: 900;
-  color: #3edda4;
   font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.settingsBtn {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  display: flex;
+.clearBoardBtn {
+  height: 32px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: white;
   flex-shrink: 0;
-  padding: 0;
 }
 
-.settingsBtn:hover {
-  background: rgba(255, 255, 255, 0.25);
+.clearBoardBtn:hover {
+  background: var(--bg-surface);
 }
 
-.settingsBtn:active {
-  transform: scale(0.95);
+:root[data-skin="gaming"] .clearBoardBtn:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 8px !important;
 }
 
-@media (max-width: 640px) {
-  .headerRace {
-    height: 56px;
-    padding: 0 12px;
-    gap: 8px;
-  }
-
-  .backBtn,
-  .settingsBtn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .raceName {
-    font-size: 14px;
-  }
-
-  .waveLabel {
-    font-size: 10px;
-  }
-
-  .time {
-    font-size: 14px;
+/* Phones: the mode chip already says LIVE; keep the clock. */
+@media (max-width: 600px) {
+  .raceLiveLabel,
+  .racePastLabel {
+    display: none;
   }
 
   .timeDisplay {
-    padding: 6px 10px;
+    font-size: 13px;
+    padding: 3px 6px;
+    letter-spacing: 0;
+  }
+
+  /* Icon-only on phones */
+  .clearBoardBtn span {
+    display: none;
   }
 }

@@ -9,6 +9,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0 6px;
+  min-width: 0;
 }
 
 .waveBarLabel {
@@ -18,19 +19,37 @@
   flex-shrink: 0;
 }
 
+/* Single scrollable row, not wrap — with many waves, wrapping used to push
+   the sub-tabs and content down a whole extra row (or two) per wave. Scroll
+   position is set once on load (RaceMode.tsx) to reveal the running/current
+   wave; the user can then swipe/scroll to any other wave and tap to select. */
 .wavePills {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  min-width: 0;
+  /* Small top/bottom padding so the pills' focus/active box-shadow isn't
+     clipped by the scroll container. */
+  padding: 2px 2px 6px;
+  margin: -2px -2px -6px;
 }
 
 /* ── Wave-pill status system: 3 clearly distinct states ──
-   Upcoming = neutral gray · Running = green (only green state) · Finished = blue.
+   Upcoming = neutral gray · Running = green (only green state) ·
+   Finished = red diagonal stripes (finish flag).
    Selection is shown as a solid fill of the pill's own status color, so status
    and "which wave am I viewing" are always both readable. */
 
 /* Upcoming (not started yet): neutral gray outline chip */
 .wavePill {
+  flex-shrink: 0;
+  scroll-snap-align: center;
+  white-space: nowrap;
   padding: 5px 14px;
   border-radius: 20px;
   border: 1.5px solid var(--border-card);
@@ -65,76 +84,115 @@
   box-shadow: 0 2px 8px rgba(47, 207, 149, 0.45);
 }
 
-/* Finished: blue = done/closed */
+/* Finished: red diagonal "finish flag" stripes = wave closed */
 .wavePillFinished {
-  border-color: var(--brand);
-  color: var(--brand-strong);
-  background: rgba(99, 166, 252, 0.12);
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--text-secondary);
+  background-color: var(--bg-card);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(231, 76, 60, 0.22) 0 4px,
+    transparent 4px 9px
+  );
   font-weight: 600;
 }
 
 .wavePillFinished.wavePillActive {
-  background: var(--brand-strong);
-  border-color: var(--brand-strong);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(63, 134, 231, 0.35);
+  background-color: var(--text-secondary);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(231, 76, 60, 0.75) 0 4px,
+    transparent 4px 9px
+  );
+  border-color: #e74c3c;
+  color: var(--bg-card);
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.35);
 }
 
+/* ── Sub-tabs: compact segmented control (same look as the CREATE tabs) ── */
 .subTabs {
   display: flex;
-  gap: 4px;
-  background: var(--bg-surface);
-  border: 1.5px solid var(--border-card);
-  border-radius: 10px;
-  padding: 3px;
-  box-shadow: 0 1px 4px var(--shadow-sm);
+  gap: 2px;
+  padding: 2px;
   margin-bottom: 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--bg-surface, #f5f8ff);
 }
 
 .subTab {
+  position: relative;
   flex: 1;
-  padding: 9px 4px;
-  /* Non-selected tabs: the active blue at 20% opacity so they still read as buttons */
-  border: 1.5px solid transparent;
-  background: rgba(99, 166, 252, 0.20);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--brand-strong);
-  border-radius: 8px;
+  height: 36px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #14243c);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .subTab:hover {
-  background: rgba(99, 166, 252, 0.32);
-  border-color: var(--brand);
-  color: var(--brand-strong);
+  background: var(--surface-1, #fff);
 }
 
 .subTabActive,
 .subTabActive:hover {
-  background: var(--brand-strong);
-  border-color: var(--brand-strong);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(63, 134, 231, 0.35);
+  background: var(--surface-1, #fff);
+  border-color: var(--brand, #63a6fc);
+  color: var(--brand-strong, #3f86e7);
+  font-weight: 700;
 }
 
-.subTabGlow {
-  color: #c05000;
-  animation: subTabGlowPulse 1.6s ease-in-out infinite;
+/* Check-In still has riders to tick: a small amber dot, no pulsing glow */
+.subTabGlow::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
 }
 
-@keyframes subTabGlowPulse {
-  0%, 100% {
-    border-color: transparent;
-    box-shadow: none;
-  }
-  50% {
-    border-color: #ffb020;
-    box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.25);
-  }
+:root[data-skin="gaming"] .subTabs .subTab:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .content {
   flex: 1;
+  animation: modeReveal var(--beat-3) ease-out;
+}
+
+@keyframes modeReveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══ Race day: full timeline; the wave bottom sheet floats over it ═══ */
+.rdc {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  height: calc(100dvh - 128px); /* below the race top bar and tab strip */
+  min-height: 420px;
+}
+
+/* Sheet open: leave room so waves above the sheet stay reachable */
+.rdcWithSheet {
+  height: calc(50dvh - 70px);
+  min-height: 220px;
 }

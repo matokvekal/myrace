@@ -71,6 +71,86 @@ export const formattedTime = ({ hour, minute }: { hour: number; minute: number }
   `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}:00`;
 
 
+/**
+ * Robustly parse a stored race-clock value into a Date.
+ * Accepts ISO ("2026-07-12T14:30:05Z"), 24-hour ("14:30:05" / "14:30"),
+ * and locale 12-hour ("2:30:05 PM") — the last of which older start paths
+ * produced via toLocaleTimeString() and which naive parsers turned into
+ * an Invalid Date (→ total time of 0).
+ */
+export const parseClockTime = (t: string | null | undefined): Date | null => {
+  if (!t) return null;
+  if (t.includes("T")) {
+    const d = new Date(t);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const ampmMatch = /\s*(AM|PM)\s*$/i.exec(t);
+  const core = t.replace(/\s*(AM|PM)\s*$/i, "").trim();
+  const [h0, m = 0, s = 0] = core.split(":").map(Number);
+  if (isNaN(h0) || isNaN(m) || isNaN(s)) return null;
+  let h = h0;
+  if (ampmMatch) {
+    const isPm = ampmMatch[1].toUpperCase() === "PM";
+    if (isPm && h < 12) h += 12;
+    if (!isPm && h === 12) h = 0;
+  }
+  const d = new Date();
+  d.setHours(h, m, s, 0);
+  return d;
+};
+
+/**
+ * Time elapsed between a wall-clock "HH:MM:SS" start string and `now`, as
+ * "MM:SS" (or "H:MM:SS" past the hour). This is the exact format written into
+ * `rider.elapsedTimeFromStart`, so the live screens, the rider list and the
+ * finalize sweep must all use THIS function — three private copies had already
+ * drifted into the codebase.
+ */
+export const formatElapsedSince = (
+  now: Date,
+  startTimeStr: string | null | undefined
+): string => {
+  if (!startTimeStr) return "--:--";
+  const [h, m, s = 0] = startTimeStr.split(":").map(Number);
+  const start = new Date(now);
+  start.setHours(h, m, s, 0);
+  const diffSec = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 1000));
+  const hrs = Math.floor(diffSec / 3600);
+  const mins = Math.floor((diffSec % 3600) / 60);
+  const secs = diffSec % 60;
+  if (hrs > 0) return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+};
+
+/**
+ * The total elapsed time to display for a rider: computed live from the
+ * start clock → last-lap arrival, falling back to the stored string.
+ * Returns "—" when nothing usable is available.
+ */
+export const riderTotalTime = (rider: {
+  timeStartRace: string | null;
+  timeArrive: string | null;
+  elapsedTimeFromStart: string | null;
+}): string => {
+  const start = parseClockTime(rider.timeStartRace);
+  const end = rider.timeArrive ? new Date(rider.timeArrive) : null;
+  if (start && end && !isNaN(end.getTime())) {
+    const ms = end.getTime() - start.getTime();
+    if (ms >= 0) return formatTime(ms / 1000);
+  }
+  const stored = rider.elapsedTimeFromStart;
+  return stored && stored !== "00:00" && stored !== "00:00:00" ? stored : "—";
+};
+
+/**
+ * `parseClockTime` as epoch milliseconds, or null. Convenience for the live
+ * screens that only ever want to subtract two instants (BUGS.md #26).
+ */
+export const parseClockTimeMs = (t: string | null | undefined): number | null => {
+   const d = parseClockTime(t);
+   return d ? d.getTime() : null;
+};
+
 export const formatTime = (seconds: number): string => {
   // If negative or NaN, return "00:00"
   if (!Number.isFinite(seconds) || seconds < 0) return "00:00";

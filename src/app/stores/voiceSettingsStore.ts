@@ -15,7 +15,11 @@ const defaultSettings: VoiceSettings = {
   enabled: true,
   language: 'he',
   model: 'webspeech',
-  autoConfirm: true,
+  // Off by default: "assist" mode — spoken bibs just fill the voice buffer for
+  // the commissaire to review, nothing gets recorded automatically. Safe to
+  // default this way (unlike flipping a live feature) — autoConfirm was
+  // previously unwired everywhere, so this had zero effect until now.
+  autoConfirm: false,
 };
 
 const defaultCommands: VoiceCommand[] = [];

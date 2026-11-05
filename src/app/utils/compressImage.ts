@@ -32,6 +32,30 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Decode a File into something canvas can draw, preferring createImageBitmap.
+ * It decodes straight from the File (no giant data-URL round-trip), applies EXIF
+ * orientation, and copes with more formats — which is what keeps a phone-camera
+ * photo from failing to decode and cascading into a crash (BUGS.md #13).
+ */
+async function decodeToDrawable(
+  file: File
+): Promise<{ source: CanvasImageSource; width: number; height: number }> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: "from-image"
+      } as ImageBitmapOptions);
+      return { source: bitmap, width: bitmap.width, height: bitmap.height };
+    } catch {
+      // Fall through to the <img> path below.
+    }
+  }
+  const dataUrl = await readFileAsDataURL(file);
+  const img = await loadImage(dataUrl);
+  return { source: img, width: img.width, height: img.height };
+}
+
 /** Approximate the byte size of a base64 data URL without decoding it. */
 function approxBytes(dataUrl: string): number {
   const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
@@ -41,16 +65,10 @@ function approxBytes(dataUrl: string): number {
 export async function compressImage(file: File, opts: CompressOptions = {}): Promise<string> {
   const { maxBytes = 180_000, maxDimension = 1600, mimeType = 'image/jpeg' } = opts;
 
-  const original = await readFileAsDataURL(file);
-  const img = await loadImage(original);
+  const { source, width: srcW, height: srcH } = await decodeToDrawable(file);
 
-  // Already small enough and not oversized — keep as-is (preserves PNG/GIF).
-  if (file.size <= maxBytes && Math.max(img.width, img.height) <= maxDimension) {
-    return original;
-  }
-
-  let width = img.width;
-  let height = img.height;
+  let width = srcW;
+  let height = srcH;
   if (Math.max(width, height) > maxDimension) {
     const scale = maxDimension / Math.max(width, height);
     width = Math.round(width * scale);
@@ -59,7 +77,13 @@ export async function compressImage(file: File, opts: CompressOptions = {}): Pro
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  if (!ctx) return original; // Canvas unavailable — fall back to raw.
+  if (!ctx) {
+    // No canvas — only safe to keep the raw bytes if they're already small,
+    // otherwise storing a full-resolution photo is what bloats storage and can
+    // crash rendering on low-memory devices (BUGS.md #13).
+    if (file.size <= maxBytes) return readFileAsDataURL(file);
+    throw new Error('Canvas unavailable and image too large to store raw');
+  }
 
   const draw = (w: number, h: number) => {
     canvas.width = w;
@@ -67,7 +91,7 @@ export async function compressImage(file: File, opts: CompressOptions = {}): Pro
     // White backdrop so transparent PNGs don't turn black under JPEG.
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
+    ctx.drawImage(source, 0, 0, w, h);
   };
 
   draw(width, height);
@@ -86,6 +110,16 @@ export async function compressImage(file: File, opts: CompressOptions = {}): Pro
     out = canvas.toDataURL(mimeType, quality);
   }
 
-  // Never return something bigger than the original.
-  return approxBytes(out) < approxBytes(original) ? out : original;
+  // A well-formed JPEG data URL always starts with this; anything else means
+  // toDataURL failed (e.g. iOS returning "data:," for an oversized canvas).
+  if (!out.startsWith('data:image/')) {
+    throw new Error('Image encoding failed');
+  }
+
+  // Free the decoded bitmap if we made one.
+  if (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) {
+    source.close();
+  }
+
+  return out;
 }

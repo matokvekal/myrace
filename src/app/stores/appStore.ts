@@ -53,7 +53,6 @@ export const useDataStore = create<AppState>((set, get) => ({
 
   handleSendOtp: async (otp) => {
     try {
-      //todo add this
       const user = await get().getUser();
       let phone = get().user?.phone;
       if (!phone) {

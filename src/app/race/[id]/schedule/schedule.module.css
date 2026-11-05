@@ -12,82 +12,103 @@
   font-size: 14px;
 }
 
-/* Wave block */
+/* ── Wave block: ONE clear unit — navy frame, tinted body; the inner
+   start cards float inside it so the parent/child nesting is obvious ── */
 .wave {
-  background: linear-gradient(160deg, var(--bg-card), var(--bg-card-2));
-  border-radius: 16px;
-  border: 1px solid var(--border-card);
+  background: #e9eaed;
+  border-radius: 4px;
+  border: 1px solid #1d3d78;
   overflow: hidden;
-  box-shadow: 0 12px 20px var(--shadow-sm);
 }
 
-/* ── Dark navy wave header — intentional race-official design, kept hardcoded ── */
+/* ── Flat navy wave header with a gold hairline ── */
 .waveHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  background: linear-gradient(140deg, #1f3558, #162640);
+  padding: 8px 12px;
+  background: #1d3d78;
+  border-bottom: 1px solid #c9a24a;
   color: #fff;
+  position: relative;
 }
 
 .waveLabel {
   font-size: 14px;
-  font-weight: 700;
-  color: #00FF7F;
+  font-weight: 800;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 .waveTime {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #bfd1ea;
-  flex: 1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
 }
 
 .liveBtn {
   min-height: 32px;
 }
 
-/* Start group */
+/* Started / finished waves: a coloured edge. Green = started, gold = finished. */
+.waveHeader[data-wave-lock="running"] {
+  box-shadow: inset 3px 0 0 #2fbf71;
+}
+
+.waveHeader[data-wave-lock="finished"] {
+  box-shadow: inset 3px 0 0 #c9a24a;
+}
+
+/* Start group: an inset card INSIDE the wave — clearly a child of the wave */
 .startGroup {
-  border-top: 3px solid var(--text-primary);
+  margin: 8px;
+  border: 1px solid #d3d5da;
+  border-radius: 2px;
+  overflow: hidden;
   background: var(--bg-card);
 }
 
-/* ── Light yellow race-flag start header ── */
+/* Mid-blue start header: the middle tier between the navy wave header and
+   the white category rows */
 .startHeader {
-  padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 900;
-  color: #1f3558;
-  background: linear-gradient(135deg, #ffd95c, #ffca42);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #3a5f9e;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 3px solid #e6b840;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  transition: background 0.2s ease;
 }
 
-/* ── Lighter yellow when wave is running ── */
-.startHeader[data-wave-running="true"] {
-  background: linear-gradient(135deg, #fffae6, #fff9d9);
-  border-bottom-color: #f0e6c0;
-  color: #5a4a2a;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
+.startHeader[data-wave-lock="running"] {
+  box-shadow: inset 3px 0 0 #2fbf71;
+}
+
+.startHeader[data-wave-lock="finished"] {
+  box-shadow: inset 3px 0 0 #c9a24a;
 }
 
 .startInfo {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.startLabel {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 .startActions {
@@ -96,14 +117,34 @@
   flex-shrink: 0;
 }
 
-/* Start time in yellow header: deep orange contrast color, kept */
+/* Small LIVE chip next to the start clock */
+.liveChipBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 2px;
+  background: #d92b2b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.liveChipBtn:active {
+  transform: scale(0.96);
+}
+
 .startTime {
-  font-weight: 900;
-  text-transform: none;
-  letter-spacing: 0.05em;
-  font-size: 18px;
-  color: #d84315;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 15px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Category row */
@@ -115,12 +156,33 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Category color dot: injected via inline style from data model */
+/* Category color bar: injected via inline style from data model —
+   tall bar instead of a small dot so the category colour really shows */
 .colorDot {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 26px;
   border-radius: 3px;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* Bigger tap target around the thin colour bar */
+.colorDotBtn {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  margin: -4px -4px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.colorDotBtn:disabled {
+  cursor: default;
+}
+
+.colorDotBtn:not(:disabled):hover {
+  background: rgba(99, 166, 252, 0.12);
 }
 
 .catInfo {
@@ -132,8 +194,8 @@
 }
 
 .catName {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -143,6 +205,56 @@
 .catMeta {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* Per-category laps stepper; red when laps are still 0 so it needs setting */
+.lapsEditor {
+  display: inline-flex;
+  /* .catInfo is a column flex box: without this the pill stretches the full row */
+  align-self: flex-start;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  vertical-align: middle;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+.lapsMissing {
+  background: #e53935;
+  color: #fff;
+}
+
+.lapsBtn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lapsEditing {
+  padding: 0 3px;
+}
+
+.lapsValue {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.lapsEditing .lapsValue {
+  min-width: 38px;
 }
 
 .statusBadge {
@@ -167,31 +279,27 @@
   flex-shrink: 0;
 }
 
-.standingsBtn {
-  min-height: 32px;
+.catActions .standingsBtn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 /* Wave/start stats */
-.waveStat {
-  font-size: 13px;
-  font-weight: 700;
-  color: #00FF7F;
-  background: rgba(62, 221, 164, 0.14);
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin-left: auto;
-  margin-right: 8px;
-}
-
-/* Start stat: intentional orange timing accent, kept */
+.waveStat,
 .startStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
   font-size: 13px;
-  font-weight: 700;
-  color: #f57c00;
-  background: rgba(255, 193, 7, 0.18);
-  padding: 2px 7px;
-  border-radius: 8px;
-  margin-left: 8px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Lap progress bar */
@@ -209,7 +317,7 @@
 }
 
 .lapSegmentDone {
-  background: var(--brand-strong);
+  background: #c9a24a;
 }
 
 /* Inline standings */
@@ -349,15 +457,14 @@
   z-index: 50;
   width: 40px;
   height: 40px;
-  border-radius: 5px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 2px;
+  background: #1d3d78;
   border: none;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.45);
   transition: opacity 0.2s, transform 0.2s;
 }
 
@@ -560,7 +667,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: linear-gradient(140deg, #1f3558, #162640);
+  background: linear-gradient(140deg, #1d3d78, #122a54);
   color: #fff;
   gap: 12px;
 }
@@ -609,6 +716,31 @@
   gap: 8px;
 }
 
+.nudgeBtn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  min-width: 34px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  transition: all 0.2s;
+}
+
+.nudgeBtn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.nudgeBtn:active {
+  transform: scale(0.94);
+}
+
 .timeInput {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -653,14 +785,14 @@
   overflow: hidden;
 }
 
-/* Light yellow race-flag slot header */
+/* Light blue slot header, gold trim (matches start headers) */
 .slotHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(135deg, #ffd95c, #ffca42);
-  border-bottom: 2px solid #e6b840;
+  background: linear-gradient(135deg, #e3f0ff, #c9e0fa);
+  border-bottom: 2px solid #e0a92c;
 }
 
 .slotLabel {
@@ -760,15 +892,13 @@
 
 @media (max-width: 640px) {
   .startHeader {
-    padding: 10px 12px;
-    font-size: 12px;
+    padding: 6px 8px;
     gap: 8px;
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .startInfo {
     width: 100%;
+    gap: 8px;
   }
 
   .startActions {
@@ -776,21 +906,9 @@
     justify-content: flex-start;
   }
 
-  .startTime {
-    font-size: 16px;
-  }
-
   .container {
-    padding: 8px 8px 32px;
+    padding: 8px 0 32px;
     gap: 10px;
-  }
-
-  .wave {
-    border-radius: 12px;
-  }
-
-  .catName {
-    max-width: 120px;
   }
 }
 
@@ -845,7 +963,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: linear-gradient(140deg, #1f3558, #162640);
+  background: linear-gradient(140deg, #1d3d78, #122a54);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
@@ -872,11 +990,54 @@
   gap: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, #1f3558, #162640);
+  background: linear-gradient(135deg, #1d3d78, #122a54);
 }
 
 .waveTimeRow:last-child {
   border-bottom: none;
+}
+
+/* Locked (started / finished) wave rows in the editor */
+.waveTimeRow[data-wave-lock="running"] {
+  box-shadow: inset 4px 0 0 #3edda4;
+}
+
+.waveTimeRow[data-wave-lock="finished"] {
+  box-shadow: inset 4px 0 0 #ffcf40;
+}
+
+.nudgeBtn:disabled,
+.timeInput:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.nudgeBtn:disabled:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.lockTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.lockTag[data-wave-lock="running"] {
+  color: #3edda4;
+  background: rgba(62, 221, 164, 0.16);
+}
+
+.lockTag[data-wave-lock="finished"] {
+  color: #ffcf40;
+  background: rgba(255, 207, 64, 0.18);
 }
 
 .categoryAssignSection {
@@ -931,4 +1092,525 @@
   color: var(--text-muted);
   font-size: 13px;
   padding: 24px 16px;
+}
+
+/* Rider name is a button that opens the rider details modal. */
+button.standingName {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  text-align: start;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 32px;
+}
+.nameStatus {
+  margin-inline-start: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(120, 130, 150, 0.18);
+  color: #51607a;
+}
+.nameStatusDNF { background: rgba(255, 140, 0, 0.18); color: #b35f00; }
+.nameStatusDSQ { background: rgba(220, 53, 100, 0.15); color: #b8205c; }
+.nameStatusDNS { background: rgba(120, 130, 150, 0.2); color: #51607a; }
+
+.editColorBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 130, 150, 0.35);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.editColorBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.colorOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+.colorModal {
+  width: 100%;
+  max-width: 320px;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #14243c);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.colorTitle { font-weight: 800; }
+.colorCurrent { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.colorSwatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); }
+.colorInput { width: 100%; height: 48px; border: 0; padding: 0; background: none; }
+.colorActions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Ignore / Restore Wave */
+.waveIgnored {
+  opacity: 0.6;
+}
+.ignoredBadge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fde68a;
+  color: #78350f;
+  font-size: 12px;
+  font-weight: 800;
+}
+.waveActionBtn {
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 2px;
+  background: transparent;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.waveActionBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fgSuggested {
+  padding: 2px 8px;
+  border: 1px dashed #1d4ed8;
+  border-radius: 10px;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Finish Group on each category row */
+.fgRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 6px;
+  flex-wrap: wrap;
+}
+.fgCaption {
+  font-size: 11px;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fgSelect {
+  min-height: 36px;
+  padding: 2px 6px;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.fgSelectSuggested {
+  border-style: dashed;
+  border-color: #1d4ed8;
+  color: #1d4ed8;
+}
+.fgApplyAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-weight: 700;
+  min-height: 36px;
+}
+
+/* Phones: two tight lines instead of a tall stack.
+   Line 1: chevron, colour, name, colour + riders icons.
+   Line 2 (under the name): riders, laps, status, Finish Group.
+   The wrappers dissolve so their children can share one wrapping flex row. */
+@media (max-width: 640px) {
+  .startGroup {
+    margin: 6px 4px;
+  }
+  .categoryRow {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    padding: 6px 8px;
+  }
+  .catInfo,
+  .catActions {
+    display: contents;
+  }
+  .expandIcon,
+  .colorDotBtn {
+    order: 0;
+  }
+  .catName {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+  .catActions .editColorBtn,
+  .catActions .standingsBtn {
+    order: 2;
+  }
+  /* Forces everything after it onto line 2 */
+  .categoryRow::after {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .catMeta,
+  .lapsEditor,
+  .categoryRow > .statusBadge {
+    order: 4;
+    align-self: center;
+  }
+  .catInfo > .catMeta:nth-child(2) {
+    margin-inline-start: 20px;
+  }
+  .categoryRow > .statusBadge {
+    padding: 2px 5px;
+    font-size: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  /* Wave header: same one-line density as the start header below it */
+  .waveHeader {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .fgRow {
+    order: 5;
+    gap: 4px;
+    margin-inline: auto 0;
+    flex-wrap: nowrap;
+  }
+  .fgCaption {
+    width: min-content;
+    font-size: 9px;
+    line-height: 1;
+    text-align: end;
+  }
+  .fgSelect {
+    min-height: 28px;
+    max-width: 76px;
+    padding: 0 2px;
+    font-size: 12px;
+  }
+  .fgSuggested {
+    display: none;
+  }
+}
+
+/* Smallest phones: the select alone (it keeps its aria-label and tooltip) */
+@media (max-width: 349px) {
+  .fgCaption {
+    display: none;
+  }
+}
+
+/* "No riders added yet" hint (new race) — one compact row, Schedule stays usable below */
+.emptyRiders {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary);
+}
+
+.emptyRidersIcon {
+  flex-shrink: 0;
+  color: var(--brand-strong);
+}
+
+.emptyRidersText {
+  flex: 1;
+  min-width: 0;
+}
+
+.emptyRidersTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.emptyRidersSub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.emptyRiders > button {
+  flex-shrink: 0;
+}
+
+/* ═══ Wave editor: one compact section per wave ═══ */
+.wvHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wvTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #14243c);
+}
+
+.wvHeaderEnd {
+  display: flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+.wvPrimary,
+.wvSecondary {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wvPrimary {
+  border: 1px solid var(--brand-strong, #3f86e7);
+  background: var(--brand-strong, #3f86e7);
+  color: #fff;
+}
+
+.wvSecondary {
+  border: 1px solid var(--border-card, #d9e7fb);
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-weight: 500;
+}
+
+.wvEmpty {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.wv {
+  margin-bottom: 10px;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 8px;
+  background: var(--surface-1, #fff);
+  overflow: hidden;
+}
+
+.wvHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-surface, #f5f8ff);
+  border-bottom: 1px solid var(--border-card, #d9e7fb);
+}
+
+.wvName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #14243c);
+}
+
+.wvBase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvTime {
+  height: 30px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvHead .wvDanger {
+  margin-inline-start: auto;
+}
+
+.wvIcon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+  background: var(--surface-1, #fff);
+  color: var(--text-primary, #14243c);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wvIcon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wvDanger {
+  color: var(--danger, #df4b7b);
+}
+
+/* category | interval | start | actions */
+.wvRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 76px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 2px 10px;
+  border-top: 1px solid var(--border-card, #d9e7fb);
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+}
+
+.wvRowHead {
+  min-height: 28px;
+  border-top: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvCat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wvCatName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wvGap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvGapInput {
+  width: 52px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvUnit {
+  font-size: 12px;
+}
+
+.wvStart {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.wvRowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wvMove,
+.wvAddCat {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--text-primary, #14243c);
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-card, #d9e7fb);
+  border-radius: 6px;
+}
+
+.wvAddCat {
+  display: block;
+  margin: 6px 10px 8px;
+  height: 32px;
+  font-size: 13px;
+  color: var(--brand-strong, #3f86e7);
+}
+
+.wvNote {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+.wvFg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #8498ba);
+}
+
+@media (max-width: 480px) {
+  .wvRow {
+    grid-template-columns: minmax(0, 1fr) 64px 68px;
+  }
+
+  .wvRowActions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .wvRowHead span:last-child {
+    display: none;
+  }
+}
+
+:root[data-skin="gaming"] .wv button:not(:disabled),
+:root[data-skin="gaming"] .wvHeader button:not(:disabled),
+:root[data-skin="gaming"] .wvFg button:not(:disabled),
+:root[data-skin="gaming"] .wvEmpty button:not(:disabled) {
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  text-transform: none;
+  letter-spacing: normal;
 }

@@ -179,18 +179,50 @@ export function parseNumber(transcript: string, language: Language): number | nu
 export function extractNumbers(transcript: string, language: Language): number[] {
   if (!transcript) return [];
 
-  // Mobile STT often returns digit strings ("47") instead of words. Try digit
-  // extraction first — it's faster and more reliable when it applies.
-  const digitMatches = transcript.match(/\b\d+\b/g);
-  if (digitMatches) {
-    const numbers: number[] = [];
-    for (const m of digitMatches) {
-      const n = parseInt(m, 10);
-      if (n > 0 && n <= 9999) numbers.push(n);
+  // Mobile STT often returns digit strings ("47"), sometimes mixed with number
+  // words in one phrase ("47 ושלושים"). Walk the tokens in order: a digit token
+  // is a number on its own and ends any word run before it, so neither kind is
+  // dropped and the spoken order is kept.
+  const out: number[] = [];
+  let words: string[] = [];
+  const flushWords = () => {
+    if (words.length) out.push(...wordsToNumbers(words, language));
+    words = [];
+  };
+  for (const tok of tokenize(transcript)) {
+    const digits = tok.replace(/["'\-–]/g, '');
+    if (/^\d+$/.test(digits)) {
+      flushWords();
+      const n = parseInt(digits, 10);
+      if (n > 0 && n <= 9999) out.push(n);
+    } else {
+      words.push(tok);
     }
-    if (numbers.length > 0) return numbers;
   }
+  flushWords();
+  return out;
+}
 
-  // Fallback: compositional word parsing (Hebrew/English spoken number words).
-  return wordsToNumbers(tokenize(transcript), language);
+/**
+ * The recognizer returns several guesses (alternatives) per phrase, best first.
+ * We know which bibs are actually racing, so use that: take the first guess in
+ * which every number heard is a real bib; otherwise the guess with the most
+ * real bibs (earlier guess wins a tie). Returns only real bibs, each once, in
+ * spoken order. "47" misheard as "57" is recovered when 57 isn't racing and
+ * a lower-ranked guess says 47.
+ */
+export function pickBibsFromAlternatives(
+  alternatives: string[],
+  language: Language,
+  validBibs: Set<string>
+): string[] {
+  let best: string[] = [];
+  for (const alt of alternatives) {
+    const heard = extractNumbers(alt, language).map(String);
+    if (heard.length === 0) continue;
+    const valid = [...new Set(heard.filter((b) => validBibs.has(b)))];
+    if (valid.length === heard.length) return valid;
+    if (valid.length > best.length) best = valid;
+  }
+  return best;
 }
