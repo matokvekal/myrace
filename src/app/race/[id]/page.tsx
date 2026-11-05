@@ -221,6 +221,7 @@ const Race: React.FC = () => {
             {serverConfigured && !live && raceUuid !== DEMO_RACE_UUID && (
               <Suspense fallback={null}>
                 <LocalOnlyBadge raceUuid={raceUuid} />
+                {!race.viewOnly && !finalized && <ShareRace raceUuid={raceUuid} raceName={race.name} />}
               </Suspense>
             )}
             <div className={styles.tabContent}>

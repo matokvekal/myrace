@@ -1,4 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { DEMO_RACE_UUID } from "@/utils/demoSeed";
+// Upload / Share Race, next to Edit (server builds only; liveClient stays out of the eager bundle).
+const RaceServerAction = lazy(() => import("../../../live/RaceServerAction"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 import styles from "./info.module.css";
 import { RaceProps } from "@/types/types";
 import Icons from "@/constants/Icons";
@@ -446,6 +450,12 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
 
   return (
     <div className={styles.container}>
+      {/* Upload to server / Share Race: first thing on Info (server builds only). */}
+      {serverConfigured && !race.viewOnly && race.uuid !== DEMO_RACE_UUID && !editMode && (
+        <Suspense fallback={null}>
+          <RaceServerAction raceUuid={race.uuid} raceName={race.name} />
+        </Suspense>
+      )}
       {/* Edit / Save / Cancel bar — gone once the race is finalized: race
           details are part of the signed record and the store rejects changes. */}
       <div className={styles.editBar}>
