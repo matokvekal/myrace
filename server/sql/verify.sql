@@ -1,18 +1,19 @@
--- verify.sql — read-only checks after running 001–010 on the Commissaire database.
+-- verify.sql — read-only checks after running 001–012 on the Commissaire database.
 -- Run: psql "<commissaire_live connection>" -f verify.sql
 -- Every query should return the "expected" shown in its comment.
 
--- 1. All migrations applied. Expected: 001…010, ten rows.
+-- 1. All migrations applied. Expected: 001…012, twelve rows.
 SELECT version, "appliedAt" FROM schema_migrations ORDER BY version;
 
--- 2. All tables present. Expected: 19 rows, missing = false everywhere.
+-- 2. All tables present. Expected: 23 rows, missing = false everywhere.
 SELECT t AS table_name, to_regclass('public.' || t) IS NULL AS missing
 FROM unnest(ARRAY[
   'schema_migrations', 'users', 'user_identities', 'sessions', 'otp_codes',
   'races', 'categories', 'riders',
   'invitations', 'race_members', 'contact_groups', 'contacts', 'contact_group_members',
   'race_events', 'race_snapshots', 'sync_cursors', 'official_versions',
-  'user_preferences', 'race_hidden'
+  'user_preferences', 'race_hidden',
+  'accounts', 'account_members', 'account_invitations', 'audit_logs'
 ]) AS t
 ORDER BY 1;
 
@@ -33,6 +34,7 @@ SELECT c.table_name, c.is_nullable AS nullable,
 FROM information_schema.columns c
 WHERE c.table_schema = 'public' AND c.column_name = 'raceUuid'
   AND c.table_name <> 'race_hidden' -- per-user list bookkeeping (010), keyed (userId, raceUuid); not race data
+  AND c.table_name <> 'audit_logs'  -- non-race audit trail (012); "raceUuid" is optional context, not race data
 ORDER BY 1;
 
 -- 5. No triggers or stored functions: rules stay in TypeScript. Expected: 0 and 0.

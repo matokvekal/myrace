@@ -31,7 +31,8 @@ describe("race delete keeps every row (no cascades, no hard delete)", () => {
       `SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'raceUuid' ORDER BY 1`,
     );
     // race_hidden (010) is per-user list bookkeeping, not race data: kept when a race is deleted.
-    expect(tables.map((t) => t.table_name).sort()).toEqual([...RACE_TABLES, "race_hidden"].sort());
+    // audit_logs (012) is the non-race audit trail ("raceUuid" optional context): kept too.
+    expect(tables.map((t) => t.table_name).sort()).toEqual([...RACE_TABLES, "race_hidden", "audit_logs"].sort());
   });
 
   it("deleting a finished race hides it for that user only and keeps every row", async () => {

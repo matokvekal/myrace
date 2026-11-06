@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import { ZodError } from "zod";
+import { accountsRouter, organizationsRouter } from "./accounts/routes.js";
 import { authRouter, meRouter } from "./auth/auth.js";
 import { env } from "./config/env.js";
 import { db } from "./db/pool.js";
@@ -46,6 +47,9 @@ export function createApp() {
   app.use("/api/v1/me", preferencesRouter);
   app.use("/api/v1/me", meRouter);
   app.use("/api/v1/invitations", invitationsRouter);
+  // Accounts & organizations (0.2 Phase 2). Org membership grants no race access.
+  app.use("/api/v1/accounts", accountsRouter);
+  app.use("/api/v1/organizations", organizationsRouter);
   app.use("/api/v1/races/:raceUuid", membersRouter);
   app.use("/api/v1/races/:raceUuid", resultsRouter);
   app.use("/api/v1/races", racesRouter);

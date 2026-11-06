@@ -4,6 +4,7 @@
  * the rows an Action changed. Every query is scoped by "raceUuid".
  */
 import type { Db } from "../db/pool.js";
+import { ensurePersonalAccount } from "../accounts/accounts.js";
 import type { RiderMark } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 
@@ -130,15 +131,19 @@ export async function saveChanges(d: Db, state: RaceState, ch: RowChanges, seq: 
   }
 }
 
-/** Inserts a whole race (Publish / create). */
-export async function insertRace(d: Db, state: RaceState): Promise<void> {
+/**
+ * Inserts a whole race (Publish / create). `accountId` (012): the account the race belongs
+ * to; default = the creator's personal account.
+ */
+export async function insertRace(d: Db, state: RaceState, accountId?: string): Promise<void> {
   const r = state.race as unknown as Record<string, unknown>;
   const cols = RACE_COLUMNS.filter((c) => c !== "lastSeq");
+  const account = accountId ?? (await ensurePersonalAccount(d, state.race.ownerUserId));
   // "createdByUserId" (011): the account creating the race = its first owner. Written here
-  // only — it is not in RACE_COLUMNS, so no update path can ever change it.
+  // only — it is not in RACE_COLUMNS, so no update path can ever change it. Same for "accountId".
   await d.query(
-    `INSERT INTO races (${cols.map(q).join(", ")}, "createdByUserId") VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")}, $${cols.length + 1})`,
-    [...cols.map((c) => (JSON_COLUMNS.has(c) && r[c] != null ? JSON.stringify(r[c]) : r[c] ?? null)), state.race.ownerUserId],
+    `INSERT INTO races (${cols.map(q).join(", ")}, "createdByUserId", "accountId") VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")}, $${cols.length + 1}, $${cols.length + 2})`,
+    [...cols.map((c) => (JSON_COLUMNS.has(c) && r[c] != null ? JSON.stringify(r[c]) : r[c] ?? null)), state.race.ownerUserId, account],
   );
   for (const c of Object.values(state.categories)) await upsert(d, "categories", CATEGORY_COLUMNS, c as unknown as Record<string, unknown>, 0);
   for (const x of Object.values(state.riders)) await upsert(d, "riders", RIDER_COLUMNS, x as unknown as Record<string, unknown>, 0);
