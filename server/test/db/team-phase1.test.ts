@@ -371,3 +371,18 @@ describe("invitation edge cases (QA T3/T4)", () => {
     expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(outsider.token))).status).toBe(403);
   });
 });
+
+describe("invitation preview matches accept (QA T6)", () => {
+  it("an existing admin sees canAccept=false for a deputy's lower-role invitation", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    await db.query(`UPDATE races SET "memberWrites" = true WHERE uuid = $1`, [race.raceUuid]);
+    const deputy = await newUser("P1Dep2");
+    const boss = await newUser("P1Boss");
+    await addMember(owner, race.raceUuid, deputy, ["admin"]);
+    await addMember(owner, race.raceUuid, boss, ["admin"]);
+    const inv = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(deputy.token)).send({ userIds: [boss.id], roles: ["viewer"], sendEmail: false });
+    const token = String(inv.body.invitations[0].url).split("/invite/")[1];
+    expect((await api().get(`/api/v1/invitations/${token}`).set(auth(boss.token))).body.canAccept).toBe(false);
+    expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(boss.token))).status).toBe(403);
+  });
+});

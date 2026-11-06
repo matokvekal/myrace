@@ -531,13 +531,32 @@ still open).
 - Tests: `services/live/__tests__/accountIsolation.test.ts`, `components/pwa/__tests__/serviceWorker.test.ts`,
   `server/test/no-store.test.ts`.
 
-### Race Access Rules (current phase, 2026-11-04)
-- **Owner only writes.** `server/src/races/access.ts` `WRITES_OWNER_ONLY()` (env
-  `COMMISSAIRE_MEMBER_WRITES=1` turns role-based member writes back on — only the
-  multi-user DB suite uses it). Non-owner members get read-only access (`phaseAccess`),
-  so the app hides write controls and the server refuses each of their Actions. Live
-  (`heat/[heatId]`) requires `canOnScreen(race, "live", "update")`. Roles/multi-user
-  management are FUTURE scope — don't build them.
+### Race Access Rules (0.2 Phase 1, branch feature/v0.2-phase1 — see docs/v2/)
+- **Member writes are PER RACE.** `races."memberWrites"` (migration 011, default false). Off =
+  only the owner writes (0.1.x behaviour; `phaseAccess` strips members' writes). The owner
+  switches it in Team (`PUT /races/:uuid/member-writes`, audited, every joined socket gets the
+  new access via `refreshRaceSockets`). `COMMISSAIRE_MEMBER_WRITES=1` = on everywhere (tests only).
+- **Roles** (`src/shared/race/roles.ts`): admin, start, counter, checkin, **results** (0.2:
+  LapCountCorrection/StatusCorrection via `results.update`; correction panel in Results →
+  rider details, `results/ResultCorrection.tsx`), viewer. Finalize/Amend stay owner-only.
+- **Admin delegation is owner-only** (`delegationError` / `isAdminLike` in shared access.ts):
+  only the current owner grants admin or a Team write override, changes/removes an admin-like
+  member, or withdraws an admin-like invitation. Invitation ACCEPT re-checks it against the
+  current owner, so an admin can't demote/promote through an invitation.
+- **Original creator** `races."createdByUserId"` (011; backfilled from snapshot seq 0, never in
+  `RACE_COLUMNS`, written only by `insertRace`). Only the creator soft-deletes (even after
+  `/transfer`, even if no longer a member); anyone else's delete hides for them. Legacy NULL
+  creator → current owner.
+- **Audit = `race_events` only.** Server-written `RaceAdmin` entries (`server/src/races/audit.ts`
+  `logServerEvent`, same transaction as the change): published/unpublished, joinCodeRotated,
+  invitationCreated/Revoked/Declined, ownerTransferred, hidden, deleted, memberWritesChanged.
+  Never tokens, secrets or join codes. Devices can't send `RaceAdmin`.
+- **Invitations:** `declinedAt` = its own status; a soft-deleted race's invitations are gone.
+- **Rejected offline Actions are KEPT** in `live_outbox` (`rejected` field), never re-sent,
+  per account, removed only by the user's Dismiss (`SyncBadge` → `RejectedActions` sheet) or
+  with the race itself. Never delete them in code.
+- Live (`heat/[heatId]`) requires `canOnScreen(race, "live", "update")`; `canOnScreen` stays
+  permissive when no access is cached (an offline owner must reach Live; the server refuses).
 - **Guests (signed out, server builds):** `live/AccountOnly.tsx` guards `/main` and every
   `/race/*` route → `/account?reason=guest&next=…`. A guest reads ONE race only through
   its share link `/share/:token` (`app/share/SharePage.tsx`, standalone: plain fetches of

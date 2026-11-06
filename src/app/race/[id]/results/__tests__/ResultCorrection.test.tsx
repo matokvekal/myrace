@@ -18,6 +18,12 @@ vi.mock("@/services/live/liveBridge", () => ({
   liveAllows: () => bridge.allows,
   liveDispatch: bridge.dispatch,
 }));
+// A t() that fills {{placeholders}} like the app's initialised i18next does.
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (_key: string, def: string, vars: Record<string, unknown> = {}) => def.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => String(vars[k] ?? "")),
+  }),
+}));
 const raceState = vi.hoisted(() => ({ finalized: false }));
 vi.mock("@/stores/racesStore", () => ({
   default: (sel: (s: { races: { uuid: string; finalized?: unknown }[] }) => unknown) =>
@@ -26,14 +32,18 @@ vi.mock("@/stores/racesStore", () => ({
 
 import ResultCorrection from "../ResultCorrection";
 
-const rider = { id: 1, uuid: "rider-uuid-1", lapsCounter: 3, bibNumber: 7, firstName: "A", lastName: "B" } as never;
+const base = { id: 1, uuid: "rider-uuid-1", lapsCounter: 3, bibNumber: 7, firstName: "A", lastName: "B", raceStatus: "finished", status: "finished" };
+const rider = base as never;
+const as = (over: Record<string, unknown>) => ({ ...base, ...over }) as never;
 
 beforeEach(() => {
   bridge.live = true;
   bridge.canResults = true;
   bridge.allows = true;
-  bridge.dispatch.mockClear();
+  bridge.dispatch.mockReset();
+  bridge.dispatch.mockResolvedValue("id");
   raceState.finalized = false;
+  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("ResultCorrection", () => {
@@ -49,16 +59,44 @@ describe("ResultCorrection", () => {
     bridge.canResults = false;
     rerender(<ResultCorrection raceUuid="race-1" rider={rider} />);
     expect(container.innerHTML).toBe("");
+    bridge.canResults = true;
+    rerender(<ResultCorrection raceUuid="race-1" rider={as({ raceStatus: "upcoming", status: "standing" })} />);
+    expect(container.innerHTML).toBe(""); // wave not started: a correction would start them with laps
   });
 
-  it("sends a lap-count correction and a status correction", () => {
+  it("sends a lap-count correction and a status correction, after confirming", async () => {
     render(<ResultCorrection raceUuid="race-1" rider={rider} />);
     expect(screen.getByTestId("correct-laps-save")).toBeDisabled(); // unchanged count
     fireEvent.change(screen.getByTestId("correct-laps"), { target: { value: "5" } });
     fireEvent.click(screen.getByTestId("correct-laps-save"));
     expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "LapCountCorrection", { riderUuid: "rider-uuid-1", laps: 5 });
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/5 laps \(now 3\)/));
+    await screen.findByRole("status");
     fireEvent.click(screen.getByTestId("correct-status-DSQ"));
     expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "StatusCorrection", { riderUuid: "rider-uuid-1", status: "DSQ" });
+  });
+
+  it("nothing is sent when the confirm is cancelled", () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    render(<ResultCorrection raceUuid="race-1" rider={rider} />);
+    fireEvent.click(screen.getByTestId("correct-status-DNF"));
+    expect(bridge.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("Clear is offered only to undo DNF/DSQ/DNS — never on a finisher (it would put them back on course)", () => {
+    const { rerender } = render(<ResultCorrection raceUuid="race-1" rider={rider} />);
+    expect(screen.queryByTestId("correct-status-clear")).toBeNull();
+    rerender(<ResultCorrection raceUuid="race-1" rider={as({ status: "DSQ" })} />);
+    expect(screen.getByTestId("correct-status-DSQ")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("correct-status-clear"));
+    expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "StatusCorrection", { riderUuid: "rider-uuid-1", status: "running" });
+  });
+
+  it("a failed send is shown, not thrown", async () => {
+    bridge.dispatch.mockRejectedValue(new Error("Not a shared race"));
+    render(<ResultCorrection raceUuid="race-1" rider={rider} />);
+    fireEvent.click(screen.getByTestId("correct-status-DNF"));
+    expect(await screen.findByRole("status")).toHaveTextContent(/Could not send: Not a shared race/);
   });
 
   it("refuses up front when the role doesn't allow it (nothing sent)", async () => {
