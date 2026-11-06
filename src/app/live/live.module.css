@@ -262,3 +262,16 @@
 .dotWarn {
   background: #e0a100;
 }
+
+/* 0.2: "Not applied" review list — a bottom sheet over the screen, so opening it never
+   squeezes the sync badge's row or pushes the Live board down. */
+.sheet {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1000;
+  max-height: 60vh;
+  overflow-y: auto;
+  text-align: start;
+}

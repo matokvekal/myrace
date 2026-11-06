@@ -94,4 +94,15 @@ describe("rejected offline actions", () => {
     const again = await import("../liveClient");
     expect((await again.rejectedActions(LOCAL)).map((r) => r.actionId)).toEqual([lap]);
   });
+
+  it("don't count as waiting, and leave with the race when the race is removed from the device", async () => {
+    const live = await load("judge");
+    answer = (actions) => actions.map((a) => ({ actionId: a.actionId, seq: null, applied: false, reason: "forbidden" }));
+    await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    await live.flush(LOCAL);
+    expect(await live.outboxCounts(LOCAL)).toEqual({ pending: 0, rejected: 1 });
+    expect(live.useLiveStore.getState().sync[LOCAL].pending).toBe(0);
+    await live.removeDeletedRace(LOCAL);
+    expect(await live.outboxCounts(LOCAL)).toEqual({ pending: 0, rejected: 0 });
+  });
 });

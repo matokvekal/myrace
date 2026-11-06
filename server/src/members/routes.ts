@@ -299,7 +299,10 @@ invitationsRouter.get("/:token", route(async (req, res) => {
     id: i.id, raceUuid: i.raceUuid, raceName: i.raceName, raceDate: i.raceDate, invitedBy: i.invitedBy, roles: i.roles,
     waves: i.permissions.waves ?? null, status: invitationStatus(i), forEmail: i.email,
     // An admin-like invitation from someone who is no longer the owner (e.g. after a transfer) can't be accepted.
-    canAccept: (await canAccept(db, i, authed(req).userId)) && !delegationError(i.createdBy === i.ownerUserId, null, i),
+    canAccept: (await canAccept(db, i, authed(req).userId)) && !delegationError(i.createdBy === i.ownerUserId, await db.one<{ roles: MemberRole[]; permissions: MemberPermissions }>(
+      `SELECT roles, permissions FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`,
+      [i.raceUuid, authed(req).userId],
+    ), i),
   });
 }));
 

@@ -8,6 +8,7 @@ import useCategoryStore from "@/stores/categoryStore";
 import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import RiderLapTable from "./RiderLapTable";
+import ResultCorrection from "./ResultCorrection";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
 import { Trophy, SlidersHorizontal, ListFilter, Check, RefreshCw } from "lucide-react";
 import { refreshRaceData } from "@/services/live/liveRaceRoom";
@@ -493,6 +494,7 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defau
         <RiderDetailModal rider={selectedRider} onClose={() => setSelectedRider(null)}>
           {/* Lap-by-lap performance below the rider's details; the latest rider data, laps resolved */}
           <RiderLapTable rider={raceRiders.find((r) => r.id === selectedRider.id) ?? selectedRider} field={raceRiders} />
+          <ResultCorrection raceUuid={raceUuid} rider={raceRiders.find((r) => r.id === selectedRider.id) ?? selectedRider} />
         </RiderDetailModal>
       )}
 

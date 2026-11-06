@@ -29,7 +29,7 @@ export default function RejectedActions({ raceUuid, count, onClose }: { raceUuid
   };
 
   return (
-    <div className={styles.card} data-testid="rejected-actions" role="region" aria-label={t("live.notAppliedTitle", "Not applied")}>
+    <div className={`${styles.card} ${styles.sheet}`} data-testid="rejected-actions" role="region" aria-label={t("live.notAppliedTitle", "Not applied")}>
       <div className={styles.spread}>
         <strong>{t("live.notAppliedTitle", "Not applied")}</strong>
         <button className={styles.link} onClick={onClose}>{t("live.close", "Close")}</button>

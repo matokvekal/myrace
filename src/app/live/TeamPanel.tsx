@@ -5,6 +5,7 @@ import { isLiveRace } from "@/services/live/liveBridge";
 import {
   accessFor,
   detachRace,
+  outboxCounts,
   directory,
   publishRace,
   team,
@@ -93,8 +94,13 @@ export default function TeamPanel({ raceUuid }: { raceUuid: string }) {
       <div className={styles.card}>
         <button
           className={styles.danger}
-          onClick={() => {
-            if (window.confirm(t("live.detachConfirm", "Stop syncing this race on this phone? Your local copy and anything still waiting to be sent stay here."))) {
+          onClick={async () => {
+            // Say exactly what stays behind (0.2): unsent and refused Actions are kept on this phone.
+            const { pending, rejected } = await outboxCounts(raceUuid);
+            const kept = pending || rejected
+              ? " " + t("live.detachKept", "{{pending}} waiting to be sent and {{rejected}} not applied stay on this phone; they are no longer shown once syncing stops.", { pending, rejected })
+              : "";
+            if (window.confirm(t("live.detachConfirm", "Stop syncing this race on this phone? Your local copy and anything still waiting to be sent stay here.") + kept)) {
               detachRace(raceUuid);
               setLinked(false);
             }

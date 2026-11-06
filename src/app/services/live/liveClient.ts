@@ -721,6 +721,12 @@ export async function flushAll() {
 
 export const pendingCount = async (local: string) => (await outboxList(local)).length;
 
+/** What stays on this phone for a race: Actions still to send, and refused ones kept for review. */
+export async function outboxCounts(local: string): Promise<{ pending: number; rejected: number }> {
+  const all = await outboxAll(local);
+  return { pending: all.filter((e) => !e.rejected).length, rejected: all.filter((e) => e.rejected).length };
+}
+
 // ---------------------------------------------------------------------------
 // Local ↔ server records
 

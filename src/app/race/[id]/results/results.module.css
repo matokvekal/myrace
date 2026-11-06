@@ -566,3 +566,46 @@
   font-weight: 800;
   white-space: nowrap;
 }
+
+/* Results judge correction (0.2) — inside the rider details, shared races only */
+.correction {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #d0d5dd);
+  border-radius: 8px;
+}
+.correctionTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.correctionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.correctionRow input {
+  width: 64px;
+  min-height: 36px;
+  text-align: center;
+}
+.correctionRow button {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #d0d5dd);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.correctionRow button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.correctionNote {
+  margin: 0;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
