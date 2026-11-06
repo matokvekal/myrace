@@ -5,7 +5,7 @@
  * opens the existing panel (`RaceServerAction`: upload, sync state, publish / link / copy / share)
  * unchanged, in a modal that works on phone and desktop. Nothing about sharing itself changes.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CloudCheck, CloudUpload, X } from "lucide-react";
 import { useLiveStore } from "@/services/live/liveClient";
 import { isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
@@ -18,16 +18,41 @@ type Tone = "action" | "ok" | "wait" | "error";
 export default function RaceServerButton({ raceUuid, raceName }: { raceUuid: string; raceName: string }) {
   const [open, setOpen] = useState(false);
   const [, tick] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const on = () => tick((n) => n + 1);
     window.addEventListener(LIVE_ACCESS_EVENT, on);
     return () => window.removeEventListener(LIVE_ACCESS_EVENT, on);
   }, []);
+  // Focus moves into the dialog, Tab stays inside it, and returns to the icon on close.
+  // Escape closes only the top-most dialog (the nested publish modal handles its own).
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const trigger = triggerRef.current;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      const dlg = dialogRef.current;
+      if (!dlg) return;
+      const nested = dlg.querySelector('[role="dialog"]');
+      if (e.key === "Escape") {
+        if (!nested) setOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || nested) return;
+      const items = [...dlg.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.hasAttribute("disabled"));
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      trigger?.focus();
+    };
   }, [open]);
 
   const linked = isLiveRace(raceUuid);
@@ -38,12 +63,18 @@ export default function RaceServerButton({ raceUuid, raceName }: { raceUuid: str
   const tone: Tone = !linked
     ? publishError ? "error" : "action"
     : sync?.revoked ? "error" : !online || !connected || (sync?.pending ?? 0) > 0 ? "wait" : "ok";
-  const label = !linked ? "Only on this device — upload and share" : "On server — sync and sharing";
+  const label = {
+    action: "Only on this device — upload and share",
+    error: !linked ? "Upload failed — retry and share" : "No access to this race on the server",
+    wait: "On server — waiting to sync",
+    ok: "On server — synced; sharing",
+  }[tone];
 
   return (
     <>
       <button
         type="button"
+        ref={triggerRef}
         className={styles.iconBtn}
         data-tone={tone}
         aria-label={label}
@@ -58,6 +89,7 @@ export default function RaceServerButton({ raceUuid, raceName }: { raceUuid: str
       {open && (
         <div className={modal.overlay} onClick={() => setOpen(false)}>
           <div
+            ref={dialogRef}
             className={modal.modal}
             role="dialog"
             aria-modal="true"
@@ -65,7 +97,7 @@ export default function RaceServerButton({ raceUuid, raceName }: { raceUuid: str
             onClick={(e) => e.stopPropagation()}
             data-testid="race-server-modal"
           >
-            <button type="button" className={modal.close} onClick={() => setOpen(false)} aria-label="Close">
+            <button ref={closeRef} type="button" className={modal.close} onClick={() => setOpen(false)} aria-label="Close">
               <X size={18} aria-hidden="true" />
             </button>
             <h3 id="race-server-modal-title" className={modal.title} dir="auto">Server & sharing</h3>

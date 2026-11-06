@@ -38,6 +38,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: calc(100dvh - 32px); /* phone held sideways: scroll inside */
+  overflow-y: auto;
 }
 .close {
   position: absolute;

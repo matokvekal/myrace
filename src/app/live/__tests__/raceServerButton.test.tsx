@@ -10,11 +10,20 @@ vi.mock("@/services/live/liveClient", () => ({
   useLiveStore: (sel: (s: typeof state.store) => unknown) => sel(state.store),
 }));
 vi.mock("@/services/live/liveBridge", () => ({ isLiveRace: () => state.linked, LIVE_ACCESS_EVENT: "x" }));
-vi.mock("../RaceServerAction", () => ({ default: () => <section data-testid="race-server-action">panel</section> }));
+const inner = vi.hoisted(() => ({ open: false }));
+vi.mock("../RaceServerAction", () => ({
+  default: () => (
+    <section data-testid="race-server-action">
+      panel <button>Upload Race to Server</button>
+      {inner.open && <div role="dialog" data-testid="inner">publish</div>}
+    </section>
+  ),
+}));
 
 import RaceServerButton from "../RaceServerButton";
 
 beforeEach(() => {
+  inner.open = false;
   state.linked = false;
   state.store = { sync: {}, publishErrors: {}, online: true, socketConnected: true };
 });
@@ -47,5 +56,26 @@ describe("RaceServerButton", () => {
     state.store.sync = { r1: { pending: 2 } };
     rerender(<RaceServerButton raceUuid="r1" raceName="Race" />);
     expect(screen.getByTestId("race-server-open")).toHaveAttribute("data-tone", "wait");
+  });
+
+  it("moves focus into the dialog and back to the icon; Escape leaves it open while a nested dialog is open", () => {
+    render(<RaceServerButton raceUuid="r1" raceName="Race" />);
+    const icon = screen.getByTestId("race-server-open");
+    fireEvent.click(icon);
+    expect(document.activeElement).toBe(screen.getByLabelText("Close"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(document.activeElement).toBe(icon);
+
+    inner.open = true;
+    fireEvent.click(icon);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByTestId("race-server-modal")).toBeInTheDocument(); // only the inner one may close
+  });
+
+  it("the icon's label says the state for screen readers", () => {
+    state.linked = true;
+    state.store.sync = { r1: { pending: 1 } };
+    render(<RaceServerButton raceUuid="r1" raceName="Race" />);
+    expect(screen.getByTestId("race-server-open")).toHaveAttribute("aria-label", "On server — waiting to sync");
   });
 });

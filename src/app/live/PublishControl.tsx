@@ -15,6 +15,13 @@ export default function PublishControl({ raceUuid, raceName, compact = false }: 
   const [info, setInfo] = useState<ShareInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  // Escape closes this (top-most) dialog only; the Info modal around it ignores Escape while it is open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const load = useCallback(async () => {
     setError(null);
