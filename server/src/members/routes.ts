@@ -233,6 +233,7 @@ interface InvitationRow {
   revokedAt: Date | null;
   declinedAt: Date | null;
   createdBy: string;
+  ownerUserId: string;
   raceName: string;
   raceDate: string;
   invitedBy: string;
@@ -242,8 +243,8 @@ const invitationStatus = (i: InvitationRow) =>
   i.declinedAt ? "declined" : i.revokedAt ? "revoked" : i.expiresAt < new Date() ? "expired" : i.useCount >= i.maxUses ? "used" : "valid";
 
 const SELECT_INVITATION = `SELECT i.id, i."raceUuid", i.email, i."userId", i.roles, i.permissions, i."maxUses", i."useCount",
-         i."expiresAt", i."revokedAt", i."declinedAt", i."createdBy", r.name AS "raceName", r.date AS "raceDate", u.name AS "invitedBy"
-  FROM invitations i JOIN races r ON r.uuid = i."raceUuid" JOIN users u ON u.id = i."createdBy"`;
+         i."expiresAt", i."revokedAt", i."declinedAt", i."createdBy", r."ownerUserId", r.name AS "raceName", r.date AS "raceDate", u.name AS "invitedBy"
+  FROM invitations i JOIN races r ON r.uuid = i."raceUuid" AND r."deletedAt" IS NULL JOIN users u ON u.id = i."createdBy"`;
 
 /** May this user accept this invitation? Email invitations need that email verified on the account. */
 async function canAccept(d: Db, i: InvitationRow, userId: string): Promise<boolean> {
@@ -296,7 +297,9 @@ invitationsRouter.get("/:token", route(async (req, res) => {
   if (!i) throw new ApiError(404, "not_found", "Invitation not found");
   res.json({
     id: i.id, raceUuid: i.raceUuid, raceName: i.raceName, raceDate: i.raceDate, invitedBy: i.invitedBy, roles: i.roles,
-    waves: i.permissions.waves ?? null, status: invitationStatus(i), forEmail: i.email, canAccept: await canAccept(db, i, authed(req).userId),
+    waves: i.permissions.waves ?? null, status: invitationStatus(i), forEmail: i.email,
+    // An admin-like invitation from someone who is no longer the owner (e.g. after a transfer) can't be accepted.
+    canAccept: (await canAccept(db, i, authed(req).userId)) && !delegationError(i.createdBy === i.ownerUserId, null, i),
   });
 }));
 
@@ -334,7 +337,9 @@ myInvitationsRouter.post("/:id/decline", route(async (req, res) => {
   // Declined (0.2) is its own status — not the organizer's revoke. Audited by the invitee.
   const seq = await tx(async (d) => {
     const n = await d.query(
-      `UPDATE invitations SET "declinedAt" = now() WHERE id = $1 AND "declinedAt" IS NULL AND "revokedAt" IS NULL RETURNING "raceUuid"`, [i.id]);
+      `UPDATE invitations SET "declinedAt" = now()
+       WHERE id = $1 AND "declinedAt" IS NULL AND "revokedAt" IS NULL AND "useCount" < "maxUses" AND "expiresAt" > now()
+       RETURNING "raceUuid"`, [i.id]);
     return n.length ? logServerEvent(d, i.raceUuid, authed(req).userId, "RaceAdmin", { op: "invitationDeclined", invitationId: i.id }) : null;
   }).catch((e: { code?: string }) => {
     if (e?.code === "not_member") return null; // race gone meanwhile: nothing to decline

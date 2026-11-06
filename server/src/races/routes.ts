@@ -344,7 +344,7 @@ racesRouter.put("/:raceUuid/member-writes", route(async (req, res) => {
     return logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "memberWritesChanged", enabled });
   });
   if (seq) {
-    await refreshRaceSockets(m.raceUuid);
+    await refreshRaceSockets(m.raceUuid, m.userId);
     await announceSeq(m.raceUuid, seq);
   }
   res.json({ memberWrites: enabled });

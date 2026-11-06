@@ -148,10 +148,11 @@ export async function refreshMemberSockets(raceUuid: string, userId: string): Pr
 }
 
 /** A race-wide access change (e.g. member writes switched): refresh every joined member's sockets. */
-export async function refreshRaceSockets(raceUuid: string): Promise<void> {
+export async function refreshRaceSockets(raceUuid: string, exceptUserId?: string): Promise<void> {
   if (!io) return;
   const sockets = await io.of("/race").in(room(raceUuid)).fetchSockets();
   const users = new Set(sockets.map((s) => (s.data as SocketData).userId));
+  if (exceptUserId) users.delete(exceptUserId); // e.g. the owner: their access didn't change
   for (const userId of users) await refreshMemberSockets(raceUuid, userId);
 }
 

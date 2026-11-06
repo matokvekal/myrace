@@ -338,3 +338,36 @@ describe("invitation lifecycle", () => {
     expect((await accept(forB.token, a)).status).toBe(403); // wrong account
   });
 });
+
+describe("invitation edge cases (QA T3/T4)", () => {
+  it("a used invitation can't be declined afterwards; a deleted race's invitation is gone", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    const g = await newUser("P1G");
+    const inv = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token)).send({ userIds: [g.id], roles: ["viewer"], sendEmail: false });
+    const id = inv.body.invitations[0].id;
+    const token = String(inv.body.invitations[0].url).split("/invite/")[1];
+    expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(g.token))).status).toBe(200);
+    await api().post(`/api/v1/me/invitations/${id}/decline`).set(auth(g.token));
+    const row = await db.one<{ declinedAt: Date | null }>(`SELECT "declinedAt" FROM invitations WHERE id = $1`, [id]);
+    expect(row!.declinedAt).toBeNull();
+    expect((await adminEvents(race.raceUuid)).some((e) => e.payload.op === "invitationDeclined")).toBe(false);
+
+    const other = await publishRace(owner, 1, 1, 2);
+    const inv2 = await api().post(`/api/v1/races/${other.raceUuid}/invitations`).set(auth(owner.token)).send({ userIds: [g.id], roles: ["viewer"], sendEmail: false });
+    const token2 = String(inv2.body.invitations[0].url).split("/invite/")[1];
+    await api().delete(`/api/v1/races/${other.raceUuid}`).set(auth(owner.token));
+    expect((await api().post(`/api/v1/invitations/${token2}/accept`).set(auth(g.token))).status).toBe(404);
+    expect((await api().get("/api/v1/me/invitations").set(auth(g.token))).body.invitations.map((i: { raceUuid: string }) => i.raceUuid)).not.toContain(other.raceUuid);
+  });
+
+  it("after a transfer, the old owner's pending admin invitation shows as not acceptable", async () => {
+    const race = await publishRace(owner, 1, 1, 2);
+    await addMember(owner, race.raceUuid, admin, ["admin"]);
+    const inv = await api().post(`/api/v1/races/${race.raceUuid}/invitations`).set(auth(owner.token)).send({ link: true, roles: ["admin"], sendEmail: false });
+    const token = String(inv.body.invitations[0].url).split("/invite/")[1];
+    await api().post(`/api/v1/races/${race.raceUuid}/transfer`).set(auth(owner.token)).send({ userId: admin.id });
+    const info = await api().get(`/api/v1/invitations/${token}`).set(auth(outsider.token));
+    expect(info.body.canAccept).toBe(false);
+    expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(outsider.token))).status).toBe(403);
+  });
+});

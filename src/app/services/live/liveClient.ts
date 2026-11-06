@@ -409,7 +409,7 @@ const isRaceDeleted = (err: unknown) => err instanceof LiveApiError && err.statu
 
 /** Remove a deleted (or hidden) shared race from this device: link, queued Actions, access cache and local data. */
 export async function removeDeletedRace(local: string): Promise<void> {
-  const queued = await outboxList(local);
+  const queued = await outboxAll(local);
   await outboxDelete(queued.map((e) => e.actionId));
   detachRace(local);
   localStorage.removeItem(ACCESS_KEY(local));
@@ -540,6 +540,12 @@ interface OutboxEntry {
   userId: string | null;
   createdAt: number;
   action: RaceAction;
+  /**
+   * 0.2: the server answered "not applied". The entry is KEPT (never silently dropped) for
+   * the user to review; it is never sent again and leaves only when the user dismisses it
+   * (or the race itself is removed from this device).
+   */
+  rejected?: { reason: string; seq: number | null; at: number };
 }
 
 async function outboxPut(e: OutboxEntry) {
@@ -547,11 +553,48 @@ async function outboxPut(e: OutboxEntry) {
   await db.put("live_outbox", e);
   db.close();
 }
-async function outboxList(local: string): Promise<OutboxEntry[]> {
+/** Every entry of a race, sent-pending and rejected. */
+async function outboxAll(local: string): Promise<OutboxEntry[]> {
   const db = await initIndexedDB();
   const rows = (await db.getAllFromIndex("live_outbox", "byRace", local)) as OutboxEntry[];
   db.close();
   return rows.sort((a, b) => a.createdAt - b.createdAt);
+}
+/** Entries still waiting to be sent (rejected ones are kept apart, never re-sent). */
+async function outboxList(local: string): Promise<OutboxEntry[]> {
+  return (await outboxAll(local)).filter((e) => !e.rejected);
+}
+
+/** An Action the server did not apply, kept on this device for review (0.2). */
+export interface RejectedAction {
+  actionId: string;
+  type: string;
+  reason: string;
+  reasonText: string;
+  riderUuid: string | null;
+  createdAt: number;
+  rejectedAt: number;
+}
+const mine = (e: OutboxEntry) => e.userId === null || e.userId === session?.user.id;
+/** This account's rejected Actions for a race, oldest first (another account's are never shown). */
+export async function rejectedActions(local: string): Promise<RejectedAction[]> {
+  return (await outboxAll(local)).filter((e) => e.rejected && mine(e)).map((e) => ({
+    actionId: e.actionId,
+    type: e.action.type,
+    reason: e.rejected!.reason,
+    reasonText: REASON_TEXT[e.rejected!.reason] ?? e.rejected!.reason,
+    riderUuid: (e.action.payload as { riderUuid?: string }).riderUuid ?? null,
+    createdAt: Math.floor(e.createdAt / 1000),
+    rejectedAt: e.rejected!.at,
+  }));
+}
+const toNotApplied = (list: RejectedAction[]): RaceSync["notApplied"] => list.map((r) => ({ actionId: r.actionId, type: r.type, reason: r.reason }));
+/** The user reviewed these and lets them go. Only rejected entries of this account are removed. */
+export async function dismissRejected(local: string, actionIds: string[]): Promise<void> {
+  const ids = new Set(actionIds);
+  const gone = (await outboxAll(local)).filter((e) => e.rejected && mine(e) && ids.has(e.actionId)).map((e) => e.actionId);
+  await outboxDelete(gone);
+  setSync(local, { notApplied: toNotApplied(await rejectedActions(local)) });
 }
 async function outboxDelete(ids: string[]) {
   if (!ids.length) return;
@@ -644,15 +687,21 @@ export async function flush(local: string): Promise<void> {
       }
       const done: string[] = [];
       const rejected: RaceSync["notApplied"] = [];
+      const kept: OutboxEntry[] = [];
       results.forEach((r, i) => {
         const e = entries[i];
         if (!e) return;
-        done.push(e.actionId);
-        if (!r.applied) rejected.push({ actionId: e.actionId, type: e.action.type, reason: r.reason ?? "invalid" });
+        if (r.applied) done.push(e.actionId);
+        else {
+          rejected.push({ actionId: e.actionId, type: e.action.type, reason: r.reason ?? "invalid" });
+          kept.push({ ...e, rejected: { reason: r.reason ?? "invalid", seq: r.seq, at: Date.now() } });
+        }
       });
+      // Not applied ≠ lost: kept on the device (marked, never re-sent) until the user dismisses it.
+      for (const e of kept) await outboxPut(e);
       await outboxDelete(done);
       if (rejected.length) {
-        setSync(local, { notApplied: [...syncOf(local).notApplied, ...rejected].slice(-50) });
+        setSync(local, { notApplied: toNotApplied(await rejectedActions(local)) });
         const first = rejected[0];
         toast.warn(`Not applied: ${first.type} — ${REASON_TEXT[first.reason] ?? first.reason}`, { toastId: `na-${first.actionId}` });
       }
@@ -1148,7 +1197,7 @@ export async function openLiveRace(local: string | null): Promise<void> {
   const prevLink = prev ? linkOf(prev) : null;
   if (prevLink && socket?.connected) socket.emit("leave", { raceUuid: prevLink.serverRaceUuid });
   if (!local || !linkOf(local)) return;
-  setSync(local, { pending: await pendingCount(local) });
+  setSync(local, { pending: await pendingCount(local), notApplied: toNotApplied(await rejectedActions(local)) });
   if (ensureSocket()?.connected) await joinRoom(local);
   else await catchUp(local);
   void flush(local);
@@ -1479,8 +1528,12 @@ export const team = {
   official: (local: string) => api<{ versions: Record<string, unknown>[]; publicKey: string | null }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/official`),
   deleteRace: (local: string) => api("DELETE", `/races/${linkOf(local)!.serverRaceUuid}`),
   /** 0.2: owner switches judges' writes on/off for this race; access arrives over the socket. */
-  setMemberWrites: (local: string, enabled: boolean) =>
-    api<{ memberWrites: boolean }>("PUT", `/races/${linkOf(local)!.serverRaceUuid}/member-writes`, { enabled }),
+  setMemberWrites: async (local: string, enabled: boolean) => {
+    const r = await api<{ memberWrites: boolean }>("PUT", `/races/${linkOf(local)!.serverRaceUuid}/member-writes`, { enabled });
+    const a = accessFor(local);
+    if (a) cacheAccess(local, { ...a, memberWrites: r.memberWrites }); // the owner's socket gets no refresh
+    return r;
+  },
 };
 
 export interface Member {
