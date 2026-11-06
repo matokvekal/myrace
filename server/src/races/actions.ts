@@ -17,7 +17,7 @@ import { tx } from "../db/pool.js";
 import { ApiError, logger } from "../lib/core.js";
 import { publishChanges, type CommittedChanges } from "../realtime/socket.js";
 import { authorizeAction } from "../../../src/shared/race/access.js";
-import { PROTOCOL_VERSION, type RaceAction } from "../../../src/shared/race/actions.js";
+import { PROTOCOL_VERSION, UNDOABLE_ACTION_TYPES, type RaceAction } from "../../../src/shared/race/actions.js";
 import { actionHeat, applyAction, deriveRider, groupRiders, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
@@ -95,6 +95,23 @@ async function appendEvent(
   return s!.lastSeq;
 }
 
+/**
+ * 0.2 — a stale Undo: the rider has a NEWER correction (later in the race's order) that is
+ * still in effect, so undoing this older one would act on a view that is out of date. Checked
+ * inside the race lock in server order, so an Undo sent offline is judged when it arrives.
+ */
+async function newerCorrection(d: Db, raceUuid: string, t: { seq: number; payload: unknown }): Promise<boolean> {
+  const rider = (t.payload as { riderUuid?: string }).riderUuid;
+  return !!(await d.one(
+    `SELECT 1 FROM race_events c
+     WHERE c."raceUuid" = $1 AND c.type = 'LapCountCorrection' AND c.applied AND c.seq > $2 AND c.payload->>'riderUuid' = $3
+       AND NOT EXISTS (SELECT 1 FROM race_events u WHERE u."raceUuid" = $1 AND u.type = 'Undo' AND u.applied
+                       AND u.payload->>'targetActionId' = c."actionId"::text)
+     LIMIT 1`,
+    [raceUuid, t.seq, rider],
+  ));
+}
+
 export const isOfficial = async (d: Db, raceUuid: string) =>
   !!(await d.one(`SELECT 1 FROM official_versions WHERE "raceUuid" = $1`, [raceUuid]));
 
@@ -148,8 +165,8 @@ export async function processActions(raceUuid: string, userId: string, items: un
 
       let targets: Record<string, RaceAction> | undefined;
       if (!reason && a.type === "Undo") {
-        const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; applied: boolean }>(
-          `SELECT "actionId", "raceUuid", type, payload, applied FROM race_events WHERE "actionId" = $1`,
+        const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; applied: boolean; seq: number }>(
+          `SELECT "actionId", "raceUuid", type, payload, applied, seq FROM race_events WHERE "actionId" = $1`,
           [a.payload.targetActionId],
         );
         const alreadyUndone = await d.one(
@@ -157,7 +174,8 @@ export async function processActions(raceUuid: string, userId: string, items: un
           [raceUuid, a.payload.targetActionId],
         );
         // Undo reverses exactly its target: an applied AddLap/RiderFinished of this race, once.
-        if (!t || t.raceUuid !== raceUuid || !t.applied || !["AddLap", "RiderFinished"].includes(t.type) || alreadyUndone) reason = "invalid";
+        if (!t || t.raceUuid !== raceUuid || !t.applied || !(UNDOABLE_ACTION_TYPES as readonly string[]).includes(t.type) || alreadyUndone) reason = "invalid";
+        else if (t.type === "LapCountCorrection" && (await newerCorrection(d, raceUuid, t))) reason = "stale";
         else targets = { [t.actionId]: { ...a, actionId: t.actionId, type: t.type, payload: t.payload } as RaceAction };
       }
       if (!reason) {

@@ -660,6 +660,7 @@ const REASON_TEXT: Record<string, string> = {
   invalid: "not valid any more",
   race_official: "the race is final — the owner can include it in an amendment",
   not_member: "you are no longer a member of this race",
+  stale: "a newer correction of this rider replaced it",
 };
 
 /** Sends a race's queue in local order, one batch at a time. */

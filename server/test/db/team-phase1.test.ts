@@ -386,3 +386,101 @@ describe("invitation preview matches accept (QA T6)", () => {
     expect((await api().post(`/api/v1/invitations/${token}/accept`).set(auth(boss.token))).status).toBe(403);
   });
 });
+
+describe("undo of a lap correction (0.2 decision)", () => {
+  const setup = async () => {
+    const race = await publishRace(owner, 1, 2, 5);
+    const judge = await newUser("P1UndoJudge");
+    const counterU = await newUser("P1UndoCounter");
+    await addMember(owner, race.raceUuid, judge, ["results"]);
+    await addMember(owner, race.raceUuid, counterU, ["counter"]);
+    await db.query(`UPDATE races SET "memberWrites" = true WHERE uuid = $1`, [race.raceUuid]);
+    // Wave started 10 min ago; two recorded laps 4 min apart (past times: a future-dated event
+    // is held to its arrival, and the minimum-lap rule would drop the second).
+    const t0 = Date.now() - 600_000;
+    await send(owner, race.raceUuid, action(race.raceUuid, "WaveStarted", { heat: 1 }, { at: new Date(t0).toISOString() }));
+    const r = race.riders[0].uuid;
+    await send(owner, race.raceUuid,
+      action(race.raceUuid, "AddLap", { riderUuid: r }, { at: new Date(t0 + 240_000).toISOString() }),
+      action(race.raceUuid, "AddLap", { riderUuid: r }, { at: new Date(t0 + 480_000).toISOString() }));
+    return { race, judge, counterU, r };
+  };
+  const riderRow = async (raceUuid: string, r: string) =>
+    (await db.one<{ lapsCounter: number; lapsDetails: unknown[]; timeArrive: string | null }>(
+      `SELECT "lapsCounter", "lapsDetails", "timeArrive" FROM riders WHERE "raceUuid" = $1 AND uuid = $2`, [raceUuid, r]))!;
+
+  it("restores the recorded laps exactly (count AND lap details); the correction stays in the log; audited", async () => {
+    const { race, judge, r } = await setup();
+    const before = await riderRow(race.raceUuid, r);
+    expect(before.lapsCounter).toBe(2);
+    const fix = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 0 });
+    expect((await send(judge, race.raceUuid, fix))[0].applied).toBe(true);
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(0);
+
+    const undo = action(race.raceUuid, "Undo", { targetActionId: fix.actionId });
+    expect((await send(judge, race.raceUuid, undo))[0]).toMatchObject({ applied: true, reason: null });
+    const after = await riderRow(race.raceUuid, r);
+    expect(after.lapsCounter).toBe(2);
+    expect(after.lapsDetails).toEqual(before.lapsDetails);
+    expect(after.timeArrive).toBe(before.timeArrive);
+
+    const log = await db.query<{ actionId: string; type: string; userId: string; applied: boolean }>(
+      `SELECT "actionId", type, "userId", applied FROM race_events WHERE "actionId" = ANY($1::uuid[]) ORDER BY seq`, [[fix.actionId, undo.actionId]]);
+    expect(log.map((e) => [e.type, e.userId, e.applied])).toEqual([["LapCountCorrection", judge.id, true], ["Undo", judge.id, true]]);
+    // Undoing twice is refused.
+    expect((await send(judge, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: fix.actionId })))[0].reason).toBe("invalid");
+  });
+
+  it("only roles that may correct can undo a correction; a results judge still can't undo a lap", async () => {
+    const { race, judge, counterU, r } = await setup();
+    const viewer = await newUser("P1UndoViewer");
+    await addMember(owner, race.raceUuid, viewer, ["viewer"]);
+    const fix = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 1 });
+    await send(judge, race.raceUuid, fix);
+    expect((await send(viewer, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: fix.actionId })))[0].reason).toBe("forbidden");
+    expect((await send(counterU, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: fix.actionId })))[0].applied).toBe(true);
+    const lap = action(race.raceUuid, "AddLap", { riderUuid: race.riders[1].uuid }, { at: new Date(Date.now() - 60_000).toISOString() });
+    await send(owner, race.raceUuid, lap);
+    expect((await send(judge, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: lap.actionId })))[0].reason).toBe("forbidden");
+  });
+
+  it("a stale undo (a newer correction replaced the target) is refused — also when it arrives late from an offline device", async () => {
+    const { race, judge, counterU, r } = await setup();
+    const older = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 1 });
+    await send(judge, race.raceUuid, older);
+    // Offline phone prepared this Undo of `older` before the counter's newer correction...
+    const offlineUndo = action(race.raceUuid, "Undo", { targetActionId: older.actionId }, { at: new Date().toISOString() });
+    const newer = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 3 });
+    await send(counterU, race.raceUuid, newer);
+    // ...and delivers it afterwards: refused, the newer correction stands.
+    expect((await send(judge, race.raceUuid, offlineUndo))[0]).toMatchObject({ applied: false, reason: "stale" });
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(3);
+    // Once the newer one is undone, the older can be undone too (back to the recorded laps).
+    expect((await send(counterU, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: newer.actionId })))[0].applied).toBe(true);
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(1);
+    expect((await send(judge, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: older.actionId })))[0].applied).toBe(true);
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(2);
+  });
+
+  it("a correction of another race can't be undone through this race", async () => {
+    const a = await setup();
+    const b = await setup();
+    const fixB = action(b.race.raceUuid, "LapCountCorrection", { riderUuid: b.r, laps: 1 });
+    await send(owner, b.race.raceUuid, fixB);
+    expect((await send(owner, a.race.raceUuid, action(a.race.raceUuid, "Undo", { targetActionId: fixB.actionId })))[0].reason).toBe("invalid");
+    expect((await riderRow(b.race.raceUuid, b.r)).lapsCounter).toBe(1);
+  });
+
+  it("rider history (no Team access) gives the corrector actionId, laps and undone", async () => {
+    const { race, judge, r } = await setup();
+    const fix = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 1 });
+    await send(judge, race.raceUuid, fix);
+    const h = await api().get(`/api/v1/races/${race.raceUuid}/history?riderUuid=${r}`).set(auth(judge.token));
+    const ev = h.body.events.find((e: { type: string }) => e.type === "LapCountCorrection");
+    expect(ev).toMatchObject({ actionId: fix.actionId, laps: 1, undone: false });
+    expect(ev.userId).toBeUndefined(); // no authors/devices without Team
+    await send(judge, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: fix.actionId }));
+    const h2 = await api().get(`/api/v1/races/${race.raceUuid}/history?riderUuid=${r}`).set(auth(judge.token));
+    expect(h2.body.events.find((e: { type: string }) => e.type === "LapCountCorrection").undone).toBe(true);
+  });
+});

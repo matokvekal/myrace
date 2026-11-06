@@ -13,6 +13,7 @@
 --   role "results"            Results judge: lap-count and status corrections only.
 --   race_events "RaceAdmin"   Server-written audit entry for owner/admin operations
 --                             (transfer, publish, delete, invitations, member writes...).
+--   reason "stale"            An Undo of a lap correction that a newer correction replaced.
 
 ALTER TABLE races       ADD COLUMN IF NOT EXISTS "createdByUserId" uuid;
 ALTER TABLE races       ADD COLUMN IF NOT EXISTS "memberWrites" boolean NOT NULL DEFAULT false;
@@ -44,6 +45,10 @@ ALTER TABLE race_events ADD CONSTRAINT race_events_type_check CHECK (type IN (
   'RiderCheckedIn', 'CommentSet', 'RaceEdited', 'SettingChanged',
   'MemberChanged', 'Finalized', 'Amended',
   'RaceAdmin'));
+
+ALTER TABLE race_events DROP CONSTRAINT IF EXISTS race_events_reason_check;
+ALTER TABLE race_events ADD CONSTRAINT race_events_reason_check
+  CHECK (reason IN ('not_member', 'forbidden', 'out_of_scope', 'race_official', 'locked', 'invalid', 'upgrade_required', 'stale'));
 
 INSERT INTO schema_migrations (version) VALUES ('011-team-phase1') ON CONFLICT (version) DO NOTHING;
 

@@ -239,7 +239,9 @@ racesRouter.get("/:raceUuid/history", route(async (req, res) => {
   }
   const rows = await db.query<Record<string, unknown>>(
     `SELECT e.seq, e."actionId", e.type, e.payload, e.heat, e."deviceTime", e."clockOffsetMs", e."eventAt", e."clockCheck", e."serverReceivedAt", e.applied, e.reason,
-            e."deviceId", e."userId", u.name AS "userName"
+            e."deviceId", e."userId", u.name AS "userName",
+            EXISTS (SELECT 1 FROM race_events x WHERE x."raceUuid" = e."raceUuid" AND x.type = 'Undo' AND x.applied
+                    AND x.payload->>'targetActionId' = e."actionId"::text) AS undone
      FROM race_events e LEFT JOIN users u ON u.id = e."userId"
      WHERE e."raceUuid" = $1 AND e.seq > $2 AND ($3::text IS NULL OR e.payload->>'riderUuid' = $3)
        AND ($4::int[] IS NULL OR e.heat IS NULL OR e.heat = ANY($4::int[]))
@@ -247,7 +249,12 @@ racesRouter.get("/:raceUuid/history", route(async (req, res) => {
     [m.raceUuid, qs.afterSeq, qs.riderUuid ?? null, m.access.waves, qs.limit],
   );
   res.json({
-    events: rows.map((e) => (audit ? e : { seq: e.seq, type: e.type, eventAt: e.eventAt, applied: e.applied, reason: e.reason })),
+    // Without Team: the rider's own events, no authors/devices. actionId/undone/laps let a
+    // corrector find (and undo) the latest lap correction (0.2).
+    events: rows.map((e) => (audit ? e : {
+      seq: e.seq, type: e.type, eventAt: e.eventAt, applied: e.applied, reason: e.reason, actionId: e.actionId, undone: e.undone,
+      ...(e.type === "LapCountCorrection" ? { laps: (e.payload as { laps?: number }).laps } : {}),
+    })),
   });
 }));
 

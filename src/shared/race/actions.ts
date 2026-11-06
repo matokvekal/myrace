@@ -54,8 +54,12 @@ const ACTION_TYPE_SET: ReadonlySet<string> = new Set(ACTION_TYPES);
 export const isActionType = (value: unknown): value is ActionType =>
   typeof value === "string" && ACTION_TYPE_SET.has(value);
 
-/** The only Action types an `Undo` may target (AD-19). Status reversal is a StatusCorrection. */
-export const UNDOABLE_ACTION_TYPES = ["AddLap", "RiderFinished"] as const satisfies readonly ActionType[];
+/**
+ * The only Action types an `Undo` may target (AD-19). Status reversal is a StatusCorrection.
+ * 0.2: a LapCountCorrection can be undone too — by a new, audited Undo event (the correction
+ * stays in the log; the rider is re-derived from the marks without it).
+ */
+export const UNDOABLE_ACTION_TYPES = ["AddLap", "RiderFinished", "LapCountCorrection"] as const satisfies readonly ActionType[];
 
 /** Values a `StatusCorrection` can set. "running" = clear back to racing. */
 export type StatusCorrectionValue = "standing" | "running" | "DNF" | "DSQ" | "DNS";
@@ -123,6 +127,8 @@ export const NOT_APPLIED_REASONS = [
   "locked",
   "invalid",
   "upgrade_required",
+  /** 0.2: an Undo of a lap correction that a newer correction of the same rider replaced. */
+  "stale",
 ] as const;
 export type NotAppliedReason = (typeof NOT_APPLIED_REASONS)[number];
 

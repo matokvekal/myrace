@@ -25,6 +25,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 const raceState = vi.hoisted(() => ({ finalized: false }));
+const history = vi.hoisted(() => ({ events: [] as Record<string, unknown>[], fail: false }));
+vi.mock("@/services/live/liveClient", () => ({
+  team: { history: async () => { if (history.fail) throw new Error("offline"); return { events: history.events }; } },
+}));
 vi.mock("@/stores/racesStore", () => ({
   default: (sel: (s: { races: { uuid: string; finalized?: unknown }[] }) => unknown) =>
     sel({ races: [{ uuid: "race-1", finalized: raceState.finalized ? { token: "t" } : undefined }] }),
@@ -43,6 +47,8 @@ beforeEach(() => {
   bridge.dispatch.mockReset();
   bridge.dispatch.mockResolvedValue("id");
   raceState.finalized = false;
+  history.events = [];
+  history.fail = false;
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -105,5 +111,23 @@ describe("ResultCorrection", () => {
     fireEvent.click(screen.getByTestId("correct-status-DNF"));
     expect(await screen.findByRole("status")).toHaveTextContent(/doesn't allow/);
     expect(bridge.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("offers Undo for the latest correction still in effect (from history) and sends a new Undo event", async () => {
+    history.events = [
+      { type: "AddLap", applied: true, actionId: "lap-1" },
+      { type: "LapCountCorrection", applied: true, undone: false, actionId: "fix-1", laps: 2 },
+    ];
+    render(<ResultCorrection raceUuid="race-1" rider={as({ uuid: "rider-uuid-9" })} />);
+    fireEvent.click(await screen.findByTestId("correct-laps-undo"));
+    expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "Undo", { targetActionId: "fix-1" });
+    expect(await screen.findByRole("status")).toHaveTextContent(/undone/);
+  });
+
+  it("no Undo when the latest correction was already undone", async () => {
+    history.events = [{ type: "LapCountCorrection", applied: true, undone: true, actionId: "fix-1", laps: 2 }];
+    render(<ResultCorrection raceUuid="race-1" rider={as({ uuid: "rider-uuid-8" })} />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("correct-laps-undo")).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import useRaceStore from "@/stores/racesStore";
@@ -14,7 +14,27 @@ import styles from "./results.module.css";
  * Hidden: local races, a final race (corrections then go through Amend), a rider whose wave
  * hasn't started. Every change asks first. "Clear" is offered only to undo DNF/DSQ/DNS — never
  * on a rider who finished or is still standing, because clearing puts a rider back on course.
+ *
+ * Undo (0.2 decision): the rider's latest lap correction still in effect can be undone. That
+ * sends a NEW `Undo` event (nothing in the log is deleted or rewritten); the server re-derives
+ * the rider from the recorded laps, and refuses it as "stale" if a newer correction replaced it.
  */
+
+/** Corrections sent from this device this session (found again even before history loads / offline). */
+const sentHere = new Map<string, { actionId: string; laps: number }>();
+
+/** The rider's latest lap correction still in effect, from the race history (shared races). */
+async function latestCorrection(raceUuid: string, riderUuid: string): Promise<{ actionId: string; laps: number } | null> {
+  try {
+    const { team } = await import("@/services/live/liveClient");
+    const { events } = await team.history(raceUuid, riderUuid);
+    const last = [...events].reverse().find((e) => e.type === "LapCountCorrection" && e.applied);
+    if (!last || last.undone) return null;
+    return { actionId: String(last.actionId), laps: Number((last as { laps?: number; payload?: { laps?: number } }).laps ?? (last as { payload?: { laps?: number } }).payload?.laps ?? 0) };
+  } catch {
+    return sentHere.get(riderUuid) ?? null; // offline: what this device sent
+  }
+}
 type OutStatus = "DNF" | "DSQ" | "DNS";
 const OUT: OutStatus[] = ["DNF", "DSQ", "DNS"]; // project order: DNF → DSQ → DNS
 
@@ -32,6 +52,12 @@ function CorrectionForm({ raceUuid, rider }: { raceUuid: string; rider: RiderPro
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const isOut = (OUT as string[]).includes(rider.status);
+  const [lastFix, setLastFix] = useState<{ actionId: string; laps: number } | null>(sentHere.get(rider.uuid!) ?? null);
+  useEffect(() => {
+    let live = true;
+    void latestCorrection(raceUuid, rider.uuid!).then((c) => { if (live) setLastFix(c); });
+    return () => { live = false; };
+  }, [raceUuid, rider.uuid]);
 
   const send = async (type: "LapCountCorrection" | "StatusCorrection", payload: Record<string, unknown>, confirmText: string, done: string) => {
     if (busy) return;
@@ -42,7 +68,12 @@ function CorrectionForm({ raceUuid, rider }: { raceUuid: string; rider: RiderPro
     if (!window.confirm(confirmText)) return;
     setBusy(true);
     try {
-      await liveDispatch(raceUuid, type, payload);
+      const id = await liveDispatch(raceUuid, type, payload);
+      if (type === "LapCountCorrection" && id) {
+        const fix = { actionId: id, laps: Number(payload.laps) };
+        sentHere.set(rider.uuid!, fix);
+        setLastFix(fix);
+      }
       setNote(done);
     } catch (e) {
       setNote(t("results.correctFailed", "Could not send: {{msg}}", { msg: e instanceof Error ? e.message : String(e) }));
@@ -118,6 +149,34 @@ function CorrectionForm({ raceUuid, rider }: { raceUuid: string; rider: RiderPro
           </button>
         )}
       </div>
+      {lastFix && (
+        <div className={styles.correctionRow}>
+          <button
+            type="button"
+            disabled={busy}
+            data-testid="correct-laps-undo"
+            onClick={async () => {
+              if (busy) return;
+              if (!window.confirm(t("results.confirmUndo", "Undo the lap correction ({{laps}} laps) for {{name}}? The count goes back to the recorded laps.", { laps: lastFix.laps, name }))) return;
+              setBusy(true);
+              try {
+                // The server checks the role for the TARGET (a correction) and refuses a stale undo;
+                // a refusal is kept on this device for review.
+                await liveDispatch(raceUuid, "Undo", { targetActionId: lastFix.actionId });
+                sentHere.delete(rider.uuid!);
+                setLastFix(null);
+                setNote(t("results.undoSent", "Correction undone — sent."));
+              } catch (e) {
+                setNote(t("results.correctFailed", "Could not send: {{msg}}", { msg: e instanceof Error ? e.message : String(e) }));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {t("results.undoCorrection", "Undo lap correction ({{laps}} laps)", { laps: lastFix.laps })}
+          </button>
+        </div>
+      )}
       {note && <p className={styles.correctionNote} role="status">{note}</p>}
     </div>
   );

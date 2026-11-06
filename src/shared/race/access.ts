@@ -380,7 +380,9 @@ export function authorizeAction(access: EffectiveAccess, action: RaceAction, sta
       // A missing or non-undoable target is a recorded no-op for the reducer, but
       // the sender still needs lap-delete permission.
       if (!target || !("riderUuid" in target.payload)) return anyOf(access, [["live", "delete"]]) ? OK : forbidden;
-      return onRider((target.payload as { riderUuid: string }).riderUuid, [["live", "delete"]]);
+      // Undoing a lap-count correction needs the right to correct (results judge, counter in scope…).
+      const undoNeeds: Need[] = target.type === "LapCountCorrection" ? [["live", "update"], ["results", "update"]] : [["live", "delete"]];
+      return onRider((target.payload as { riderUuid: string }).riderUuid, undoNeeds);
     }
     case "LapCountCorrection":
       return onRider(action.payload.riderUuid, [["live", "update"], ["results", "update"]]);

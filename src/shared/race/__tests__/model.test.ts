@@ -42,13 +42,13 @@ describe("Action catalog", () => {
     expect(isActionType(undefined)).toBe(false);
   });
 
-  it("Undo may target only AddLap and RiderFinished", () => {
-    expect(UNDOABLE_ACTION_TYPES).toEqual(["AddLap", "RiderFinished"]);
+  it("Undo may target only AddLap, RiderFinished and (0.2 decision) LapCountCorrection", () => {
+    expect(UNDOABLE_ACTION_TYPES).toEqual(["AddLap", "RiderFinished", "LapCountCorrection"]);
   });
 
   it("not-applied reasons are the API error codes", () => {
     expect([...NOT_APPLIED_REASONS].sort()).toEqual(
-      ["forbidden", "invalid", "locked", "not_member", "out_of_scope", "race_official", "upgrade_required"],
+      ["forbidden", "invalid", "locked", "not_member", "out_of_scope", "race_official", "stale", "upgrade_required"],
     );
   });
 });
