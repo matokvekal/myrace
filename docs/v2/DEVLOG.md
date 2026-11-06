@@ -30,7 +30,7 @@ Plan: `version2.md` · Phase 1 plan: `docs/v2/1-phase1-plan.md` · Audit: `docs/
 | T4 | Invitation declined status (audited) | done | PASS w/ notes → decline only valid invites, deleted-race invites gone, transfer preview |
 | T5 | Rejected offline actions kept for review | done | PASS w/ notes → detach notice, bottom sheet, preview = accept check |
 | T6 | Results judge correction panel (Results tab) | done | PASS w/ notes → fixed: no Clear on finishers (HIGH), confirm every change, hidden before start, busy/error, i18n/a11y |
-| T7 | Undo of a lap correction (user decision 2026-11-06): new audited Undo event, stale undo refused (`stale`), history exposes actionId/undone | done | pending |
+| T7 | Undo of a lap correction (user decision 2026-11-06): new audited Undo event, stale undo refused (`stale`), history exposes actionId/undone | done | PASS w/ notes ×2 → fixed: event-time order for stale, shared check in amendments + rider re-derive, newest-in-effect on client, self-exclusion |
 
 ## Decisions taken by the manager (within the approved spec)
 - `canOnScreen` NOT made stricter (planned in 1-phase1-plan Step 8): it would redirect an owner

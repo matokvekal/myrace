@@ -29,7 +29,12 @@ async function latestCorrection(raceUuid: string, riderUuid: string): Promise<{ 
     const { team } = await import("@/services/live/liveClient");
     const { events } = await team.history(raceUuid, riderUuid);
     // The newest correction still in effect (an older one stays undoable after the newest is undone).
-    const last = [...events].reverse().find((e) => e.type === "LapCountCorrection" && e.applied && !e.undone);
+    // Race order = event time (as the server judges "stale"), not arrival order.
+    const at = (e: Record<string, unknown>) => Date.parse(String(e.eventAt ?? "")) || 0;
+    const last = events
+      .filter((e) => e.type === "LapCountCorrection" && e.applied && !e.undone)
+      .sort((a, b) => at(a) - at(b) || Number(a.seq ?? 0) - Number(b.seq ?? 0))
+      .at(-1);
     if (!last) return null;
     return { actionId: String(last.actionId), laps: Number((last as { laps?: number; payload?: { laps?: number } }).laps ?? (last as { payload?: { laps?: number } }).payload?.laps ?? 0) };
   } catch {

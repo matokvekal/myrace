@@ -127,11 +127,11 @@ export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: s
     const newer = await d.one(
       `SELECT 1 FROM race_events c
        WHERE c."raceUuid" = $1 AND c.type = 'LapCountCorrection' AND ${COUNTS("c", "$5")} AND c.payload->>'riderUuid' = $2
-         AND (c."eventAt", c.seq) > ($3::timestamptz, $4::bigint)
+         AND c."actionId" <> $6::uuid AND (c."eventAt", c.seq) > ($3::timestamptz, $4::bigint)
          AND NOT EXISTS (SELECT 1 FROM race_events u WHERE u."raceUuid" = $1 AND u.type = 'Undo' AND ${COUNTS("u", "$5")}
                          AND u.payload->>'targetActionId' = c."actionId"::text)
        LIMIT 1`,
-      [raceUuid, riderUuid, t.eventAt, t.seq, acceptedNow],
+      [raceUuid, riderUuid, t.eventAt, t.seq, acceptedNow, t.actionId],
     );
     if (newer) return { reason: "stale" };
   }

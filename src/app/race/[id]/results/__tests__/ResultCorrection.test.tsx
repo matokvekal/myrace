@@ -140,4 +140,14 @@ describe("ResultCorrection", () => {
     fireEvent.click(await screen.findByTestId("correct-laps-undo"));
     expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "Undo", { targetActionId: "fix-old" });
   });
+
+  it("picks the newest correction by event time (an offline one delivered late is older)", async () => {
+    history.events = [
+      { type: "LapCountCorrection", applied: true, undone: false, actionId: "made-later", laps: 4, seq: 10, eventAt: "2026-11-06T10:05:00Z" },
+      { type: "LapCountCorrection", applied: true, undone: false, actionId: "made-earlier-offline", laps: 1, seq: 11, eventAt: "2026-11-06T10:01:00Z" },
+    ];
+    render(<ResultCorrection raceUuid="race-1" rider={as({ uuid: "rider-uuid-6" })} />);
+    fireEvent.click(await screen.findByTestId("correct-laps-undo"));
+    expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "Undo", { targetActionId: "made-later" });
+  });
 });
