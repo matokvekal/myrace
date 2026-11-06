@@ -1,0 +1,20 @@
+/* Info tab: the server/sharing icon (opens the panel in a modal). 44 px touch target. */
+.iconBtn {
+  --tone: #e8770e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-inline-end: auto; /* sits at the start of the Info bar; Edit stays at the end */
+  border-radius: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  background: color-mix(in srgb, var(--tone) 10%, transparent);
+  color: var(--tone);
+  cursor: pointer;
+}
+.iconBtn:hover { background: color-mix(in srgb, var(--tone) 18%, transparent); }
+.iconBtn:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.iconBtn[data-tone="ok"] { --tone: #2a9d4b; }
+.iconBtn[data-tone="wait"] { --tone: #c98a00; }
+.iconBtn[data-tone="error"] { --tone: #d23b3b; }

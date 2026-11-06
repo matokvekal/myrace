@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_RACE_UUID } from "@/utils/demoSeed";
 // Upload / Share Race, next to Edit (server builds only; liveClient stays out of the eager bundle).
-const RaceServerAction = lazy(() => import("../../../live/RaceServerAction"));
+const RaceServerButton = lazy(() => import("../../../live/RaceServerButton"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 import styles from "./info.module.css";
 import { RaceProps } from "@/types/types";
@@ -450,15 +450,16 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
 
   return (
     <div className={styles.container}>
-      {/* Upload to server / Share Race: first thing on Info (server builds only). */}
-      {serverConfigured && !race.viewOnly && race.uuid !== DEMO_RACE_UUID && !editMode && (
-        <Suspense fallback={null}>
-          <RaceServerAction raceUuid={race.uuid} raceName={race.name} />
-        </Suspense>
-      )}
       {/* Edit / Save / Cancel bar — gone once the race is finalized: race
-          details are part of the signed record and the store rejects changes. */}
+          details are part of the signed record and the store rejects changes.
+          Server builds: the upload / sync / sharing panel sits behind one icon at the start
+          of this bar and opens in a modal (keeps Info clean). */}
       <div className={styles.editBar}>
+        {serverConfigured && !race.viewOnly && race.uuid !== DEMO_RACE_UUID && !editMode && (
+          <Suspense fallback={null}>
+            <RaceServerButton raceUuid={race.uuid} raceName={race.name} />
+          </Suspense>
+        )}
         {finalized ? (
           <span className={styles.lockedNote} data-testid="info-locked-note">
             <Lock size={13} /> Race details are locked
