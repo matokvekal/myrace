@@ -65,3 +65,18 @@ recorded crossing — no timestamp is invented. Where timing data is insufficien
 - Results show the count and the real last crossing; the correction itself is visible in the
   rider's history (Team/audit) — the official record stays explainable.
 Baseline e2e/type issues: see `docs/v2/baseline-issues.md`.
+
+## 2026-11-07 — Reprioritized: EVENT-READY release (user)
+P0: judges on one race end to end (invite existing/new users, accept, roles enforced, simultaneous
+work, live laps + sync + results + offline recovery, minimal judge/invitation UI, nothing else
+changes). P1 only if needed for P0: organizations, essential audit/permission fixes. P2 deferred:
+plans/quotas/billing, advanced org admin, nonessential management screens.
+- Management UI worker (P2-T5) stopped before writing any file — nothing lost.
+- Organizations backend (P2-T1…T4) stays committed (inactive unless used; no UI). Its last QA
+  (PASS WITH NOTES) findings are DEFERRED, none affect race judging:
+  M accept/revoke lock-order deadlock (accounts/invitations.ts accept vs DELETE);
+  L concurrent accepts → unique violation 500; L raceAccountFor role re-check after lock;
+  L preview shows forEmail/invitedBy to non-invitees; L invite volume/no rate limit + skipped userIds.
+- P0 approach: full local stack (API in NODE_ENV=test on an isolated *_e2e_test DB + Vite with
+  VITE_SERVER_URL) and multi-browser Playwright: existing multiuser/cloud-sync/race-persistence
+  specs + new 3-judge event spec.
