@@ -130,4 +130,14 @@ describe("ResultCorrection", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByTestId("correct-laps-undo")).toBeNull();
   });
+
+  it("after the newest correction was undone, offers Undo for the older one still in effect", async () => {
+    history.events = [
+      { type: "LapCountCorrection", applied: true, undone: false, actionId: "fix-old", laps: 1 },
+      { type: "LapCountCorrection", applied: true, undone: true, actionId: "fix-new", laps: 4 },
+    ];
+    render(<ResultCorrection raceUuid="race-1" rider={as({ uuid: "rider-uuid-7" })} />);
+    fireEvent.click(await screen.findByTestId("correct-laps-undo"));
+    expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "Undo", { targetActionId: "fix-old" });
+  });
 });

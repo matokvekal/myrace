@@ -29,7 +29,8 @@ Plan: `version2.md` · Phase 1 plan: `docs/v2/1-phase1-plan.md` · Audit: `docs/
 | T3 | Per-race member writes (owner switch, audited, socket refresh) | done | PASS w/ notes → owner skipped in refresh, cached access sync |
 | T4 | Invitation declined status (audited) | done | PASS w/ notes → decline only valid invites, deleted-race invites gone, transfer preview |
 | T5 | Rejected offline actions kept for review | done | PASS w/ notes → detach notice, bottom sheet, preview = accept check |
-| T6 | Results judge correction panel (Results tab) | done | pending |
+| T6 | Results judge correction panel (Results tab) | done | PASS w/ notes → fixed: no Clear on finishers (HIGH), confirm every change, hidden before start, busy/error, i18n/a11y |
+| T7 | Undo of a lap correction (user decision 2026-11-06): new audited Undo event, stale undo refused (`stale`), history exposes actionId/undone | done | pending |
 
 ## Decisions taken by the manager (within the approved spec)
 - `canOnScreen` NOT made stricter (planned in 1-phase1-plan Step 8): it would redirect an owner
@@ -39,3 +40,13 @@ Plan: `version2.md` · Phase 1 plan: `docs/v2/1-phase1-plan.md` · Audit: `docs/
   be accepted (preview shows canAccept=false). Follows decision 2 (only the CURRENT owner delegates admin).
 - Existing test `races.test.ts` "transfer…" changed expectation (old owner = creator now deletes for
   everyone) — required by decision 3.
+
+## Phase 1 regression (2026-11-06)
+- Server unit + DB (isolated Docker PG): 135/135. Client unit: 80 files / 583+ tests pass. Shared: 121.
+- Typecheck: only the 2 pre-existing test-file errors. Web build + verify-dist OK; server build OK;
+  new release markers present. Eager main chunk 85.19 kB gz — identical to baseline 0.1.17 (the
+  "~65 kB" in CLAUDE.md is out of date; not changed by 0.2).
+- Playwright (all specs, no server configured): 60 passed, 12 skipped, 12 failed. Baseline main
+  (0.1.17) run of the same 12: 11 fail there too (pre-existing): guest-share ×8, create-race:36,
+  i18n:44, ui-smoke:14. full-race-e2e:207 failed once under full-suite load; passes alone and 3/3
+  repeated on this branch → timing flake, not a regression.

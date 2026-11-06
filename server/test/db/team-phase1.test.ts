@@ -483,4 +483,49 @@ describe("undo of a lap correction (0.2 decision)", () => {
     const h2 = await api().get(`/api/v1/races/${race.raceUuid}/history?riderUuid=${r}`).set(auth(judge.token));
     expect(h2.body.events.find((e: { type: string }) => e.type === "LapCountCorrection").undone).toBe(true);
   });
+
+  it("'newer' follows race order (event time), so an offline correction delivered late is judged by when it happened", async () => {
+    const { race, judge, counterU, r } = await setup();
+    const now = Date.now();
+    // B was made later (event time) and arrives first; A was made earlier offline and arrives last.
+    const b = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 4 }, { at: new Date(now - 20_000).toISOString() });
+    const a = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 1 }, { at: new Date(now - 60_000).toISOString() });
+    await send(counterU, race.raceUuid, b);
+    await send(judge, race.raceUuid, a);
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(4); // B is the one in effect
+    expect((await send(judge, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: a.actionId })))[0].reason).toBe("stale");
+    expect((await send(judge, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: b.actionId })))[0].applied).toBe(true);
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(1); // back to A, which now counts
+  });
+
+  it("a judge can't undo a correction outside their waves", async () => {
+    const { race, r } = await setup();
+    const scoped = await newUser("P1Scoped");
+    await addMember(owner, race.raceUuid, scoped, ["results"], { waves: [2] });
+    const fix = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 1 });
+    await send(owner, race.raceUuid, fix);
+    expect((await send(scoped, race.raceUuid, action(race.raceUuid, "Undo", { targetActionId: fix.actionId })))[0].reason).toBe("out_of_scope");
+  });
+
+  it("an amendment applies the same Undo checks and re-derives the rider (incl. a late lap and its Undo together)", async () => {
+    const { race, r } = await setup();
+    const fix = action(race.raceUuid, "LapCountCorrection", { riderUuid: r, laps: 0 });
+    await send(owner, race.raceUuid, fix);
+    expect((await api().post(`/api/v1/races/${race.raceUuid}/finalize`).set(auth(owner.token))).status).toBe(201);
+    // Held back by the official result:
+    const undo = action(race.raceUuid, "Undo", { targetActionId: fix.actionId });
+    const undoAgain = action(race.raceUuid, "Undo", { targetActionId: fix.actionId });
+    const r2 = race.riders[1].uuid;
+    const lateLap = action(race.raceUuid, "AddLap", { riderUuid: r2 }, { at: new Date(Date.now() - 300_000).toISOString() });
+    const undoLate = action(race.raceUuid, "Undo", { targetActionId: lateLap.actionId });
+    const held = await send(owner, race.raceUuid, undo, undoAgain, lateLap, undoLate);
+    expect(held.map((x) => x.reason)).toEqual(["race_official", "race_official", "race_official", "race_official"]);
+    const amend = await api().post(`/api/v1/races/${race.raceUuid}/amend`).set(auth(owner.token))
+      .send({ reason: "undo wrong correction", includeActionIds: [undo.actionId, undoAgain.actionId, lateLap.actionId, undoLate.actionId] });
+    expect(amend.status).toBe(201);
+    // The duplicate Undo is not included; the rest are.
+    expect(amend.body.official.includeActionIds).toEqual([undo.actionId, lateLap.actionId, undoLate.actionId]);
+    expect((await riderRow(race.raceUuid, r)).lapsCounter).toBe(2); // correction undone → recorded laps
+    expect((await riderRow(race.raceUuid, r2)).lapsCounter).toBe(0); // late lap and its Undo cancel out
+  });
 });

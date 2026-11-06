@@ -28,8 +28,9 @@ async function latestCorrection(raceUuid: string, riderUuid: string): Promise<{ 
   try {
     const { team } = await import("@/services/live/liveClient");
     const { events } = await team.history(raceUuid, riderUuid);
-    const last = [...events].reverse().find((e) => e.type === "LapCountCorrection" && e.applied);
-    if (!last || last.undone) return null;
+    // The newest correction still in effect (an older one stays undoable after the newest is undone).
+    const last = [...events].reverse().find((e) => e.type === "LapCountCorrection" && e.applied && !e.undone);
+    if (!last) return null;
     return { actionId: String(last.actionId), laps: Number((last as { laps?: number; payload?: { laps?: number } }).laps ?? (last as { payload?: { laps?: number } }).payload?.laps ?? 0) };
   } catch {
     return sentHere.get(riderUuid) ?? null; // offline: what this device sent

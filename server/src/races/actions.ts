@@ -21,7 +21,7 @@ import { PROTOCOL_VERSION, UNDOABLE_ACTION_TYPES, type RaceAction } from "../../
 import { actionHeat, applyAction, deriveRider, groupRiders, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
-import { loadMarks, loadState, saveChanges } from "./repo.js";
+import { AMENDED_IDS, loadMarks, loadState, saveChanges } from "./repo.js";
 import { envelope, payloadError } from "./schemas.js";
 
 export interface ActionResult {
@@ -96,20 +96,46 @@ async function appendEvent(
 }
 
 /**
- * 0.2 — a stale Undo: the rider has a NEWER correction (later in the race's order) that is
- * still in effect, so undoing this older one would act on a view that is out of date. Checked
- * inside the race lock in server order, so an Undo sent offline is judged when it arrives.
+ * An event counts when applied, or accepted by an amendment (same rule as loadMarks) — including
+ * the amendment being built right now (`$P` = its accepted ids so far).
  */
-async function newerCorrection(d: Db, raceUuid: string, t: { seq: number; payload: unknown }): Promise<boolean> {
-  const rider = (t.payload as { riderUuid?: string }).riderUuid;
-  return !!(await d.one(
-    `SELECT 1 FROM race_events c
-     WHERE c."raceUuid" = $1 AND c.type = 'LapCountCorrection' AND c.applied AND c.seq > $2 AND c.payload->>'riderUuid' = $3
-       AND NOT EXISTS (SELECT 1 FROM race_events u WHERE u."raceUuid" = $1 AND u.type = 'Undo' AND u.applied
-                       AND u.payload->>'targetActionId' = c."actionId"::text)
-     LIMIT 1`,
-    [raceUuid, t.seq, rider],
-  ));
+const COUNTS = (alias: string, p: string) => `(${alias}.applied OR ${alias}."actionId" IN (${AMENDED_IDS}) OR ${alias}."actionId" = ANY(${p}::uuid[]))`;
+
+export interface UndoTarget { actionId: string; raceUuid: string; type: string; payload: unknown; riderUuid: string | null }
+
+/**
+ * The ONE check of an Undo's target, used by live Actions AND by amendments: the target is an
+ * undoable event of this race that counts and isn't undone yet; and (0.2) an Undo of a lap
+ * correction is "stale" when a NEWER correction of the same rider still counts. Newer = later in
+ * race order (event time, then seq) — the order the engine applies marks in, so an offline
+ * correction delivered late is judged by when it happened. Runs under the race row lock.
+ */
+export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: string, acceptedNow: readonly string[] = []): Promise<{ reason: "invalid" | "stale" } | { target: UndoTarget }> {
+  const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; counts: boolean; seq: number; eventAt: Date }>(
+    `SELECT e."actionId", e."raceUuid", e.type, e.payload, ${COUNTS("e", "$3")} AS counts, e.seq, e."eventAt"
+     FROM race_events e WHERE e."actionId" = $2 AND e."raceUuid" = $1`,
+    [raceUuid, targetActionId, acceptedNow],
+  );
+  if (!t || !t.counts || !(UNDOABLE_ACTION_TYPES as readonly string[]).includes(t.type)) return { reason: "invalid" };
+  const alreadyUndone = await d.one(
+    `SELECT 1 FROM race_events u WHERE u."raceUuid" = $1 AND u.type = 'Undo' AND ${COUNTS("u", "$3")} AND u.payload->>'targetActionId' = $2 LIMIT 1`,
+    [raceUuid, targetActionId, acceptedNow],
+  );
+  if (alreadyUndone) return { reason: "invalid" };
+  const riderUuid = (t.payload as { riderUuid?: string }).riderUuid ?? null;
+  if (t.type === "LapCountCorrection") {
+    const newer = await d.one(
+      `SELECT 1 FROM race_events c
+       WHERE c."raceUuid" = $1 AND c.type = 'LapCountCorrection' AND ${COUNTS("c", "$5")} AND c.payload->>'riderUuid' = $2
+         AND (c."eventAt", c.seq) > ($3::timestamptz, $4::bigint)
+         AND NOT EXISTS (SELECT 1 FROM race_events u WHERE u."raceUuid" = $1 AND u.type = 'Undo' AND ${COUNTS("u", "$5")}
+                         AND u.payload->>'targetActionId' = c."actionId"::text)
+       LIMIT 1`,
+      [raceUuid, riderUuid, t.eventAt, t.seq, acceptedNow],
+    );
+    if (newer) return { reason: "stale" };
+  }
+  return { target: { actionId: t.actionId, raceUuid: t.raceUuid, type: t.type, payload: t.payload, riderUuid } };
 }
 
 export const isOfficial = async (d: Db, raceUuid: string) =>
@@ -165,18 +191,9 @@ export async function processActions(raceUuid: string, userId: string, items: un
 
       let targets: Record<string, RaceAction> | undefined;
       if (!reason && a.type === "Undo") {
-        const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; applied: boolean; seq: number }>(
-          `SELECT "actionId", "raceUuid", type, payload, applied, seq FROM race_events WHERE "actionId" = $1`,
-          [a.payload.targetActionId],
-        );
-        const alreadyUndone = await d.one(
-          `SELECT 1 FROM race_events WHERE "raceUuid" = $1 AND type = 'Undo' AND applied AND payload->>'targetActionId' = $2`,
-          [raceUuid, a.payload.targetActionId],
-        );
-        // Undo reverses exactly its target: an applied AddLap/RiderFinished of this race, once.
-        if (!t || t.raceUuid !== raceUuid || !t.applied || !(UNDOABLE_ACTION_TYPES as readonly string[]).includes(t.type) || alreadyUndone) reason = "invalid";
-        else if (t.type === "LapCountCorrection" && (await newerCorrection(d, raceUuid, t))) reason = "stale";
-        else targets = { [t.actionId]: { ...a, actionId: t.actionId, type: t.type, payload: t.payload } as RaceAction };
+        const c = await checkUndoTarget(d, raceUuid, a.payload.targetActionId);
+        if ("reason" in c) reason = c.reason;
+        else targets = { [c.target.actionId]: { ...a, actionId: c.target.actionId, type: c.target.type, payload: c.target.payload } as RaceAction };
       }
       if (!reason) {
         const auth = authorizeAction(m.access, a, state, targets);

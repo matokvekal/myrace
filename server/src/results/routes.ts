@@ -25,7 +25,7 @@ import { actionTime, applyAction, categoryKey } from "../../../src/shared/race/e
 import { planFinalization } from "../../../src/shared/race/finalPlan.js";
 import type { RaceState, SharedRider } from "../../../src/shared/race/state.js";
 import { raceNotFound, requireMember, requireOwner } from "../races/access.js";
-import { rederive } from "../races/actions.js";
+import { checkUndoTarget, rederive } from "../races/actions.js";
 import { loadState, saveChanges } from "../races/repo.js";
 
 export const FINALIZE_SIGNATURE_VERSION = "commissaire-race-final/v1";
@@ -226,6 +226,18 @@ resultsRouter.post("/amend", route(async (req, res) => {
     const rederiveSet = new Set<string>();
     for (const a of late) {
       const action = { ...a, deviceTime: new Date(a.deviceTime as unknown as Date).toISOString() } as RaceAction;
+      if (action.type === "Undo") {
+        // Same checks as a live Undo (target, once, not stale). An Undo included earlier in this
+        // amendment counts as already undone. Its target's rider is re-derived.
+        const targetId = (action.payload as { targetActionId: string }).targetActionId;
+        // `included` = what this amendment already accepted: an Undo of a late lap included above
+        // counts, and a second Undo of the same target is refused as already undone.
+        const c = await checkUndoTarget(d, m.raceUuid, targetId, included);
+        if ("reason" in c) continue;
+        included.push(a.actionId);
+        if (c.target.riderUuid) rederiveSet.add(c.target.riderUuid);
+        continue;
+      }
       // A held-back late action keeps its original event time (never its arrival or amendment time).
       const r = applyAction(state, action, Number(a.eventAtMs));
       if (!r.applied) continue;

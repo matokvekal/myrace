@@ -54,7 +54,8 @@ export async function loadState(d: Db, raceUuid: string, lock = false): Promise<
 }
 
 /** Actions an official amendment accepted after the race was finalized (AD-13). */
-const AMENDED_IDS = `SELECT unnest("includeActionIds") FROM official_versions WHERE "raceUuid" = $1`;
+/** Actions an amendment accepted although they were held back (count as applied). `$1` = raceUuid. */
+export const AMENDED_IDS = `SELECT unnest("includeActionIds") FROM official_versions WHERE "raceUuid" = $1`;
 
 /** Applied (or amendment-accepted) lap marks of these riders, with undone marks flagged. */
 export async function loadMarks(d: Db, raceUuid: string, riderUuids: string[]): Promise<Map<string, RiderMark[]>> {
