@@ -261,3 +261,101 @@ describe("active organization: admin rights, isolation, member rules", () => {
     for (const secret of [alice.token, bob.token, "password", "tokenHash", "joinCode"]) expect(text).not.toContain(secret);
   });
 });
+
+describe("QA fixes: visibility, member list, audit, validation", () => {
+  let admin: TestUser, manager: TestUser, req: TestUser, other: TestUser, invitedU: TestUser, suspendedU: TestUser, judge: TestUser;
+  let org: string;
+
+  beforeAll(async () => {
+    [admin, manager, req, other, invitedU, suspendedU, judge] = await Promise.all(
+      ["QaAdmin", "QaManager", "QaReq", "QaOther", "QaInvited", "QaSuspended", "QaJudge"].map((n) => newUser(n)));
+    org = (await requestOrg(admin, "QA Club")).body.organization.id;
+    await activate(org, admin.id, "admin");
+    await addOrgMember(org, manager.id, "manager");
+    await addOrgMember(org, judge.id, "judge");
+  });
+
+  it("requester view: only while pending and only without any member row; requests list follows", async () => {
+    const pending = (await requestOrg(req, "Req Pending")).body.organization.id;
+    expect((await api().get(`/api/v1/organizations/${pending}`).set(auth(req.token))).status).toBe(200);
+    // A removed member row (any status) ends the requester view, also for the list.
+    await addOrgMember(pending, req.id, "member", "removed");
+    expect((await api().get(`/api/v1/organizations/${pending}`).set(auth(req.token))).status).toBe(404);
+    expect((await api().get("/api/v1/accounts").set(auth(req.token))).body.requests.map((o: { id: string }) => o.id)).not.toContain(pending);
+    // Activated without making the requester a member: no view, no request entry.
+    const activated = (await requestOrg(req, "Req Activated")).body.organization.id;
+    await db.query(`UPDATE accounts SET status = 'active' WHERE id = $1`, [activated]);
+    expect((await api().get(`/api/v1/organizations/${activated}`).set(auth(req.token))).status).toBe(404);
+    expect((await api().get("/api/v1/accounts").set(auth(req.token))).body.requests.map((o: { id: string }) => o.id)).not.toContain(activated);
+  });
+
+  it("GET /accounts never shows another user's pending request", async () => {
+    const theirs = (await requestOrg(req, "Not Yours")).body.organization.id;
+    const list = await api().get("/api/v1/accounts").set(auth(other.token));
+    expect(JSON.stringify(list.body)).not.toContain(theirs);
+    expect(list.body.requests).toEqual([]);
+  });
+
+  it("members with status invited or suspended can't see or act", async () => {
+    await addOrgMember(org, invitedU.id, "admin", "invited");
+    await addOrgMember(org, suspendedU.id, "admin", "suspended");
+    for (const u of [invitedU, suspendedU]) {
+      expect((await api().get(`/api/v1/organizations/${org}`).set(auth(u.token))).status).toBe(404);
+      expect((await api().get(`/api/v1/organizations/${org}/members`).set(auth(u.token))).status).toBe(404);
+      expect((await api().patch(`/api/v1/organizations/${org}`).set(auth(u.token)).send({ name: "Nope" })).status).toBe(404);
+      expect((await api().patch(`/api/v1/organizations/${org}/members/${judge.id}`).set(auth(u.token)).send({ role: "member" })).status).toBe(404);
+      expect((await api().delete(`/api/v1/organizations/${org}/members/${judge.id}`).set(auth(u.token))).status).toBe(404);
+    }
+    expect((await orgRole(db, org, judge.id))).toMatchObject({ role: "judge", status: "active" });
+  });
+
+  it("member emails only for owner/admin; a manager gets name/role/status", async () => {
+    const asAdmin = await api().get(`/api/v1/organizations/${org}/members`).set(auth(admin.token));
+    expect(asAdmin.body.members.find((m: { userId: string }) => m.userId === judge.id).email).toBe(judge.email);
+    const asManager = await api().get(`/api/v1/organizations/${org}/members`).set(auth(manager.token));
+    expect(asManager.status).toBe(200);
+    for (const m of asManager.body.members) expect(m).not.toHaveProperty("email");
+    expect(JSON.stringify(asManager.body)).not.toContain(judge.email);
+  });
+
+  it("admin changing their own role → 403; PATCH/DELETE on a removed member → 404; non-uuid ids → 404", async () => {
+    const self = await api().patch(`/api/v1/organizations/${org}/members/${admin.id}`).set(auth(admin.token)).send({ role: "manager" });
+    expect(self.status).toBe(403);
+    expect((await orgRole(db, org, admin.id))!.role).toBe("admin");
+    const gone = await newUser("QaGone");
+    await addOrgMember(org, gone.id, "member", "removed");
+    expect((await api().patch(`/api/v1/organizations/${org}/members/${gone.id}`).set(auth(admin.token)).send({ role: "judge" })).status).toBe(404);
+    expect((await api().delete(`/api/v1/organizations/${org}/members/${gone.id}`).set(auth(admin.token))).status).toBe(404);
+    expect((await orgRole(db, org, gone.id))).toMatchObject({ role: "member", status: "removed" });
+    expect((await api().patch(`/api/v1/organizations/${org}/members/not-a-uuid`).set(auth(admin.token)).send({ role: "judge" })).status).toBe(404);
+    expect((await api().delete(`/api/v1/organizations/${org}/members/123`).set(auth(admin.token))).status).toBe(404);
+    expect((await api().patch(`/api/v1/organizations/not-a-uuid`).set(auth(admin.token)).send({ name: "Xx" })).status).toBe(404);
+    expect((await api().get(`/api/v1/organizations/not-a-uuid/members`).set(auth(admin.token))).status).toBe(404);
+  });
+
+  it("PATCH with unknown fields → 400 and nothing changes", async () => {
+    for (const body of [{ status: "active" }, { slug: "new-slug" }, { name: "Ok Name", requestedBy: admin.id }]) {
+      expect((await api().patch(`/api/v1/organizations/${org}`).set(auth(admin.token)).send(body)).status).toBe(400);
+    }
+    expect((await db.one<{ name: string }>(`SELECT name FROM accounts WHERE id = $1`, [org]))!.name).toBe("QA Club");
+    expect((await api().patch(`/api/v1/organizations/${org}/members/${judge.id}`).set(auth(admin.token)).send({ role: "member", status: "removed" })).status).toBe(400);
+  });
+
+  it("organization.updated audit: field names always, values for name/description only, never contact", async () => {
+    const r = await api().patch(`/api/v1/organizations/${org}`).set(auth(admin.token))
+      .send({ name: "QA Club 2", description: "About us", contact: "secret-phone-0501234567" });
+    expect(r.status).toBe(200);
+    const last = (await auditOf(org)).at(-1)!;
+    expect(last.data.fields).toEqual(["name", "description", "contact"]);
+    expect(last.data.name).toEqual({ from: "QA Club", to: "QA Club 2" });
+    expect(last.data.description).toEqual({ from: "", to: "About us" });
+    expect(last.data).not.toHaveProperty("contact");
+    expect(JSON.stringify(last.data)).not.toContain("0501234567");
+  });
+
+  it("the personal account name is read live from users.name", async () => {
+    await db.query(`UPDATE users SET name = 'Renamed Other' WHERE id = $1`, [other.id]);
+    const r = await api().get("/api/v1/accounts").set(auth(other.token));
+    expect(r.body.personal.name).toBe("Renamed Other");
+  });
+});

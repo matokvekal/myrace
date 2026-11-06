@@ -45,6 +45,10 @@ On the server, as the admin:
    release's `server/` (read-only). If it lists missing SQL files, apply exactly
    those from `server/sql/` by hand, in order, then check again. Never run
    `000-create-database.sql` on an existing database.
+   **0.2 (migrations 011 and 012):** apply them in order, each as ONE transaction,
+   BEFORE starting the new server: `psql -1 -v ON_ERROR_STOP=1 -f sql/011-team-phase1.sql`, then
+   `psql -1 -v ON_ERROR_STOP=1 -f sql/012-organizations.sql` (`-1` = single transaction, so a
+   failure leaves nothing half-applied). The new API refuses to start until both are recorded.
 4. **API**: unpack to a new release folder, link `server/.env` to the shared
    production `.env` (template: `server/deploy/production.env.example`), point
    PM2's `server-commissaire` at it (`server/deploy/ecosystem.config.cjs`; it reads

@@ -22,3 +22,15 @@ organization.requested
 organization.member_role_changed
 /:accountId/members/:userId
 ensurePersonalAccount
+/org-invite/
+organization.invitation_created
+organization.invitation_accepted
+organization.invitation_declined
+organization.invitation_revoked
+member_suspended
+/:accountId/invitations
+/:accountId/races
+/api/v1/account-invitations
+/api/v1/me/account-invitations
+not_org_staff
+organization.race_created

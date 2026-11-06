@@ -19,6 +19,7 @@ import { shareTokenFor } from "../public/shareToken.js";
 import { processActions } from "./actions.js";
 import { announceSeq, logServerEvent } from "./audit.js";
 import { insertRace, loadState } from "./repo.js";
+import { logAudit, raceAccountFor } from "../accounts/accounts.js";
 import { newCategory, newRider } from "./schemas.js";
 
 export const racesRouter = Router();
@@ -52,6 +53,24 @@ const raceInfo = z
   .partial()
   .required({ name: true });
 
+/** Optional target account of a new race (0.2 P2-T4); default = my personal account. */
+const accountChoice = z.object({ accountId: z.string().uuid().optional() });
+
+/**
+ * Inserts a new race under the chosen account (personal, or an active org where I'm staff —
+ * else 403 not_org_staff). Creator/owner stay me. An org race is audited in audit_logs.
+ */
+async function insertRaceFor(d: import("../db/pool.js").Db, state: RaceState, userId: string, accountId: string | undefined) {
+  const account = await raceAccountFor(d, userId, accountId);
+  await insertRace(d, state, account.accountId);
+  if (account.organization) {
+    await logAudit(d, {
+      accountId: account.accountId, raceUuid: state.race.uuid, actorUserId: userId, action: "organization.race_created",
+      entityType: "race", entityId: state.race.uuid, data: { name: state.race.name },
+    });
+  }
+}
+
 async function addOwnerMembership(d: import("../db/pool.js").Db, raceUuid: string, userId: string) {
   await d.query(`INSERT INTO race_members ("raceUuid", "userId", roles, "addedBy") VALUES ($1, $2, '{admin}', $2)`, [raceUuid, userId]);
 }
@@ -59,11 +78,12 @@ async function addOwnerMembership(d: import("../db/pool.js").Db, raceUuid: strin
 /** POST /races — a new, empty shared race owned by the caller. */
 racesRouter.post("/", route(async (req, res) => {
   const info = raceInfo.parse(req.body);
+  const { accountId } = accountChoice.parse(req.body);
   const userId = authed(req).userId;
   // A new race gets the current default minimum lap (180 s) unless it says otherwise.
   const state: RaceState = { race: blankRace(randomUUID(), userId, { minLapSeconds: DEFAULT_MIN_LAP_SECONDS, ...(info as Partial<SharedRace>) }), categories: {}, riders: {} };
   await tx(async (d) => {
-    await insertRace(d, state);
+    await insertRaceFor(d, state, userId, accountId);
     await addOwnerMembership(d, state.race.uuid, userId);
     await d.query(`INSERT INTO race_snapshots ("raceUuid", seq, data) VALUES ($1, 0, $2)`, [state.race.uuid, JSON.stringify(state)]);
   });
@@ -79,6 +99,7 @@ const publishBody = z.object({
   race: raceInfo,
   categories: z.array(newCategory).max(500),
   riders: z.array(newRider.extend({ checked: z.boolean().optional(), status: z.enum(["standing", "DNS"]).optional() })).max(5000),
+  accountId: z.string().uuid().optional(),
 });
 racesRouter.post("/publish", route(async (req, res) => {
   const body = publishBody.parse(req.body);
@@ -114,7 +135,7 @@ racesRouter.post("/publish", route(async (req, res) => {
       [Object.keys(state.riders), Object.keys(state.categories)],
     );
     if (clash) throw new ApiError(409, "already_published", "This race was already published");
-    await insertRace(d, state);
+    await insertRaceFor(d, state, userId, body.accountId);
     await addOwnerMembership(d, raceUuid, userId);
     await d.query(`INSERT INTO race_snapshots ("raceUuid", seq, data) VALUES ($1, 0, $2)`, [raceUuid, JSON.stringify(state)]);
   });
@@ -128,8 +149,8 @@ racesRouter.post("/publish", route(async (req, res) => {
  */
 racesRouter.get("/", route(async (req, res) => {
   const userId = authed(req).userId;
-  const rows = await db.query<{ uuid: string; deletedAt: Date | null; hidden: boolean; publishedAt: Date | null }>(
-    `SELECT r.uuid, r."deletedAt", r."publishedAt", (h."userId" IS NOT NULL) AS hidden
+  const rows = await db.query<{ uuid: string; deletedAt: Date | null; hidden: boolean; publishedAt: Date | null; accountId: string | null }>(
+    `SELECT r.uuid, r."deletedAt", r."publishedAt", r."accountId", (h."userId" IS NOT NULL) AS hidden
      FROM races r
      LEFT JOIN race_members m ON m."raceUuid" = r.uuid AND m."userId" = $1 AND m."revokedAt" IS NULL
      LEFT JOIN race_hidden h ON h."raceUuid" = r.uuid AND h."userId" = $1
@@ -146,7 +167,7 @@ racesRouter.get("/", route(async (req, res) => {
     const m = await loadMembership(db, row.uuid, userId).catch(() => null);
     const state = await loadState(db, row.uuid);
     if (!m || m.revoked || !state) continue;
-    out.push({ race: projectRace(m.access, state.race), access: accessSummary(m), published: m.isOwner ? row.publishedAt !== null : undefined });
+    out.push({ race: projectRace(m.access, state.race), access: accessSummary(m), published: m.isOwner ? row.publishedAt !== null : undefined, accountId: row.accountId });
   }
   res.json({ races: out, removed });
 }));
