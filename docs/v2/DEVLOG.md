@@ -12,6 +12,9 @@ Plan: `version2.md` · Phase 1 plan: `docs/v2/1-phase1-plan.md` · Audit: `docs/
 | 2026-11-05 | Results judge: lap/status corrections; finalize/amend owner-only | user decision 4 |
 | 2026-11-05 | Legacy race with unknown creator (no seq-0 snapshot) → current owner may delete (today's behaviour) | manager default, reported for review |
 | 2026-11-05 | DB tests run on isolated Docker PostgreSQL (user instruction), loopback-only guard | user instruction |
+| 2026-11-06 | Lap corrections support Undo: new audited Undo event, stale undo refused | user decision |
+| 2026-11-06 | Ranking after an UPWARD lap correction: keep engine behaviour — corrected lap count + the last ACTUAL recorded crossing time; never invent timestamps | user decision |
+| 2026-11-06 | Phase 1 accepted; Phase 2 = Organizations | user |
 
 ## Baseline (before any 0.2 code)
 - Client unit: 78 files / 571 tests pass. Server unit + DB (isolated): 108 tests, 4 failed before fixes:
@@ -50,3 +53,15 @@ Plan: `version2.md` · Phase 1 plan: `docs/v2/1-phase1-plan.md` · Audit: `docs/
   (0.1.17) run of the same 12: 11 fail there too (pre-existing): guest-share ×8, create-race:36,
   i18n:44, ui-smoke:14. full-race-e2e:207 failed once under full-suite load; passes alone and 3/3
   repeated on this branch → timing flake, not a regression.
+
+## Ranking ambiguity (documented per user decision 2026-11-06)
+A lap correction changes the COUNT, not the timing. Ranking is "more laps first, then earlier last
+arrival" (`rankRiders`). After an upward correction the rider's arrival time is their last ACTUALLY
+recorded crossing — no timestamp is invented. Where timing data is insufficient this is ambiguous:
+- Two riders with equal (corrected) laps: the corrected one is ordered by an older crossing, so may
+  rank AHEAD of a rider who really crossed that lap later. Commissaires must check such pairs.
+- A corrected rider with no recorded crossing at all has no arrival time; they rank after riders
+  with the same lap count that have one (null arrival sorts last).
+- Results show the count and the real last crossing; the correction itself is visible in the
+  rider's history (Team/audit) — the official record stays explainable.
+Baseline e2e/type issues: see `docs/v2/baseline-issues.md`.
