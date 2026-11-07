@@ -5,6 +5,7 @@
  *   cd server && npm run e2e:stack              # DB + API :4100 + app :3100, Ctrl+C stops all
  *   npm run e2e:stack -- --no-app               # DB + API only
  *   npm run e2e:stack -- --no-build             # reuse server/dist
+ *   npm run e2e:stack -- --stop                 # stop the API/app of a run killed without Ctrl+C
  *
  * 1. Starts the isolated PostgreSQL of docker-compose.test.yml (127.0.0.1:55432).
  * 2. Creates a SEPARATE database `commissaire_e2e_test` in it if missing (the unit/DB
@@ -21,7 +22,7 @@
  *       E2E_BASE_URL=http://localhost:3100 npx playwright test tests/event-judges.spec.ts
  */
 import { spawn, spawnSync } from "node:child_process";
-import { createWriteStream, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +40,21 @@ const E2E_DB = "commissaire_e2e_test";
 const E2E_URL = `postgresql://commissaire_test:commissaire_test@${HOST}/${E2E_DB}`;
 const logDir = join(tmpdir(), "commissaire-e2e");
 mkdirSync(logDir, { recursive: true });
+const pidFile = join(logDir, "pids.json");
+
+// Processes of an earlier run that was killed without Ctrl+C (e.g. its terminal closed):
+// stop them first, so two stacks never run at once. `--stop` does only this.
+function killPrevious() {
+  let pids = [];
+  try { pids = JSON.parse(readFileSync(pidFile, "utf8")); } catch { return; }
+  for (const pid of pids) {
+    if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" });
+    else try { process.kill(pid, "SIGTERM"); } catch { /* gone */ }
+  }
+  try { unlinkSync(pidFile); } catch { /* gone */ }
+}
+killPrevious();
+if (args.has("--stop")) process.exit(0);
 
 // Guard: only a *_test database on loopback, ever.
 const u = new URL(E2E_URL);
@@ -88,6 +104,7 @@ const start = (label, cmd, a, cwd, env) => {
     if (!stopping) stop(1);
   });
   children.push(p);
+  writeFileSync(pidFile, JSON.stringify(children.map((c) => c.pid)));
   return p;
 };
 const apiEnv = {
@@ -130,10 +147,21 @@ function stop(code = 0) {
     if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(p.pid), "/T", "/F"], { stdio: "ignore" });
     else p.kill("SIGTERM");
   }
+  try { unlinkSync(pidFile); } catch { /* gone */ }
   process.exit(code);
 }
 process.on("SIGINT", () => stop(0));
 process.on("SIGTERM", () => stop(0));
+// Windows: killing the npm/shell that started us sends no signal, which used to leave the
+// API and Vite running (and holding memory). Stop when the parent process is gone.
+const parentPid = process.ppid;
+setInterval(() => {
+  try {
+    process.kill(parentPid, 0);
+  } catch {
+    stop(0);
+  }
+}, 2000).unref();
 
 await waitFor(`http://127.0.0.1:${API_PORT}/api/v1/health`, "API");
 if (!args.has("--no-app")) await waitFor(`http://localhost:${APP_PORT}/`, "App");

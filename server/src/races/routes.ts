@@ -205,17 +205,27 @@ racesRouter.get("/:raceUuid/snapshot", route(async (req, res) => {
 racesRouter.get("/:raceUuid/changes", route(async (req, res) => {
   const afterSeq = z.coerce.number().int().min(0).parse(req.query.afterSeq ?? 0);
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
-  const state = await loadState(db, m.raceUuid);
-  if (!state) throw raceNotFound();
-  if (state.race.lastSeq - afterSeq > 5000) return res.json({ snapshot: true, lastSeq: state.race.lastSeq });
-  const riders = await db.query<{ uuid: string }>(`SELECT uuid FROM riders WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [m.raceUuid, afterSeq]);
-  const cats = await db.query<{ uuid: string }>(`SELECT uuid FROM categories WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [m.raceUuid, afterSeq]);
-  const raceChanged = await db.one(`SELECT 1 FROM races WHERE uuid = $1 AND "changedSeq" > $2`, [m.raceUuid, afterSeq]);
-  const removed = await db.query<{ type: string; uuid: string; heat: number | null }>(
-    `SELECT type, COALESCE(payload->>'riderUuid', payload->>'categoryUuid') AS uuid, heat FROM race_events
-     WHERE "raceUuid" = $1 AND seq > $2 AND applied AND type IN ('RiderDeleted', 'CategoryDeleted')`,
-    [m.raceUuid, afterSeq],
-  );
+  // ONE consistent snapshot: read separately, an Action committed between loadState and the
+  // changedSeq queries listed a rider as changed but returned its OLDER row, with a lastSeq
+  // the Device then believed it had — the newer lap was silently lost on that Device.
+  const read = await tx(async (t) => {
+    await t.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    const state = await loadState(t, m.raceUuid);
+    if (!state) throw raceNotFound();
+    if (state.race.lastSeq - afterSeq > 5000) return { state, far: true as const };
+    const riders = await t.query<{ uuid: string }>(`SELECT uuid FROM riders WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [m.raceUuid, afterSeq]);
+    const cats = await t.query<{ uuid: string }>(`SELECT uuid FROM categories WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [m.raceUuid, afterSeq]);
+    const raceChanged = await t.one(`SELECT 1 FROM races WHERE uuid = $1 AND "changedSeq" > $2`, [m.raceUuid, afterSeq]);
+    const removed = await t.query<{ type: string; uuid: string; heat: number | null }>(
+      `SELECT type, COALESCE(payload->>'riderUuid', payload->>'categoryUuid') AS uuid, heat FROM race_events
+       WHERE "raceUuid" = $1 AND seq > $2 AND applied AND type IN ('RiderDeleted', 'CategoryDeleted')`,
+      [m.raceUuid, afterSeq],
+    );
+    return { state, far: false as const, riders, cats, raceChanged, removed };
+  });
+  const { state } = read;
+  if (read.far) return res.json({ snapshot: true, lastSeq: state.race.lastSeq });
+  const { riders, cats, raceChanged, removed } = read;
   const visibleRemovals = removed.filter((r) => m.access.waves === null || waveInScope(m.access, r.heat));
   res.json({
     lastSeq: state.race.lastSeq,
