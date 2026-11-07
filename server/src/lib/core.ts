@@ -5,7 +5,8 @@ import pino from "pino";
 import { env } from "../config/env.js";
 
 export const logger = pino({
-  level: env.NODE_ENV === "test" ? "silent" : env.LOG_LEVEL,
+  // Tests are silent unless LOG_LEVEL is set explicitly (the e2e stack logs "sent" mail to its api.log).
+  level: env.NODE_ENV === "test" && !process.env.LOG_LEVEL ? "silent" : env.LOG_LEVEL,
   // Never log secrets, tokens or rider personal data.
   redact: ["req.headers.authorization", "req.headers.cookie", "*.password", "*.refreshToken", "*.code", "*.token"],
 });

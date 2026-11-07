@@ -64,14 +64,21 @@ async function seedLocalRace(page: Page, raceName = "Shared E2E Race"): Promise<
   }, { w1: WAVE1, w2: WAVE2, raceName });
 }
 
+/** 0.2: members may write only once the owner switches judging on for this race. */
+async function enableJudging(page: Page) {
+  const toggle = page.getByTestId("member-writes-toggle");
+  await expect(toggle).not.toBeChecked();
+  await toggle.click(); // flips once the server agreed
+  await expect(toggle).toBeChecked();
+}
+
 const lapsOn = async (page: Page, bib: number) => Number(((await racingCard(page, bib).getAttribute("data-laps")) ?? "0/0").split("/")[0]);
 
 /** Shares the open local race from the Team tab and returns an admin invitation link (path only). */
 async function shareWithAdminLink(page: Page, localUuid: string): Promise<string> {
-  await page.goto(`/race/${localUuid}`);
-  await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.goto(`/race/${localUuid}/team`);
   await page.getByTestId("publish-race").click();
-  await expect(page.getByTestId("sync-badge")).toContainText("Synced");
+  await enableJudging(page);
   const linkEditor = page.locator("text=Roles (any combination)").locator("..").nth(1);
   await linkEditor.getByRole("button", { name: "Viewer (read-only)" }).click(); // off
   await linkEditor.getByRole("button", { name: "Admin", exact: true }).click(); // on
@@ -119,11 +126,10 @@ test("two commissaires run one shared race live, both ways, within their waves",
   let localUuid = "";
   await test.step("owner shares a local race from the Team tab", async () => {
     localUuid = await seedLocalRace(A.page);
-    await A.page.goto(`/race/${localUuid}`);
-    await A.page.getByRole("button", { name: "Team", exact: true }).click();
+    await A.page.goto(`/race/${localUuid}/team`);
     await A.page.getByTestId("publish-race").click();
     await expect(A.page.getByText("Invite commissaires")).toBeVisible();
-    await expect(A.page.getByTestId("sync-badge")).toContainText("Synced");
+    await enableJudging(A.page);
   });
 
   let inviteUrl = "";
@@ -156,6 +162,7 @@ test("two commissaires run one shared race live, both ways, within their waves",
   });
 
   await test.step("owner starts wave 1 on the Grid; the counter's app sees it", async () => {
+    await A.page.goto(`/race/${localUuid}`);
     await gotoRaceMode(A.page, "Race");
     await selectWave(A.page, 1);
     await openRaceView(A.page, "Grid");

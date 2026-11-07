@@ -39,3 +39,21 @@ undo, catch-up (`lifecycle`, `races`, `recovered-lap`), the 2026-11-04 wave-star
 
 Not restored yet (they started an in-process PGlite and need a rewrite for a real server):
 `migration-009`, `startup-schema`, `tls`, `dist-smoke`.
+
+## Multi-user browser specs (local full stack)
+
+`cd server && npm run e2e:stack` (`scripts/e2e-stack.mjs`) runs everything locally, never production:
+the compose PostgreSQL above, a SEPARATE database `commissaire_e2e_test` in it (created if missing,
+schema rebuilt from `server/sql` on every start — `commissaire_test` of the DB tests is never touched),
+the API built and started on `127.0.0.1:4100` (NODE_ENV=test, `COMMISSAIRE_SKIP_DOTENV=1`, mail logged),
+and the app with Vite on `http://localhost:3100` (`VITE_SERVER_URL` set by the script, not Git Bash).
+Flags: `--no-app`, `--no-build`. Logs: `<os tmp>/commissaire-e2e/api.log` (every "sent" email, since
+`LOG_LEVEL=info` is set explicitly) and `app.log`. Ctrl+C stops the API and the app.
+
+```bash
+MULTIUSER_E2E=1 E2E_API_URL=http://localhost:4100 MULTIUSER_API=http://localhost:4100 E2E_BASE_URL=http://localhost:3100 npx playwright test tests/event-judges.spec.ts tests/multiuser.spec.ts
+```
+
+`tests/event-judges.spec.ts`: owner + Start judge + wave-scoped Counter + Results judge in four browser
+contexts — invitations, judging switch, concurrent laps, offline once-only delivery, corrections + undo,
+revocation mid-race (refused taps listed as "not applied"), judging off, identical results.
