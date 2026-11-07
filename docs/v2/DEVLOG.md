@@ -80,3 +80,14 @@ plans/quotas/billing, advanced org admin, nonessential management screens.
 - P0 approach: full local stack (API in NODE_ENV=test on an isolated *_e2e_test DB + Vite with
   VITE_SERVER_URL) and multi-browser Playwright: existing multiuser/cloud-sync/race-persistence
   specs + new 3-judge event spec.
+
+## 2026-11-07 — Close of 0.2 (multi-judge)
+- Decisions (user): server = source of truth; first write wins per rider + lap (server `duplicate`, audit kept);
+  manual Sync in LIVE; email-verification NOT changed (link/QR for password sign-ups); Info sharing behind an icon.
+- Committed + QA'd: first-write-wins (8c3b5dd, 850b751), live multi-judge client (ad6dbd4), E2E stack/spec (5f43a27),
+  sync correctness from E2E (3dfee22), reload single-flight/debounce + Sync errors (4c363a2), sync QA fixes
+  (2c49aba: one writer per race, no older snapshot, skipped rows released after re-read, no resurrection).
+- Release 0.2.0: commit 047e47a, GitHub `release-047e47a`. Deployment pending (Linux production agent).
+- Tests at release: server 178/178, client 617/617, typecheck clean (2 baseline), builds OK, event E2E all steps
+  pass except a live-clock column comparison (test artifact).
+- Next task: Rapid Lap Entry (spec with OPEN questions: docs/v2/rapid-lap-entry.md). Not started.

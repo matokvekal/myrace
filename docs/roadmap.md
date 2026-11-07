@@ -1,5 +1,18 @@
 # Commissaire — Feature Roadmap
 
+> **Status 2026-11-07:** the phases below are the ORIGINAL 0.1 roadmap. Current progress and priorities are in
+> `docs/CURRENT_STATE.md`; the 0.2 plan and requirement status are in `version2.md`.
+>
+> | Item | Status |
+> |---|---|
+> | Roles system (old Phase 2) | **Done in 0.2** (server-enforced roles, per-race judging) |
+> | Real-time multi-user (old Phase 3) | **Done** (Socket.IO, outbox, first-write-wins, Sync) |
+> | Database (old Phase 4) | **Done** (PostgreSQL server, migrations 001–012) — not Supabase |
+> | 0.2.0 release | Published (`release-047e47a`), **deployment pending** |
+> | Next | **Rapid Lap Entry** (`docs/v2/rapid-lap-entry.md`) |
+> | Deferred | Organizations UI, plans/limits, Super Admin, billing |
+
+
 **Last Updated:** 2026-07-25
 
 ---

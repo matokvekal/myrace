@@ -1,3 +1,6 @@
+> **Superseded (2026-11-07):** this handoff describes 0.1.12–0.1.13. For the current state read
+> `AGENTS.md` and `docs/CURRENT_STATE.md`.
+
 # Commissaire — Handoff (2026-11-04)
 
 Read `CLAUDE.md` first (project rules), then this file. Nothing here is deployed

@@ -1,6 +1,6 @@
 # Commissaire — App Overview for Agents
 
-**Last Updated:** 2026-11-04 (see HANDOFF.md for the current state of work)  
+**Last Updated:** 2026-11-07 — start with `AGENTS.md` (rules, deployment) and `docs/CURRENT_STATE.md` (current state, resume steps)  
 **Tech Stack:** React + Vite + React Router v6, TypeScript, Zustand, IndexedDB (`idb`)
 
 > Note: uses `[id]` folder names and `layout.tsx` but is NOT Next.js — routing is React Router v6.

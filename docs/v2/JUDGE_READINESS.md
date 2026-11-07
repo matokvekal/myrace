@@ -85,3 +85,11 @@ Automated: server unit + DB 178/178; client unit 617/617; typecheck clean (2 kno
 Known limits: email invitations need a verified email (use link/QR); Start/Finish controls are not hidden by role
 (refused on use and listed); the Live screen doesn't leave on revocation (taps refused); a lap shorter than the
 race's minimum lap time is refused permanently (use a correction).
+
+## Deployment status (2026-11-07)
+- Release **`release-047e47a`** (app 0.2.0, commit `047e47a5a5aa`) published on GitHub with server + web archives,
+  `SHA256SUMS` and install notes (DB backup, migrations 011 → 012 with `psql -1`, PM2, smoke check, rollback).
+- **Not deployed yet.** Production health on 2026-11-07 reported release `eeebf7e` (0.1.15 API). Production
+  members are still read-only until 0.2.0 is installed by the Linux production agent.
+- After deployment: confirm `/api/v1/health` reports `047e47a5a5aa`, then run the smoke check from the release notes.
+- Event method: invite judges by **link/QR**, turn on "Judges can record in this race", assign roles per link.

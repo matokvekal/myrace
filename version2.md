@@ -6,6 +6,27 @@
 Structure: (1) review comments on the original draft, (2) the revised plan,
 (Appendix A/B) the original draft and guidelines, verbatim.
 
+## Requirement status (updated 2026-11-07 — see docs/CURRENT_STATE.md)
+
+**Implemented (branch `feature/v0.2-phase1`, release `release-047e47a`, app 0.2.0 — NOT yet deployed):**
+- Phase 0 audit (`docs/v2/0-as-is.md`). Phase 1 judges: per-race member writes, roles incl. results judge,
+  owner-only admin delegation, invitation declined status, original creator + creator-only delete,
+  RaceAdmin audit, rejected offline actions kept for review, Results correction panel, lap-correction Undo.
+- Event hardening (user priority 2026-11-07): first write wins per rider+lap (`duplicate`), LIVE Sync button,
+  concurrent-tap fix, sync correctness fixes, invite role-picker reset, email-verification guidance,
+  Info sharing behind an icon, multi-browser E2E (`tests/event-judges.spec.ts`).
+- Organizations BACKEND (Phase 2 P2-T1…T4): accounts, members, judge-pool invitations, org races, audit_logs.
+
+**Pending:** production deployment of 0.2.0 (Linux production agent); merge to `main` (needs approval).
+
+**Deferred (user, 2026-11-07 — after the event):** Organizations/Management UI (P2-T5), plans & limits,
+Super Admin, billing, audit-history screen, multi-race client isolation audit (Phase 4 of this plan),
+invitation list in the app, org QA findings (DEVLOG), email-verification for password sign-ups.
+
+**Next:** Rapid Lap Entry — `docs/v2/rapid-lap-entry.md` (not started).
+
+---
+
 ## Review comments (my opinion)
 
 **Overall:** The direction is right (server-enforced, additive, local-first, creator-only
