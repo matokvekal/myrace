@@ -256,6 +256,7 @@ export async function purgeApiCache(): Promise<void> {
 
 /** Per-account state that must not survive a switch to another account. Races on the device stay. */
 function clearAccountState() {
+  forgetRaceSyncState();
   for (let i = localStorage.length - 1; i >= 0; i--) {
     const k = localStorage.key(i);
     if (k?.startsWith(ACCESS_KEY_PREFIX)) localStorage.removeItem(k);
@@ -409,7 +410,19 @@ const writePendingDeletes = (list: string[]) => localStorage.setItem(PENDING_DEL
 const isRaceDeleted = (err: unknown) => err instanceof LiveApiError && err.status === 410 && err.code === "race_deleted";
 
 /** Remove a deleted (or hidden) shared race from this device: link, queued Actions, access cache and local data. */
+/** Per-race sync bookkeeping that must not outlive the race on this device (or the account). */
+function forgetRaceSyncState(local?: string): void {
+  const races = local ? [local] : [...new Set([...reloadTimers.keys(), ...skippedRemote.keys(), ...rowsAppliedSeq.keys()])];
+  for (const l of races) {
+    clearTimeout(reloadTimers.get(l));
+    reloadTimers.delete(l);
+    skippedRemote.delete(l);
+    rowsAppliedSeq.delete(l);
+  }
+}
+
 export async function removeDeletedRace(local: string): Promise<void> {
+  forgetRaceSyncState(local);
   const queued = await outboxAll(local);
   await outboxDelete(queued.map((e) => e.actionId));
   detachRace(local);
@@ -650,7 +663,14 @@ export async function dispatchAction(
   } as RaceAction;
   // Pending BEFORE the first await: a snapshot/catch-up applied meanwhile must not overwrite this tap.
   markPending(local, action);
-  await outboxPut({ actionId, localRaceUuid: local, serverRaceUuid: link.serverRaceUuid, userId: session?.user.id ?? null, createdAt: Date.now() * 1000 + (seqCounter++ % 1000), action });
+  try {
+    await outboxPut({ actionId, localRaceUuid: local, serverRaceUuid: link.serverRaceUuid, userId: session?.user.id ?? null, createdAt: Date.now() * 1000 + (seqCounter++ % 1000), action });
+  } catch (err) {
+    // Not queued: rebuild the pending set from what really is queued, so remote rows apply again.
+    const left = await outboxList(local).catch(() => []);
+    pendingRiders.set(local, new Set(left.map((e) => (e.action.payload as { riderUuid?: string }).riderUuid).filter((u): u is string => !!u)));
+    throw err;
+  }
   setSync(local, { pending: syncOf(local).pending + 1 });
   scheduleFlush(local);
   return actionId;
@@ -747,11 +767,15 @@ async function flushOnce(local: string): Promise<void> {
     setSync(local, { pending: left.length, lastSyncAt: Date.now() });
     const skipped = skippedRemote.get(local);
     const nowPending = pendingRiders.get(local)!;
+    // Skipped remote rows are released only AFTER a successful re-read (below / in loadSnapshot):
+    // if the re-read fails they stay listed and the next flush or Sync tries again.
     const resolved = skipped ? [...skipped.uuids].filter((u) => !nowPending.has(u)) : [];
-    if (skipped && resolved.length) {
-      for (const u of resolved) skipped.uuids.delete(u);
-      if (!skipped.uuids.size) skippedRemote.delete(local);
-    }
+    const release = () => {
+      const sk = skippedRemote.get(local);
+      if (!sk) return;
+      for (const u of resolved) sk.uuids.delete(u);
+      if (!sk.uuids.size) skippedRemote.delete(local);
+    };
     if (duplicates > 0) {
       toast.info(i18next.t("live.alreadyRecorded", "Already recorded by another judge") || "Already recorded by another judge", { toastId: `dup-${local}`, autoClose: 2500 });
       // The other judge's lap reached this device while ours was queued, so it was skipped
@@ -764,6 +788,7 @@ async function flushOnce(local: string): Promise<void> {
       // Re-read what the socket brought while those riders were queued (lastSeq is already past it).
       try {
         await fetchChanges(local, link.serverRaceUuid, skipped.afterSeq);
+        release();
       } catch {
         /* the next catch-up / Sync retries */
       }
@@ -1004,6 +1029,20 @@ interface ChangeSet {
 const rowsAppliedSeq = new Map<string, number>();
 
 /**
+ * One writer per race. Change sets (socket or HTTP) and full reloads are applied strictly one
+ * at a time: their store writes are async (IndexedDB), and interleaved an older catch-up could
+ * write an older race/category row over a newer one that a socket message had just applied —
+ * with lastSeq already past it, nothing would ever bring the newer row back.
+ */
+const raceWriteQueue = new Map<string, Promise<unknown>>();
+function serialPerRace<T>(local: string, fn: () => Promise<T>): Promise<T> {
+  const prev = raceWriteQueue.get(local) ?? Promise.resolve();
+  const next = prev.catch(() => undefined).then(fn);
+  raceWriteQueue.set(local, next.catch(() => undefined));
+  return next;
+}
+
+/**
  * GET /changes after `afterSeq` and apply it. A response can be OLDER than what the socket
  * applied while it was in flight (the race moved on between the request and the answer);
  * applying it would put back older rows — another judge's lap vanished from this device
@@ -1015,6 +1054,8 @@ async function fetchChanges(local: string, serverRaceUuid: string, afterSeq: num
     if (ch.snapshot) return loadSnapshot(local);
     if (await applyChanges(local, ch, "http")) return;
   }
+  // Still overtaken after 3 reads: take the authoritative full copy instead of giving up.
+  return loadSnapshot(local);
 }
 
 /**
@@ -1025,7 +1066,12 @@ async function fetchChanges(local: string, serverRaceUuid: string, afterSeq: num
  * A socket message is stale once its seq is no longer ahead; an HTTP answer (changes or
  * snapshot, `lastSeq` = the state it shows) once it is behind.
  */
-async function applyChanges(local: string, ch: ChangeSet, source: "socket" | "http" = "socket"): Promise<boolean> {
+function applyChanges(local: string, ch: ChangeSet, source: "socket" | "http" = "socket"): Promise<boolean> {
+  return serialPerRace(local, () => applyChangesNow(local, ch, source));
+}
+
+/** applyChanges' body — only ever run inside serialPerRace (directly, or from loadSnapshot's). */
+async function applyChangesNow(local: string, ch: ChangeSet, source: "socket" | "http"): Promise<boolean> {
   const stale = () => {
     const applied = Math.max(linkOf(local)?.lastSeq ?? 0, rowsAppliedSeq.get(local) ?? 0);
     if (source === "socket") return typeof ch.seq === "number" && ch.seq <= applied;
@@ -1257,11 +1303,21 @@ function cancelReloadSoon(local: string): void {
   reloadTimers.delete(local);
 }
 
-async function loadSnapshot(local: string): Promise<void> {
-  const link = linkOf(local)!;
+function loadSnapshot(local: string): Promise<void> {
+  return serialPerRace(local, () => loadSnapshotNow(local));
+}
+
+async function loadSnapshotNow(local: string): Promise<void> {
+  const link = linkOf(local);
+  if (!link) return;
+  const appliedSeq = () => Math.max(linkOf(local)?.lastSeq ?? 0, rowsAppliedSeq.get(local) ?? 0);
   let snap = await api<Snapshot>("GET", `/races/${link.serverRaceUuid}/snapshot`);
-  // Overtaken by the socket while in flight: read again rather than put older rows back.
-  for (let i = 0; i < 2 && snap.lastSeq < (linkOf(local)?.lastSeq ?? 0); i++) snap = await api<Snapshot>("GET", `/races/${link.serverRaceUuid}/snapshot`);
+  // Overtaken while in flight: read again rather than put older rows back.
+  for (let i = 0; i < 2 && snap.lastSeq < appliedSeq(); i++) snap = await api<Snapshot>("GET", `/races/${link.serverRaceUuid}/snapshot`);
+  // Removed/unlinked meanwhile (deleted race, sign-out): never bring it back.
+  if (linkOf(local)?.serverRaceUuid !== link.serverRaceUuid) return;
+  // Still older than what this device shows: applying it would delete newer rows. Retry later.
+  if (snap.lastSeq < appliedSeq()) throw new Error("stale_snapshot");
   cacheAccess(local, snap.access);
   const races = useRaceStore.getState();
   const existing = races.races.find((r) => r.uuid === local);
@@ -1299,8 +1355,15 @@ async function loadSnapshot(local: string): Promise<void> {
     if (dupCatIds.has(c.id)) continue;
     if (!c.uuid || !keepCats.has(c.uuid)) await applyingRemote(() => useCategoryStore.getState().deleteCategory(c.id));
   }
-  await applyChanges(local, { ...snap, lastSeq: snap.lastSeq }, "http");
-  setLink(local, { lastSeq: snap.lastSeq });
+  await applyChangesNow(local, { ...snap, lastSeq: snap.lastSeq }, "http");
+  setLink(local, { lastSeq: Math.max(snap.lastSeq, linkOf(local)?.lastSeq ?? 0) });
+  // A full copy covers every row skipped while it was queued (except those still queued).
+  const sk = skippedRemote.get(local);
+  if (sk) {
+    const still = pendingRiders.get(local) ?? new Set<string>();
+    for (const u of [...sk.uuids]) if (!still.has(u)) sk.uuids.delete(u);
+    if (!sk.uuids.size) skippedRemote.delete(local);
+  }
 }
 
 // ---------------------------------------------------------------------------
