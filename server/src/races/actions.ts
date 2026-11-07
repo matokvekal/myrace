@@ -18,7 +18,7 @@ import { ApiError, logger } from "../lib/core.js";
 import { publishChanges, type CommittedChanges } from "../realtime/socket.js";
 import { authorizeAction } from "../../../src/shared/race/access.js";
 import { PROTOCOL_VERSION, UNDOABLE_ACTION_TYPES, type RaceAction } from "../../../src/shared/race/actions.js";
-import { actionHeat, applyAction, deriveRider, groupRiders, rankRiders } from "../../../src/shared/race/engine.js";
+import { actionHeat, applyAction, deriveRider, groupRiders, raceMinLapMs, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
 import { AMENDED_IDS, loadMarks, loadState, saveChanges } from "./repo.js";
@@ -138,6 +138,33 @@ export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: s
   return { target: { actionId: t.actionId, raceUuid: t.raceUuid, type: t.type, payload: t.payload, riderUuid } };
 }
 
+/**
+ * First write wins per rider + lap (0.2 business rule). A TAPPED AddLap (live tap or a resolved
+ * Joker) is a duplicate when the rider already has a counting tapped lap within the race's
+ * minimum lap time of it — in EITHER direction, so a late (offline) report with an earlier
+ * device time can't replace the lap already committed. Same window as the engine's minimum-lap
+ * rule (raceMinLapMs); compared against the tapped marks the engine actually counts, so legacy
+ * duplicates stored as applied (already filtered by deriveRider) don't widen the window.
+ * Recovered passages (RECAP) are exempt, exactly as in deriveRider. Runs under the race row lock,
+ * so concurrent batches are judged in commit order. Undo of the first lap does NOT resurrect a
+ * duplicate: only an explicit correction changes laps afterwards.
+ */
+export async function isDuplicateLap(d: Db, state: RaceState, riderUuid: string, at: number): Promise<boolean> {
+  const minLap = raceMinLapMs(state);
+  if (minLap <= 0) return false;
+  const marks = (await loadMarks(d, state.race.uuid, [riderUuid])).get(riderUuid) ?? [];
+  const tapped = marks
+    .filter((m) => m.type === "AddLap" && !m.undone && !m.recovered)
+    .sort((a, b) => a.at - b.at || a.seq - b.seq);
+  let last: number | null = null;
+  for (const m of tapped) {
+    if (last !== null && m.at - last < minLap) continue; // filtered by the engine: not a counting lap
+    last = m.at;
+    if (Math.abs(at - m.at) < minLap) return true;
+  }
+  return false;
+}
+
 export const isOfficial = async (d: Db, raceUuid: string) =>
   !!(await d.one(`SELECT 1 FROM official_versions WHERE "raceUuid" = $1`, [raceUuid]));
 
@@ -211,13 +238,18 @@ export async function processActions(raceUuid: string, userId: string, items: un
       }
 
       const applied = applyAction(state, a, time.at);
-      if (!applied.applied) {
-        const seq = await appendEvent(d, raceUuid, a, userId, heat, false, applied.reason, time);
-        out.push({ actionId: a.actionId, seq, applied: false, reason: applied.reason });
-        committed.results.push({ actionId: a.actionId, seq, applied: false, reason: applied.reason, userId });
+      // AddLap's applyAction only validates (no state change), so it can still be refused here.
+      const notApplied = !applied.applied ? applied.reason
+        : a.type === "AddLap" && !a.payload.recovered && await isDuplicateLap(d, state, a.payload.riderUuid, time.at) ? "duplicate"
+        : null;
+      if (notApplied) {
+        const seq = await appendEvent(d, raceUuid, a, userId, heat, false, notApplied, time);
+        out.push({ actionId: a.actionId, seq, applied: false, reason: notApplied });
+        committed.results.push({ actionId: a.actionId, seq, applied: false, reason: notApplied, userId });
         committed.seq = seq;
         continue;
       }
+      if (!applied.applied) continue; // narrowed above
 
       const seq = await appendEvent(d, raceUuid, a, userId, heat, true, null, time);
       const ch = applied.changes;

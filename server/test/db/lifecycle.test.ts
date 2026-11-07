@@ -102,7 +102,9 @@ describe("race day", () => {
     const res = await send(counter, race.raceUuid,
       action(race.raceUuid, "AddLap", { riderUuid: a.uuid }, { at: lapAt(8) }),
       action(race.raceUuid, "AddLap", { riderUuid: a.uuid }, { at: new Date(start + 8 * MIN + 1500).toISOString() })); // same crossing, other phone
-    expect(res.every((r) => r.applied)).toBe(true);
+    // 0.2 rule "first write wins per rider + lap": the second phone's report is kept for audit
+    // but stored NOT applied ("duplicate"); it used to be applied and filtered by the engine.
+    expect(res.map((r) => [r.applied, r.reason])).toEqual([[true, null], [false, "duplicate"]]);
     const r = riderOf(await snapshot(owner, race.raceUuid), a.uuid)!;
     expect(r.lapsCounter).toBe(1);
     expect(r.lapsDetails[0].lapTime).toBe("08:00");

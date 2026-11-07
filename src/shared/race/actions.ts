@@ -129,6 +129,8 @@ export const NOT_APPLIED_REASONS = [
   "upgrade_required",
   /** 0.2: an Undo of a lap correction that a newer correction of the same rider replaced. */
   "stale",
+  /** 0.2: first write wins per rider + lap — a later report of a lap already recorded (kept for audit). */
+  "duplicate",
 ] as const;
 export type NotAppliedReason = (typeof NOT_APPLIED_REASONS)[number];
 

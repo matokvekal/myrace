@@ -48,7 +48,7 @@ describe("Action catalog", () => {
 
   it("not-applied reasons are the API error codes", () => {
     expect([...NOT_APPLIED_REASONS].sort()).toEqual(
-      ["forbidden", "invalid", "locked", "not_member", "out_of_scope", "race_official", "stale", "upgrade_required"],
+      ["duplicate", "forbidden", "invalid", "locked", "not_member", "out_of_scope", "race_official", "stale", "upgrade_required"],
     );
   });
 });
