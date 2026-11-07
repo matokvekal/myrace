@@ -161,11 +161,17 @@ const goOnline = async (d: Dev) => { await d.ctx.setOffline(false); await d.page
 async function boardText(d: Dev): Promise<string> {
   await d.page.goto(`/race/${d.race}`);
   await gotoRaceMode(d.page, "Board");
-  await expect(d.page.getByText("Wave 1 · 09:00")).toBeVisible({ timeout: 20_000 });
-  await expect(d.page.locator("body")).toContainText(/P\d+\s*301\s*Rider301/);
-  const text = (await d.page.locator("body").innerText()).replace(/\s+/g, " ");
-  // Cells are inline spans ("P1301Rider301 Test1/500:02"): the bib must repeat in the name.
-  return [...text.matchAll(/P(\d+?) ?(\d{3}) ?Rider\2 Test ?(\d+)\/(\d)/g)].map((m) => `P${m[1]} ${m[2]} ${m[3]}/${m[4]}`).join(" | ");
+  const wave = d.page.getByTestId("board-wave-1");
+  await expect(wave).toBeVisible({ timeout: 20_000 });
+  // Show every rider of each wave-1 category ("All results (N)"), then read the structured rows.
+  const expand = wave.locator('[data-testid^="board-expand-"]');
+  for (let i = 0; i < (await expand.count()); i++) {
+    const b = expand.nth(i);
+    if (/all/i.test(await b.innerText())) await b.click();
+  }
+  const rows = wave.getByTestId("board-result-row");
+  await expect(rows.first()).toBeVisible();
+  return (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim()).join(" | ");
 }
 
 /** The last email the API "sent" to this address (MAIL_TRANSPORT=log), as text. */

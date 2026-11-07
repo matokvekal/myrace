@@ -68,3 +68,20 @@ Revocation in the browser: **NOT TESTED** (run stopped). Known gap: the Live scr
 5. With your approval only: deploy, then a short rehearsal on production with 2–3 phones before the event.
 
 Uncommitted work in the tree at the time of this report (E2E engineer): `src/app/race/[id]/heat/[heatId]/page.tsx`, `useLapRecording.ts`, `src/app/live/TeamPanel.tsx` (email hint), `public/locales/he/common.json`, `server/src/lib/core.ts` (test log level), `server/package.json`, `server/scripts/e2e-stack.mjs`, `tests/multiuser.spec.ts`, `tests/event-judges.spec.ts`, `docs/server/testing.md`.
+
+
+## Final verification (2026-11-07, before 0.2.0 release)
+Local full stack (API + PostgreSQL + app), owner + Start judge + Counter (wave 1) + Results judge + Viewer, `tests/event-judges.spec.ts`:
+**Browser-verified PASS:** 3 judges join by link/QR (picker resets); email invite to a password account shows guidance;
+role limits (counter: wave 1 only, can't start/finish; results: corrections only; start: waves only; viewer read-only);
+simultaneous laps on different riders → identical on all devices and the server; same rider on two devices → one lap,
+first committed time, no "not applied"; offline taps arrive once; delayed duplicate resolved; Sync button repairs a
+drifted device; corrections + undo converge; mid-race revocation (later/offline taps refused, listed); judging off →
+read-only; Results identical on all devices; Board identical in positions, bibs and laps.
+**Only mismatch:** the elapsed-time column of riders still on course (00:28 vs 00:30) — a ticking clock read a
+moment apart on two devices, not a data difference (spec compares a live clock; test artifact).
+Server rule: first write wins per rider+lap (`duplicate`), atomic under the race lock.
+Automated: server unit + DB 178/178; client unit 617/617; typecheck clean (2 known baseline errors); builds OK.
+Known limits: email invitations need a verified email (use link/QR); Start/Finish controls are not hidden by role
+(refused on use and listed); the Live screen doesn't leave on revocation (taps refused); a lap shorter than the
+race's minimum lap time is refused permanently (use a correction).
