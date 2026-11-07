@@ -131,6 +131,12 @@ test("keypad: unambiguous bibs auto-accept, ambiguous ones need Enter, invalid o
     await rows.nth(2).getByTestId("rapid-row-down").click();
     expect((await rows.nth(2).innerText()).trim().split(/\s/)[0]).toBe("18");
     await page.screenshot({ path: path.join(os.tmpdir(), "rapid-entry-history.png") });
+    // Visual themes follow <html data-theme>: light (blue) and dark (gold).
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+    await expect(page.getByTestId("rapid-key-enter")).toHaveCSS("color", "rgb(10, 15, 28)");
+    await page.screenshot({ path: path.join(os.tmpdir(), "rapid-entry-dark.png") });
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+    await expect(page.getByTestId("rapid-key-enter")).toHaveCSS("color", "rgb(255, 255, 255)");
   });
 
   await test.step("same bib again is 'too soon', not a second lap", async () => {

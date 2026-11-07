@@ -1,4 +1,102 @@
-/* Rapid Entry — mobile portrait first, one hand, no scrolling while typing, no animations. */
+/* Rapid Entry — mobile portrait first, one hand, no scrolling while typing, no animations.
+ *
+ * Visual themes (0.2.3) follow the app theme on <html data-theme> (useTheme):
+ *   light / contrast → "Samsung": white & ice-blue, blue accents, blue gradient Enter
+ *   dark / night     → "Tour de France": midnight navy, gold accents, gold Enter
+ * Only colours, type and finishes live in the tokens below. Every size, gap, grid and
+ * breakpoint is the 0.2.2 layout, unchanged. */
+
+/* ── theme tokens (scoped to the Live page while it is in Keypad mode) ── */
+:global(div[data-entry-mode="keypad"]) {
+  --re-page:
+    radial-gradient(700px 380px at 90% -8%, rgba(37, 99, 235, 0.10), transparent 62%),
+    linear-gradient(180deg, #f7faff 0%, #eef4fd 100%);
+  --re-ink: #0b1b33;
+  --re-ink-soft: #5b6f8c;
+  --re-ink-faint: #9aabc3;
+  --re-accent: #2563eb;
+  --re-line: #e6eef9;
+
+  --re-surface: #ffffff;
+  --re-surface-edge: rgba(37, 99, 235, 0.10);
+  --re-surface-shadow: 0 6px 22px rgba(30, 64, 140, 0.08);
+
+  --re-display-bg: #ffffff;
+  --re-display-edge: rgba(37, 99, 235, 0.18);
+  --re-display-shadow: 0 8px 26px rgba(30, 64, 140, 0.10);
+  --re-display-ink: #0b1b33;
+
+  --re-digit: #0b1b33;
+  --re-digit-press: #2563eb;
+  --re-press-glow: radial-gradient(circle, rgba(37, 99, 235, 0.12) 0 38%, transparent 62%);
+
+  --re-enter-bg: linear-gradient(180deg, #4f8bff 0%, #2563eb 55%, #1d4ed8 100%);
+  --re-enter-press: linear-gradient(180deg, #3b7bff 0%, #1d4ed8 60%, #1e40af 100%);
+  --re-enter-ink: #ffffff;
+  --re-enter-shadow: 0 10px 24px rgba(37, 99, 235, 0.32);
+
+  --re-ok: #15803d;      --re-ok-bg: #e7f8ee;
+  --re-warn: #a16207;    --re-warn-bg: #fdf3d7;
+  --re-bad: #dc2626;     --re-bad-bg: #fde8e8;
+  --re-bad-strong: #991b1b;
+  --re-hint: #b45309;
+  --re-ambiguous: #f59e0b;
+
+  --re-switch-bg: #e6eefa;
+  --re-switch-on: #ffffff;
+  --re-switch-ink: #5b6f8c;
+  --re-switch-ink-on: #1d4ed8;
+
+  /* Keypad digits: a soft, rounded, light-weight face — friendly, but a plain sans
+     for instant number recognition. System fonts only (offline at the venue). */
+  --re-digit-font: "SF Pro Rounded", ui-rounded, "Segoe UI Variable Display", "Segoe UI", Roboto,
+    "Assistant", system-ui, sans-serif;
+
+  background: var(--re-page);
+}
+
+:global([data-theme="dark"] div[data-entry-mode="keypad"]),
+:global([data-theme="night"] div[data-entry-mode="keypad"]) {
+  --re-page:
+    radial-gradient(640px 360px at 92% -10%, rgba(250, 204, 21, 0.10), transparent 60%),
+    radial-gradient(520px 320px at -10% 110%, rgba(234, 179, 8, 0.06), transparent 60%),
+    linear-gradient(180deg, #0a0f1c 0%, #05070d 100%);
+  --re-ink: #f5f3ea;
+  --re-ink-soft: #a8b0c2;
+  --re-ink-faint: #5d6780;
+  --re-accent: #facc15;
+  --re-line: rgba(250, 204, 21, 0.08);
+
+  --re-surface: #0d1424;
+  --re-surface-edge: rgba(250, 204, 21, 0.14);
+  --re-surface-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+
+  --re-display-bg: linear-gradient(180deg, #111a2e 0%, #0a1020 100%);
+  --re-display-edge: rgba(250, 204, 21, 0.35);
+  --re-display-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --re-display-ink: #ffffff;
+
+  --re-digit: #ffffff;
+  --re-digit-press: #facc15;
+  --re-press-glow: radial-gradient(circle, rgba(250, 204, 21, 0.14) 0 38%, transparent 62%);
+
+  --re-enter-bg: linear-gradient(180deg, #fde047 0%, #facc15 45%, #d4a106 100%);
+  --re-enter-press: linear-gradient(180deg, #facc15 0%, #eab308 50%, #b8860b 100%);
+  --re-enter-ink: #0a0f1c;
+  --re-enter-shadow: 0 10px 26px rgba(234, 179, 8, 0.28);
+
+  --re-ok: #4ade80;      --re-ok-bg: rgba(74, 222, 128, 0.12);
+  --re-warn: #fcd34d;    --re-warn-bg: rgba(252, 211, 77, 0.12);
+  --re-bad: #f87171;     --re-bad-bg: rgba(248, 113, 113, 0.13);
+  --re-bad-strong: #fca5a5;
+  --re-hint: #fcd34d;
+  --re-ambiguous: #facc15;
+
+  --re-switch-bg: rgba(255, 255, 255, 0.06);
+  --re-switch-on: #facc15;
+  --re-switch-ink: #a8b0c2;
+  --re-switch-ink-on: #0a0f1c;
+}
 
 .root {
   display: flex;
@@ -10,6 +108,7 @@
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  color: var(--re-ink);
 }
 
 /* ── history: compact rows, newest first ─────────────── */
@@ -18,8 +117,9 @@
   min-height: 60px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #fff;
+  background: var(--re-surface);
   border-radius: 12px;
+  box-shadow: 0 0 0 1px var(--re-surface-edge), var(--re-surface-shadow);
 }
 
 .row {
@@ -28,7 +128,7 @@
   align-items: center;
   gap: 6px;
   height: 36px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--re-line);
   font-size: 13px;
 }
 
@@ -42,7 +142,7 @@
   flex: 1;
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--re-ink-faint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,7 +150,7 @@
   cursor: pointer;
 }
 
-.moveBtn:active { background: #f1f5f9; }
+.moveBtn:active { color: var(--re-accent); }
 .moveBtn:disabled { opacity: 0.25; cursor: default; }
 
 .rowColor {
@@ -64,14 +164,14 @@
   font-size: 18px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #0f172a;
+  color: var(--re-ink);
 }
 
 .rowName {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: #64748b;
+  color: var(--re-ink-soft);
 }
 
 .rowStatus {
@@ -86,7 +186,7 @@
 
 .rowTime {
   font-variant-numeric: tabular-nums;
-  color: #94a3b8;
+  color: var(--re-ink-faint);
   font-size: 12px;
 }
 
@@ -95,7 +195,7 @@
   height: 36px;
   border: none;
   background: transparent;
-  color: #cbd5e1;
+  color: var(--re-ink-faint);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -108,16 +208,16 @@
 .rowX:disabled { opacity: 0.3; cursor: not-allowed; }
 .rowXArmed { background: #dc2626; color: #fff; }
 
-.row[data-status="recorded"] .rowStatus { background: #dcfce7; color: #166534; }
+.row[data-status="recorded"] .rowStatus { background: var(--re-ok-bg); color: var(--re-ok); }
 .row[data-status="invalid"] .rowBib,
-.row[data-status="invalid"] .rowStatus { color: #dc2626; }
-.row[data-status="invalid"] .rowStatus { background: #fee2e2; }
-.row[data-status="tooSoon"] .rowStatus { background: #fef3c7; color: #92400e; }
-.row[data-status="blocked"] .rowStatus { background: #fee2e2; color: #991b1b; }
+.row[data-status="invalid"] .rowStatus { color: var(--re-bad); }
+.row[data-status="invalid"] .rowStatus { background: var(--re-bad-bg); }
+.row[data-status="tooSoon"] .rowStatus { background: var(--re-warn-bg); color: var(--re-warn); }
+.row[data-status="blocked"] .rowStatus { background: var(--re-bad-bg); color: var(--re-bad-strong); }
 .row[data-status="undone"] { opacity: 0.5; }
 .row[data-status="undone"] .rowBib,
 .row[data-status="undone"] .rowName { text-decoration: line-through; }
-.row[data-status="undone"] .rowStatus { color: #475569; }
+.row[data-status="undone"] .rowStatus { color: var(--re-ink-soft); }
 
 /* ── entry: display + keypad ─────────────────────────── */
 .entry {
@@ -128,8 +228,8 @@
 }
 
 .display {
-  background: #0f172a;
-  color: #fff;
+  background: var(--re-display-bg);
+  color: var(--re-display-ink);
   border-radius: 14px;
   padding: 4px 14px;
   height: 76px;
@@ -137,11 +237,12 @@
   flex-direction: column;
   justify-content: center;
   box-sizing: border-box;
-  border: 2px solid transparent;
+  border: 2px solid var(--re-display-edge);
+  box-shadow: var(--re-display-shadow);
 }
 
-.display[data-match="ambiguous"] { border-color: #f59e0b; }
-.display[data-match="none"] { border-color: #ef4444; }
+.display[data-match="ambiguous"] { border-color: var(--re-ambiguous); }
+.display[data-match="none"] { border-color: var(--re-bad); }
 
 .digits,
 .placeholder {
@@ -152,7 +253,7 @@
   letter-spacing: 0.04em;
 }
 
-.display[data-match="none"] .digits { color: #fca5a5; }
+.display[data-match="none"] .digits { color: var(--re-bad); }
 
 .flash {
   display: flex;
@@ -176,15 +277,15 @@
   white-space: nowrap;
 }
 
-.flash[data-status="recorded"] { color: #86efac; }
-.flash[data-status="tooSoon"] { color: #fcd34d; }
+.flash[data-status="recorded"] { color: var(--re-ok); }
+.flash[data-status="tooSoon"] { color: var(--re-warn); }
 .flash[data-status="invalid"],
-.flash[data-status="blocked"] { color: #fca5a5; }
+.flash[data-status="blocked"] { color: var(--re-bad); }
 
 .hint {
   font-size: 14px;
   font-weight: 700;
-  color: #fcd34d;
+  color: var(--re-hint);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -214,15 +315,19 @@
   grid-row: 1 / span 4;
 }
 
+/* Digit keys: the number alone — no plate, border or shadow. The whole cell stays the
+   touch target; a press only tints the digit and a faint halo behind it. */
 .key {
   flex: 1;
   min-width: 0;
   border: none;
   border-radius: 16px;
-  background: #eef2f7;
-  color: #0f172a;
+  background: transparent;
+  box-shadow: none;
+  color: var(--re-digit);
+  font-family: var(--re-digit-font);
   font-size: 34px;
-  font-weight: 600;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
@@ -232,14 +337,27 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.key:active { background: #d9e1ec; }
-
-.enter {
-  background: #16a34a;
-  color: #fff;
+.key:active {
+  color: var(--re-digit-press);
+  background: var(--re-press-glow);
 }
 
-.enter:active { background: #15803d; }
+.key:focus-visible {
+  outline: 2px solid var(--re-accent);
+  outline-offset: -2px;
+}
+
+.enter {
+  background: var(--re-enter-bg);
+  color: var(--re-enter-ink);
+  box-shadow: var(--re-enter-shadow);
+  font-weight: 700;
+}
+
+.enter:active {
+  background: var(--re-enter-press);
+  color: var(--re-enter-ink);
+}
 
 .enterArrow {
   font-size: 44px;
@@ -321,6 +439,15 @@
   font-size: 14px;
   white-space: nowrap;
 }
+
+/* Keypad mode only: the same bar in the keypad theme (cards mode keeps the rules above). */
+:global(div[data-entry-mode="keypad"]) .modeSwitch { background: var(--re-switch-bg); }
+:global(div[data-entry-mode="keypad"]) .modeBtn { color: var(--re-switch-ink); }
+:global(div[data-entry-mode="keypad"]) .modeBtn[aria-pressed="true"] {
+  background: var(--re-switch-on);
+  color: var(--re-switch-ink-on);
+}
+:global(div[data-entry-mode="keypad"]) .modeInfo { color: var(--re-ink); }
 
 .modeSync {
   display: flex;

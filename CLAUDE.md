@@ -652,7 +652,7 @@ still open).
 - Hebrew + English support required (use `dir="auto"` on text elements)
 - Local data is IndexedDB; shared races sync with the Commissaire server (cloud PostgreSQL). Tests never use the production DB.
 
-### Rapid Entry keypad (Live, 0.2.1–0.2.2 — prototype)
+### Rapid Entry keypad (Live, 0.2.1–0.2.3 — prototype)
 - Live has two modes: Cards (unchanged) | Keypad (`heat/[heatId]/rapidEntry/`), toggle + swipe
   (right → keypad), remembered per race (`commissaire.liveEntryMode.<race>`).
 - Bibs match through a digit trie of the WAVE's riders (`bibIndex.ts`): complete → recorded at
@@ -671,3 +671,7 @@ still open).
   switch + (cards) sync / (keypad) wave · clock; the Sync button is hidden on the keypad.
   Cards mode hides the wave-info chip and the entry row (Joker · Bib · RECAP) behind
   `SHOW_CARD_INFO_INPUT = false` in `heat/[heatId]/page.tsx` — code kept, flip to restore.
+- 0.2.3 (visual only): keypad themes follow `<html data-theme>` — light/contrast = white + blue,
+  blue-gradient Enter; dark/night = midnight navy + gold Enter. Digit keys have no plate/border
+  (whole cell still the touch target). All colours are `--re-*` tokens scoped to
+  `div[data-entry-mode="keypad"]` in `rapidEntry.module.css`; sizes/layout unchanged.
