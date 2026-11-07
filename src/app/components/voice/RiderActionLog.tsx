@@ -9,7 +9,7 @@ interface RiderAction {
   id: string;
   rider: RiderProps;
   timestamp: number;
-  source: 'click' | 'voice';
+  source: 'click' | 'voice' | 'keypad';
   categoryColor: string;
   statusChange?: 'DNF' | 'DSQ' | 'DNS' | 'FINISH';
 }
@@ -268,7 +268,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
                         <div className={styles.meta}>
                           <span className={styles.time}>{formatTime(action.timestamp)}</span>
                           <span className={`${styles.source} ${styles[action.source]}`}>
-                            {action.source === 'voice' ? '🎤' : '👆'}
+                            {action.source === 'voice' ? '🎤' : action.source === 'keypad' ? '🔢' : '👆'}
                           </span>
                         </div>
                         {!isOut && !isFinished && (lastLapTime || sinceArrive) && (

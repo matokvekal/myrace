@@ -60,6 +60,25 @@ function loadPersistedActions(key: string | null): RiderAction[] {
   }
 }
 
+/** Where a lap came from: a card tap (also Joker resolution), voice, or the Rapid Entry keypad. */
+export type LapSource = "click" | "voice" | "keypad";
+
+export interface RecordLapOptions {
+  /** No toasts — the caller shows the outcome itself (Rapid Entry history). */
+  quiet?: boolean;
+  /** When the entry was accepted (diagnostics only; the lap time is `atTime`). */
+  acceptedAt?: number;
+}
+
+/** What recordLap did. Callers that only tap may ignore it. */
+export type LapOutcome =
+  | { ok: true; actionId: string; lap: number; finished: boolean; liveActionId?: string }
+  | {
+      ok: false;
+      reason: "finished" | "ignoredWave" | "noPermission" | "doubleTap" | "tooSoon" | "refused";
+      waitSeconds?: number;
+    };
+
 export interface RiderAction {
   id: string;
   rider: RiderProps;
@@ -67,7 +86,7 @@ export interface RiderAction {
   prevRider?: RiderProps;
   prevOrderIndex?: number;
   timestamp: number;
-  source: "click" | "voice";
+  source: LapSource;
   categoryColor: string;
   statusChange?: "DNF" | "DSQ" | "DNS" | "FINISH";
   /** Shared races: the AddLap / RiderFinished Action this entry sent (Undo targets it). */
@@ -105,7 +124,7 @@ interface Params {
    * board-wide trailing debounce and not a per-card delay.
    */
   boardHoldMs: number;
-  onLapRecorded?: (rider: RiderProps, catColor: string, source: "click" | "voice") => void;
+  onLapRecorded?: (rider: RiderProps, catColor: string, source: LapSource) => void;
   /** RECAP MODE: a longer duplicate-protection interval (ms) instead of the race's own. */
   minLapMsOverride?: number;
 }
@@ -264,22 +283,28 @@ export function useLapRecording({
    * so the recorded lap reflects when it actually happened, not when it was
    * resolved. Omit for a normal tap, which stamps "now" exactly as before.
    */
-  const recordLap = (tapped: RiderProps, source: "click" | "voice" = "click", atTime?: Date): void => {
+  const recordLap = (
+    tapped: RiderProps,
+    source: LapSource = "click",
+    atTime?: Date,
+    opts: RecordLapOptions = {},
+  ): LapOutcome => {
+    const say = opts.quiet ? null : toast;
     // Start from the store, not the card that was tapped: a lap for this rider from
     // another device may have arrived since the render (it then also counts for the
     // minimum-lap check below, so both judges tapping the same rider make ONE lap).
     const rider = riderNow(tapped);
-    if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
+    if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return { ok: false, reason: "finished" };
 
     // An ignored wave records nothing (its riders are hidden from Live anyway).
     if (isRiderIgnored(rider, useCategoryStore.getState().categories)) {
-      toast.warn("This wave is ignored — restore it in Schedule to record laps");
-      return;
+      say?.warn("This wave is ignored — restore it in Schedule to record laps");
+      return { ok: false, reason: "ignoredWave" };
     }
 
     if (!canForRace(raceUuid, "MARK_LAP")) {
-      toast.warn("No permission to mark laps");
-      return;
+      say?.warn("No permission to mark laps");
+      return { ok: false, reason: "noPermission" };
     }
 
     const clickTime = atTime ?? new Date();
@@ -290,7 +315,7 @@ export function useLapRecording({
     // resolution would otherwise produce a negative (always-truthy) diff here
     // and get silently swallowed.
     if (lastActionRef.current && lastActionRef.current.riderId === rider.id) {
-      if (now - lastActionRef.current.timestamp < 500) return;
+      if (now - lastActionRef.current.timestamp < 500) return { ok: false, reason: "doubleTap" };
     }
 
     if (rider.timeArrive) {
@@ -298,13 +323,13 @@ export function useLapRecording({
       const minLapMs = minLapMsOverride ?? minLapMsFor(race);
       if (msSinceLast < minLapMs) {
         const remaining = Math.ceil((minLapMs - msSinceLast) / 1000);
-        toast.info(`Wait ${remaining}s before next lap`);
-        return;
+        say?.info(`Wait ${remaining}s before next lap`);
+        return { ok: false, reason: "tooSoon", waitSeconds: remaining };
       }
     }
 
     // Shared race: the member's role and scope must allow this lap before anything changes.
-    if (!liveAllows(raceUuid, "AddLap", { riderUuid: rider.uuid ?? "" })) return;
+    if (!liveAllows(raceUuid, "AddLap", { riderUuid: rider.uuid ?? "" })) return { ok: false, reason: "refused" };
     const liveActionId = isLiveRace(raceUuid) && rider.uuid ? newActionId() : undefined;
 
     const lapsCounter = (rider.lapsCounter || 0) + 1;
@@ -356,7 +381,7 @@ export function useLapRecording({
         screen: "Heat",
         entityType: "rider",
         entityId: rider.bibNumber,
-        details: { lap: lapsCounter, lapTime, source, finished: isFinished },
+        details: { lap: lapsCounter, lapTime, source, finished: isFinished, ...(opts.acceptedAt != null ? { acceptedAt: new Date(opts.acceptedAt).toISOString() } : {}) },
       });
     }
 
@@ -397,9 +422,10 @@ export function useLapRecording({
 
     // `rider` here is still the pre-tap snapshot — keep it for an exact undo.
     const prevOrderIndex = displayOrder.indexOf(rider.id);
+    const actionId = `${rider.id}-${lapsCounter}-${actionTimestamp}`;
     setRiderActions((prev) => [
       {
-        id: `${rider.id}-${lapsCounter}-${actionTimestamp}`,
+        id: actionId,
         rider: updatedRider,
         prevRider: rider,
         prevOrderIndex: prevOrderIndex === -1 ? undefined : prevOrderIndex,
@@ -410,6 +436,7 @@ export function useLapRecording({
       },
       ...prev,
     ]);
+    return { ok: true, actionId, lap: lapsCounter, finished: isFinished, liveActionId };
   };
 
   /** Put a rider back exactly where they were before their last recorded lap. */

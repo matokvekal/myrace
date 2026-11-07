@@ -651,3 +651,16 @@ still open).
 - Club dictionary: no UI; `clubDictionaryStore` entries (if any) are still applied by the import wizard
 - Hebrew + English support required (use `dir="auto"` on text elements)
 - Local data is IndexedDB; shared races sync with the Commissaire server (cloud PostgreSQL). Tests never use the production DB.
+
+### Rapid Entry keypad (Live, 0.2.1 — prototype)
+- Live has two modes: Cards (unchanged) | Keypad (`heat/[heatId]/rapidEntry/`), toggle + swipe
+  (right → keypad), remembered per race (`commissaire.liveEntryMode.<race>`).
+- Bibs match through a digit trie of the WAVE's riders (`bibIndex.ts`): complete → recorded at
+  once; ambiguous (1 while 18/182 exist) → Enter only; prefix → wait; none → red after
+  `INVALID_CLEAR_MS` (digits typed before that pause stay one invalid number). Timings in
+  `rapidEntryConfig.ts` are UX experiments, not rules.
+- Records through `recordLap(rider, "keypad", firstKeypressTime, { quiet, acceptedAt })`, which now
+  returns a `LapOutcome` (card taps ignore it). Undo = existing `cancelAction`, latest lap only.
+- History per wave in localStorage `commissaire.rapidEntry.<race>:heat:<wave>`.
+- Voice is OFF by default (store v1 migration); the mic shows only when switched on in Race Setup.
+- Start screen groups: `data-start-state` red notStarted / orange standing (countdown) / green started.

@@ -1,4 +1,4 @@
-# Next task — Rapid Lap Entry (NOT STARTED)
+# Rapid Lap Entry — PROTOTYPE in 0.2.1 (feedback pending)
 
 **Status:** specification draft from the user (2026-11-07). Not implemented. Items marked **OPEN** are
 not approved requirements — they need the user's decision before implementation.

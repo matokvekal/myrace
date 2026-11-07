@@ -992,7 +992,13 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
             .sort()[0];
           const blocked = issues.length > 0;
           return (
-            <section key={group.id} className={styles.simpleGroup} data-testid="simple-start-group">
+            <section
+              key={group.id}
+              className={styles.simpleGroup}
+              data-testid="simple-start-group"
+              // Start status colour: red = not started, orange = standing (countdown, before GO), green = after GO.
+              data-start-state={upcoming ? (countdown?.groupId === group.id ? "standing" : "notStarted") : "started"}
+            >
               <div className={styles.simpleHead}>
                 <span className={styles.simpleTime}>{group.time || "No time"}</span>
                 <span className={styles.simpleCount}>{groupRiders.length} riders</span>

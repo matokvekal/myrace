@@ -1367,9 +1367,15 @@
 .simpleGroup {
   padding: 10px 12px;
   border: 1px solid var(--border-card, #d9e7fb);
+  border-left-width: 6px;
   border-radius: 12px;
   background: var(--surface-1, #fff);
 }
+
+/* Start status: RED not started · ORANGE standing (before GO) · GREEN after GO */
+.simpleGroup[data-start-state="notStarted"] { border-color: #fca5a5; border-left-color: #dc2626; background: #fef2f2; }
+.simpleGroup[data-start-state="standing"] { border-color: #fdba74; border-left-color: #f97316; background: #fff7ed; }
+.simpleGroup[data-start-state="started"] { border-color: #86efac; border-left-color: #16a34a; background: #f0fdf4; }
 
 .simpleHead {
   display: flex;

@@ -41,7 +41,10 @@ import { planWaveFinish } from "@/utils/waveFinish";
 import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
 import { liveFilterOptions } from "./liveFilter";
 import FinishWaveModal from "./FinishWaveModal";
-import { Bike, List, ChevronDown, Flag } from "lucide-react";
+import { Bike, List, ChevronDown, Flag, LayoutGrid, Grid3x3 } from "lucide-react";
+import RapidEntry from "./rapidEntry/RapidEntry";
+import { useLiveEntryMode, useModeSwipe, type LiveEntryMode } from "./rapidEntry/useLiveEntryMode";
+import rapidStyles from "./rapidEntry/rapidEntry.module.css";
 import liveStyles from "../../../../live/live.module.css";
 import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
@@ -823,6 +826,29 @@ const Heat: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, startedWaveCats.length, waveAllFinished]);
 
+  // ── Rapid Entry (keypad) — a second Live mode next to the cards; same recordLap.
+  const [entryMode, setEntryModeRaw] = useLiveEntryMode(raceUuid);
+  const setEntryMode = (mode: LiveEntryMode) => {
+    if (mode === "keypad" && voiceActive) setVoiceActive(false); // the mic lives on the cards screen
+    setEntryModeRaw(mode);
+  };
+  const dialogOpen = !!contextRider || !!resolvingJoker || showWaveInfo || confirmClear || showFinishWave || showMicPrompt;
+  const modeSwipe = useModeSwipe({
+    enabled: !dialogOpen,
+    onSwipeRight: () => setEntryMode("keypad"),
+    onSwipeLeft: () => setEntryMode("cards"),
+  });
+  const raceRiderList = useMemo(() => riders.filter((r) => r.raceUuid === raceUuid), [riders, raceUuid]);
+  const waveRiderList = useMemo(
+    () => raceRiderList.filter((r) => waveCategories.some((c) => riderInCategory(r, c))),
+    [raceRiderList, waveCategories]
+  );
+  const actionIdSet = useMemo(() => new Set(riderActions.map((a) => a.id)), [riderActions]);
+  // Voice switched off in Settings while listening → stop listening.
+  useEffect(() => {
+    if (!voiceSettings.enabled && voiceActive) setVoiceActive(false);
+  }, [voiceSettings.enabled, voiceActive]);
+
   // One short message instead of an empty board, matched to the actual state.
   const waveRiderTotal = riders.filter(
     (r) => r.raceUuid === raceUuid && waveCategories.some((c) => riderInCategory(r, c))
@@ -842,7 +868,13 @@ const Heat: React.FC = () => {
   const jokerReady = !liveEmpty && activeRiders.length > 0;
 
   return (
-    <div className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`} data-recap-mode={recap.active ? "on" : undefined}>
+    <div
+      className={`${styles.heat} ${recap.active ? styles.heatRecap : ""}`}
+      data-recap-mode={recap.active ? "on" : undefined}
+      data-entry-mode={entryMode}
+      onTouchStart={modeSwipe.onTouchStart}
+      onTouchEnd={modeSwipe.onTouchEnd}
+    >
       <HeaderHeats
         raceId={raceUuid}
         onClearBoard={waveStopped && !clearedWave ? () => setConfirmClear(true) : undefined}
@@ -855,6 +887,35 @@ const Heat: React.FC = () => {
           </div>
         </Suspense>
       )}
+
+      {/* Live mode: rider cards | Rapid Entry keypad (also by swipe). */}
+      <div className={rapidStyles.modeBar}>
+        <div className={rapidStyles.modeSwitch} role="group" aria-label="Recording mode">
+          <button
+            type="button"
+            className={rapidStyles.modeBtn}
+            aria-pressed={entryMode === "cards"}
+            onClick={() => setEntryMode("cards")}
+            data-testid="mode-cards"
+          >
+            <LayoutGrid size={16} aria-hidden="true" /> Cards
+          </button>
+          <button
+            type="button"
+            className={rapidStyles.modeBtn}
+            aria-pressed={entryMode === "keypad"}
+            onClick={() => setEntryMode("keypad")}
+            data-testid="mode-keypad"
+          >
+            <Grid3x3 size={16} aria-hidden="true" /> Keypad
+          </button>
+        </div>
+        {entryMode === "keypad" && (
+          <span className={rapidStyles.modeInfo}>
+            {heatId != null ? `Wave ${heatId} · ` : ""}{elapsedTime}
+          </span>
+        )}
+      </div>
 
       {/* Rider detail modal (double-click) */}
       {contextRider && (
@@ -975,7 +1036,7 @@ const Heat: React.FC = () => {
         </div>
       )}
 
-      <div className={styles.wrapper}>
+      <div className={styles.wrapper} hidden={entryMode === "keypad"} style={entryMode === "keypad" ? { display: "none" } : undefined}>
         {/* Control panel: clock, wave info, Joker and bib search, grouped
             into one elevated card so this reads as a single distinct zone
             between the header and the racing grid. */}
@@ -1283,10 +1344,32 @@ const Heat: React.FC = () => {
         </div>
       </div>
 
+      {entryMode === "keypad" && (
+        <RapidEntry
+          persistKey={persistKey}
+          active={!dialogOpen}
+          waveRiders={waveRiderList}
+          startedRiders={filteredRiders}
+          raceRiders={raceRiderList}
+          waveOfRider={(r) => categories.find((c) => riderInCategory(r, c))?.heat?.toString() || null}
+          getCatColor={getCatColor}
+          record={(rider, at, acceptedAt) => recordLap(rider, "keypad", at, { quiet: true, acceptedAt })}
+          actionIds={actionIdSet}
+          lapsNow={(id) => useRiderStore.getState().riders.find((r) => r.id === id)?.lapsCounter ?? null}
+          undo={(actionId) => {
+            if (!canForRace(raceUuid, "UNDO_EVENT")) {
+              toast.warn("No permission to undo laps");
+              return false;
+            }
+            return !!cancelAction(actionId);
+          }}
+        />
+      )}
+
       {/* Voice debug panel — active/auto-confirm mode only. In assist mode it
           just covers rider cards for no benefit, since nothing auto-records
           anyway; the new voice-buffer panel is the assist-mode equivalent. */}
-      {voiceActive && voiceSettings.autoConfirm && (
+      {entryMode === "cards" && voiceActive && voiceSettings.autoConfirm && (
         <div className={styles.voiceDebug}>
           <div className={styles.voiceDebugRow}>
             <span className={styles.voiceDebugLabel}>status:</span>
@@ -1332,6 +1415,7 @@ const Heat: React.FC = () => {
       )}
 
       {/* Floating mic button and voice indicator */}
+      {entryMode === "cards" && (
       <div className={styles.voiceContainer}>
         {voiceActive && <VoiceIndicator isListening={isListening} lastTranscript={lastTranscript} />}
 
@@ -1344,6 +1428,8 @@ const Heat: React.FC = () => {
               .controlRow stacks to a column on narrow phones — this row never
               wraps to vertical on its own. */}
           <div className={styles.micRow}>
+            {/* Voice is experimental: no mic at all unless it is switched on in Race Setup. */}
+            {voiceSettings.enabled && (
             <button
               className={styles.micButtonRadar}
               onClick={handleToggleVoice}
@@ -1359,6 +1445,7 @@ const Heat: React.FC = () => {
                 isListening={voiceIsListening}
               />
             </button>
+            )}
 
             {/* Voice buffer toggle — every heard bib lands here (assist mode's
                 only output; active mode logs it too, alongside the real record).
@@ -1395,6 +1482,7 @@ const Heat: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

@@ -11,3 +11,4 @@ account-sync-retry
 stale_profile
 race-publish-status
 actFinishPrimary
+rapid-key-enter

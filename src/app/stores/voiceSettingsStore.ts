@@ -12,7 +12,9 @@ interface VoiceSettingsStore {
 }
 
 const defaultSettings: VoiceSettings = {
-  enabled: true,
+  // Voice isn't proven reliable yet: OFF until switched on in Race Setup. The Live mic
+  // icon only shows when this is on.
+  enabled: false,
   language: 'he',
   model: 'webspeech',
   // Off by default: "assist" mode — spoken bibs just fill the voice buffer for
@@ -48,6 +50,14 @@ export const useVoiceSettingsStore = create<VoiceSettingsStore>()(
     }),
     {
       name: 'voice-settings-store',
+      // v1: `enabled` defaults to OFF. Before v1 no screen could change it, so a stored
+      // `true` is only the old default — reset it (language / auto-record are kept).
+      version: 1,
+      migrate: (persisted, version) => {
+        const s = persisted as { settings?: VoiceSettings } | undefined;
+        if (version < 1 && s?.settings) s.settings = { ...s.settings, enabled: false };
+        return s as unknown as VoiceSettingsStore;
+      },
       storage: typeof window !== 'undefined' ?
         {
           getItem: (name) => {

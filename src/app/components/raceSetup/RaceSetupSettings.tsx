@@ -54,7 +54,7 @@ export default function RaceSetupSettings() {
   const id = useId();
   const { jokerEnabled, toggleJokerEnabled } = useJokerMode();
   const { holdMs, setHoldMs, coverMs, setCoverMs } = useBoardHold();
-  const { settings: voiceSettings, setLanguage: setVoiceLanguage, setAutoConfirm } = useVoiceSettingsStore();
+  const { settings: voiceSettings, setLanguage: setVoiceLanguage, setAutoConfirm, setEnabled: setVoiceEnabled } = useVoiceSettingsStore();
   const seconds = (ms: number) => t("prefs.seconds", "{{n}} s", { n: ms / 1000 });
 
   return (
@@ -133,6 +133,20 @@ export default function RaceSetupSettings() {
         </p>
       )}
       <div className={styles.settingRow}>
+        <label className={styles.settingLabel} htmlFor={`${id}-voice-enabled`}>
+          {t("prefs.voiceEnabled", "Voice input on Live (experimental)")}
+        </label>
+        <input
+          id={`${id}-voice-enabled`}
+          type="checkbox"
+          className={styles.switch}
+          checked={voiceSettings.enabled}
+          onChange={(e) => setVoiceEnabled(e.target.checked)}
+          data-testid="voice-enabled"
+        />
+      </div>
+      {voiceSettings.enabled && (<>
+      <div className={styles.settingRow}>
         <span className={styles.settingLabel} id={`${id}-voice-lang`}>
           {t("prefs.voiceLanguage", "Language")}
         </span>
@@ -172,6 +186,7 @@ export default function RaceSetupSettings() {
           data-testid="voice-auto-confirm"
         />
       </div>
+      </>)}
     </div>
   );
 }
