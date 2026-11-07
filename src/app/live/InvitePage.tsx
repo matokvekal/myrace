@@ -70,8 +70,12 @@ export default function InvitePage() {
               {preview.status !== "valid" ? (
                 <p className={styles.error}>{t("live.inviteInvalid", "This invitation is no longer valid.")}</p>
               ) : !preview.canAccept ? (
-                <p className={styles.error} dir="auto">
-                  {preview.forEmail
+                <p className={styles.error} dir="auto" data-testid="invite-cannot-accept">
+                  {preview.forEmail && preview.forEmail.toLowerCase() === user.email?.toLowerCase()
+                    // Their own address, not verified yet (password sign-up). The server's email-code
+                    // sign-in would replace an unverified password, so it is not offered here.
+                    ? t("live.inviteEmailUnverified", "This invitation is for your email, but your account hasn't verified it yet. Ask the organizer for an invitation link or QR code instead — it works without email verification.")
+                    : preview.forEmail
                     ? t("live.inviteWrongEmail", "This invitation is for {{email}}. Sign in with that email (verified) to accept.", { email: preview.forEmail })
                     : t("live.inviteWrongAccount", "This invitation is for another account.")}
                 </p>

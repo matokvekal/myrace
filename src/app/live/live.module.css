@@ -275,3 +275,57 @@
   overflow-y: auto;
   text-align: start;
 }
+
+/* Live: manual Sync (flush the outbox, then reload the server's copy). 44px touch target. */
+.syncNow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--brand);
+  background: var(--bg-surface-3);
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.syncNow:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.syncNowSpin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: syncNowSpin 0.8s linear infinite;
+}
+
+@keyframes syncNowSpin { to { transform: rotate(360deg); } }
+
+.syncNowMsg {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.syncNowErr {
+  font-size: 0.8rem;
+  color: #d33;
+}
+
+.syncRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 12px 0;
+}

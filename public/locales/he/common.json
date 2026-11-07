@@ -72,6 +72,7 @@
   "live.invite": "הזמנת קומיסרים",
   "live.invitedBy": "מאת",
   "live.inviteEmails": "כתובות אימייל (מופרדות בפסיק או בשורה חדשה)",
+  "live.inviteEmailHint": "הזמנה באימייל מתקבלת רק בחשבון שאימת את כתובת האימייל. לשופטים שנרשמים עכשיו עם סיסמה — השתמשו ב\"צור קישור + QR\".",
   "live.inviteInvalid": "ההזמנה כבר אינה בתוקף.",
   "live.inviteSignIn": "יש להתחבר (או ליצור חשבון) כדי לראות את ההזמנה ולאשר אותה.",
   "live.invitesSent": "נשלחו {{n}} הזמנות",
@@ -231,5 +232,17 @@
   "heat.clearBoardTitle": "איפוס השעון וניקוי כרטיסי הרוכבים; התוצאות נשמרות בתוצאות",
   "schedule.noRidersTitle": "עדיין לא נוספו רוכבים",
   "schedule.noRidersSub": "הוסיפו רוכבים למרוץ כדי להתחיל.",
-  "schedule.addRiders": "הוספת רוכבים"
+  "schedule.addRiders": "הוספת רוכבים",
+  "live.syncNow": "סנכרון",
+  "live.syncNowBusy": "מסנכרן…",
+  "live.syncNowHint": "שליחת מה שממתין, ואז טעינה מחדש של המרוץ מהשרת",
+  "live.syncNowDone": "סונכרן",
+  "live.syncNowPending": "סונכרן · {{n}} עדיין ממתינים לשליחה",
+  "live.syncNowFailed": "הסנכרון נכשל: {{msg}}",
+  "live.wavesList": "גלים {{list}}",
+  "live.allWaves": "כל הגלים",
+  "live.customScreens": "מסכים מותאמים",
+  "live.linkGrants": "הקישור נותן:",
+  "live.inviteEmailUnverified": "ההזמנה מיועדת לאימייל שלך, אבל החשבון עדיין לא אימת אותו. בקשו מהמארגן קישור הזמנה או קוד QR — הם עובדים בלי אימות אימייל.",
+  "live.alreadyRecorded": "כבר נרשם על ידי שופט אחר"
 }

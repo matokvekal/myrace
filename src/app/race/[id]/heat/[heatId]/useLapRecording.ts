@@ -83,6 +83,13 @@ interface Params {
    */
   persistKey: string | null;
   riders: RiderProps[];
+  /**
+   * The riders as they are in the store RIGHT NOW. A shared race applies other devices'
+   * laps to the store at any moment; the positions written after a tap must start from
+   * that state, not from the last render, or a just-arrived remote lap is overwritten
+   * (two judges tapping at once each lost the other's laps). Defaults to `riders`.
+   */
+  latestRiders?: () => RiderProps[];
   updateRider: (rider: RiderProps) => void;
   updateAllRiders: (riders: RiderProps[]) => void;
   /** Km per lap, when the race defines a circuit length. */
@@ -107,6 +114,7 @@ export function useLapRecording({
   raceUuid,
   persistKey,
   riders,
+  latestRiders,
   updateRider,
   updateAllRiders,
   circuitKm,
@@ -175,6 +183,11 @@ export function useLapRecording({
       /* quota / serialization — the log is a convenience, never block scoring. */
     }
   }, [riderActions]);
+
+  /** Every rider as the store holds them NOW (another judge's lap may have landed since the render). */
+  const allNow = (): RiderProps[] => latestRiders?.() ?? riders;
+  /** This rider as the store holds them NOW — never write back a stale render copy. */
+  const riderNow = (rider: RiderProps): RiderProps => allNow().find((r) => r.id === rider.id) ?? rider;
 
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActionRef = useRef<{ riderId: number; timestamp: number } | null>(null);
@@ -251,7 +264,11 @@ export function useLapRecording({
    * so the recorded lap reflects when it actually happened, not when it was
    * resolved. Omit for a normal tap, which stamps "now" exactly as before.
    */
-  const recordLap = (rider: RiderProps, source: "click" | "voice" = "click", atTime?: Date): void => {
+  const recordLap = (tapped: RiderProps, source: "click" | "voice" = "click", atTime?: Date): void => {
+    // Start from the store, not the card that was tapped: a lap for this rider from
+    // another device may have arrived since the render (it then also counts for the
+    // minimum-lap check below, so both judges tapping the same rider make ONE lap).
+    const rider = riderNow(tapped);
     if ((rider.totalLaps > 0 && rider.lapsCounter >= rider.totalLaps) || rider.raceStatus === "finished") return;
 
     // An ignored wave records nothing (its riders are hidden from Live anyway).
@@ -312,7 +329,7 @@ export function useLapRecording({
       raceStatus: isFinished ? "finished" : "running",
     };
 
-    const allWithUpdated = riders.map((r) => (r.id === intermediateRider.id ? intermediateRider : r));
+    const allWithUpdated = allNow().map((r) => (r.id === intermediateRider.id ? intermediateRider : r));
     const sorted = calculatePositions(allWithUpdated);
     const positionAtLap = sorted.find((r) => r.id === rider.id)?.position_category ?? rider.position_category;
 
@@ -456,7 +473,8 @@ export function useLapRecording({
   };
 
   /** Undo a rider's most recent lap (from the rider modal). */
-  const revertLap = (rider: RiderProps): boolean => {
+  const revertLap = (shown: RiderProps): boolean => {
+    const rider = riderNow(shown);
     if (rider.lapsCounter <= 0) return false;
     if (!canForRace(raceUuid, "UNDO_EVENT")) {
       toast.warn("No permission to undo laps");
@@ -487,7 +505,7 @@ export function useLapRecording({
     if (!action) return null;
 
     const riderIdStr = actionId.split("-")[0];
-    const rider = riders.find((r) => r.id === Number(riderIdStr));
+    const rider = allNow().find((r) => r.id === Number(riderIdStr));
 
     // A manual "Finish Race" adds no lap: undo is a straight restore of the exact
     // pre-finish snapshot, so every lap, time and position comes back untouched.
@@ -499,7 +517,7 @@ export function useLapRecording({
       }
       const restored = { ...action.prevRider };
       updateRider(restored);
-      updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
+      updateAllRiders(calculatePositions(allNow().map((r) => (r.id === restored.id ? restored : r))));
       setRiderActions((prev) => prev.filter((a) => a.id !== actionId));
       setUndoneFinishes([action, ...undoneFinishes.filter((u) => u.id !== actionId)]);
       if (race) {
@@ -625,7 +643,8 @@ export function useLapRecording({
    * flag, which requires a rider to have completed ALL laps (see linkedGroups).
    * Undo goes through `cancelAction` with the snapshot stored on the log entry.
    */
-  const finishRider = (rider: RiderProps): boolean => {
+  const finishRider = (tapped: RiderProps): boolean => {
+    const rider = riderNow(tapped);
     if (rider.raceStatus === "finished" || ["DNF", "DSQ", "DNS"].includes(rider.status)) return false;
     if (!canForRace(raceUuid, "MARK_LAP")) {
       toast.warn("No permission to finish riders");
@@ -643,7 +662,7 @@ export function useLapRecording({
       timeArrive: finishTime.toISOString(),
       elapsedTimeFromStart: formatTime((finishTime.getTime() - raceStart.getTime()) / 1000),
     };
-    const sorted = calculatePositions(riders.map((r) => (r.id === finished.id ? finished : r)));
+    const sorted = calculatePositions(allNow().map((r) => (r.id === finished.id ? finished : r)));
     const withPos: RiderProps = {
       ...finished,
       position_category: sorted.find((r) => r.id === rider.id)?.position_category ?? rider.position_category,
@@ -717,7 +736,7 @@ export function useLapRecording({
     dropPendingMove(action.rider.id);
     const restored = { ...action.rider };
     updateRider(restored);
-    updateAllRiders(calculatePositions(riders.map((r) => (r.id === restored.id ? restored : r))));
+    updateAllRiders(calculatePositions(allNow().map((r) => (r.id === restored.id ? restored : r))));
     setUndoneFinishes(undoneFinishes.filter((u) => u.id !== actionId));
     setRiderActions((prev) => [{ ...redoAction, rider: restored, timestamp: Date.now() }, ...prev.filter((a) => a.id !== actionId)]);
     void recordRaceEvent({

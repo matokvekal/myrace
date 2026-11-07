@@ -106,3 +106,128 @@ describe("rejected offline actions", () => {
     expect(await live.outboxCounts(LOCAL)).toEqual({ pending: 0, rejected: 0 });
   });
 });
+
+describe("duplicate lap reports (first write wins on the server)", () => {
+  it("leave the outbox, are not listed as not applied, and reload the server's copy", async () => {
+    const live = await load("judge");
+    answer = (actions) => actions.map((a) => ({ actionId: a.actionId, seq: null, applied: false, reason: "duplicate" }));
+    await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    await live.flush(LOCAL);
+
+    expect(await live.rejectedActions(LOCAL)).toEqual([]);
+    expect(await live.outboxCounts(LOCAL)).toEqual({ pending: 0, rejected: 0 });
+    expect(live.useLiveStore.getState().sync[LOCAL].notApplied).toEqual([]);
+    // The other judge's lap was skipped locally while ours was queued: fetch the server's copy.
+    const urls = vi.mocked(fetch).mock.calls.map(([u]) => String(u));
+    expect(urls.some((u) => u.endsWith(`/races/${SERVER}/snapshot`))).toBe(true);
+  });
+
+  it("are told apart from real refusals in the same batch", async () => {
+    const live = await load("judge");
+    answer = (actions) => actions.map((a, i) => ({ actionId: a.actionId, seq: null, applied: false, reason: i === 0 ? "duplicate" : "forbidden" }));
+    await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    const refused = await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-2" });
+    await live.flush(LOCAL);
+    expect((await live.rejectedActions(LOCAL)).map((r) => r.actionId)).toEqual([refused]);
+  });
+
+  it("isDuplicateResult only matches a not-applied duplicate", async () => {
+    const live = await load("judge");
+    expect(live.isDuplicateResult({ applied: false, reason: "duplicate" })).toBe(true);
+    expect(live.isDuplicateResult({ applied: true, reason: "duplicate" })).toBe(false);
+    expect(live.isDuplicateResult({ applied: false, reason: "stale" })).toBe(false);
+  });
+});
+
+describe("manual Sync (syncRaceNow)", () => {
+  const snapshot = {
+    lastSeq: 42,
+    access: { role: "judge", screens: {} },
+    race: { name: "Server race" },
+    categories: [],
+    riders: [
+      { uuid: "r-1", bibNumber: 1, firstName: "Server", lastName: "One", category: "Elite", lapsCounter: 3 },
+      { uuid: "r-2", bibNumber: 2, firstName: "Server", lastName: "Two", category: "Elite", lapsCounter: 5 },
+    ],
+  };
+  let calls: string[];
+  let actionsDown: boolean;
+
+  async function loadWithStores() {
+    const live = await load("judge");
+    const { default: useRaceStore } = await import("@/stores/racesStore");
+    const { default: useRiderStore } = await import("@/stores/ridersStore");
+    const { default: useCategoryStore } = await import("@/stores/categoryStore");
+    useRaceStore.setState({ races: [{ id: 1, uuid: LOCAL, name: "Local race" } as never] });
+    useCategoryStore.setState({ categories: [] });
+    const { makeRider } = await import("@/test/factories");
+    // r-1 has a lap typed here that has not been sent; r-2's local copy is stale.
+    const mine = [
+      makeRider({ id: 1, uuid: "r-1", raceUuid: LOCAL, bibNumber: 1, lapsCounter: 4 }),
+      makeRider({ id: 2, uuid: "r-2", raceUuid: LOCAL, bibNumber: 2, lapsCounter: 1 }),
+    ];
+    useRiderStore.setState({ riders: mine, lastFetchedRaceUuid: LOCAL });
+    return { live, useRiderStore, useRaceStore };
+  }
+
+  beforeEach(() => {
+    calls = [];
+    actionsDown = false;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith(`/races/${SERVER}/actions`)) {
+        calls.push("actions");
+        if (actionsDown) return new Response(JSON.stringify({ error: { code: "unavailable", message: "n/a" } }), { status: 503 });
+        const body = JSON.parse(String(init?.body)) as { actions: { actionId: string; type: string }[] };
+        posted.push(body.actions);
+        return new Response(JSON.stringify({ results: answer(body.actions) }), { status: 200 });
+      }
+      if (url.endsWith(`/races/${SERVER}/snapshot`)) {
+        calls.push("snapshot");
+        return new Response(JSON.stringify(snapshot), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: { code: "unavailable", message: "n/a" } }), { status: 503 });
+    }));
+  });
+
+  it("sends the outbox FIRST, then replaces the local copy with the server snapshot", async () => {
+    const { live, useRiderStore, useRaceStore } = await loadWithStores();
+    await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    const res = await live.syncRaceNow(LOCAL);
+
+    expect(calls.filter((c) => c === "actions" || c === "snapshot").slice(0, 2)).toEqual(["actions", "snapshot"]);
+    expect(res).toEqual({ pending: 0, rejected: 0 });
+    const riders = useRiderStore.getState().riders;
+    expect(riders.find((r) => r.uuid === "r-1")!.lapsCounter).toBe(3); // sent → server's copy
+    expect(riders.find((r) => r.uuid === "r-2")!.lapsCounter).toBe(5); // stale local copy replaced
+    expect(useRaceStore.getState().races[0].name).toBe("Server race");
+  });
+
+  it("an Action that could not be sent stays queued and its rider keeps the local change", async () => {
+    const { live, useRiderStore } = await loadWithStores();
+    actionsDown = true;
+    await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    const res = await live.syncRaceNow(LOCAL);
+
+    expect(calls.indexOf("actions")).toBeLessThan(calls.indexOf("snapshot"));
+    expect(res.pending).toBe(1); // never discarded
+    const riders = useRiderStore.getState().riders;
+    expect(riders.find((r) => r.uuid === "r-1")!.lapsCounter).toBe(4); // queued change wins until sent
+    expect(riders.find((r) => r.uuid === "r-2")!.lapsCounter).toBe(5);
+  });
+
+  it("refused Actions stay in review after a Sync", async () => {
+    const { live } = await loadWithStores();
+    answer = (actions) => actions.map((a) => ({ actionId: a.actionId, seq: null, applied: false, reason: "forbidden" }));
+    const lap = await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    const res = await live.syncRaceNow(LOCAL);
+    expect(res).toEqual({ pending: 0, rejected: 1 });
+    expect((await live.rejectedActions(LOCAL)).map((r) => r.actionId)).toEqual([lap]);
+  });
+
+  it("throws (nothing replaced) when the snapshot can't be fetched", async () => {
+    const { live, useRiderStore } = await loadWithStores();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await expect(live.syncRaceNow(LOCAL)).rejects.toThrow();
+    expect(useRiderStore.getState().riders.find((r) => r.uuid === "r-2")!.lapsCounter).toBe(1);
+  });
+});

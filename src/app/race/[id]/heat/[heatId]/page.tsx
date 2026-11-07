@@ -42,10 +42,12 @@ import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
 import { liveFilterOptions } from "./liveFilter";
 import FinishWaveModal from "./FinishWaveModal";
 import { Bike, List, ChevronDown, Flag } from "lucide-react";
+import liveStyles from "../../../../live/live.module.css";
 import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 // Shared races: the sync state where it matters most (offline / waiting to send).
 const SyncBadge = lazy(() => import("../../../../live/SyncBadge"));
+const SyncNowButton = lazy(() => import("../../../../live/SyncNowButton"));
 
 // Category identity is name + subCategory: the same name can exist in several
 // waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
@@ -296,6 +298,7 @@ const Heat: React.FC = () => {
     raceUuid,
     persistKey,
     riders,
+    latestRiders: () => withoutIgnoredRiders(useRiderStore.getState().riders, useCategoryStore.getState().categories),
     updateRider,
     updateAllRiders,
     circuitKm,
@@ -322,6 +325,10 @@ const Heat: React.FC = () => {
   // A tap records at the moment of the tap (the card waits 300 ms to tell a
   // double-tap — rider history — from a single tap, and passes the tap time).
   // In RECAP MODE the same flow applies, with the 6-minute duplicate check.
+  /** The rider as the store holds them NOW — a remote lap may have landed since this render. */
+  const freshRider = (rider: RiderProps): RiderProps =>
+    useRiderStore.getState().riders.find((r) => r.id === rider.id) ?? rider;
+
   const handleRiderClick = (rider: RiderProps, source: 'click' | 'voice' = 'click', at?: Date) => {
     recordLap(rider, source, at);
   };
@@ -393,7 +400,8 @@ const Heat: React.FC = () => {
     processNext();
   };
 
-  const handleStatusChange = (rider: RiderProps, status: RiderProps["status"]) => {
+  const handleStatusChange = (shown: RiderProps, status: RiderProps["status"]) => {
+    const rider = freshRider(shown);
     const isOut = ["DNF", "DSQ", "DNS"].includes(status);
     if (isOut && !canForRace(raceUuid, status === "DNS" ? "MARK_DNS" : "MARK_DNF")) {
       toast.warn("No permission to change rider status");
@@ -429,7 +437,7 @@ const Heat: React.FC = () => {
   };
 
   const handleSaveComment = (rider: RiderProps, comment: string) => {
-    updateRider({ ...rider, comment });
+    updateRider({ ...freshRider(rider), comment });
   };
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -499,7 +507,8 @@ const Heat: React.FC = () => {
     try {
       const now = new Date();
       if (isLiveRace(raceUuid)) void liveDispatch(raceUuid, "WaveFinished", { heat: heatId });
-      const plan = planWaveFinish(waveCategories, storeRiders, raceUuid, now);
+      // From the store NOW, not the render: laps from other devices must not be overwritten.
+      const plan = planWaveFinish(waveCategories, useRiderStore.getState().riders, raceUuid, now);
       for (const cat of plan.categories) await useCategoryStore.getState().updateCategory(cat);
       if (plan.finalized.length > 0) await updateAllRiders(plan.finalized);
       if (plan.closedOut.length > 0) await updateAllRiders(plan.closedOut);
@@ -553,7 +562,9 @@ const Heat: React.FC = () => {
   // it happened at the moment the Joker was tapped, not now. Returns whether
   // it succeeded so the modal knows whether to close or let the commissaire retry.
   const resolveJoker = (joker: JokerEntry, bibNumber: number): boolean => {
-    const candidate = runningRiders.find((r) => r.bibNumber === bibNumber);
+    const shown = runningRiders.find((r) => r.bibNumber === bibNumber);
+    // The store's copy: a lap from another device since the render must count for the block below.
+    const candidate = shown ? freshRider(shown) : undefined;
     if (!candidate) {
       toast.error(`No active rider with bib ${bibNumber}`);
       return false;
@@ -838,8 +849,9 @@ const Heat: React.FC = () => {
       />
       {isLiveRace(raceUuid) && (
         <Suspense fallback={null}>
-          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 0" }}>
+          <div className={liveStyles.syncRow}>
             <SyncBadge raceUuid={raceUuid} />
+            <SyncNowButton raceUuid={raceUuid} />
           </div>
         </Suspense>
       )}

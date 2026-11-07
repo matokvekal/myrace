@@ -347,15 +347,29 @@ function AccessEditor({
   );
 }
 
-function Invite({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
+/** What an invitation grants, in words: "Laps (counter), Check-in · Waves 1, 2". */
+function accessSummary(t: ReturnType<typeof useTranslation>["t"], roles: MemberRole[], permissions: MemberPermissions): string {
+  const labels = ROLE_LABEL(t);
+  const parts = [roles.length ? roles.map((r) => labels[r]).join(", ") : t("live.noRoles", "No role")];
+  parts.push(permissions.waves?.length ? t("live.wavesList", "Waves {{list}}", { list: permissions.waves.join(", ") }) : t("live.allWaves", "All waves"));
+  if (permissions.screens && Object.keys(permissions.screens).length) parts.push(t("live.customScreens", "custom screens"));
+  return parts.join(" · ");
+}
+
+export function Invite({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
   const { t } = useTranslation();
   const [emails, setEmails] = useState("");
   const [groups, setGroups] = useState<{ id: string; name: string; contactIds: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string | null }[]>([]);
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [contactIds, setContactIds] = useState<string[]>([]);
-  const [link, setLink] = useState<{ url: string; qrSvg: string } | null>(null);
-  const [sent, setSent] = useState<number | null>(null);
+  /** Every link made in this session, newest first, each with the access it carries. */
+  const [links, setLinks] = useState<{ url: string; qrSvg: string; access: string }[]>([]);
+  const [sent, setSent] = useState<{ n: number; access: string } | null>(null);
+  // Remounting an editor puts its roles/waves back to the default, so the NEXT invitation
+  // never silently carries the previous one's extra roles.
+  const [emailEditorKey, setEmailEditorKey] = useState(0);
+  const [linkEditorKey, setLinkEditorKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState("");
 
@@ -370,11 +384,14 @@ function Invite({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
     try {
       const list = emails.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean);
       const r = await team.invite(raceUuid, { emails: asLink ? [] : list, groupIds: asLink ? [] : groupIds, contactIds: asLink ? [] : contactIds, link: asLink, maxUses: asLink ? 20 : 1, roles, permissions });
+      const access = accessSummary(t, roles, permissions);
       if (asLink) {
         const l = r.invitations.find((i) => i.link);
-        if (l) setLink({ url: l.url, qrSvg: l.qrSvg });
+        if (l) setLinks((cur) => [{ url: l.url, qrSvg: l.qrSvg, access }, ...cur]);
+        setLinkEditorKey((k) => k + 1);
       } else {
-        setSent(r.invitations.length);
+        setSent({ n: r.invitations.length, access });
+        setEmailEditorKey((k) => k + 1);
         // Remember new addresses in the directory for next time.
         for (const e of list) await directory.addContact("", e).catch(() => {});
         setEmails("");
@@ -389,6 +406,10 @@ function Invite({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
     <div className={styles.card}>
       <h2 className={styles.subtitle}>{t("live.invite", "Invite commissaires")}</h2>
       <textarea className={styles.textarea} dir="ltr" placeholder={t("live.inviteEmails", "Email addresses (comma or new line)")} value={emails} onChange={(e) => setEmails(e.target.value)} />
+      {/* Email invitations need a VERIFIED email on the account; a password sign-up isn't verified yet. */}
+      <p className={styles.muted} data-testid="invite-email-hint">
+        {t("live.inviteEmailHint", "An email invitation can be accepted only by an account that verified that email. For judges signing up now with a password, use \"Create link + QR\" below.")}
+      </p>
       {groups.length > 0 && (
         <>
           <span className={styles.muted}>{t("live.fromGroups", "From your groups")}</span>
@@ -416,16 +437,23 @@ function Invite({ raceUuid, isOwner }: { raceUuid: string; isOwner: boolean }) {
         </>
       )}
       {error && <p className={styles.error} dir="auto">{error}</p>}
-      {sent !== null && <p className={styles.muted}>{t("live.invitesSent", "{{n}} invitation(s) sent", { n: sent })}</p>}
-      <AccessEditor raceUuid={raceUuid} initialRoles={["counter"]} initialPermissions={{}} ownerChoices={isOwner} saveLabel={t("live.sendInvites", "Send invitations")} onSave={(r, p) => void send(r, p, false)} />
-      <AccessEditor raceUuid={raceUuid} initialRoles={["viewer"]} initialPermissions={{}} ownerChoices={isOwner} saveLabel={t("live.makeLink", "Create link + QR")} onSave={(r, p) => void send(r, p, true)} />
-      {link && (
-        <div className={styles.item}>
+      {sent !== null && (
+        <p className={styles.muted} dir="auto" data-testid="invites-sent">
+          {t("live.invitesSent", "{{n}} invitation(s) sent", { n: sent.n })} · {sent.access}
+        </p>
+      )}
+      <AccessEditor key={`email-${emailEditorKey}`} raceUuid={raceUuid} initialRoles={["counter"]} initialPermissions={{}} ownerChoices={isOwner} saveLabel={t("live.sendInvites", "Send invitations")} onSave={(r, p) => void send(r, p, false)} />
+      <AccessEditor key={`link-${linkEditorKey}`} raceUuid={raceUuid} initialRoles={["viewer"]} initialPermissions={{}} ownerChoices={isOwner} saveLabel={t("live.makeLink", "Create link + QR")} onSave={(r, p) => void send(r, p, true)} />
+      {links.map((link) => (
+        <div key={link.url} className={styles.item} data-testid="invite-link">
+          <span className={styles.badge} dir="auto" data-testid="invite-link-access">
+            {t("live.linkGrants", "This link gives:")} {link.access}
+          </span>
           <div className={styles.qr} dangerouslySetInnerHTML={{ __html: link.qrSvg }} />
           <input className={styles.input} dir="ltr" readOnly value={link.url} onFocus={(e) => e.currentTarget.select()} />
           <button className={styles.secondary} onClick={() => void navigator.clipboard?.writeText(link.url)}>{t("live.copy", "Copy link")}</button>
         </div>
-      )}
+      ))}
       <div className={styles.row}>
         <input className={styles.input} style={{ flex: 1 }} dir="auto" placeholder={t("live.newGroup", "New group, e.g. Federation A")} value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
         <button

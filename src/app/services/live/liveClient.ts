@@ -15,6 +15,7 @@
  */
 import { io, type Socket } from "socket.io-client";
 import { toast } from "react-toastify";
+import i18next from "i18next";
 import { create } from "zustand";
 import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import useRiderStore from "@/stores/ridersStore";
@@ -661,14 +662,36 @@ const REASON_TEXT: Record<string, string> = {
   race_official: "the race is final — the owner can include it in an amendment",
   not_member: "you are no longer a member of this race",
   stale: "a newer correction of this rider replaced it",
+  duplicate: "already recorded by another judge",
 };
 
-/** Sends a race's queue in local order, one batch at a time. */
-export async function flush(local: string): Promise<void> {
+/**
+ * The server keeps the FIRST report of a rider's lap; a second one (another judge tapped
+ * the same crossing) comes back `duplicate`. That is not a lost record — the lap is on the
+ * server — so it leaves the outbox and is never listed under "not applied".
+ */
+export const isDuplicateResult = (r: { applied: boolean; reason: string | null }) => !r.applied && r.reason === "duplicate";
+
+
+/**
+ * Sends a race's queue in local order, one batch at a time. A call made while a send is
+ * running waits for THAT send (Sync must not read the snapshot before the queue went out).
+ */
+const flushRuns = new Map<string, Promise<void>>();
+export function flush(local: string): Promise<void> {
+  const running = flushRuns.get(local);
+  if (running) return running;
+  const run = flushOnce(local).finally(() => flushRuns.delete(local));
+  flushRuns.set(local, run);
+  return run;
+}
+
+async function flushOnce(local: string): Promise<void> {
   if (flushing.has(local) || !session || !navigator.onLine) return;
   const link = linkOf(local);
   if (!link) return;
   flushing.add(local);
+  let duplicates = 0;
   try {
     for (;;) {
       // Only this account's entries (and ones queued while signed out) go with this account's token.
@@ -693,7 +716,10 @@ export async function flush(local: string): Promise<void> {
         const e = entries[i];
         if (!e) return;
         if (r.applied) done.push(e.actionId);
-        else {
+        else if (isDuplicateResult(r)) {
+          done.push(e.actionId);
+          duplicates++;
+        } else {
           rejected.push({ actionId: e.actionId, type: e.action.type, reason: r.reason ?? "invalid" });
           kept.push({ ...e, rejected: { reason: r.reason ?? "invalid", seq: r.seq, at: Date.now() } });
         }
@@ -710,7 +736,17 @@ export async function flush(local: string): Promise<void> {
     const left = await outboxList(local);
     pendingRiders.set(local, new Set(left.map((e) => (e.action.payload as { riderUuid?: string }).riderUuid).filter((u): u is string => !!u)));
     setSync(local, { pending: left.length, lastSyncAt: Date.now() });
-    if (left.length === 0 && fallbackNeeded(local)) await catchUp(local);
+    if (duplicates > 0) {
+      toast.info(i18next.t("live.alreadyRecorded", "Already recorded by another judge") || "Already recorded by another judge", { toastId: `dup-${local}`, autoClose: 2500 });
+      // The other judge's lap reached this device while ours was queued, so it was skipped
+      // (a queued change wins locally) and a catch-up from lastSeq would not bring it back.
+      // Reload the server's copy so the board shows the lap the server kept.
+      try {
+        await loadSnapshot(local);
+      } catch {
+        /* the next catch-up / Sync retries */
+      }
+    } else if (left.length === 0 && fallbackNeeded(local)) await catchUp(local);
   } finally {
     flushing.delete(local);
   }
@@ -1055,6 +1091,42 @@ export async function refreshRace(local: string): Promise<boolean> {
   return true;
 }
 
+export interface SyncNowResult {
+  /** Actions still waiting to be sent (kept, re-sent later — never discarded). */
+  pending: number;
+  /** Actions the server refused, kept on this device for review. */
+  rejected: number;
+}
+
+/**
+ * Manual Sync (Live screen). In this order:
+ *  1. send the outbox (waits for a send already running),
+ *  2. replace the local copy of the race, its categories and riders with the server's
+ *     AUTHORITATIVE snapshot — riders with a change still queued keep their local state
+ *     until it is sent, so nothing typed here is lost, and nothing stale overwrites the server,
+ *  3. leave the outbox as it is: unsent Actions stay queued, refused ones stay in review.
+ * Throws when it can't reach the server (the caller shows the error).
+ */
+export async function syncRaceNow(local: string): Promise<SyncNowResult> {
+  if (!linkOf(local)) throw new Error("This race is not shared");
+  if (!session) throw new Error("Sign in to sync");
+  if (!navigator.onLine) throw new Error("No connection");
+  await flush(local);
+  try {
+    await loadSnapshot(local);
+  } catch (err) {
+    if (err instanceof LiveApiError && err.status === 404) setSync(local, { revoked: true });
+    if (isRaceDeleted(err)) await removeDeletedRace(local);
+    throw err;
+  }
+  const pending = await pendingCount(local);
+  const rejected = await rejectedActions(local);
+  if (pending === 0) setLink(local, { idRepair: ID_REPAIR_VERSION }); // a full reload also repairs duplicate ids
+  setSync(local, { pending, notApplied: toNotApplied(rejected), lastSyncAt: Date.now() });
+  if (pending > 0) scheduleFlush(local, 2000);
+  return { pending, rejected: rejected.length };
+}
+
 const ID_REPAIR_VERSION = 1;
 
 async function catchUpOnce(local: string): Promise<void> {
@@ -1115,6 +1187,8 @@ async function loadSnapshot(local: string): Promise<void> {
   for (const id of dupIds) await applyingRemote(() => useRiderStore.getState().deleteRider(id));
   for (const r of currentRiders) {
     if (dupIds.has(r.id)) continue;
+    // A rider with a change still queued here stays (it may not have reached the server yet).
+    if (r.uuid && pendingUuids.has(r.uuid)) continue;
     if (!r.uuid || !keep.has(r.uuid)) await applyingRemote(() => useRiderStore.getState().deleteRider(r.id));
   }
   await useCategoryStore.getState().getCategories(local);
