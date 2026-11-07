@@ -58,6 +58,12 @@ const catKey = (name: string, sub?: string | null) => `${name}|${sub ?? ""}`;
 const riderCatKey = (r: { category: string; subCategory?: string | null }) =>
   catKey(r.category, r.subCategory);
 
+/**
+ * Cards mode: the wave-info chip and the entry row (Joker · Bib input · RECAP) are hidden
+ * for now (user request, 0.2.2). The code stays — flip to true to bring them back.
+ */
+const SHOW_CARD_INFO_INPUT = false;
+
 const Heat: React.FC = () => {
   const { t } = useTranslation();
   const params = useParams();
@@ -879,16 +885,8 @@ const Heat: React.FC = () => {
         raceId={raceUuid}
         onClearBoard={waveStopped && !clearedWave ? () => setConfirmClear(true) : undefined}
       />
-      {isLiveRace(raceUuid) && (
-        <Suspense fallback={null}>
-          <div className={liveStyles.syncRow}>
-            <SyncBadge raceUuid={raceUuid} />
-            <SyncNowButton raceUuid={raceUuid} />
-          </div>
-        </Suspense>
-      )}
-
-      {/* Live mode: rider cards | Rapid Entry keypad (also by swipe). */}
+      {/* Top bar: Cards | Keypad (also by swipe) + sync (cards) or wave · clock (keypad).
+          Sync keeps running in the background in both modes; only the button is hidden on the keypad. */}
       <div className={rapidStyles.modeBar}>
         <div className={rapidStyles.modeSwitch} role="group" aria-label="Recording mode">
           <button
@@ -910,10 +908,19 @@ const Heat: React.FC = () => {
             <Grid3x3 size={16} aria-hidden="true" /> Keypad
           </button>
         </div>
-        {entryMode === "keypad" && (
+        {entryMode === "keypad" ? (
           <span className={rapidStyles.modeInfo}>
             {heatId != null ? `Wave ${heatId} · ` : ""}{elapsedTime}
           </span>
+        ) : (
+          isLiveRace(raceUuid) && (
+            <Suspense fallback={null}>
+              <div className={`${liveStyles.syncRow} ${rapidStyles.modeSync}`}>
+                <SyncBadge raceUuid={raceUuid} />
+                <SyncNowButton raceUuid={raceUuid} />
+              </div>
+            </Suspense>
+          )
         )}
       </div>
 
@@ -1085,7 +1092,7 @@ const Heat: React.FC = () => {
               </button>
             )}
             <p className={styles.timerText}>{elapsedTime}</p>
-            {currentWave && (
+            {SHOW_CARD_INFO_INPUT && currentWave && (
             <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
               {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
               {waveCategories
@@ -1099,7 +1106,7 @@ const Heat: React.FC = () => {
           </div>
 
           {/* Entry row: Unknown Rider · bib (prominent) · RECAP MODE */}
-          <div className={styles.entryRow}>
+          <div className={styles.entryRow} style={SHOW_CARD_INFO_INPUT ? undefined : { display: "none" }}>
             {jokerEnabled && (
               <button
                 className={styles.jokerBtn}

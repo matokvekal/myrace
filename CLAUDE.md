@@ -652,7 +652,7 @@ still open).
 - Hebrew + English support required (use `dir="auto"` on text elements)
 - Local data is IndexedDB; shared races sync with the Commissaire server (cloud PostgreSQL). Tests never use the production DB.
 
-### Rapid Entry keypad (Live, 0.2.1 — prototype)
+### Rapid Entry keypad (Live, 0.2.1–0.2.2 — prototype)
 - Live has two modes: Cards (unchanged) | Keypad (`heat/[heatId]/rapidEntry/`), toggle + swipe
   (right → keypad), remembered per race (`commissaire.liveEntryMode.<race>`).
 - Bibs match through a digit trie of the WAVE's riders (`bibIndex.ts`): complete → recorded at
@@ -664,3 +664,10 @@ still open).
 - History per wave in localStorage `commissaire.rapidEntry.<race>:heat:<wave>`.
 - Voice is OFF by default (store v1 migration); the mic shows only when switched on in Race Setup.
 - Start screen groups: `data-start-state` red notStarted / orange standing (countdown) / green started.
+- 0.2.2: keypad is digits + a tall Enter only (no Backspace/Clear keys; the physical keyboard
+  keeps Backspace/Escape). A unique bib clears the input first and records on the next tick.
+  History labels are one word (`4 LEFT`, `FINISH`, `WAIT 23s`, `WAVE 2`, `UNKNOWN`); the ▲▼ arrows
+  reorder THIS LIST only — never lap times or the official order. One compact top bar: mode
+  switch + (cards) sync / (keypad) wave · clock; the Sync button is hidden on the keypad.
+  Cards mode hides the wave-info chip and the entry row (Joker · Bib · RECAP) behind
+  `SHOW_CARD_INFO_INPUT = false` in `heat/[heatId]/page.tsx` — code kept, flip to restore.

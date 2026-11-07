@@ -112,7 +112,7 @@ test("keypad: unambiguous bibs auto-accept, ambiguous ones need Enter, invalid o
     await expect(page.getByTestId("rapid-display")).toContainText("34"); // incomplete prefix waits
     await type(page, "1");
     await type(page, "18");
-    await expect(page.getByTestId("rapid-display")).toContainText("Enter → 18");
+    await expect(page.getByTestId("rapid-display")).toHaveAttribute("data-match", "ambiguous");
     await page.getByTestId("rapid-key-enter").dispatchEvent("pointerdown");
     await type(page, "1");
     await page.getByTestId("rapid-key-enter").dispatchEvent("pointerdown");
@@ -123,16 +123,19 @@ test("keypad: unambiguous bibs auto-accept, ambiguous ones need Enter, invalid o
     await expect(rows).toHaveCount(7);
     const texts = await rows.allInnerTexts();
     // newest first
-    expect(texts[0]).toMatch(/345[\s\S]*Wave 2/);
-    expect(texts[1]).toMatch(/999[\s\S]*Unknown bib/);
-    expect(texts.slice(2).map((t) => t.split(/\s/)[0])).toEqual(["1", "18", "341", "182", "431"]);
-    for (const t of texts.slice(2)) expect(t).toMatch(/Lap 1/);
+    expect(texts[0]).toMatch(/345[\s\S]*Wave 2/i);
+    expect(texts[1]).toMatch(/999[\s\S]*Unknown/i);
+    expect(texts.slice(2).map((t) => t.trim().split(/\s/)[0])).toEqual(["1", "18", "341", "182", "431"]);
+    for (const t of texts.slice(2)) expect(t).toMatch(/4 left/i); // 5 laps, lap 1 done
+    // Order arrows reorder this list only.
+    await rows.nth(2).getByTestId("rapid-row-down").click();
+    expect((await rows.nth(2).innerText()).trim().split(/\s/)[0]).toBe("18");
     await page.screenshot({ path: path.join(os.tmpdir(), "rapid-entry-history.png") });
   });
 
   await test.step("same bib again is 'too soon', not a second lap", async () => {
     await type(page, "431");
-    await expect(page.getByTestId("rapid-row").first()).toContainText(/Too soon/);
+    await expect(page.getByTestId("rapid-row").first()).toContainText(/Wait/i);
   });
 
   await test.step("back to the cards: keypad laps are on the board, and a card tap still records", async () => {

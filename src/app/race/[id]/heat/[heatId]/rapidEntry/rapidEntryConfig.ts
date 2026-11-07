@@ -12,7 +12,7 @@ export const INVALID_CLEAR_MS = 500;
 export const AMBIGUOUS_ACCEPT_MS: number | null = null;
 
 /** How long the last result stays in the big display once the input is empty (ms). */
-export const RESULT_FLASH_MS = 1600;
+export const RESULT_FLASH_MS = 700;
 
 /** Entries kept in the per-wave history on this device. */
 export const HISTORY_LIMIT = 300;

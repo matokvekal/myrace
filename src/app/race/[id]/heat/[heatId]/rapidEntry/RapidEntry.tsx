@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Delete, X } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 import type { RiderProps } from "@/types/types";
 import type { LapOutcome } from "../useLapRecording";
 import { bibKey, buildBibIndex } from "./bibIndex";
@@ -42,6 +42,8 @@ export interface RapidEntryRecord {
   name?: string;
   color?: string;
   lap?: number;
+  /** Laps still to ride after this one (when the category's lap count is known). */
+  left?: number;
   finished?: boolean;
   /** Action-log id (undo target). */
   actionId?: string;
@@ -114,6 +116,16 @@ export default function RapidEntry(props: Props) {
   const patchEntry = (id: string, patch: Partial<RapidEntryRecord>) =>
     setHist((h) => ({ key: h.key, entries: h.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
   const removeEntry = (id: string) => setHist((h) => ({ key: h.key, entries: h.entries.filter((e) => e.id !== id) }));
+  /** Move an entry up/down in THIS LIST only — never changes a lap time or the official order. */
+  const moveEntry = (id: string, dir: -1 | 1) =>
+    setHist((h) => {
+      const i = h.entries.findIndex((e) => e.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= h.entries.length) return h;
+      const next = [...h.entries];
+      [next[i], next[j]] = [next[j], next[i]];
+      return { key: h.key, entries: next };
+    });
 
   // ── lookups
   const index = useMemo(() => buildBibIndex(waveRiders.map((r) => r.bibNumber)), [waveRiders]);
@@ -170,10 +182,8 @@ export default function RapidEntry(props: Props) {
     const note = other
       ? wave
         ? t("rapid.otherWave", "Wave {{wave}}", { wave })
-        : t("rapid.notInWave", "Not in this wave")
-      : index.classify(text) === "prefix"
-        ? t("rapid.incomplete", "Incomplete")
-        : t("rapid.unknown", "Unknown bib");
+        : t("rapid.notInWave", "Other wave")
+      : t("rapid.unknown", "Unknown");
     log({ id: newId(), bib: text, typedAt, acceptedAt: Date.now(), status: "invalid", note });
   };
 
@@ -182,7 +192,7 @@ export default function RapidEntry(props: Props) {
     const base = { id: newId(), bib, typedAt, acceptedAt };
     const inWave = waveByBib.get(bib) ?? [];
     if (inWave.length > 1) {
-      log({ ...base, status: "blocked", note: t("rapid.bibTwice", "Bib used twice") });
+      log({ ...base, status: "blocked", note: t("rapid.bibTwice", "Double bib") });
       return;
     }
     const rider = startedByBib.get(bib)?.[0] ?? inWave[0];
@@ -196,27 +206,31 @@ export default function RapidEntry(props: Props) {
       return;
     }
     if (!startedByBib.has(bib)) {
-      log({ ...base, ...who, status: "blocked", note: t("rapid.notStarted", "Not started") });
+      log({ ...base, ...who, status: "blocked", note: t("rapid.notStarted", "No start") });
       return;
     }
     const out = record(rider, new Date(typedAt), acceptedAt);
     if (out.ok) {
-      log({ ...base, ...who, status: "recorded", lap: out.lap, finished: out.finished, actionId: out.actionId });
+      const left = rider.totalLaps > 0 ? Math.max(0, rider.totalLaps - out.lap) : undefined;
+      log({ ...base, ...who, status: "recorded", lap: out.lap, left, finished: out.finished, actionId: out.actionId });
       return;
     }
     const notes: Record<string, string> = {
-      finished: t("rapid.finished", "Already finished"),
-      doubleTap: t("rapid.duplicate", "Duplicate"),
-      noPermission: t("rapid.noPermission", "No permission"),
-      refused: t("rapid.refused", "Not allowed for your role"),
-      ignoredWave: t("rapid.ignoredWave", "Wave ignored"),
+      finished: t("rapid.finished", "Finish"),
+      doubleTap: t("rapid.duplicate", "Double"),
+      noPermission: t("rapid.noPermission", "No access"),
+      refused: t("rapid.refused", "No access"),
+      ignoredWave: t("rapid.ignoredWave", "Ignored"),
     };
     if (out.reason === "tooSoon") {
-      log({ ...base, ...who, status: "tooSoon", note: t("rapid.tooSoon", "Too soon · {{s}}s", { s: out.waitSeconds ?? 0 }) });
+      log({ ...base, ...who, status: "tooSoon", note: t("rapid.tooSoon", "Wait {{s}}s", { s: out.waitSeconds ?? 0 }) });
     } else {
       log({ ...base, ...who, status: "blocked", note: notes[out.reason] ?? out.reason });
     }
   };
+
+  /** Run after the browser paints the cleared input (entries keep their order: FIFO). */
+  const later = (fn: () => void) => setTimeout(fn, 0);
 
   /** After a digit: accept, wait, or schedule the invalid-clear. */
   const evaluate = (text: string, typedAt: number, auto: boolean) => {
@@ -224,7 +238,7 @@ export default function RapidEntry(props: Props) {
     const m = index.classify(text);
     if (m === "complete" && auto) {
       setInput("", null);
-      accept(text, typedAt);
+      later(() => accept(text, typedAt));
     } else if (m === "ambiguous" && auto && AMBIGUOUS_ACCEPT_MS != null) {
       timer.current = setTimeout(() => {
         if (cur.current.text !== text) return;
@@ -264,7 +278,7 @@ export default function RapidEntry(props: Props) {
     clearTimer();
     setInput("", null);
     const m = index.classify(text);
-    if (m === "complete" || m === "ambiguous") accept(text, typedAt);
+    if (m === "complete" || m === "ambiguous") later(() => accept(text, typedAt));
     else commitInvalid(text, typedAt);
   };
 
@@ -353,22 +367,17 @@ export default function RapidEntry(props: Props) {
   // ── what the display says about the current input
   const match = input ? index.classify(input) : null;
   const exact = input ? (startedByBib.get(input)?.[0] ?? waveByBib.get(input)?.[0]) : undefined;
-  let hint: string | null = null;
-  if (match === "ambiguous") {
-    const more = index.continuations(input, 3);
-    hint = `${t("rapid.enterFor", "Enter → {{bib}}", { bib: input })}${exact ? ` · ${nameOf(exact)}` : ""}${more.length ? ` · ${t("rapid.orKeepTyping", "or")} ${more.join(", ")}…` : ""}`;
-  } else if (match === "prefix") {
-    hint = `${index.continuations(input, 4).join(", ")}…`;
-  } else if (match === "complete") {
-    hint = t("rapid.enterToRecord", "Enter to record");
-  } else if (match === "none") {
-    hint = t("rapid.noRider", "No rider with this number");
-  }
+  // Only an ambiguous number needs a word: Enter.
+  const hint = match === "ambiguous" ? `↵ ${input}${exact ? ` · ${nameOf(exact)}` : ""}` : null;
 
   const statusLabel = (e: RapidEntryRecord): string => {
     switch (statusOf(e)) {
       case "recorded":
-        return e.finished ? t("rapid.finish", "Finish") : t("rapid.lap", "Lap {{n}}", { n: e.lap });
+        return e.finished
+          ? t("rapid.finish", "Finish")
+          : e.left != null
+            ? t("rapid.left", "{{n}} left", { n: e.left })
+            : t("rapid.lap", "Lap {{n}}", { n: e.lap });
       case "undone":
         return t("rapid.undone", "Undone");
       default:
@@ -398,14 +407,20 @@ export default function RapidEntry(props: Props) {
   return (
     <div ref={rootRef} className={styles.root} style={height ? { height } : undefined} data-testid="rapid-entry">
       <div className={styles.history} aria-label={t("rapid.history", "Entries")} data-testid="rapid-history">
-        {entries.length === 0 ? (
-          <div className={styles.historyEmpty}>{t("rapid.historyEmpty", "Type a bib — it is recorded as soon as it is unambiguous.")}</div>
-        ) : (
-          entries.map((e) => {
+        {entries.map((e, i) => {
             const st = statusOf(e);
             const blocked = undoBlockedReason(e);
             return (
               <div key={e.id} className={styles.row} data-status={st} data-testid="rapid-row">
+                {/* Order arrows: this list only — lap times and official order never change here. */}
+                <span className={styles.rowMove}>
+                  <button type="button" className={styles.moveBtn} disabled={i === 0} onClick={() => moveEntry(e.id, -1)} aria-label={t("rapid.moveUp", "Move up")} data-testid="rapid-row-up">
+                    <ChevronUp size={16} aria-hidden="true" />
+                  </button>
+                  <button type="button" className={styles.moveBtn} disabled={i === entries.length - 1} onClick={() => moveEntry(e.id, 1)} aria-label={t("rapid.moveDown", "Move down")} data-testid="rapid-row-down">
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </button>
+                </span>
                 <span className={styles.rowColor} style={e.color ? { background: e.color } : undefined} />
                 <span className={styles.rowBib}>{e.bib}</span>
                 <span className={styles.rowName} dir="auto">{e.name ?? ""}</span>
@@ -428,8 +443,7 @@ export default function RapidEntry(props: Props) {
                 )}
               </div>
             );
-          })
-        )}
+          })}
       </div>
 
       <div className={styles.entry} data-no-swipe>
@@ -441,24 +455,21 @@ export default function RapidEntry(props: Props) {
               <span className={styles.flashBib}>{flash.bib}</span>
               <span className={styles.flashText} dir="auto">
                 {flash.status === "recorded" ? "✓" : "✕"} {statusLabel(flash)}
-                {flash.name ? ` · ${flash.name}` : ""}
               </span>
             </span>
           ) : (
-            <span className={styles.placeholder}>{t("rapid.placeholder", "Bib")}</span>
+            <span className={styles.placeholder}>&nbsp;</span>
           )}
-          <span className={styles.hint} dir="auto">{input ? hint : " "}</span>
+          {hint && <span className={styles.hint} dir="auto">{hint}</span>}
         </div>
 
         <div className={styles.pad}>
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
             <span key={d} className={styles.cell}>{key(d, () => pressDigit(d), { testId: `rapid-key-${d}` })}</span>
           ))}
-          <span className={styles.cell}>{key("C", pressClear, { className: styles.keyMuted, aria: t("rapid.clear", "Clear"), testId: "rapid-key-clear" })}</span>
-          <span className={styles.cell}>{key("0", () => pressDigit("0"), { testId: "rapid-key-0" })}</span>
-          <span className={styles.cell}>{key(<Delete size={28} aria-hidden="true" />, pressBack, { className: styles.keyMuted, aria: t("rapid.backspace", "Backspace"), testId: "rapid-key-back" })}</span>
+          <span className={styles.zeroCell}>{key("0", () => pressDigit("0"), { testId: "rapid-key-0" })}</span>
           <span className={styles.enterCell}>
-            {key(<><span className={styles.enterArrow} aria-hidden="true">↵</span>{t("rapid.enter", "Enter")}</>, pressEnter, { className: styles.enter, testId: "rapid-key-enter" })}
+            {key(<span className={styles.enterArrow} aria-hidden="true">↵</span>, pressEnter, { className: styles.enter, aria: t("rapid.enter", "Enter"), testId: "rapid-key-enter" })}
           </span>
         </div>
       </div>
