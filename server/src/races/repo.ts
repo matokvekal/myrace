@@ -75,9 +75,11 @@ export async function loadMarks(d: Db, raceUuid: string, riderUuids: string[]): 
   const undone = new Set(
     (
       await d.query<{ target: string }>(
+        // Only Undos of THESE marks (indexed: race_events_undo_target_idx) — not every Undo of the race.
         `SELECT payload->>'targetActionId' AS target FROM race_events
-         WHERE "raceUuid" = $1 AND type = 'Undo' AND (applied OR "actionId" IN (${AMENDED_IDS}))`,
-        [raceUuid],
+         WHERE "raceUuid" = $1 AND type = 'Undo' AND payload->>'targetActionId' = ANY($2::text[])
+           AND (applied OR "actionId" IN (${AMENDED_IDS}))`,
+        [raceUuid, rows.map((r) => String(r.actionId))],
       )
     ).map((r) => r.target),
   );

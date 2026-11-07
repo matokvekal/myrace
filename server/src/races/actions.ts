@@ -18,7 +18,7 @@ import { ApiError, logger } from "../lib/core.js";
 import { publishChanges, type CommittedChanges } from "../realtime/socket.js";
 import { authorizeAction } from "../../../src/shared/race/access.js";
 import { PROTOCOL_VERSION, UNDOABLE_ACTION_TYPES, type RaceAction } from "../../../src/shared/race/actions.js";
-import { actionHeat, applyAction, deriveRider, groupRiders, raceMinLapMs, rankRiders } from "../../../src/shared/race/engine.js";
+import { actionHeat, applyAction, categoryOfRider, deriveRider, groupRiders, raceMinLapMs, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
 import { AMENDED_IDS, loadMarks, loadState, saveChanges } from "./repo.js";
@@ -152,9 +152,13 @@ export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: s
 export async function isDuplicateLap(d: Db, state: RaceState, riderUuid: string, at: number): Promise<boolean> {
   const minLap = raceMinLapMs(state);
   if (minLap <= 0) return false;
+  // Same as the engine: before the wave started nothing counts (taps before the start aren't laps).
+  const rider = state.riders[riderUuid];
+  const startMs = rider ? categoryOfRider(state, rider)?.startedAt ?? null : null;
+  if (startMs === null) return false;
   const marks = (await loadMarks(d, state.race.uuid, [riderUuid])).get(riderUuid) ?? [];
   const tapped = marks
-    .filter((m) => m.type === "AddLap" && !m.undone && !m.recovered)
+    .filter((m) => m.type === "AddLap" && !m.undone && !m.recovered && m.at >= startMs)
     .sort((a, b) => a.at - b.at || a.seq - b.seq);
   let last: number | null = null;
   for (const m of tapped) {
