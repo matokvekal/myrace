@@ -117,9 +117,31 @@ describe("duplicate lap reports (first write wins on the server)", () => {
     expect(await live.rejectedActions(LOCAL)).toEqual([]);
     expect(await live.outboxCounts(LOCAL)).toEqual({ pending: 0, rejected: 0 });
     expect(live.useLiveStore.getState().sync[LOCAL].notApplied).toEqual([]);
-    // The other judge's lap was skipped locally while ours was queued: fetch the server's copy.
-    const urls = vi.mocked(fetch).mock.calls.map(([u]) => String(u));
-    expect(urls.some((u) => u.endsWith(`/races/${SERVER}/snapshot`))).toBe(true);
+    // The other judge's lap was skipped locally while ours was queued: fetch the server's copy
+    // (once, shortly after the burst — single-flight + debounce).
+    const snaps = () => vi.mocked(fetch).mock.calls.map(([u]) => String(u)).filter((u) => u.endsWith(`/races/${SERVER}/snapshot`)).length;
+    await vi.waitFor(() => expect(snaps()).toBe(1), { timeout: 4000 });
+  });
+
+  it("a burst of duplicate answers reloads the race ONCE, not per send", async () => {
+    const live = await load("judge");
+    answer = (actions) => actions.map((a) => ({ actionId: a.actionId, seq: null, applied: false, reason: "duplicate" }));
+    for (const r of ["r-1", "r-2", "r-3"]) {
+      await live.dispatchAction(LOCAL, "AddLap", { riderUuid: r });
+      await live.flush(LOCAL);
+    }
+    const snaps = () => vi.mocked(fetch).mock.calls.map(([u]) => String(u)).filter((u) => u.endsWith(`/races/${SERVER}/snapshot`)).length;
+    expect(snaps()).toBe(0); // not during the burst
+    await vi.waitFor(() => expect(snaps()).toBe(1), { timeout: 4000 });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(snaps()).toBe(1);
+  });
+
+  it("two flushes at once send the queue once", async () => {
+    const live = await load("judge");
+    await live.dispatchAction(LOCAL, "AddLap", { riderUuid: "r-1" });
+    await Promise.all([live.flush(LOCAL), live.flush(LOCAL)]);
+    expect(posted.length).toBe(1);
   });
 
   it("are told apart from real refusals in the same batch", async () => {

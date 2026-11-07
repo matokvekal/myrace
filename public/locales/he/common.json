@@ -244,5 +244,10 @@
   "live.customScreens": "מסכים מותאמים",
   "live.linkGrants": "הקישור נותן:",
   "live.inviteEmailUnverified": "ההזמנה מיועדת לאימייל שלך, אבל החשבון עדיין לא אימת אותו. בקשו מהמארגן קישור הזמנה או קוד QR — הם עובדים בלי אימות אימייל.",
-  "live.alreadyRecorded": "כבר נרשם על ידי שופט אחר"
+  "live.alreadyRecorded": "כבר נרשם על ידי שופט אחר",
+  "live.syncNowOffline": "אין חיבור — השינויים ממתינים לשליחה",
+  "live.syncNowSignedOut": "יש להתחבר כדי לסנכרן",
+  "live.syncNowNotShared": "המרוץ אינו משותף",
+  "live.syncNowNoAccess": "אין יותר גישה למרוץ הזה",
+  "live.syncNowServer": "השרת לא הגיב — נסו שוב"
 }

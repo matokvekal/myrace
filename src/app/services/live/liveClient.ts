@@ -648,8 +648,9 @@ export async function dispatchAction(
     deviceId: deviceId(),
     protocolVersion: PROTOCOL_VERSION,
   } as RaceAction;
-  await outboxPut({ actionId, localRaceUuid: local, serverRaceUuid: link.serverRaceUuid, userId: session?.user.id ?? null, createdAt: Date.now() * 1000 + (seqCounter++ % 1000), action });
+  // Pending BEFORE the first await: a snapshot/catch-up applied meanwhile must not overwrite this tap.
   markPending(local, action);
+  await outboxPut({ actionId, localRaceUuid: local, serverRaceUuid: link.serverRaceUuid, userId: session?.user.id ?? null, createdAt: Date.now() * 1000 + (seqCounter++ % 1000), action });
   setSync(local, { pending: syncOf(local).pending + 1 });
   scheduleFlush(local);
   return actionId;
@@ -756,11 +757,9 @@ async function flushOnce(local: string): Promise<void> {
       // The other judge's lap reached this device while ours was queued, so it was skipped
       // (a queued change wins locally) and a catch-up from lastSeq would not bring it back.
       // Reload the server's copy so the board shows the lap the server kept.
-      try {
-        await loadSnapshot(local);
-      } catch {
-        /* the next catch-up / Sync retries */
-      }
+      // A bunch of riders tapped by two judges gives a duplicate on almost every send: reload
+      // ONCE, shortly after the burst (single-flight + trailing debounce), not on every flush.
+      reloadSnapshotSoon(local);
     } else if (resolved.length && skipped) {
       // Re-read what the socket brought while those riders were queued (lastSeq is already past it).
       try {
@@ -1176,12 +1175,13 @@ export interface SyncNowResult {
  * Throws when it can't reach the server (the caller shows the error).
  */
 export async function syncRaceNow(local: string): Promise<SyncNowResult> {
-  if (!linkOf(local)) throw new Error("This race is not shared");
-  if (!session) throw new Error("Sign in to sync");
-  if (!navigator.onLine) throw new Error("No connection");
+  if (!linkOf(local)) throw new SyncError("not_shared");
+  if (!session) throw new SyncError("signed_out");
+  if (!navigator.onLine) throw new SyncError("offline");
   await flush(local);
+  cancelReloadSoon(local); // this sync reloads now; a reload queued by the flush is not needed
   try {
-    await loadSnapshot(local);
+    await reloadSnapshotOnce(local);
   } catch (err) {
     if (err instanceof LiveApiError && err.status === 404) setSync(local, { revoked: true });
     if (isRaceDeleted(err)) await removeDeletedRace(local);
@@ -1226,6 +1226,37 @@ interface Snapshot extends ChangeSet {
 }
 
 /** Replaces the local copy of a shared race with the server's snapshot (filtered for this member). */
+/** Why a manual Sync could not run (the button shows a translated text per code). */
+export class SyncError extends Error {
+  constructor(public code: "not_shared" | "signed_out" | "offline") {
+    super(code);
+  }
+}
+
+const reloadTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const reloading = new Map<string, Promise<void>>();
+/** One full reload per race at a time; a caller during a reload joins it. */
+function reloadSnapshotOnce(local: string): Promise<void> {
+  const running = reloading.get(local);
+  if (running) return running;
+  const run = loadSnapshot(local).finally(() => reloading.delete(local));
+  reloading.set(local, run);
+  return run;
+}
+/** Trailing-debounced reload (a burst of duplicate answers → one reload after it). */
+export const RELOAD_DEBOUNCE_MS = 1500;
+function reloadSnapshotSoon(local: string): void {
+  clearTimeout(reloadTimers.get(local));
+  reloadTimers.set(local, setTimeout(() => {
+    reloadTimers.delete(local);
+    void reloadSnapshotOnce(local).catch(() => { /* the next catch-up / Sync retries */ });
+  }, RELOAD_DEBOUNCE_MS));
+}
+function cancelReloadSoon(local: string): void {
+  clearTimeout(reloadTimers.get(local));
+  reloadTimers.delete(local);
+}
+
 async function loadSnapshot(local: string): Promise<void> {
   const link = linkOf(local)!;
   let snap = await api<Snapshot>("GET", `/races/${link.serverRaceUuid}/snapshot`);

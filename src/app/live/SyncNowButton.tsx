@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { syncRaceNow } from "@/services/live/liveClient";
+import { LiveApiError, SyncError, syncRaceNow } from "@/services/live/liveClient";
 import styles from "./live.module.css";
 
 type State = { kind: "idle" } | { kind: "busy" } | { kind: "ok"; pending: number } | { kind: "error"; message: string };
@@ -25,7 +25,19 @@ export default function SyncNowButton({ raceUuid }: { raceUuid: string }) {
       setState({ kind: "ok", pending: res.pending });
       clearRef.current = setTimeout(() => setState({ kind: "idle" }), 4000);
     } catch (err) {
-      setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+      // Translated, short reasons; the message clears by itself after a few seconds.
+      const message =
+        err instanceof SyncError
+          ? err.code === "offline"
+            ? t("live.syncNowOffline", "No connection — changes stay queued")
+            : err.code === "signed_out"
+              ? t("live.syncNowSignedOut", "Sign in to sync")
+              : t("live.syncNowNotShared", "This race is not shared")
+          : err instanceof LiveApiError && (err.status === 404 || err.status === 410)
+            ? t("live.syncNowNoAccess", "No access to this race any more")
+            : t("live.syncNowServer", "The server didn't answer — try again");
+      setState({ kind: "error", message });
+      clearRef.current = setTimeout(() => setState({ kind: "idle" }), 6000);
     }
   };
 
@@ -53,7 +65,7 @@ export default function SyncNowButton({ raceUuid }: { raceUuid: string }) {
         )}
         {state.kind === "error" && (
           <span className={styles.syncNowErr}>
-            {t("live.syncNowFailed", "Sync failed: {{msg}}", { msg: state.message })}
+            {state.message}
           </span>
         )}
       </span>
