@@ -115,8 +115,8 @@ export const undoWindowExpired = (target: Pick<UndoTarget, "type" | "receivedAt"
   WINDOWED_UNDO_TYPES.includes(target.type) && nowMs - target.receivedAt > LAP_UNDO_WINDOW_MS;
 
 export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: string, acceptedNow: readonly string[] = []): Promise<{ reason: "invalid" | "stale" } | { target: UndoTarget }> {
-  const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; counts: boolean; seq: number; eventAt: Date; createdAt: Date }>(
-    `SELECT e."actionId", e."raceUuid", e.type, e.payload, ${COUNTS("e", "$3")} AS counts, e.seq, e."eventAt", e."createdAt"
+  const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; counts: boolean; seq: number; eventAt: Date; serverReceivedAt: Date }>(
+    `SELECT e."actionId", e."raceUuid", e.type, e.payload, ${COUNTS("e", "$3")} AS counts, e.seq, e."eventAt", e."serverReceivedAt"
      FROM race_events e WHERE e."actionId" = $2 AND e."raceUuid" = $1`,
     [raceUuid, targetActionId, acceptedNow],
   );
@@ -139,7 +139,7 @@ export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: s
     );
     if (newer) return { reason: "stale" };
   }
-  return { target: { actionId: t.actionId, raceUuid: t.raceUuid, type: t.type, payload: t.payload, riderUuid, receivedAt: new Date(t.createdAt).getTime() } };
+  return { target: { actionId: t.actionId, raceUuid: t.raceUuid, type: t.type, payload: t.payload, riderUuid, receivedAt: new Date(t.serverReceivedAt).getTime() } };
 }
 
 /**
