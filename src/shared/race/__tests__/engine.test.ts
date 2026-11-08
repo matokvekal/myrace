@@ -264,11 +264,27 @@ describe("setup rules (Story 2.6)", () => {
     expect(state.riders[riders[0].uuid].category).toBe("Elite Men");
   });
 
+  it("0.3 GO lock: riders of a started wave can't be edited or deleted; before GO they can", () => {
+    const { state, cat, riders } = race();
+    // started (startedAt set by GO)
+    expect(state.categories[cat.uuid].startedAt).not.toBeNull();
+    expect(applyAction(state, makeAction("RiderEdited", { riderUuid: riders[1].uuid, changes: { firstName: "X" } }), T0)).toEqual({ applied: false, reason: "locked" });
+    expect(applyAction(state, makeAction("RiderDeleted", { riderUuid: riders[1].uuid }), T0)).toEqual({ applied: false, reason: "locked" });
+    // before GO (standing / check-in): editable and deletable
+    state.categories[cat.uuid].startedAt = null;
+    state.categories[cat.uuid].status = "upcoming";
+    expect(applyAction(state, makeAction("RiderEdited", { riderUuid: riders[1].uuid, changes: { firstName: "X" } }), T0).applied).toBe(true);
+    expect(applyAction(state, makeAction("RiderDeleted", { riderUuid: riders[1].uuid }), T0).applied).toBe(true);
+  });
+
   it("riders with laps can't be deleted or moved; duplicate bibs are refused; derived fields can't be edited", () => {
     const { state, riders } = race();
     state.riders[riders[0].uuid].lapsCounter = 1;
     expect(applyAction(state, makeAction("RiderDeleted", { riderUuid: riders[0].uuid }), T0)).toEqual({ applied: false, reason: "locked" });
     expect(applyAction(state, makeAction("RiderEdited", { riderUuid: riders[0].uuid, changes: { category: "Other" } }), T0)).toEqual({ applied: false, reason: "locked" });
+    // 0.3: the wave has started, so any edit is "locked" first; the field rules are checked before GO.
+    expect(applyAction(state, makeAction("RiderEdited", { riderUuid: riders[1].uuid, changes: { bibNumber: 1 } }), T0)).toEqual({ applied: false, reason: "locked" });
+    for (const c of Object.values(state.categories)) c.startedAt = null;
     expect(applyAction(state, makeAction("RiderEdited", { riderUuid: riders[1].uuid, changes: { bibNumber: 1 } }), T0)).toEqual({ applied: false, reason: "invalid" });
     expect(applyAction(state, makeAction("RiderEdited", { riderUuid: riders[1].uuid, changes: { lapsCounter: 9 } as never }), T0)).toEqual({ applied: false, reason: "invalid" });
   });

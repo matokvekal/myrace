@@ -17,7 +17,7 @@ import { tx } from "../db/pool.js";
 import { ApiError, logger } from "../lib/core.js";
 import { publishChanges, type CommittedChanges } from "../realtime/socket.js";
 import { authorizeAction } from "../../../src/shared/race/access.js";
-import { PROTOCOL_VERSION, UNDOABLE_ACTION_TYPES, type RaceAction } from "../../../src/shared/race/actions.js";
+import { LAP_UNDO_WINDOW_MS, PROTOCOL_VERSION, UNDOABLE_ACTION_TYPES, WINDOWED_UNDO_TYPES, type RaceAction } from "../../../src/shared/race/actions.js";
 import { actionHeat, applyAction, categoryOfRider, deriveRider, groupRiders, raceMinLapMs, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
@@ -101,7 +101,7 @@ async function appendEvent(
  */
 const COUNTS = (alias: string, p: string) => `(${alias}.applied OR ${alias}."actionId" IN (${AMENDED_IDS}) OR ${alias}."actionId" = ANY(${p}::uuid[]))`;
 
-export interface UndoTarget { actionId: string; raceUuid: string; type: string; payload: unknown; riderUuid: string | null }
+export interface UndoTarget { actionId: string; raceUuid: string; type: string; payload: unknown; riderUuid: string | null; receivedAt: number }
 
 /**
  * The ONE check of an Undo's target, used by live Actions AND by amendments: the target is an
@@ -110,9 +110,13 @@ export interface UndoTarget { actionId: string; raceUuid: string; type: string; 
  * race order (event time, then seq) — the order the engine applies marks in, so an offline
  * correction delivered late is judged by when it happened. Runs under the race row lock.
  */
+/** True when a live Undo of this target comes too late (server receive times; corrections are never windowed). */
+export const undoWindowExpired = (target: Pick<UndoTarget, "type" | "receivedAt">, nowMs: number) =>
+  WINDOWED_UNDO_TYPES.includes(target.type) && nowMs - target.receivedAt > LAP_UNDO_WINDOW_MS;
+
 export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: string, acceptedNow: readonly string[] = []): Promise<{ reason: "invalid" | "stale" } | { target: UndoTarget }> {
-  const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; counts: boolean; seq: number; eventAt: Date }>(
-    `SELECT e."actionId", e."raceUuid", e.type, e.payload, ${COUNTS("e", "$3")} AS counts, e.seq, e."eventAt"
+  const t = await d.one<{ actionId: string; raceUuid: string; type: string; payload: unknown; counts: boolean; seq: number; eventAt: Date; createdAt: Date }>(
+    `SELECT e."actionId", e."raceUuid", e.type, e.payload, ${COUNTS("e", "$3")} AS counts, e.seq, e."eventAt", e."createdAt"
      FROM race_events e WHERE e."actionId" = $2 AND e."raceUuid" = $1`,
     [raceUuid, targetActionId, acceptedNow],
   );
@@ -135,7 +139,7 @@ export async function checkUndoTarget(d: Db, raceUuid: string, targetActionId: s
     );
     if (newer) return { reason: "stale" };
   }
-  return { target: { actionId: t.actionId, raceUuid: t.raceUuid, type: t.type, payload: t.payload, riderUuid } };
+  return { target: { actionId: t.actionId, raceUuid: t.raceUuid, type: t.type, payload: t.payload, riderUuid, receivedAt: new Date(t.createdAt).getTime() } };
 }
 
 /**
@@ -224,6 +228,8 @@ export async function processActions(raceUuid: string, userId: string, items: un
       if (!reason && a.type === "Undo") {
         const c = await checkUndoTarget(d, raceUuid, a.payload.targetActionId);
         if ("reason" in c) reason = c.reason;
+        // 0.3: live Undo of a recorded lap only within LAP_UNDO_WINDOW_MS of the server receiving it.
+        else if (undoWindowExpired(c.target, Date.now())) reason = "locked";
         else targets = { [c.target.actionId]: { ...a, actionId: c.target.actionId, type: c.target.type, payload: c.target.payload } as RaceAction };
       }
       if (!reason) {
