@@ -38,5 +38,5 @@ Check-In changes need access to Check-In
 ARRAY['bibNumber', 'firstName', 'lastName']
 category_approvals
 Results changed after approval
-Type APPROVED to approve
+does not allow approving results
 RiderNameCorrected
