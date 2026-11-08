@@ -52,27 +52,38 @@ describe("setup by several members", () => {
     expect(riderOf(snap, a.uuid)).toMatchObject({ checked: true, bibNumber: 199 });
   });
 
-  it("check-in may add a late entry but may not delete or bulk-import", async () => {
+  it("check-in may add a late entry and (0.3.6) delete one before GO, but may not bulk-import", async () => {
     const late = { uuid: randomUUID(), firstName: "Late", lastName: "Entry", bibNumber: 150, category: cat(1).name, heat: 1 };
+    const wrong = { uuid: randomUUID(), firstName: "Wrong", lastName: "Entry", bibNumber: 151, category: cat(1).name, heat: 1 };
     const res = await send(checker, race.raceUuid,
       action(race.raceUuid, "RiderAdded", { rider: late }),
-      action(race.raceUuid, "RiderDeleted", { riderUuid: late.uuid }),
+      action(race.raceUuid, "RiderAdded", { rider: wrong }),
+      action(race.raceUuid, "RiderDeleted", { riderUuid: wrong.uuid }),
       action(race.raceUuid, "RidersImported", { riders: [], categories: [] }));
-    expect(res.map((r) => r.reason)).toEqual([null, "forbidden", "forbidden"]);
+    expect(res.map((r) => r.reason)).toEqual([null, null, null, "forbidden"]);
     race.riders.push({ uuid: late.uuid, bibNumber: 150, category: cat(1).name, heat: 1 });
   });
 
-  it("owner manages categories; start commissaire may only move start times", async () => {
+  it("owner manages categories and settings; (0.3.6) start changes no start times or settings, only freezes a derived wave", async () => {
     const extra = { uuid: randomUUID(), name: "Kids", heat: 3, laps: 1, startTime: "11:00" };
-    let res = await send(owner, race.raceUuid, action(race.raceUuid, "CategoryAdded", { category: extra }));
-    expect(res[0].applied).toBe(true);
+    const derived = { uuid: randomUUID(), name: "Minis", heat: null, laps: 1, startTime: "11:30" };
+    let res = await send(owner, race.raceUuid, action(race.raceUuid, "CategoryAdded", { category: extra }), action(race.raceUuid, "CategoryAdded", { category: derived }));
+    expect(res.every((r) => r.applied)).toBe(true);
     res = await send(starter, race.raceUuid,
       action(race.raceUuid, "CategoryEdited", { categoryUuid: extra.uuid, changes: { startTime: "11:15" } }),
+      action(race.raceUuid, "CategoryEdited", { categoryUuid: extra.uuid, changes: { heat: 4 } }),
       action(race.raceUuid, "CategoryEdited", { categoryUuid: extra.uuid, changes: { laps: 2 } }),
-      action(race.raceUuid, "CategoryDeleted", { categoryUuid: extra.uuid }));
-    expect(res.map((r) => r.reason)).toEqual([null, "forbidden", "forbidden"]);
-    res = await send(owner, race.raceUuid, action(race.raceUuid, "CategoryDeleted", { categoryUuid: extra.uuid }));
-    expect(res[0].applied).toBe(true);
+      action(race.raceUuid, "CategoryDeleted", { categoryUuid: extra.uuid }),
+      action(race.raceUuid, "SettingChanged", { changes: { leaderFinishAll: false } }),
+      action(race.raceUuid, "CategoryEdited", { categoryUuid: derived.uuid, changes: { heat: 4 } }),
+      action(race.raceUuid, "CategoryEdited", { categoryUuid: derived.uuid, changes: { heat: 5 } }));
+    expect(res.map((r) => r.reason)).toEqual(["forbidden", "forbidden", "forbidden", "forbidden", "forbidden", null, "forbidden"]);
+    res = await send(owner, race.raceUuid,
+      action(race.raceUuid, "CategoryEdited", { categoryUuid: extra.uuid, changes: { startTime: "11:15" } }),
+      action(race.raceUuid, "SettingChanged", { changes: { leaderFinishAll: true } }),
+      action(race.raceUuid, "CategoryDeleted", { categoryUuid: extra.uuid }),
+      action(race.raceUuid, "CategoryDeleted", { categoryUuid: derived.uuid }));
+    expect(res.every((r) => r.applied)).toBe(true);
   });
 
   it("a category with riders cannot be deleted", async () => {

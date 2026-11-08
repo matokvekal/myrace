@@ -17,7 +17,6 @@
 import type { RaceAction } from "./actions";
 import { MEMBER_ROLES, type MemberRole } from "./roles";
 import {
-  RACE_OPERATION_SETTINGS,
   type CategoryUuid,
   type RaceState,
   type SharedCategory,
@@ -83,19 +82,24 @@ const screensWith = (base: ScreenAccess, list: readonly Screen[]): Partial<Recor
  */
 export const ROLE_DEFAULTS: Readonly<Record<MemberRole, Partial<Record<Screen, ScreenAccess>>>> = {
   admin: screensWith(FULL, SCREENS),
+  // 0.3.6: start runs waves only — start times / wave numbers (schedule) and race settings are
+  // configuration (owner/admin). Exception: freezing a derived wave at Start (authorizeAction).
   start: {
     ...screensWith(VIEW, ALL_SCREENS_EXCEPT_TEAM),
     start: { view: true, create: false, update: true, delete: false },
-    schedule: { view: true, create: false, update: true, delete: false },
   },
+  // 0.3.6: the counter also corrects results (lap count, status, audited name fix after GO) and
+  // approves the podium — the invited judge (start + counter + checkin) works RESULTS too.
   counter: {
     ...screensWith(VIEW, ALL_SCREENS_EXCEPT_TEAM),
     live: FULL,
+    results: { view: true, create: false, update: true, delete: false },
   },
+  // 0.3.6: rider management includes delete; the engine still refuses it after GO / with laps.
   checkin: {
     ...screensWith(VIEW, ALL_SCREENS_EXCEPT_TEAM),
     checkin: { view: true, create: false, update: true, delete: false },
-    riders: { view: true, create: true, update: true, delete: false },
+    riders: { view: true, create: true, update: true, delete: true },
   },
   // Results judge (0.2): corrects lap counts and rider statuses (LapCountCorrection,
   // StatusCorrection accept results.update). No laps, starts, riders or finalize.
@@ -340,7 +344,6 @@ export const canApproveCategory = (access: EffectiveAccess, category: SharedCate
 
 const SCHEDULE_FIELDS = new Set(["startTime", "heat"]);
 const MAP_FIELDS = new Set<string>(RACE_MAP_FIELDS);
-const OPERATION_SETTINGS = new Set<string>(RACE_OPERATION_SETTINGS);
 
 /** Wave not yet started: the rider's category is still upcoming. */
 const preStart = (state: RaceState, rider: SharedRider): boolean => {
@@ -415,7 +418,14 @@ export function authorizeAction(access: EffectiveAccess, action: RaceAction, sta
     case "CategoryEdited": {
       const fields = Object.keys(action.payload.changes);
       const scheduleOnly = fields.length > 0 && fields.every((f) => SCHEDULE_FIELDS.has(f));
-      const res = onCategory(action.payload.categoryUuid, scheduleOnly ? [["schedule", "update"], ["categories", "update"]] : [["categories", "update"]]);
+      // 0.3.6: Start may only FREEZE a derived wave (a not-started category without a wave gets
+      // its number when its wave is started) — never move a category or change start times.
+      const cat = state.categories[action.payload.categoryUuid];
+      const freezesWave = fields.length === 1 && fields[0] === "heat" && !!cat && !(Number(cat.heat) > 0) && cat.status === "upcoming" && cat.startedAt == null;
+      const res = onCategory(
+        action.payload.categoryUuid,
+        freezesWave ? [["schedule", "update"], ["categories", "update"], ["start", "update"]] : scheduleOnly ? [["schedule", "update"], ["categories", "update"]] : [["categories", "update"]],
+      );
       if (!res.ok) return res;
       const newHeat = action.payload.changes.heat;
       return newHeat === undefined || waveInScope(access, newHeat) ? OK : outOfScope;
@@ -452,11 +462,9 @@ export function authorizeAction(access: EffectiveAccess, action: RaceAction, sta
       const mapOnly = fields.length > 0 && fields.every((f) => MAP_FIELDS.has(f));
       return anyOf(access, mapOnly ? [["map", "update"], ["info", "update"]] : [["info", "update"]]) ? OK : forbidden;
     }
-    case "SettingChanged": {
-      const fields = Object.keys(action.payload.changes);
-      const operationOnly = fields.length > 0 && fields.every((f) => OPERATION_SETTINGS.has(f));
-      return anyOf(access, operationOnly ? [["settings", "update"], ["start", "update"]] : [["settings", "update"]]) ? OK : forbidden;
-    }
+    case "SettingChanged":
+      // 0.3.6: race settings (incl. first-finish-all-finish) are configuration: owner/admin only.
+      return anyOf(access, [["settings", "update"]]) ? OK : forbidden;
     case "MemberChanged":
       if (!access.screens.team.update) return forbidden;
       // The owner's access is protected: nobody changes it through membership.

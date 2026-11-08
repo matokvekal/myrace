@@ -86,11 +86,11 @@ describe("screen restrictions", () => {
     expect(authorizeAction(lapsNoUndo, undo, state, { [lap.actionId]: lap })).toEqual({ ok: false, reason: "forbidden" });
   });
 
-  it("Check-in may create and edit riders but not delete or bulk-import them (matrix rows 23, 42-44)", () => {
+  it("Check-in may create, edit and (0.3.6, before GO — engine) delete riders, but not bulk-import them", () => {
     const { state, riders } = race();
     const a = member(["checkin"]);
     expect(authorizeAction(a, makeAction("RiderEdited", { riderUuid: riders[1].uuid, changes: { bibNumber: 7 } }), state).ok).toBe(true);
-    expect(authorizeAction(a, makeAction("RiderDeleted", { riderUuid: riders[1].uuid }), state).ok).toBe(false);
+    expect(authorizeAction(a, makeAction("RiderDeleted", { riderUuid: riders[1].uuid }), state).ok).toBe(true);
     expect(authorizeAction(a, makeAction("RidersImported", { riders: [], categories: [] }), state).ok).toBe(false);
   });
 

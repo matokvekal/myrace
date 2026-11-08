@@ -13,7 +13,7 @@ import { Plus, Edit2, GripVertical, X, Trash2, AlertTriangle, Play, Pause, Flag,
 import { freezeDerivedWaves, riderInCategory } from "../schedule/Schedule";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
-import { isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
+import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { statusLabel } from "@/utils/statusLabels";
 
 interface Props {
@@ -348,6 +348,8 @@ const StartManager: React.FC<Props> = ({ raceUuid, waveNum, categories, simple =
   const [blockedNotice, setBlockedNotice] = useState(false);
   const [countdown, setCountdown] = useState<{ groupId: string; seconds: number } | null>(null);
 const [editingStartId, setEditingStartId] = useState<string | null>(null);
+  // 0.3.6: start groups / start times are schedule configuration (owner, admin) — judges only start.
+  const canSchedule = canOnScreen(raceUuid, "schedule", "update");
   const [startGroups, setStartGroups] = useState<StartGroup[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [waveBaseTime, setWaveBaseTime] = useState<string>("");
@@ -1150,14 +1152,16 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                     <Flag size={13} /> Finish Wave
                   </button>
                 ))}
-              <Button
-                variant="primary"
-                size="sm"
-                startIcon={<Plus size={14} />}
-                onClick={addNewStart}
-              >
-                Add Start Group
-              </Button>
+              {canSchedule && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  startIcon={<Plus size={14} />}
+                  onClick={addNewStart}
+                >
+                  Add Start Group
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -1432,26 +1436,28 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                   </button>
                 </div>
               </div>
-              <div className={styles.startActions}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => setEditingStartId(group.id)}
-                  title="Manage categories"
-                >
-                  <Edit2 size={14} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => deleteStart(group.id)}
-                  title="Delete start"
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </div>
+              {canSchedule && (
+                <div className={styles.startActions}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={() => setEditingStartId(group.id)}
+                    title="Manage categories"
+                  >
+                    <Edit2 size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={() => deleteStart(group.id)}
+                    title="Delete start"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              )}
             </div>
 
             {hasCategories ? (
@@ -1537,9 +1543,11 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
             ) : (
               <div className={styles.emptyStart}>
                 <p>No categories assigned to this start</p>
-                <Button variant="secondary" size="sm" onClick={() => setEditingStartId(group.id)}>
-                  Add Categories
-                </Button>
+                {canSchedule && (
+                  <Button variant="secondary" size="sm" onClick={() => setEditingStartId(group.id)}>
+                    Add Categories
+                  </Button>
+                )}
               </div>
             )}
           </div>

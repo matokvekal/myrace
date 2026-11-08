@@ -58,14 +58,17 @@ describe("RiderNameCorrected (audited name fix after GO)", () => {
     expect(state.riders[a.uuid].lastName).toBe("Levy");
   });
 
-  it("needs results.update: owner, admin, results judge — not the invited start/counter/checkin judge", () => {
+  it("needs results.update: owner, admin, results judge and (0.3.6) the counter / invited judge — not check-in or start alone", () => {
     const { state, a } = setup();
     const act = makeAction("RiderNameCorrected", { riderUuid: a.uuid, changes: { lastName: "Levy" }, reason: "typo" });
     const ok = (isOwner: boolean, roles: string[]) => authorizeAction(effectiveAccess({ isOwner, roles: roles as never, permissions: {} }), act, state).ok;
     expect(ok(true, [])).toBe(true);
     expect(ok(false, ["admin"])).toBe(true);
     expect(ok(false, ["results"])).toBe(true);
-    expect(ok(false, ["start", "counter", "checkin"])).toBe(false);
+    expect(ok(false, ["start", "counter", "checkin"])).toBe(true);
+    expect(ok(false, ["counter"])).toBe(true);
+    expect(ok(false, ["checkin"])).toBe(false);
+    expect(ok(false, ["start"])).toBe(false);
     expect(ok(false, ["viewer"])).toBe(false);
   });
 });

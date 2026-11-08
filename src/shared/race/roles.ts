@@ -52,7 +52,7 @@ export const PERMISSION_MATRIX: Readonly<Record<Permission, Readonly<Partial<Rec
   // See the live race, boards, results
   viewRace: { owner: "all", admin: "all", start: "all", counter: "all", checkin: "all", results: "all", viewer: "all" },
   // Edit race setup (categories, laps, start times)
-  editSetup: { owner: "all", admin: "all", start: "startTimesOnly" },
+  editSetup: { owner: "all", admin: "all" }, // 0.3.6: start times are setup too (Start only freezes a derived wave)
   // Add/edit riders, bibs, late entries
   editRiders: { owner: "all", admin: "all", checkin: "all" },
   // Check riders in, set DNS before start
@@ -62,11 +62,11 @@ export const PERMISSION_MATRIX: Readonly<Record<Permission, Readonly<Partial<Rec
   // Add Lap, Undo, resolve Jokers
   recordLaps: { owner: "all", admin: "all", counter: "inScope" },
   // Correct a rider's lap count
-  correctLapCount: { owner: "all", admin: "all", counter: "inScope", results: "inScope" },
+  correctLapCount: { owner: "all", admin: "all", counter: "inScope", results: "inScope" }, // in Results too (0.3.6)
   // Set DNF / DSQ during the race
   setRaceStatus: { owner: "all", admin: "all", counter: "inScope", results: "inScope" },
   // Race settings (first-finish-all-finish etc.)
-  raceSettings: { owner: "all", admin: "all", start: "raceOperationOnly" },
+  raceSettings: { owner: "all", admin: "all" }, // 0.3.6: no longer the start role
   // Manage members, view the Audit history
   manageMembers: { owner: "all", admin: "all" },
   // Finalize, Amend

@@ -15,7 +15,7 @@ const FR10: Row[] = [
   ["See the live race, boards, results", "viewRace",
     { owner: "all", admin: "all", start: "all", counter: "all", checkin: "all", results: "all", viewer: "all" }],
   ["Edit race setup (categories, laps, start times)", "editSetup",
-    { owner: "all", admin: "all", start: "startTimesOnly", counter: null, checkin: null, results: null, viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: null, checkin: null, results: null, viewer: null }], // 0.3.6
   ["Add/edit riders, bibs, late entries", "editRiders",
     { owner: "all", admin: "all", start: null, counter: null, checkin: "all", results: null, viewer: null }],
   ["Check riders in, set DNS before start", "checkIn",
@@ -29,7 +29,7 @@ const FR10: Row[] = [
   ["Set DNF / DSQ during the race", "setRaceStatus",
     { owner: "all", admin: "all", start: null, counter: "inScope", checkin: null, results: "inScope", viewer: null }],
   ["Race settings (first-finish-all-finish etc.)", "raceSettings",
-    { owner: "all", admin: "all", start: "raceOperationOnly", counter: null, checkin: null, results: null, viewer: null }],
+    { owner: "all", admin: "all", start: null, counter: null, checkin: null, results: null, viewer: null }], // 0.3.6
   ["Manage members, view the Audit history", "manageMembers",
     { owner: "all", admin: "all", start: null, counter: null, checkin: null, results: null, viewer: null }],
   ["Finalize, Amend", "finalize",
@@ -100,16 +100,26 @@ describe("role defaults give exactly the FR-10 rights", () => {
     }
   });
 
-  it("Start may change only start times and waves, not other category fields", () => {
+  it("0.3.6: Start changes no start times, waves or other category fields — it only freezes a derived wave", () => {
     const { state, upcoming } = setup();
     const start = accessFor("start");
-    expect(authorizeAction(start, makeAction("CategoryEdited", { categoryUuid: upcoming.uuid, changes: { startTime: "11:30" } }), state).ok).toBe(true);
-    expect(authorizeAction(start, makeAction("CategoryEdited", { categoryUuid: upcoming.uuid, changes: { laps: 5 } }), state).ok).toBe(false);
+    const edit = (changes: Record<string, unknown>) => authorizeAction(start, makeAction("CategoryEdited", { categoryUuid: upcoming.uuid, changes }), state).ok;
+    expect(edit({ startTime: "11:30" })).toBe(false);
+    expect(edit({ heat: 4 })).toBe(false); // has a wave: moving it is configuration
+    expect(edit({ laps: 5 })).toBe(false);
+    upcoming.heat = null; // wave derived from start times: Start writes it down when starting
+    expect(edit({ heat: 2 })).toBe(true);
+    expect(edit({ heat: 2, startTime: "11:30" })).toBe(false);
+    upcoming.status = "running";
+    expect(edit({ heat: 2 })).toBe(false);
+    expect(authorizeAction(accessFor("admin"), makeAction("CategoryEdited", { categoryUuid: upcoming.uuid, changes: { startTime: "11:30" } }), state).ok).toBe(true);
   });
 
-  it("Start may change only race-operation settings", () => {
+  it("0.3.6: race settings — first-finish-all-finish included — are owner/admin only", () => {
     const { state } = setup();
     expect(authorizeAction(accessFor("start"), makeAction("SettingChanged", { changes: { autoColor: false } }), state).ok).toBe(false);
+    expect(authorizeAction(accessFor("start"), makeAction("SettingChanged", { changes: { leaderFinishAll: false } }), state).ok).toBe(false);
+    expect(authorizeAction(accessFor("admin"), makeAction("SettingChanged", { changes: { leaderFinishAll: false } }), state).ok).toBe(true);
   });
 
   it("nobody can change the owner's membership", () => {

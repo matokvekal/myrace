@@ -416,7 +416,7 @@ still open).
   now calls `useLiveRaceRoom(raceUuid)` for every view (hook re-runs when the race becomes shared).
 - **Judge permissions = existing roles** start + counter + checkin (no EDIT_RACE): `riders.create/update`
   (add, bib, name), `checkin.update`, `live` (laps, Undo, DNF/DSQ), `start` (GO). No categories/info/settings
-  writes, no rider delete, no Team. Name pencil on Check-In (`checkin-editname-*`) next to the bib pencil, both
+  writes, no Team. (0.3.6 widened this — see "Invited judges (0.3.6)" below.) Name pencil on Check-In (`checkin-editname-*`) next to the bib pencil, both
   gated by `canOnScreen(race, "riders", "update")` and hidden after the wave's GO.
 - **Shared Check-In change log:** `GET /races/:uuid/history?scope=checkin` (needs `checkin.view`, not Team):
   applied StatusCorrection / RiderAdded / RiderEdited(bib/name) before the rider's wave GO, with author name and
@@ -759,11 +759,28 @@ still open).
   Provisional + Approve button → `results/ApproveCategoryModal` (typed APPROVED);
   `results/useCategoryApprovals` reloads on open, after approving and (debounced) on result changes.
 - Name after GO: `RiderEdited` stays `locked`; `RiderNameCorrected {riderUuid, changes(first/
-  middle/last), reason}` needs results.update (owner, admin, results judge — not the invited
-  start/counter/checkin judge), reason ≥ 3 chars, audited in race_events. UI: Results → rider →
+  middle/last), reason}` needs results.update (owner, admin, results judge and, since 0.3.6, the
+  counter — so the invited judge), reason ≥ 3 chars, audited in race_events. UI: Results → rider →
   Correct name (`ResultCorrection.tsx`). Adding an Action type = update migration CHECK + the
   catalog test (model.test.ts compares ACTION_TYPES with 013's CHECK list).
 - Old editors (`EditRiders`, `RiderDetailModal`) show "Started"/lock for a SHARED race's started
   rider (`utils/riderLock.ts`); local races keep their editors.
 - Tests: `server/test/db/podium-approval.test.ts`, `src/shared/race/__tests__/approval.test.ts`,
   `results/__tests__/podiumApproval.test.tsx`, `ResultCorrection.test.tsx`, spectator tests.
+
+### Invited judges (0.3.6) — role defaults, `shared/race/access.ts` ROLE_DEFAULTS
+- Invited judge = start + counter + checkin (InviteJudges `JUDGE_ROLES`, member writes on). Rights come
+  from the role defaults, so existing judges get them on the next access refresh — no data change.
+- **counter** + `results.update`: the Results correction panel (lap count, DNF/DSQ/DNS, undo a correction),
+  the audited `RiderNameCorrected` after GO, and podium approval (unchanged rule `canApproveCategory`).
+- **checkin** + `riders.delete`: delete a rider before GO only — the engine still refuses it after the
+  wave's GO or once the rider has laps (`locked`). The rider card shows Delete only with `riders.delete`
+  (`canOnScreen`), and never for a started rider of a shared race ("Started").
+- **start** lost `schedule.update` and `SettingChanged` (incl. leaderFinishAll): start times, wave numbers
+  and race settings are owner/admin configuration. ONE exception in `authorizeAction`: Start may freeze a
+  derived wave (`CategoryEdited {heat}` on a not-started category with no wave) — `freezeDerivedWaves`
+  runs when a wave is started. StartManager hides Add Start Group / Manage categories / Delete start
+  without `schedule.update`.
+- Still owner-only: Finish Race / Amend, CREATE, INFO, race configuration, Team / invitations / member writes.
+- Tests: `server/test/db/{judge-checkin-sync,lifecycle,podium-approval}.test.ts`, shared `roles` / `access` /
+  `approval` tests, `raceMode/__tests__/judgeGates.test.tsx`.

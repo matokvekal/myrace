@@ -85,7 +85,9 @@ describe("official podium approval", () => {
     // After GO: the normal edit stays locked; the audited correction needs results.update and a reason.
     const fix = (changes: Record<string, unknown>, reason?: string) => action(r, "RiderNameCorrected", { riderUuid: w1[0].uuid, changes, ...(reason === undefined ? {} : { reason }) });
     expect((await send(owner, r, action(r, "RiderEdited", { riderUuid: w1[0].uuid, changes: { lastName: "Typo" } })))[0].reason).toBe("locked");
-    expect((await send(judge, r, fix({ lastName: "Fixed" }, "Spelling on the start list")))[0].reason).toBe("forbidden");
+    // 0.3.6: the invited judge (counter) may correct names too; check-in-only and viewers may not.
+    expect((await send(checkin, r, fix({ lastName: "Fixed" }, "Spelling on the start list")))[0].reason).toBe("forbidden");
+    expect((await send(viewer, r, fix({ lastName: "Fixed" }, "Spelling on the start list")))[0].reason).toBe("forbidden");
     expect((await send(owner, r, fix({ lastName: "Fixed" })))[0].reason).toBe("invalid");
     expect((await send(owner, r, fix({}, "Nothing")))[0].reason).toBe("invalid");
     expect((await send(owner, r, fix({ bibNumber: 9 }, "Not a name")))[0].reason).toBe("invalid");

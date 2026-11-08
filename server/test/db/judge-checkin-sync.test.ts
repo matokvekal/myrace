@@ -60,12 +60,22 @@ describe("judge check-in sync and shared change history", () => {
       );
       expect(pre.map((x) => [x.applied, x.reason])).toEqual([[true, null], [true, null], [true, null], [true, null]]);
 
-      // Never configuration: category laps, race info, deleting riders.
+      // 0.3.6: the judge may delete a wrong entry before GO.
+      const wrong = randomUUID();
+      const del = await send(
+        judge, r,
+        action(r, "RiderAdded", { rider: { uuid: wrong, firstName: "Wrong", lastName: "Entry", bibNumber: 778, category: race.cats[0].name, heat: 1 } }),
+        action(r, "RiderDeleted", { riderUuid: wrong }),
+      );
+      expect(del.map((x) => [x.applied, x.reason])).toEqual([[true, null], [true, null]]);
+
+      // Never configuration: category laps, start times, race info, race settings (0.3.6).
       const config = await send(
         judge, r,
         action(r, "CategoryEdited", { categoryUuid: race.cats[0].uuid, changes: { laps: 9 } }),
+        action(r, "CategoryEdited", { categoryUuid: race.cats[0].uuid, changes: { startTime: "12:00" } }),
         action(r, "RaceEdited", { changes: { name: "Hijacked" } }),
-        action(r, "RiderDeleted", { riderUuid: late }),
+        action(r, "SettingChanged", { changes: { leaderFinishAll: false } }),
       );
       expect(config.every((x) => !x.applied && x.reason === "forbidden")).toBe(true);
       expect((await api().post(`/api/v1/races/${r}/invitations`).set(auth(judge.token)).send({ link: true, roles: ["counter"], sendEmail: false })).status).toBe(403);
@@ -77,9 +87,17 @@ describe("judge check-in sync and shared change history", () => {
       const post = await send(
         judge, r,
         action(r, "RiderEdited", { riderUuid: late, changes: { firstName: "TooLate" } }),
+        action(r, "RiderDeleted", { riderUuid: late }),
         action(r, "StatusCorrection", { riderUuid: late, status: "DNF" }),
       );
-      expect(post.map((x) => [x.applied, x.reason])).toEqual([[false, "locked"], [true, null]]);
+      expect(post.map((x) => [x.applied, x.reason])).toEqual([[false, "locked"], [false, "locked"], [true, null]]);
+      // 0.3.6: the audited name correction (reason required) and the Results lap correction work for the judge.
+      const fixes = await send(
+        judge, r,
+        action(r, "RiderNameCorrected", { riderUuid: late, changes: { firstName: "Corrected" }, reason: "Spelling at the start line" }),
+        action(r, "LapCountCorrection", { riderUuid: late, laps: 0 }),
+      );
+      expect(fixes.map((x) => [x.applied, x.reason])).toEqual([[true, null], [true, null]]);
 
       // Shared, read-only history: every judge sees the same pre-GO changes with author and time.
       const h = await history(judge, r);

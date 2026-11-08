@@ -7,6 +7,7 @@ import useRiderStore from "@/stores/ridersStore";
 import { useRaceFinalized } from "@/utils/raceLock";
 import useCategoryStore from "@/stores/categoryStore";
 import { LOCKED_AFTER_GO_TEXT, riderLockedAfterGo } from "@/utils/riderLock";
+import { canOnScreen } from "@/services/live/liveBridge";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import styles from "./riderDetailModal.module.css";
 import { X, Edit2, Save, XCircle, User, Lock, Trash2 } from "lucide-react";
@@ -194,7 +195,8 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
             </span>
           ) : !editMode ? (
             <div className={styles.editActions}>
-              <button
+              {/* 0.3.6: only for a role that may delete riders (server-checked; permissive for local races) */}
+              {canOnScreen(rider.raceUuid, "riders", "delete") && <button
                 className={confirmDelete ? styles.deleteConfirmBtn : styles.deleteBtn}
                 onClick={handleDelete}
                 disabled={started || deleting}
@@ -203,7 +205,7 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
                 data-confirm={confirmDelete || undefined}
               >
                 <Trash2 size={14} /> {deleting ? "Deleting…" : confirmDelete ? "Confirm" : "Delete"}
-              </button>
+              </button>}
               <button className={styles.editBtn} onClick={() => setEditMode(true)}>
                 <Edit2 size={14} /> Edit
               </button>
