@@ -23,16 +23,21 @@ import {
 beforeEach(() => resetHarnessIds());
 
 describe("Action catalog", () => {
-  it("is the closed enum from the architecture, in order (same list as server/sql/011 race_events_type_check)", () => {
+  it("is the closed enum from the architecture, in order (same list as server/sql/013 race_events_type_check)", () => {
     expect(ACTION_TYPES).toEqual([
       "AddLap", "Undo", "RiderFinished", "LapCountCorrection", "StatusCorrection",
       "WaveStarted", "WaveFinished", "CategoryFinished",
       "CategoryAdded", "CategoryEdited", "CategoryDeleted",
-      "RiderAdded", "RiderEdited", "RiderDeleted", "RidersImported",
+      "RiderAdded", "RiderEdited", "RiderNameCorrected", "RiderDeleted", "RidersImported",
       "RiderCheckedIn", "CommentSet", "RaceEdited", "SettingChanged",
       "MemberChanged", "Finalized", "Amended",
       "RaceAdmin", // 0.2: server-written audit of owner/admin operations
     ]);
+    // 0.3.5: the database CHECK lists exactly these types (RiderNameCorrected added by 013).
+    const fs = require("node:fs") as typeof import("node:fs");
+    const sql = fs.readFileSync(require("node:path").resolve(process.cwd(), "server/sql/013-category-approvals.sql"), "utf8");
+    const listed = [...sql.slice(sql.indexOf("race_events_type_check CHECK"), sql.indexOf("'RaceAdmin'));") + 12).matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    expect(listed).toEqual([...ACTION_TYPES]);
   });
 
   it("recognises only catalog types", () => {

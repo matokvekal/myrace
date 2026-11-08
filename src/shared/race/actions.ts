@@ -37,6 +37,8 @@ export const ACTION_TYPES = [
   "CategoryDeleted",
   "RiderAdded",
   "RiderEdited",
+  /** 0.3.5: audited name correction of a rider whose wave already started (reason required). */
+  "RiderNameCorrected",
   "RiderDeleted",
   "RidersImported",
   "RiderCheckedIn",
@@ -70,6 +72,10 @@ export const UNDOABLE_ACTION_TYPES = ["AddLap", "RiderFinished", "LapCountCorrec
 export const LAP_UNDO_WINDOW_MS = 30_000;
 export const WINDOWED_UNDO_TYPES: readonly string[] = ["AddLap", "RiderFinished"];
 
+/** Fields a `RiderNameCorrected` may change. */
+export const RIDER_NAME_FIELDS = ["firstName", "middleName", "lastName"] as const;
+export type RiderNameField = (typeof RIDER_NAME_FIELDS)[number];
+
 /** Values a `StatusCorrection` can set. "running" = clear back to racing. */
 export type StatusCorrectionValue = "standing" | "running" | "DNF" | "DSQ" | "DNS";
 
@@ -102,6 +108,8 @@ export interface ActionPayloads {
   CategoryDeleted: { categoryUuid: CategoryUuid };
   RiderAdded: { rider: NewRider };
   RiderEdited: { riderUuid: RiderUuid; changes: Partial<Pick<SharedRider, RiderIdentityField>> };
+  /** 0.3.5: after GO a normal RiderEdited is "locked"; a name fix goes through this audited Action. */
+  RiderNameCorrected: { riderUuid: RiderUuid; changes: Partial<Pick<SharedRider, RiderNameField>>; reason: string };
   RiderDeleted: { riderUuid: RiderUuid };
   /** Riders plus only the categories that don't exist yet. Never ID/passport fields. */
   RidersImported: { riders: NewRider[]; categories: NewCategory[] };
@@ -125,7 +133,10 @@ export type RaceAdminPayload =
   | { op: "published" | "unpublished" | "deleted" | "hidden" | "joinCodeRotated" }
   | { op: "invitationCreated"; invitationId: string; email: string | null; userId: UserId | null; link: boolean; roles: MemberRole[]; waves: number[] | null }
   | { op: "invitationRevoked" | "invitationDeclined"; invitationId: string }
-  | { op: "memberWritesChanged"; enabled: boolean };
+  | { op: "memberWritesChanged"; enabled: boolean }
+  /** 0.3.5 official podium approval per category (typed APPROVED), and its automatic invalidation. */
+  | { op: "categoryApproved"; categoryUuid: CategoryUuid; categoryName: string }
+  | { op: "approvalInvalidated"; categoryUuid: CategoryUuid; categoryName: string; cause: string };
 
 /** Stable codes for an Action stored as not applied (same strings as API errors). */
 export const NOT_APPLIED_REASONS = [

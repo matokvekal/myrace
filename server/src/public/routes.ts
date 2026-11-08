@@ -21,6 +21,7 @@ import { projectPublicState } from "../../../src/shared/race/access.js";
 import { GUEST_POLL_INTERVAL_MS, guestPollingEndsAt } from "../../../src/shared/race/guestPolling.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { raceUuidFromShareToken } from "./shareToken.js";
+import { approvalViews } from "../races/approvals.js";
 
 export const publicRouter = Router();
 // A guest page polls every 10 s; this leaves room for several open tabs behind one address.
@@ -51,7 +52,8 @@ const send = (res: Response, state: RaceState, body: Record<string, unknown>) =>
 
 publicRouter.get("/races/:token", route(async (req, res) => {
   const state = await stateOf(String(req.params.token));
-  send(res, state, projectPublicState(state));
+  // 0.3.5: only VALID approvals (result unchanged since APPROVED), no judge identity.
+  send(res, state, { ...projectPublicState(state), approvals: await approvalViews(db, state, { guest: true }) });
 }));
 
 publicRouter.get("/races/:token/changes", route(async (req, res) => {
@@ -65,12 +67,14 @@ publicRouter.get("/races/:token/changes", route(async (req, res) => {
     [state.race.uuid, afterSeq],
   );
   const pub = projectPublicState(state);
-  if (removed || state.race.lastSeq - afterSeq > 5000) return send(res, state, { full: true, ...pub });
+  const approvals = await approvalViews(db, state, { guest: true });
+  if (removed || state.race.lastSeq - afterSeq > 5000) return send(res, state, { full: true, ...pub, approvals });
   const riders = new Set((await db.query<{ uuid: string }>(`SELECT uuid FROM riders WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [state.race.uuid, afterSeq])).map((r) => r.uuid));
   const cats = new Set((await db.query<{ uuid: string }>(`SELECT uuid FROM categories WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [state.race.uuid, afterSeq])).map((c) => c.uuid));
   send(res, state, {
     race: pub.race,
     categories: pub.categories.filter((c) => cats.has(c.uuid)),
     riders: pub.riders.filter((r) => r.uuid && riders.has(r.uuid)),
+    approvals, // always the full list (small): an approval or invalidation changes no category row
   });
 }));

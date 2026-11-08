@@ -25,3 +25,8 @@ NOT STARTED
 commissaire.otherRaces.v1
 share-podium-toggle
 Show top 5
+results-approve
+approve-confirm
+share-podium-pending
+correct-name-save
+RiderNameCorrected

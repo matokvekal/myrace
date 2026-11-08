@@ -4,6 +4,7 @@
  * no socket, no IndexedDB — a guest never touches management APIs or local data.
  */
 import type { SharedCategory, SharedRace, SharedRider } from "../../../shared/race/state";
+import type { CategoryApprovalView } from "../../../shared/race/approval";
 
 const API = `${String(import.meta.env.VITE_SERVER_URL ?? "").replace(/\/$/, "")}/api/v1/public`;
 
@@ -19,6 +20,8 @@ export interface PublicRace {
   race: Partial<SharedRace>;
   categories: SharedCategory[];
   riders: Partial<SharedRider>[];
+  /** 0.3.5: valid official approvals only (no judge identity). Missing on an older API. */
+  approvals?: CategoryApprovalView[];
 }
 export interface PublicChanges {
   lastSeq: number;
@@ -29,6 +32,7 @@ export interface PublicChanges {
   race?: Partial<SharedRace>;
   categories?: SharedCategory[];
   riders?: Partial<SharedRider>[];
+  approvals?: CategoryApprovalView[];
 }
 
 export class PublicApiError extends Error {

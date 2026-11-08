@@ -86,6 +86,13 @@ const payloads = {
   RidersImported: z.strictObject({ riders: z.array(newRider).max(5000), categories: z.array(newCategory).max(500) }),
   RiderCheckedIn: z.strictObject({ riderUuid: uuid, checked: z.boolean() }),
   CommentSet: z.strictObject({ riderUuid: uuid, comment: text(1000).nullable() }),
+  RiderNameCorrected: z.strictObject({
+    riderUuid: uuid,
+    changes: z
+      .strictObject({ firstName: text(100).optional(), middleName: text(100).nullable().optional(), lastName: text(100).optional() })
+      .refine((c) => Object.keys(c).length > 0, "Nothing to correct"),
+    reason: z.string().trim().min(3).max(300),
+  }),
   RaceEdited: z.strictObject({ changes: z.strictObject(raceInfoShape).partial() }),
   SettingChanged: z.strictObject({ changes: z.strictObject({ leaderFinishAll: z.boolean(), autoColor: z.boolean(), minLapSeconds: z.number().int().min(0).max(3600) }).partial() }),
 } as const;

@@ -20,7 +20,7 @@
  * it lists riders in `rederive`, the caller loads those riders' marks and calls
  * `deriveRider` for each, then `rankRiders`. Pure TypeScript.
  */
-import type { RaceAction } from "./actions";
+import { RIDER_NAME_FIELDS, type RaceAction } from "./actions";
 import { RACE_INFO_FIELDS, RIDER_IDENTITY_FIELDS } from "./state";
 import type { CategoryUuid, LapDetail, RaceState, RiderUuid, SharedCategory, SharedRider } from "./state";
 import { crossingFinishes, groupPhase, NO_GROUP_PHASE, type GroupPhase, type PhaseRider } from "./finishPhases";
@@ -513,6 +513,22 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       }
       touch(r);
       ch.rederive.add(r.uuid);
+      return { applied: true, changes: ch };
+    }
+
+    case "RiderNameCorrected": {
+      // 0.3.5: the audited name fix — allowed before AND after GO (permission: results.update, see access.ts).
+      const r = rider(p.riderUuid);
+      if (!r) return notApplied("invalid");
+      const entries = Object.entries(action.payload.changes);
+      if (entries.length === 0 || !String(action.payload.reason ?? "").trim()) return notApplied("invalid");
+      for (const [k, v] of entries) {
+        if (!(RIDER_NAME_FIELDS as readonly string[]).includes(k)) return notApplied("invalid");
+        if (k !== "middleName" && !String(v ?? "").trim()) return notApplied("invalid");
+      }
+      if (!String(action.payload.changes.firstName ?? r.firstName ?? "").trim() && !String(action.payload.changes.lastName ?? r.lastName ?? "").trim()) return notApplied("invalid");
+      Object.assign(r, action.payload.changes);
+      touch(r);
       return { applied: true, changes: ch };
     }
 

@@ -46,6 +46,8 @@ describe("race delete keeps every row (no cascades, no hard delete)", () => {
     await send(owner, a.raceUuid, action(a.raceUuid, "AddLap", { riderUuid: r1.uuid }, { at: new Date(Date.now() + 90_000).toISOString() }));
     await api().post(`/api/v1/races/${a.raceUuid}/sync`).set(auth(counter.token)).send({ deviceId: "phone-1", lastSeq: 1, pendingCount: 0 });
     expect((await api().post(`/api/v1/races/${a.raceUuid}/finalize`).set(auth(owner.token))).status).toBe(201);
+    // 0.3.5: an official podium approval (category_approvals) is race data too.
+    expect((await api().post(`/api/v1/races/${a.raceUuid}/categories/${a.cats[0].uuid}/approval`).set(auth(owner.token)).send({ confirm: "APPROVED" })).status).toBe(201);
 
     const before = await rowsOf(a.raceUuid);
     for (const t of RACE_TABLES) expect(before[t], t).toBeGreaterThan(0); // every table really had rows

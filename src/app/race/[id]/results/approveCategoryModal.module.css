@@ -1,0 +1,13 @@
+.overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.5); }
+.modal { position: relative; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 14px; background: var(--bg-card); color: var(--text-primary); }
+.close { position: absolute; top: 10px; inset-inline-end: 10px; border: none; background: none; color: var(--text-muted); cursor: pointer; }
+.title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.1rem; }
+.text { margin: 0; font-size: 0.9rem; line-height: 1.45; color: var(--text-secondary); }
+.label { font-size: 0.85rem; }
+.input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-card); background: var(--bg-surface-3, transparent); color: var(--text-primary); font-size: 1.05rem; letter-spacing: 0.08em; }
+.error { margin: 0; color: #b42318; font-size: 0.85rem; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.cancel, .confirm { min-height: 40px; padding: 0 16px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+.cancel { border: 1px solid var(--border-card); background: none; color: var(--text-secondary); }
+.confirm { border: none; background: #1f7a33; color: #fff; }
+.confirm:disabled { opacity: 0.45; cursor: not-allowed; }

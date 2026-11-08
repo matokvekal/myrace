@@ -10,7 +10,9 @@ import { authed, requireAuth } from "../auth/auth.js";
 import { db, tx } from "../db/pool.js";
 import { ApiError, randomCode, route } from "../lib/core.js";
 import { closeRace, refreshMemberSockets, refreshRaceSockets } from "../realtime/socket.js";
-import { projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
+import { canApproveCategory, categoryInScope, projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
+import { APPROVAL_CONFIRM_WORD, approvalBlocker } from "../../../src/shared/race/approval.js";
+import { approvalViews, storeApproval } from "./approvals.js";
 import { categoryOfRider, deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
@@ -429,6 +431,49 @@ racesRouter.put("/:raceUuid/member-writes", route(async (req, res) => {
     await announceSeq(m.raceUuid, seq);
   }
   res.json({ memberWrites: enabled });
+}));
+
+/**
+ * GET /races/:raceUuid/approvals (0.3.5) — the official podium approval of each category the
+ * member can see (re-checked against the current result), plus which categories THIS member may
+ * approve now. Any member who sees the race.
+ */
+racesRouter.get("/:raceUuid/approvals", route(async (req, res) => {
+  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
+  const state = await loadState(db, m.raceUuid);
+  if (!state) throw raceNotFound();
+  const visible = (uuid: string) => categoryInScope(m.access, state.categories[uuid]) && waveInScope(m.access, state.categories[uuid]?.heat ?? null);
+  const approvals = (await approvalViews(db, state)).filter((a) => visible(a.categoryUuid));
+  const canApprove = Object.values(state.categories)
+    .filter((c) => !c.ignored && visible(c.uuid) && canApproveCategory(m.access, c) && !approvalBlocker(state, c.uuid))
+    .map((c) => c.uuid);
+  res.json({ approvals, canApprove });
+}));
+
+/**
+ * POST /races/:raceUuid/categories/:categoryUuid/approval { confirm: "APPROVED" } (0.3.5) —
+ * approve a FINISHED category's results (shows its podium publicly as APPROVED). The word is
+ * checked here, not only in the app. Permission: shared `canApproveCategory`. Audited
+ * (RaceAdmin categoryApproved: who, when). Re-approving after an invalidation is allowed.
+ */
+racesRouter.post("/:raceUuid/categories/:categoryUuid/approval", route(async (req, res) => {
+  const body = z.object({ confirm: z.string() }).parse(req.body);
+  if (body.confirm !== APPROVAL_CONFIRM_WORD) throw new ApiError(400, "invalid", `Type ${APPROVAL_CONFIRM_WORD} to approve`);
+  const categoryUuid = z.string().uuid().parse(req.params.categoryUuid);
+  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
+  const seq = await tx(async (d) => {
+    const state = await loadState(d, m.raceUuid, true); // race row lock: no result change can slip in between
+    if (!state) throw raceNotFound();
+    const cat = state.categories[categoryUuid];
+    if (!cat || cat.ignored || !waveInScope(m.access, cat.heat ?? null) || !categoryInScope(m.access, cat)) throw new ApiError(404, "not_found", "Category not found");
+    if (!canApproveCategory(m.access, cat)) throw new ApiError(403, "forbidden", "Your role in this race does not allow approving results");
+    const blocker = approvalBlocker(state, categoryUuid);
+    if (blocker) throw new ApiError(409, "not_finished", blocker);
+    return storeApproval(d, state, categoryUuid, m.userId);
+  });
+  await announceSeq(m.raceUuid, seq);
+  const state = await loadState(db, m.raceUuid);
+  res.status(201).json({ approval: (await approvalViews(db, state!)).find((a) => a.categoryUuid === categoryUuid) ?? null });
 }));
 
 /** POST /races/:raceUuid/transfer — hand ownership to another active member (owner only). */

@@ -158,6 +158,7 @@ export async function insertRace(d: Db, state: RaceState, accountId?: string): P
 export const RACE_TABLES = [
   "official_versions", "sync_cursors", "race_snapshots", "race_events",
   "race_members", "invitations", "riders", "categories",
+  "category_approvals", // 013
 ] as const;
 
 /**

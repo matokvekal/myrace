@@ -47,8 +47,9 @@ const riders = [
   { uuid: "r3", bibNumber: 31, firstName: "Test", lastName: "Gamma", category: "Kids", subCategory: null, status: "standing", raceStatus: "upcoming", lapsCounter: 0 },
 ];
 const polling = (open = true) => ({ open, endsAt: open ? Date.now() + 3_600_000 : null, intervalMs: 10_000 });
-const snapshot = (over: { elite?: string; open?: boolean; race?: Record<string, unknown> } = {}) => ({
+const snapshot = (over: { elite?: string; open?: boolean; race?: Record<string, unknown>; approvals?: unknown[] } = {}) => ({
   lastSeq: 5, serverTime: Date.now(), polling: polling(over.open ?? true), race: race(over.race), categories: cats(over.elite), riders,
+  ...(over.approvals ? { approvals: over.approvals } : {}),
 });
 
 let where = "";
@@ -151,17 +152,39 @@ describe("RESULTS", () => {
     expect(screen.queryByTestId("share-rider-details")).toBeNull();
   });
 
-  it("category filter and podium (top 3 ⇄ top 5, classified riders only)", async () => {
+  it("category filter; the podium stays hidden while results are PROVISIONAL (0.3.5)", async () => {
     mount();
     await flush();
     fireEvent.change(screen.getByTestId("share-category-filter"), { target: { value: "c2" } });
     expect(screen.getAllByTestId("share-results-category")).toHaveLength(1);
     expect(screen.getByText("Test Gamma")).toBeTruthy();
     fireEvent.change(screen.getByTestId("share-category-filter"), { target: { value: "c1" } });
+    expect(screen.getByTestId("share-provisional")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("share-podium-toggle"));
+    expect(screen.queryAllByTestId("share-rider-row")).toHaveLength(0);
+    expect(screen.getByTestId("share-podium-pending")).toBeTruthy();
+    expect(screen.queryByTestId("share-approved")).toBeNull();
+  });
+
+  it("APPROVED (from the server) shows the podium, top 3 ⇄ top 5; an update without it withdraws it", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ elite: "finished", approvals: [{ categoryUuid: "c1", status: "approved", approvedAt: new Date().toISOString() }] }));
+    mount();
+    await flush();
+    expect(screen.getAllByTestId("share-approved")).toHaveLength(1);
+    expect(screen.queryAllByTestId("share-provisional")).toHaveLength(0); // Kids never started: no chip
     fireEvent.click(screen.getByTestId("share-podium-toggle"));
     expect(screen.getAllByTestId("share-rider-row").map((r) => r.textContent)).toEqual([expect.stringMatching(/Alpha/), expect.stringMatching(/Beta/)]);
-    fireEvent.click(screen.getByTestId("share-podium-size"));
+    fireEvent.click(screen.getAllByTestId("share-podium-size")[0]);
     expect(screen.getByText("Top 5")).toBeTruthy();
+    expect(screen.getByTestId("share-podium-pending")).toBeTruthy(); // Kids: not approved
+
+    // A correction voided it on the server: the next update carries no approval for c1.
+    api.fetchPublicChanges.mockResolvedValue({ lastSeq: 9, serverTime: Date.now(), polling: polling(), riders: [], approvals: [] });
+    api.fetchPublicRace.mockResolvedValue(snapshot({ elite: "finished" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
+    await flush();
+    expect(screen.queryByTestId("share-approved")).toBeNull();
+    expect(screen.queryAllByTestId("share-rider-row")).toHaveLength(0);
   });
 });
 

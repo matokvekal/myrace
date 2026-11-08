@@ -22,6 +22,7 @@ import { actionHeat, applyAction, categoryOfRider, deriveRider, groupRiders, rac
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { loadMembership, raceNotFound } from "./access.js";
 import { AMENDED_IDS, loadMarks, loadState, saveChanges } from "./repo.js";
+import { invalidateChangedApprovals } from "./approvals.js";
 import { envelope, payloadError } from "./schemas.js";
 
 export interface ActionResult {
@@ -281,6 +282,13 @@ export async function processActions(raceUuid: string, userId: string, items: un
       touched.forEach((r) => committed.riders.add(r));
       committed.removedRiders.push(...ch.removedRiders);
       committed.removedCategories.push(...ch.removedCategories);
+    }
+    // 0.3.5: any applied change that alters an approved category's result voids that approval
+    // (same transaction, audited with the change types that caused it).
+    const appliedTypes = [...new Set(out.filter((r) => r.applied).map((r) => items.find((i) => (i as { actionId?: string })?.actionId === r.actionId) as { type?: string } | undefined).map((i) => String(i?.type ?? "")))].filter(Boolean);
+    if (appliedTypes.length) {
+      const invalidatedSeq = await invalidateChangedApprovals(d, state, userId, appliedTypes.join(", "));
+      if (invalidatedSeq) committed.seq = Math.max(committed.seq, invalidatedSeq);
     }
     finalState = state;
     return out;

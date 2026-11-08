@@ -730,8 +730,8 @@ still open).
 - RESULTS: ranked per category (server `position_category`, then on course, then
   DNF/DSQ/DNS); tap a rider → `RiderLapTable` (the app's lap breakdown; public riders
   are mapped `id = uuid`). Category `<select>` + Podium toggle (top 3 ⇄ 5, classified
-  riders only). Started categories carry a **Provisional** chip. Nothing on the page says
-  approved/official — per-category approval is 0.3.5 (server-side).
+  riders only). Started categories carry a **Provisional** chip until the server reports a
+  valid approval (0.3.5, below); the podium is shown ONLY for an APPROVED category.
 - RACE: waves with NOT STARTED / RUNNING / FINISHED (rider-level STANDING in RESULTS),
   red edge while running, green stripes when finished, per-category progress. No controls.
 - Refresh (`share/publicRefresh.ts` + `share/usePublicRaceFeed.ts`): 60 s while any
@@ -742,3 +742,28 @@ still open).
   (token, name, date, location; max 20). Listed at the bottom of the spectator page and on
   My Races (`live/OtherBikeRaces.tsx`), separate from the account's races; no server table.
 - Tests: `share/__tests__/spectatorPage.test.tsx`, `tests/guest-share.spec.ts` (mocked API).
+
+### Official podium approval + audited name correction (0.3.5)
+- Table `category_approvals` (migration 013, one current row per race+category, in `RACE_TABLES`).
+  History = `race_events` RaceAdmin `categoryApproved` / `approvalInvalidated` (who, when, cause).
+- Approve: `POST /races/:uuid/categories/:categoryUuid/approval {confirm:"APPROVED"}` — the server
+  checks the exact word, `canApproveCategory` (shared access.ts: live.update or results.update,
+  category in scope; members' writes off → owner only) and `approvalBlocker` (category finished
+  AND actually started). Stores sha256 of `categoryResultFingerprint` (shared/race/approval.ts).
+- Validity = the fingerprint still matches. `invalidateChangedApprovals` runs in the same
+  transaction as every result-changing path (processActions, finalize, amend) and audits the
+  invalidation; `approvalViews` re-checks on every read too. Never show an approval the server
+  didn't just confirm.
+- `GET /races/:uuid/approvals` → `{approvals, canApprove}` for members; public race/changes carry
+  `approvals` (valid only, no judge identity). App: Results category header chip Approved /
+  Provisional + Approve button → `results/ApproveCategoryModal` (typed APPROVED);
+  `results/useCategoryApprovals` reloads on open, after approving and (debounced) on result changes.
+- Name after GO: `RiderEdited` stays `locked`; `RiderNameCorrected {riderUuid, changes(first/
+  middle/last), reason}` needs results.update (owner, admin, results judge — not the invited
+  start/counter/checkin judge), reason ≥ 3 chars, audited in race_events. UI: Results → rider →
+  Correct name (`ResultCorrection.tsx`). Adding an Action type = update migration CHECK + the
+  catalog test (model.test.ts compares ACTION_TYPES with 013's CHECK list).
+- Old editors (`EditRiders`, `RiderDetailModal`) show "Started"/lock for a SHARED race's started
+  rider (`utils/riderLock.ts`); local races keep their editors.
+- Tests: `server/test/db/podium-approval.test.ts`, `src/shared/race/__tests__/approval.test.ts`,
+  `results/__tests__/podiumApproval.test.tsx`, `ResultCorrection.test.tsx`, spectator tests.

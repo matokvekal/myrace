@@ -9,13 +9,15 @@
  * `?tab=race` opens RACE (a 0.3.2 `?tab=board` link too); the choice stays in the
  * URL so refresh and direct links keep it.
  *
- * Results are PROVISIONAL: official per-category approval comes with 0.3.5. Nothing
- * here says "approved" or "official".
+ * 0.3.5: a category is APPROVED only when the server says so (a judge typed APPROVED and
+ * the result hasn't changed since); otherwise its rankings show as PROVISIONAL. The podium
+ * is shown only for APPROVED categories.
  */
 import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Calendar, ChevronDown, Clock, MapPin, Radio, RefreshCw, Trophy } from "lucide-react";
+import { BadgeCheck, Calendar, ChevronDown, Clock, MapPin, Radio, RefreshCw, Trophy } from "lucide-react";
 import type { SharedCategory } from "../../shared/race/state";
+import type { CategoryApprovalView } from "../../shared/race/approval";
 import type { RiderProps } from "@/types/types";
 import RiderLapTable from "../race/[id]/results/RiderLapTable";
 import { STATUS_LABEL } from "@/utils/statusLabels";
@@ -165,7 +167,7 @@ function SpectatorRace({ token }: { token: string }) {
 
       <main className={styles.content}>
         <div className={styles.stack}>
-          {tab === "results" ? <ResultsTab categories={sortedCats} ridersByCat={ridersByCat} /> : <RaceTab categories={sortedCats} ridersByCat={ridersByCat} />}
+          {tab === "results" ? <ResultsTab categories={sortedCats} ridersByCat={ridersByCat} approvals={feed.approvals} /> : <RaceTab categories={sortedCats} ridersByCat={ridersByCat} />}
           {others.length > 0 && <OtherRaces races={others} />}
         </div>
       </main>
@@ -180,7 +182,7 @@ const StateChip = ({ state }: { state: CatState }) => (
   <span className={styles.stateChip} data-state={state}>{STATUS_LABEL[state]}</span>
 );
 
-function ResultsTab({ categories, ridersByCat }: { categories: SharedCategory[]; ridersByCat: Map<string, Rider[]> }) {
+function ResultsTab({ categories, ridersByCat, approvals }: { categories: SharedCategory[]; ridersByCat: Map<string, Rider[]>; approvals: Map<string, CategoryApprovalView> }) {
   const withRiders = categories.filter((c) => (ridersByCat.get(catKey(c.name, c.subCategory)) ?? []).length > 0);
   const [filter, setFilter] = useState("");
   const [podium, setPodium] = useState(false);
@@ -210,7 +212,10 @@ function ResultsTab({ categories, ridersByCat }: { categories: SharedCategory[];
         const state = categoryState(c);
         const all = rankRiders(ridersByCat.get(catKey(c.name, c.subCategory)) ?? []);
         const size = podiumSize[c.uuid] ?? 3;
-        const list = podium ? all.filter((r) => !isOut(r) && r.position_category).slice(0, size) : all;
+        const approval = approvals.get(c.uuid);
+        // The podium is published only once the category is APPROVED (0.3.5); rankings stay visible.
+        const showPodium = podium && !!approval;
+        const list = podium ? (approval ? all.filter((r) => !isOut(r) && r.position_category).slice(0, size) : []) : all;
         const field = all.map(asBreakdownRider);
         return (
           <section key={c.uuid} className={styles.card} data-testid="share-results-category">
@@ -218,10 +223,19 @@ function ResultsTab({ categories, ridersByCat }: { categories: SharedCategory[];
               <Swatch color={c.color} /> <span dir="auto">{catLabel(c)}</span>
               <span className={styles.titleChips}>
                 <StateChip state={state} />
-                {started(c) && <span className={styles.provisional} title="Results are provisional until confirmed by the judges" data-testid="share-provisional">Provisional</span>}
+                {approval ? (
+                  <span className={styles.approved} title={`Approved ${new Date(approval.approvedAt).toLocaleString()}`} data-testid="share-approved">
+                    <BadgeCheck size={12} aria-hidden="true" /> Approved
+                  </span>
+                ) : (
+                  started(c) && <span className={styles.provisional} title="Results are provisional until approved by the judges" data-testid="share-provisional">Provisional</span>
+                )}
               </span>
             </h2>
-            {podium && (
+            {podium && !approval && (
+              <p className={styles.emptySmall} data-testid="share-podium-pending">The podium is shown once the judges approve this category's results.</p>
+            )}
+            {showPodium && (
               <div className={styles.podiumBar}>
                 <span>Top {size}</span>
                 <button type="button" className={styles.linkBtn} onClick={() => setPodiumSize((m) => ({ ...m, [c.uuid]: size === 5 ? 3 : 5 }))} data-testid="share-podium-size">
@@ -229,13 +243,13 @@ function ResultsTab({ categories, ridersByCat }: { categories: SharedCategory[];
                 </button>
               </div>
             )}
-            {podium && list.length === 0 && <p className={styles.emptySmall}>No classified riders yet.</p>}
+            {showPodium && list.length === 0 && <p className={styles.emptySmall}>No classified riders yet.</p>}
             <ol className={styles.list}>
               {list.map((r, i) => {
                 const out = isOut(r);
                 const openId = `${c.uuid}:${r.uuid}`;
                 const open = openRider === openId;
-                const medal = podium && i < 3 ? [styles.rowGold, styles.rowSilver, styles.rowBronze][i] : "";
+                const medal = showPodium && i < 3 ? [styles.rowGold, styles.rowSilver, styles.rowBronze][i] : "";
                 return (
                   <Fragment key={r.uuid}>
                     <li className={`${styles.resultItem} ${medal}`}>

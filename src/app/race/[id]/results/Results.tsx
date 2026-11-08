@@ -9,8 +9,10 @@ import { RiderProps } from "@/types/types";
 import RiderDetailModal from "../../components/riderDetailModal/RiderDetailModal";
 import RiderLapTable from "./RiderLapTable";
 import ResultCorrection from "./ResultCorrection";
+import ApproveCategoryModal from "./ApproveCategoryModal";
+import { useCategoryApprovals } from "./useCategoryApprovals";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
-import { Trophy, SlidersHorizontal, ListFilter, Check, RefreshCw } from "lucide-react";
+import { Trophy, SlidersHorizontal, ListFilter, Check, RefreshCw, BadgeCheck } from "lucide-react";
 import { refreshRaceData } from "@/services/live/liveRaceRoom";
 import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
 import { parseClockTime } from "@/utils/timeUtils";
@@ -163,6 +165,16 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defau
     [riders, raceUuid, raceCategories, categories]
   );
 
+  // 0.3.5: official approval per category (shared races). Reloaded when results change here.
+  const resultsSignature = useMemo(
+    () =>
+      raceCategories.map((c) => `${c.uuid}:${c.status}`).join("|") + "#" +
+      raceRiders.map((r) => `${r.uuid}:${r.status}:${r.raceStatus}:${r.lapsCounter}:${r.bibNumber}:${r.firstName}:${r.lastName}:${r.middleName ?? ""}`).join("|"),
+    [raceCategories, raceRiders]
+  );
+  const approvals = useCategoryApprovals(raceUuid, resultsSignature);
+  const [approving, setApproving] = useState<{ uuid: string; name: string } | null>(null);
+
   const { waveNums, catWaveMap } = useMemo(() => {
     const schedule = buildSchedule(raceCategories, DEFAULT_WAVE_GAP_MINUTES);
     const map = new Map<string, number>();
@@ -273,6 +285,33 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defau
               </span>
             );
           })()}
+          {(() => {
+            // 0.3.5: APPROVED only while the server says the approval still matches the result.
+            const a = catMeta?.uuid ? approvals.byCategory.get(catMeta.uuid) : undefined;
+            if (a?.status === "approved") {
+              return (
+                <span className={styles.approvedChip} title={`Approved by ${a.approvedByName ?? "a judge"} · ${new Date(a.approvedAt).toLocaleString()}`} data-testid="results-approved">
+                  <BadgeCheck size={12} aria-hidden="true" /> Approved
+                </span>
+              );
+            }
+            if (catMeta?.status !== "finished" && catMeta?.status !== "running") return null;
+            return (
+              <span className={styles.provisionalChip} title={a?.invalidatedReason ?? "Not approved by the judges yet"} data-testid="results-provisional">
+                Provisional
+              </span>
+            );
+          })()}
+          {catMeta?.uuid && approvals.canApprove.has(catMeta.uuid) && approvals.byCategory.get(catMeta.uuid)?.status !== "approved" && (
+            <button
+              type="button"
+              className={styles.approveBtn}
+              onClick={() => setApproving({ uuid: catMeta.uuid!, name: `${name}${sub ? ` ${sub}` : ""}` })}
+              data-testid="results-approve"
+            >
+              <BadgeCheck size={13} aria-hidden="true" /> Approve
+            </button>
+          )}
           {waveNum != null && <span className={styles.count}>Wave {waveNum}</span>}
           {podiumMode && (
             <button
@@ -490,6 +529,15 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defau
         </div>
       </div>
 
+      {approving && (
+        <ApproveCategoryModal
+          raceUuid={raceUuid}
+          categoryUuid={approving.uuid}
+          categoryName={approving.name}
+          onClose={() => setApproving(null)}
+          onApproved={approvals.reload}
+        />
+      )}
       {selectedRider && (
         <RiderDetailModal rider={selectedRider} onClose={() => setSelectedRider(null)}>
           {/* Lap-by-lap performance below the rider's details; the latest rider data, laps resolved */}

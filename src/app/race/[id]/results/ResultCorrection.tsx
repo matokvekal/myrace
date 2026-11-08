@@ -183,7 +183,73 @@ function CorrectionForm({ raceUuid, rider }: { raceUuid: string; rider: RiderPro
           </button>
         </div>
       )}
+      <NameCorrection raceUuid={raceUuid} rider={rider} busy={busy} setBusy={setBusy} setNote={setNote} />
       {note && <p className={styles.correctionNote} role="status">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * 0.3.5 — audited name correction after GO (the normal rider edit is locked once the wave
+ * started). Sends `RiderNameCorrected` with a required reason; the server checks results.update,
+ * keeps who/when/why in the race log, and withdraws the category's approval if there was one.
+ */
+function NameCorrection({ raceUuid, rider, busy, setBusy, setNote }: {
+  raceUuid: string;
+  rider: RiderProps;
+  busy: boolean;
+  setBusy: (b: boolean) => void;
+  setNote: (n: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [first, setFirst] = useState(rider.firstName ?? "");
+  const [last, setLast] = useState(rider.lastName ?? "");
+  const [reason, setReason] = useState("");
+  const changes: Record<string, string> = {};
+  if (first.trim() !== (rider.firstName ?? "")) changes.firstName = first.trim();
+  if (last.trim() !== (rider.lastName ?? "")) changes.lastName = last.trim();
+  const valid = Object.keys(changes).length > 0 && (first.trim() || last.trim()) && reason.trim().length >= 3;
+
+  if (!open) {
+    return (
+      <div className={styles.correctionRow}>
+        <button type="button" disabled={busy} onClick={() => setOpen(true)} data-testid="correct-name-open">
+          {t("results.correctName", "Correct name")}
+        </button>
+      </div>
+    );
+  }
+  const save = async () => {
+    if (!valid || busy) return;
+    const payload = { riderUuid: rider.uuid, changes, reason: reason.trim() };
+    if (!liveAllows(raceUuid, "RiderNameCorrected", payload)) {
+      setNote(t("results.correctNotAllowed", "Your role in this race doesn't allow this."));
+      return;
+    }
+    const to = `${first.trim()} ${last.trim()}`.trim();
+    if (!window.confirm(t("results.confirmName", "Correct the name to \"{{to}}\"? This is recorded with your name, the time and the reason.", { to }))) return;
+    setBusy(true);
+    try {
+      await liveDispatch(raceUuid, "RiderNameCorrected", payload);
+      setNote(t("results.nameSent", "Name correction sent."));
+      setOpen(false);
+      setReason("");
+    } catch (e) {
+      setNote(t("results.correctFailed", "Could not send: {{msg}}", { msg: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className={styles.correctionRow} role="group" aria-label={t("results.correctName", "Correct name")} data-testid="correct-name">
+      <input value={first} onChange={(e) => setFirst(e.target.value)} placeholder={t("results.firstName", "First name")} aria-label={t("results.firstName", "First name")} dir="auto" maxLength={100} data-testid="correct-name-first" />
+      <input value={last} onChange={(e) => setLast(e.target.value)} placeholder={t("results.lastName", "Last name")} aria-label={t("results.lastName", "Last name")} dir="auto" maxLength={100} data-testid="correct-name-last" />
+      <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("results.nameReason", "Reason (required)")} aria-label={t("results.nameReason", "Reason (required)")} dir="auto" maxLength={300} data-testid="correct-name-reason" />
+      <button type="button" disabled={busy || !valid} onClick={() => void save()} data-testid="correct-name-save">
+        {t("results.saveName", "Save name")}
+      </button>
+      <button type="button" disabled={busy} onClick={() => setOpen(false)}>{t("common.cancel", "Cancel")}</button>
     </div>
   );
 }

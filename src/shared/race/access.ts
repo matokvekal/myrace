@@ -329,6 +329,15 @@ const invalid: AuthResult = { ok: false, reason: "invalid" };
 type Need = [Screen, WriteOperation];
 const anyOf = (access: EffectiveAccess, needs: Need[]): boolean => needs.some(([s, op]) => access.screens[s][op]);
 
+/**
+ * 0.3.5 — who may approve a category's official results (podium): a judge who records or
+ * corrects results (live.update or results.update: owner, admin, counter, results judge)
+ * with the category in scope. Server-enforced; the app only uses it to show the button.
+ * Members' writes off (per race) strips this too, like every other write.
+ */
+export const canApproveCategory = (access: EffectiveAccess, category: SharedCategory | undefined): boolean =>
+  !!category && anyOf(access, [["live", "update"], ["results", "update"]]) && categoryInScope(access, category);
+
 const SCHEDULE_FIELDS = new Set(["startTime", "heat"]);
 const MAP_FIELDS = new Set<string>(RACE_MAP_FIELDS);
 const OPERATION_SETTINGS = new Set<string>(RACE_OPERATION_SETTINGS);
@@ -423,6 +432,9 @@ export function authorizeAction(access: EffectiveAccess, action: RaceAction, sta
       const moved = { ...r, ...action.payload.changes };
       return newRidersInScope([moved]) ? OK : outOfScope;
     }
+    case "RiderNameCorrected":
+      // 0.3.5: audited correction (organizer / admin / results judge) — not the Check-In rider edit.
+      return onRider(action.payload.riderUuid, [["results", "update"]]);
     case "RiderDeleted":
       return onRider(action.payload.riderUuid, [["riders", "delete"]]);
     case "RidersImported":

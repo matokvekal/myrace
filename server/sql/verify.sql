@@ -1,11 +1,11 @@
--- verify.sql — read-only checks after running 001–012 on the Commissaire database.
+-- verify.sql — read-only checks after running 001–013 on the Commissaire database.
 -- Run: psql "<commissaire_live connection>" -f verify.sql
 -- Every query should return the "expected" shown in its comment.
 
--- 1. All migrations applied. Expected: 001…012, twelve rows.
+-- 1. All migrations applied. Expected: 001…013, thirteen rows.
 SELECT version, "appliedAt" FROM schema_migrations ORDER BY version;
 
--- 2. All tables present. Expected: 23 rows, missing = false everywhere.
+-- 2. All tables present. Expected: 24 rows, missing = false everywhere.
 SELECT t AS table_name, to_regclass('public.' || t) IS NULL AS missing
 FROM unnest(ARRAY[
   'schema_migrations', 'users', 'user_identities', 'sessions', 'otp_codes',
@@ -13,7 +13,8 @@ FROM unnest(ARRAY[
   'invitations', 'race_members', 'contact_groups', 'contacts', 'contact_group_members',
   'race_events', 'race_snapshots', 'sync_cursors', 'official_versions',
   'user_preferences', 'race_hidden',
-  'accounts', 'account_members', 'account_invitations', 'audit_logs'
+  'accounts', 'account_members', 'account_invitations', 'audit_logs',
+  'category_approvals'
 ]) AS t
 ORDER BY 1;
 
@@ -24,7 +25,7 @@ WHERE table_schema = 'public'
   AND column_name ~* '(id_?number|national|passport|teudat|extra_?fields|birth)';
 
 -- 4. Race isolation: every race-data table has a NOT NULL "raceUuid" that leads an index
---    (no foreign keys: the API keeps the relation). Expected: 8 rows, nullable = 'NO', indexed = true.
+--    (no foreign keys: the API keeps the relation). Expected: 9 rows, nullable = 'NO', indexed = true.
 SELECT c.table_name, c.is_nullable AS nullable,
        EXISTS (
          SELECT 1 FROM pg_index i

@@ -27,6 +27,7 @@ import type { RaceState, SharedRider } from "../../../src/shared/race/state.js";
 import { raceNotFound, requireMember, requireOwner } from "../races/access.js";
 import { checkUndoTarget, rederive } from "../races/actions.js";
 import { loadState, saveChanges } from "../races/repo.js";
+import { invalidateChangedApprovals } from "../races/approvals.js";
 
 export const FINALIZE_SIGNATURE_VERSION = "commissaire-race-final/v1";
 
@@ -181,6 +182,8 @@ resultsRouter.post("/finalize", route(async (req, res) => {
       await rederive(d, state, new Set(touched), touched);
       touched.forEach((x) => commit.riders.add(x));
     }
+    // 0.3.5: an approved category whose result the close-out changed loses its approval (audited).
+    await invalidateChangedApprovals(d, state, m.userId, "Finish Race");
     const rec = buildRecord(state, me.name || me.email || m.userId, 1, null);
     const seq = await appendServerEvent(d, m.raceUuid, m.userId, "Finalized", { version: 1, token: rec.token }, null);
     state.race.status = "finished";
@@ -264,7 +267,9 @@ resultsRouter.post("/amend", route(async (req, res) => {
       [m.raceUuid, nextVersion, rec.version, rec.at, rec.by, rec.nonce, rec.payload, rec.token, rec.riderCount, rec.categoryCount, rec.signature, rec.keyId],
     );
     touched.forEach((x) => commit.riders.add(x));
-    commit.seq = seq;
+    // 0.3.5: an amendment that changes an approved category's result voids that approval (audited).
+    const invalidatedSeq = await invalidateChangedApprovals(d, state, m.userId, "Amended");
+    commit.seq = Math.max(seq, invalidatedSeq);
     finalState = state;
     return { officialVersion: nextVersion, prevToken: prev.token, reason: body.reason, includeActionIds: included, ...rec };
   });

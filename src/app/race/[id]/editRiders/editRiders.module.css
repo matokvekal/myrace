@@ -317,3 +317,6 @@
   color: #e05585;
   background: #fff0f4;
 }
+
+/* 0.3.5: started rider of a shared race (server-locked) */
+.lockedNote { font-size: 0.75rem; font-weight: 600; color: var(--text-muted, #6b7a8c); white-space: nowrap; }

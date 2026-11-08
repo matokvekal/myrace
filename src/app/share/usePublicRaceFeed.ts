@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchPublicChanges, fetchPublicRace, PublicApiError, type PublicPolling } from "@/services/live/publicRace";
 import type { SharedCategory, SharedRace, SharedRider } from "../../shared/race/state";
+import type { CategoryApprovalView } from "../../shared/race/approval";
 import { PUBLIC_FOCUS_REVALIDATE_MIN_MS, PUBLIC_MANUAL_REFRESH_MIN_MS, publicRefreshDelay } from "./publicRefresh";
 
 export type PublicRider = Partial<SharedRider>;
@@ -25,6 +26,10 @@ export function usePublicRaceFeed(token: string) {
   const [offline, setOffline] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  /** 0.3.5: VALID official approvals by category uuid (the server sends only those). */
+  const [approvals, setApprovals] = useState<Map<string, CategoryApprovalView>>(new Map());
+  const setApprovalList = (list: CategoryApprovalView[] | undefined) =>
+    setApprovals(new Map((list ?? []).filter((a) => a.status === "approved").map((a) => [a.categoryUuid, a])));
 
   const seq = useRef(0);
   const loaded = useRef(false);
@@ -40,6 +45,7 @@ export function usePublicRaceFeed(token: string) {
     setRace(r.race);
     setCategories(new Map(r.categories.map((c) => [c.uuid, c])));
     setRiders(new Map(r.riders.filter((x) => x.uuid).map((x) => [x.uuid!, x])));
+    setApprovalList(r.approvals);
     setPolling(r.polling);
   }, [token]);
 
@@ -57,6 +63,8 @@ export function usePublicRaceFeed(token: string) {
         if (ch.categories?.length) setCategories((m) => { const n = new Map(m); for (const c of ch.categories!) n.set(c.uuid, c); return n; });
         if (ch.riders?.length) setRiders((m) => { const n = new Map(m); for (const r of ch.riders!) if (r.uuid) n.set(r.uuid, r); return n; });
       }
+      // Every answer with changes carries the full (small) approval list; an older API sends none.
+      if (!ch.unchanged && ch.approvals) setApprovalList(ch.approvals);
       pollingOpen.current = !!ch.polling?.open;
       setPolling(ch.polling);
     } catch (e) {
@@ -145,5 +153,5 @@ export function usePublicRaceFeed(token: string) {
     return true;
   }, [fetchNow]);
 
-  return { race, categories: categoryList, riders, polling, error, offline, updatedAt, refreshing, live: delay != null, refresh };
+  return { race, categories: categoryList, riders, approvals, polling, error, offline, updatedAt, refreshing, live: delay != null, refresh };
 }

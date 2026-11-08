@@ -150,4 +150,16 @@ describe("ResultCorrection", () => {
     fireEvent.click(await screen.findByTestId("correct-laps-undo"));
     expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "Undo", { targetActionId: "made-later" });
   });
+
+  it("0.3.5: Correct name sends an audited RiderNameCorrected with a required reason", async () => {
+    render(<ResultCorrection raceUuid="race-1" rider={rider} />);
+    fireEvent.click(screen.getByTestId("correct-name-open"));
+    fireEvent.change(screen.getByTestId("correct-name-last"), { target: { value: "Bee" } });
+    expect(screen.getByTestId("correct-name-save")).toBeDisabled(); // no reason yet
+    fireEvent.change(screen.getByTestId("correct-name-reason"), { target: { value: "Spelling" } });
+    fireEvent.click(screen.getByTestId("correct-name-save"));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/"A Bee".*reason/));
+    expect(bridge.dispatch).toHaveBeenCalledWith("race-1", "RiderNameCorrected", { riderUuid: "rider-uuid-1", changes: { lastName: "Bee" }, reason: "Spelling" });
+    await screen.findByText("Name correction sent.");
+  });
 });

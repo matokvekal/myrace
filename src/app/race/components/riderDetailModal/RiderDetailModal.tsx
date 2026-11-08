@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { RiderProps } from "@/types/types";
 import Images from "@/constants/Images";
 import useRiderStore from "@/stores/ridersStore";
 import { useRaceFinalized } from "@/utils/raceLock";
+import useCategoryStore from "@/stores/categoryStore";
+import { LOCKED_AFTER_GO_TEXT, riderLockedAfterGo } from "@/utils/riderLock";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import styles from "./riderDetailModal.module.css";
 import { X, Edit2, Save, XCircle, User, Lock, Trash2 } from "lucide-react";
@@ -73,6 +75,12 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
   // Without this the Save button would look like it worked while the store
   // silently dropped the write (utils/raceLock.ts).
   const finalized = useRaceFinalized(rider.raceUuid);
+  // 0.3.5: shared race, wave started → the server refuses a normal edit/delete; don't offer it.
+  const allCategories = useCategoryStore((s) => s.categories);
+  const lockedAfterGo = riderLockedAfterGo(rider, allCategories, allRiders);
+  useEffect(() => {
+    if (lockedAfterGo && editMode) setEditMode(false); // opened "in edit" for a rider that started meanwhile
+  }, [lockedAfterGo, editMode]);
 
   const avatar =
     rider.image?.startsWith("data:") || rider.image?.startsWith("http")
@@ -179,6 +187,10 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
           {finalized ? (
             <span className={styles.lockedTag} data-testid="rider-modal-locked">
               <Lock size={13} /> Final
+            </span>
+          ) : lockedAfterGo ? (
+            <span className={styles.lockedTag} title={LOCKED_AFTER_GO_TEXT} data-testid="rider-modal-started">
+              <Lock size={13} /> Started
             </span>
           ) : !editMode ? (
             <div className={styles.editActions}>

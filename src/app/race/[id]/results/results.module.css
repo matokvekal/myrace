@@ -609,3 +609,17 @@
   font-size: 0.9em;
   opacity: 0.8;
 }
+
+/* 0.3.5 official approval per category */
+.approvedChip, .provisionalChip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 2px 8px; border-radius: 8px; white-space: nowrap; flex-shrink: 0;
+}
+.approvedChip { background: rgba(46, 160, 67, 0.16); color: #1f7a33; }
+.provisionalChip { border: 1px dashed currentColor; color: #6b7a8c; }
+.approveBtn {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  min-height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid #1f7a33;
+  background: none; color: #1f7a33; font-size: 12px; font-weight: 700; cursor: pointer;
+}

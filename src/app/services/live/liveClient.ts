@@ -13,6 +13,7 @@
  *  - Bridge: store writes on a shared race become Actions, after the shared
  *    access rules say the member may do them.
  */
+import type { CategoryApprovalView } from "../../../shared/race/approval";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "react-toastify";
 import i18next from "i18next";
@@ -1768,6 +1769,12 @@ export const team = {
   /** 0.3.3: the race's Check-In changes (status, bib, added) — any judge with Check-In, read-only. */
   checkInHistory: (local: string) =>
     api<{ events: SharedCheckInEvent[] }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/history?scope=checkin&limit=1000`),
+  /** 0.3.5: official podium approval per category (re-checked by the server against the current result). */
+  approvals: (local: string) =>
+    api<{ approvals: CategoryApprovalView[]; canApprove: string[] }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/approvals`),
+  /** `confirm` = what the judge typed; the server accepts only "APPROVED". */
+  approveCategory: (local: string, categoryUuid: string, confirm: string) =>
+    api<{ approval: CategoryApprovalView | null }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/categories/${encodeURIComponent(categoryUuid)}/approval`, { confirm }),
   finalize: (local: string) => api<{ official: Record<string, unknown> }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/finalize`),
   amend: (local: string, reason: string, includeActionIds: string[]) =>
     api<{ official: Record<string, unknown> }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/amend`, { reason, includeActionIds }),

@@ -11,6 +11,8 @@ import { normalizeColor } from "@/utils/bibColors";
 import { isValidUciId, normalizeUciId } from "@/utils/uciId";
 import { toast } from "react-toastify";
 import { newLocalId } from "@/utils/localId";
+import useCategoryStore from "@/stores/categoryStore";
+import { LOCKED_AFTER_GO_TEXT, riderLockedAfterGo } from "@/utils/riderLock";
 
 interface Props {
   raceUuid: string;
@@ -117,6 +119,8 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
     insertRiders
   } = useRiderStore();
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
+  // 0.3.5: a shared race's started rider is locked (the server refuses the edit/delete).
+  const allCategories = useCategoryStore((s) => s.categories);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [addingNew, setAddingNew] = useState(false);
@@ -167,6 +171,10 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
   };
 
   const startEdit = (rider: RiderProps) => {
+    if (riderLockedAfterGo(rider, allCategories, raceRiders)) {
+      toast.info(LOCKED_AFTER_GO_TEXT);
+      return;
+    }
     setAddingNew(false);
     setForm(riderToForm(rider));
     setEditingId(rider.id);
@@ -658,24 +666,32 @@ const EditRiders: React.FC<Props> = ({ raceUuid, categories, onBack }) => {
                 {rider.chipNumber ? ` · 📡 ${rider.chipNumber}` : ""}
               </span>
             </div>
-            <div className={styles.rowActions}>
-              <button
-                className={styles.editBtn}
-                onClick={() =>
-                  editingId === rider.id ? cancelForm() : startEdit(rider)
-                }
-              >
-                ✎
-              </button>
-              <button
-                className={styles.deleteBtn}
-                onClick={() => askDelete(rider)}
-                aria-label={`Delete ${riderLabel(rider)}`}
-                title="Delete rider"
-              >
-                ✕
-              </button>
-            </div>
+            {riderLockedAfterGo(rider, allCategories, raceRiders) ? (
+              <div className={styles.rowActions}>
+                <span className={styles.lockedNote} title={LOCKED_AFTER_GO_TEXT} data-testid={`rider-locked-${rider.bibNumber}`}>
+                  🔒 Started
+                </span>
+              </div>
+            ) : (
+              <div className={styles.rowActions}>
+                <button
+                  className={styles.editBtn}
+                  onClick={() =>
+                    editingId === rider.id ? cancelForm() : startEdit(rider)
+                  }
+                >
+                  ✎
+                </button>
+                <button
+                  className={styles.deleteBtn}
+                  onClick={() => askDelete(rider)}
+                  aria-label={`Delete ${riderLabel(rider)}`}
+                  title="Delete rider"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
