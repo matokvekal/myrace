@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { invitations, openSharedRace, useLiveStore } from "@/services/live/liveClient";
+import { auth, invitations, openSharedRace, useLiveStore } from "@/services/live/liveClient";
+import useUIStore from "@/stores/uiStore";
+import GoogleSignInButton, { googleClientId } from "./GoogleSignInButton";
 import styles from "./live.module.css";
 
 type Preview = Awaited<ReturnType<typeof invitations.preview>>;
@@ -28,8 +30,20 @@ export default function InvitePage() {
           <div className={styles.card}>
             <h1 className={styles.title}>{t("live.inviteTitle", "You're invited to a race")}</h1>
             <p className={styles.muted}>{t("live.inviteSignIn", "Sign in (or create an account) to see and accept the invitation.")}</p>
-            <button className={styles.button} onClick={() => navigate(`/account?next=${encodeURIComponent(`/invite/${token}`)}`)}>
-              {t("live.signIn", "Sign in")}
+            {error && <p className={styles.error} role="alert" dir="auto">{error}</p>}
+            {/* Fastest path for a judge: Google signs in or creates the account, then this page shows Accept. */}
+            <GoogleSignInButton
+              onToken={(idToken) => {
+                setError(null);
+                auth.google(idToken).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+              }}
+            />
+            <button
+              className={googleClientId() ? styles.secondary : styles.button}
+              onClick={() => navigate(`/account?next=${encodeURIComponent(`/invite/${token}`)}`)}
+              data-testid="invite-signin-email"
+            >
+              {googleClientId() ? t("live.signInEmail", "Sign in with email") : t("live.signIn", "Sign in")}
             </button>
           </div>
         </div>
@@ -43,6 +57,7 @@ export default function InvitePage() {
     try {
       const { raceUuid } = await invitations.accept(token);
       const local = await openSharedRace(raceUuid);
+      useUIStore.getState().setRaceModeRace(local); // land on the race's RACE screen, not Setup
       navigate(`/race/${local}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

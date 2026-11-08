@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { auth, LiveApiError, type CodeSent } from "@/services/live/liveClient";
 import styles from "./live.module.css";
 import own from "./SignInForm.module.css";
 import { afterAuthTarget } from "./authRedirect";
+import GoogleSignInButton, { googleClientId } from "./GoogleSignInButton";
 
 /**
  * Signed-out account screen: Sign in, New account, and Forgot password.
@@ -14,39 +15,6 @@ import { afterAuthTarget } from "./authRedirect";
  */
 type Mode = "signin" | "register" | "forgot";
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (o: { client_id: string; callback: (r: { credential: string }) => void }) => void;
-          renderButton: (el: HTMLElement, o: Record<string, unknown>) => void;
-        };
-      };
-    };
-  }
-}
-
-/** "Sign in with Google" (Google Identity Services), only when a client id is configured. */
-function GoogleButton({ onToken }: { onToken: (idToken: string) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  useEffect(() => {
-    if (!clientId || !ref.current) return;
-    const render = () => {
-      window.google?.accounts.id.initialize({ client_id: clientId, callback: (r) => onToken(r.credential) });
-      if (ref.current) window.google?.accounts.id.renderButton(ref.current, { theme: "outline", size: "large", width: 280 });
-    };
-    if (window.google) return render();
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.onload = render;
-    document.head.appendChild(s);
-  }, [clientId, onToken]);
-  if (!clientId) return null;
-  return <div ref={ref} className={own.google} />;
-}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
@@ -275,8 +243,9 @@ export default function SignInForm({ next, reason = null }: { next: string | nul
                 </button>
               </div>
 
-              <GoogleButton onToken={(idToken) => void run(() => auth.google(idToken))} />
-              {import.meta.env.VITE_GOOGLE_CLIENT_ID && <div className={own.or}><span>{t("live.or", "or")}</span></div>}
+              {/* Google first: one tap signs in OR creates the account (same button for both tabs). */}
+              <GoogleSignInButton onToken={(idToken) => void run(() => auth.google(idToken))} />
+              {googleClientId() && <div className={own.or}><span>{t("live.orEmail", "or with email")}</span></div>}
 
               {mode === "signin" ? (
                 <form className={own.form} onSubmit={submitSignIn} noValidate>
