@@ -17,5 +17,4 @@ google-signin
 309442632847-s6vn7mliu05v8l48dhnk4s9lc1jr3jrp
 invite-judges-btn
 judge-link-create
-public-share-board
-public-share-results
+public-share-ask-owner
