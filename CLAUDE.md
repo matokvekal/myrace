@@ -384,6 +384,15 @@ still open).
     cloud store only when configured.
   - `Loader` is pure CSS — do NOT reintroduce `@mui/material`/`@emotion`.
 
+### 0.3 pilot (branch feature/v0.3-pilot, from feature/rapid-lap-entry)
+- Logo: `public/logo-new-26.png` source (1536x1024, black backdrop) → `public/logo.png` (600 px),
+  `src/app/assets/icons/logo.png`, favicon.ico, pwa-192/512, pwa-maskable-512, apple-touch-icon
+  (square = padded with the logo's own black, never cropped/stretched). Old files: `public/logo-backup/`.
+  Shown as a rounded tile in light and dark. SW `CACHE_VERSION` bumped to v4 so installed PWAs update.
+- My Races: `AccountSync` syncs silently (renders only on error, with Retry); `SharedRacesSection`
+  is no longer shown (sync downloads every account race anyway).
+- Live Cards | Keypad switch = real tabs (`role="tab"`, underline on the active one).
+
 ### App version
 - Single source of truth: `src/app/version.json` (`{ version, date }`), imported
   by `components/Version/Version.tsx` and shown in the side-menu footer. Edit it

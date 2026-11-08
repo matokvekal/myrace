@@ -24,7 +24,6 @@ import {
   Search
 } from "lucide-react";
 // Multi-user (only with a configured server): My shared races and invitations.
-const SharedRacesSection = lazy(() => import("../live/SharedRacesSection"));
 // The signed-in account's races from the server, every visit, with a visible state.
 const AccountSync = lazy(() => import("../live/AccountSync"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
@@ -210,7 +209,6 @@ const MainPage = () => {
         <Suspense fallback={null}>
           <div style={{ padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 8 }}>
             <AccountSync />
-            <SharedRacesSection />
           </div>
         </Suspense>
       )}

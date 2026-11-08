@@ -7,7 +7,7 @@
  * The state is always visible: syncing / synced (N races) / failed + Retry.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CloudCheck, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { syncMyRaces, useLiveStore, type SyncResult } from "@/services/live/liveClient";
 import styles from "./accountSync.module.css";
 
@@ -31,39 +31,14 @@ export default function AccountSync() {
     void run();
   }, [userId, run]);
 
-  if (!userId || state.kind === "idle") return null;
-
-  if (state.kind === "syncing") {
-    return (
-      <div className={styles.bar} data-state="syncing" data-testid="account-sync" role="status">
-        <Loader2 size={15} className={styles.spin} aria-hidden="true" /> Syncing your races from the server…
-      </div>
-    );
-  }
-  if (state.kind === "error") {
-    return (
-      <div className={styles.bar} data-state="error" data-testid="account-sync" role="alert">
-        <AlertTriangle size={15} aria-hidden="true" />
-        <span dir="auto">Couldn't sync your races: {state.message}</span>
-        <button type="button" className={styles.retry} onClick={() => void run()} data-testid="account-sync-retry">
-          <RefreshCw size={13} aria-hidden="true" /> Retry
-        </button>
-      </div>
-    );
-  }
-  const { total, failed } = state.result;
+  // 0.3: sync runs silently on every visit; only a real failure is shown (with Retry).
+  if (!userId || state.kind !== "error") return null;
   return (
-    <div className={styles.bar} data-state={failed.length ? "partial" : "done"} data-testid="account-sync" role="status">
-      {failed.length ? <AlertTriangle size={15} aria-hidden="true" /> : <CloudCheck size={15} aria-hidden="true" />}
-      <span dir="auto">
-        {failed.length
-          ? `${total - failed.length} of ${total} races synced. Not downloaded: ${failed.map((f) => f.name).join(", ")}`
-          : total === 0
-            ? "Synced. This account has no races on the server yet."
-            : `Synced · ${total} race${total === 1 ? "" : "s"} from the server`}
-      </span>
+    <div className={styles.bar} data-state="error" data-testid="account-sync" role="alert">
+      <AlertTriangle size={15} aria-hidden="true" />
+      <span dir="auto">Couldn't sync your races: {state.message}</span>
       <button type="button" className={styles.retry} onClick={() => void run()} data-testid="account-sync-retry">
-        <RefreshCw size={13} aria-hidden="true" /> {failed.length ? "Retry" : "Sync"}
+        <RefreshCw size={13} aria-hidden="true" /> Retry
       </button>
     </div>
   );

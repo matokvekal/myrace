@@ -46,6 +46,7 @@
   --re-switch-on: #ffffff;
   --re-switch-ink: #5b6f8c;
   --re-switch-ink-on: #1d4ed8;
+  --re-switch-tab-on: #1d4ed8;
 
   /* Keypad digits: a soft, rounded, light-weight face — friendly, but a plain sans
      for instant number recognition. System fonts only (offline at the venue). */
@@ -395,42 +396,49 @@
 /* ── compact top bar: Cards | Keypad + (cards) sync / (keypad) wave · clock ── */
 .modeBar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 6px;
-  min-height: 34px;
+  padding: 0 6px;
+  min-height: 40px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.25);
 }
 
+/* 0.3: two real tabs (alternative views) with an underline on the active one. */
 .modeSwitch {
-  display: inline-flex;
-  background: #e2e8f0;
-  border-radius: 8px;
-  padding: 2px;
+  display: flex;
+  flex: 0 1 260px;
+  min-width: 0;
 }
 
 .modeBtn {
-  height: 28px;
-  min-width: 72px;
-  padding: 0 10px;
+  flex: 1 1 0;
+  min-width: 96px;
+  height: 40px;
+  padding: 0 12px;
   border: none;
-  border-radius: 6px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
   background: transparent;
-  color: #475569;
-  font-weight: 700;
-  font-size: 13px;
+  color: #64748b;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.02em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
 }
 
-.modeBtn[aria-pressed="true"] {
-  background: #fff;
-  color: #0f172a;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+.modeBtn[aria-selected="true"] {
+  color: #1d4ed8;
+  border-bottom-color: #2563eb;
 }
+
+.modeBtn:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+
+.modeInfo, .modeSync { align-self: center; }
 
 .modeInfo {
   font-variant-numeric: tabular-nums;
@@ -441,11 +449,10 @@
 }
 
 /* Keypad mode only: the same bar in the keypad theme (cards mode keeps the rules above). */
-:global(div[data-entry-mode="keypad"]) .modeSwitch { background: var(--re-switch-bg); }
 :global(div[data-entry-mode="keypad"]) .modeBtn { color: var(--re-switch-ink); }
-:global(div[data-entry-mode="keypad"]) .modeBtn[aria-pressed="true"] {
-  background: var(--re-switch-on);
-  color: var(--re-switch-ink-on);
+:global(div[data-entry-mode="keypad"]) .modeBtn[aria-selected="true"] {
+  color: var(--re-switch-tab-on, var(--re-switch-on));
+  border-bottom-color: var(--re-switch-tab-on, var(--re-switch-on));
 }
 :global(div[data-entry-mode="keypad"]) .modeInfo { color: var(--re-ink); }
 

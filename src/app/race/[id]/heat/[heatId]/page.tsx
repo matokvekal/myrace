@@ -888,11 +888,12 @@ const Heat: React.FC = () => {
       {/* Top bar: Cards | Keypad (also by swipe) + sync (cards) or wave · clock (keypad).
           Sync keeps running in the background in both modes; only the button is hidden on the keypad. */}
       <div className={rapidStyles.modeBar}>
-        <div className={rapidStyles.modeSwitch} role="group" aria-label="Recording mode">
+        <div className={rapidStyles.modeSwitch} role="tablist" aria-label="Recording mode: Cards or Keypad">
           <button
             type="button"
             className={rapidStyles.modeBtn}
-            aria-pressed={entryMode === "cards"}
+            role="tab"
+            aria-selected={entryMode === "cards"}
             onClick={() => setEntryMode("cards")}
             data-testid="mode-cards"
           >
@@ -901,7 +902,8 @@ const Heat: React.FC = () => {
           <button
             type="button"
             className={rapidStyles.modeBtn}
-            aria-pressed={entryMode === "keypad"}
+            role="tab"
+            aria-selected={entryMode === "keypad"}
             onClick={() => setEntryMode("keypad")}
             data-testid="mode-keypad"
           >

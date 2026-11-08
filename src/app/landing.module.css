@@ -184,6 +184,8 @@
   position: relative;
   z-index: 2;
   width: clamp(230px, 30vw, 340px);
+  height: auto;
+  border-radius: 18px; /* logo has its own black backdrop: show it as a tile in light and dark */
   filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.55));
   animation: bob 4.2s ease-in-out infinite, fadeUp var(--beat-4) ease backwards;
 }

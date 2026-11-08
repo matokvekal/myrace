@@ -17,9 +17,10 @@
 }
 
 .cube {
-  width: 44px;
+  width: 66px;
   height: 44px;
   object-fit: contain;
+  border-radius: 8px;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55));
   transition: transform var(--beat-2) ease;
 }

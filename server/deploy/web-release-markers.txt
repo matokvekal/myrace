@@ -12,3 +12,4 @@ stale_profile
 race-publish-status
 actFinishPrimary
 rapid-key-enter
+Recording mode: Cards or Keypad

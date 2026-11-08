@@ -5,7 +5,7 @@
  * (/socket.io/*) are same-origin in production; caching them served one account's
  * /me, race list and snapshots to the next account on the same device (v2 bug,
  * fixed in v3). Only static, non-personal files are cached. */
-const CACHE_VERSION = 'commissire-v3';
+const CACHE_VERSION = 'commissire-v4';
 const APP_SHELL = [
   '/',
   '/index.html',

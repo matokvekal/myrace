@@ -242,6 +242,13 @@ export default function SignInForm({ next, reason = null }: { next: string | nul
       <div className={styles.inner}>
         <button className={styles.link} onClick={() => navigate("/main")}>← {t("live.back", "Back")}</button>
         <div className={`${styles.card} ${own.card}`}>
+          <img
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="Commissaire"
+            width={120}
+            height={80}
+            style={{ display: "block", margin: "0 auto 4px", width: 120, height: "auto", borderRadius: 12 }}
+          />
           {mode !== "forgot" ? (
             <>
               <h1 className={styles.title}>{mode === "signin" ? t("live.welcomeBack", "Sign in") : t("live.createTitle", "Create your account")}</h1>
