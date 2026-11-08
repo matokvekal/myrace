@@ -147,6 +147,17 @@ export function readLiveAccess(localRaceUuid: string): { isOwner: boolean; isCre
   }
 }
 
+/**
+ * 0.3.2 judge view: a member of a SHARED race who is neither its owner nor an admin (no Team
+ * access). They get RACE / LIVE / Results / Board only — no Create (setup tabs, Info) or Team.
+ * The same account can be owner in one race and judge in another: decided per race.
+ * UI only; the server enforces the role's rights on every Action.
+ */
+export const isJudgeOnly = (localRaceUuid: string): boolean => {
+  const a = readLiveAccess(localRaceUuid);
+  return !!a && !a.isOwner && !a.screens.team?.view;
+};
+
 /** May the member see this screen? Always true for local races and before access is known. */
 export const canViewScreen = (localRaceUuid: string, screen: string): boolean => {
   const a = readLiveAccess(localRaceUuid);

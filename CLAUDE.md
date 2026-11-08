@@ -400,6 +400,16 @@ still open).
   (else `/auth/google` → 503 `google_not_configured`). Google consent screen must be Published.
 - Accepting an invitation sets `raceModeRace` → the race opens on its RACE screen.
 
+### Race sharing (0.3.2) — two separate flows, no server change
+- **Invite Judges** (`live/InviteJudges.tsx`, RACE screen top bar, owner only): `team.invite({link, roles:
+  start/counter/checkin, 7 days, 50 uses})` + `team.setMemberWrites(true)` (owner-only, audited) so judges can
+  record in THIS race. Lists judges with Remove (`team.removeMember`); "Stop this link" revokes the invitation.
+- **Judge view** = `isJudgeOnly(local)` (liveBridge): shared race, not owner, no Team view (admins keep it).
+  Per race. Hides Create + Team in the race menu; the race page forces RACE mode (finalized → Results).
+- **Share public Board / Results** (`live/PublicShareButton.tsx`, top bar of BoardPage / ResultsPage): owner gets
+  `PublicLink` with `screen` → `/share/<token>?tab=board|results` (SharePage reads `?tab`). Others: "ask the
+  organizer" (share-link API is owner-only). Guest API stays GET-only (`server/test/public-readonly.test.ts`).
+
 ### App version
 - Single source of truth: `src/app/version.json` (`{ version, date }`), imported
   by `components/Version/Version.tsx` and shown in the side-menu footer. Edit it

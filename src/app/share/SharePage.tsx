@@ -12,7 +12,7 @@
  * 410 and the page loads the race one last time). Paused while the tab is hidden.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Calendar, Clock, ExternalLink, MapPin, Radio, Search, Trophy, Users } from "lucide-react";
 import { fetchPublicChanges, fetchPublicRace, PublicApiError, type PublicPolling } from "@/services/live/publicRace";
 import { guestPollingOpen } from "../../shared/race/guestPolling";
@@ -70,7 +70,9 @@ export default function SharePage() {
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const [tab, setTab] = useState<Tab>("board");
+  // 0.3.2: a shared Board / Results link opens on that screen (?tab=board|results), also after refresh.
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "results" ? "results" : "board"));
   const seq = useRef(0);
 
   const loadAll = useCallback(async () => {

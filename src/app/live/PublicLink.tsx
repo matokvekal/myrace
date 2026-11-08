@@ -27,7 +27,10 @@ export function PublicLink({
   embedded = false,
   initial = null,
   onChange,
+  screen,
 }: {
+  /** 0.3.2: open the guest page on this screen (`?tab=board|results`). */
+  screen?: "board" | "results";
   raceUuid: string;
   raceName: string;
   embedded?: boolean;
@@ -44,6 +47,7 @@ export function PublicLink({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const url = info ? (screen ? `${info.url}${info.url.includes("?") ? "&" : "?"}tab=${screen}` : info.url) : "";
 
   const load = useCallback(async () => {
     setError(null);
@@ -74,7 +78,7 @@ export function PublicLink({
   const copy = async () => {
     if (!info) return;
     try {
-      await navigator.clipboard.writeText(info.url);
+      await navigator.clipboard.writeText(url);
     } catch {
       const input = document.getElementById("race-share-url") as HTMLInputElement | null;
       input?.select();
@@ -86,7 +90,7 @@ export function PublicLink({
   const share = async () => {
     if (!info) return;
     try {
-      await navigator.share({ title: raceName, text: `Follow ${raceName} live`, url: info.url });
+      await navigator.share({ title: raceName, text: `Follow ${raceName} live`, url });
     } catch {
       /* cancelled */
     }
@@ -130,7 +134,7 @@ export function PublicLink({
             id="race-share-url"
             className={styles.url}
             readOnly
-            value={info.url}
+            value={url}
             onFocus={(e) => e.currentTarget.select()}
             data-testid="race-share-url"
             data-off={published ? undefined : "true"}

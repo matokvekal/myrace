@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X, LayoutDashboard, Users } from "lucide-react";
 import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
+import { isJudgeOnly } from "@/services/live/liveBridge";
 import styles from "./raceSidebar.module.css";
 
 // Team (share the race, members, invitations) needs the Commissaire server.
@@ -15,7 +16,7 @@ const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 export function useModeItems() {
   const { t } = useTranslation();
-  const { finalized, mode } = useRaceModeNav();
+  const { finalized, mode, raceUuid } = useRaceModeNav();
   const all: { key: RaceMode; label: string; icon: React.ReactNode }[] = [
     { key: "setup", label: t("phase.setup", "Create"), icon: <Sliders aria-hidden="true" /> },
     { key: "race", label: t("phase.race", "Race"), icon: <Flag aria-hidden="true" /> },
@@ -24,6 +25,8 @@ export function useModeItems() {
     { key: "board", label: t("phase.board", "Board"), icon: <LayoutDashboard aria-hidden="true" /> },
     ...(serverConfigured ? [{ key: "team" as const, label: t("live.teamTitle", "Team"), icon: <Users aria-hidden="true" /> }] : []),
   ];
+  // A judge (member without Team access) works in Race / Live and sees Results / Board.
+  if (isJudgeOnly(raceUuid)) return all.filter((i) => i.key !== "setup" && i.key !== "team");
   if (finalized) return all.filter((i) => i.key === "setup" || i.key === "results" || i.key === "board" || i.key === "team");
   // Create has no results to show yet; Results stays reachable from Race / Live.
   return mode === "setup" ? all.filter((i) => i.key !== "results") : all;

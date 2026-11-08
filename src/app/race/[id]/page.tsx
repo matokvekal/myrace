@@ -24,10 +24,11 @@ import { DEMO_RACE_UUID, DEMO_LIVE_ONBOARD_KEY } from "@/utils/demoSeed";
 import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { canForRace } from "@/services/cloud/permissions";
 import { isRaceFinalized } from "@/utils/raceLock";
-import { canViewScreen, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
+import { canViewScreen, isJudgeOnly, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
 // Multi-user (only with a configured server): sharing, members, sync state.
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
 const ShareRace = lazy(() => import("../../live/ShareRace"));
+const InviteJudges = lazy(() => import("../../live/InviteJudges"));
 const LocalOnlyBadge = lazy(() => import("../../live/LocalOnlyBadge"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
@@ -128,6 +129,15 @@ const Race: React.FC = () => {
     if (finalized && isRaceMode) setRaceModeRace(null);
   }, [finalized, isRaceMode, setRaceModeRace]);
 
+  // 0.3.2: a judge never sees Create (setup tabs, Info): the race opens on RACE,
+  // a finished race on its Results. Re-checked when access arrives (accessTick).
+  const judgeOnly = isJudgeOnly(raceUuid);
+  useEffect(() => {
+    if (!judgeOnly) return;
+    if (finalized) navigate(`/race/${raceUuid}/results`, { replace: true });
+    else if (!isRaceMode) setRaceModeRace(raceUuid);
+  }, [judgeOnly, finalized, isRaceMode, raceUuid, setRaceModeRace, navigate]);
+
   // Editing riders is impossible once finalized — leave the editor if it's open.
   useEffect(() => {
     if (finalized && ridersEdit) setRidersEdit(false);
@@ -146,7 +156,14 @@ const Race: React.FC = () => {
 
   return (
     <div className={styles.race}>
-      <HeaderRace />
+      <HeaderRace>
+        {/* RACE screen: the owner's Invite Judges (working access; public results are shared from Board / Results). */}
+        {serverConfigured && isRaceMode && race && (
+          <Suspense fallback={null}>
+            <InviteJudges raceUuid={raceUuid} raceName={race.name} />
+          </Suspense>
+        )}
+      </HeaderRace>
       {/* Hero (image + race card) belongs to Create only; Race mode goes straight to work. */}
       {!isRaceMode && (
       <div className={styles.top}>

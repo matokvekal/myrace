@@ -1,10 +1,12 @@
-import React, { useEffect } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import useRaceStore from "@/stores/racesStore";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import Results from "./Results";
 import RaceTopBar from "../../components/raceSidebar/RaceTopBar";
+const PublicShareButton = lazy(() => import("../../../live/PublicShareButton"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 import { useLiveRaceRoom } from "@/services/live/liveRaceRoom";
 import styles from "./resultsPage.module.css";
 
@@ -36,7 +38,13 @@ const ResultsPage: React.FC = () => {
 
   return (
     <>
-      <RaceTopBar />
+      <RaceTopBar>
+        {serverConfigured && race && (
+          <Suspense fallback={null}>
+            <PublicShareButton raceUuid={raceUuid} raceName={race.name} screen="results" />
+          </Suspense>
+        )}
+      </RaceTopBar>
       <div className={styles.page}>
         <Results raceUuid={raceUuid} defaultGroupBy="wave" defaultWave={waveParam > 0 ? waveParam : undefined} />
       </div>

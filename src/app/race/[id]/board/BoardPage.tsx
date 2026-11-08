@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo } from "react";
+import React, { lazy, Suspense, useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import useRaceStore from "@/stores/racesStore";
 import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import RaceTopBar from "../../components/raceSidebar/RaceTopBar";
+const PublicShareButton = lazy(() => import("../../../live/PublicShareButton"));
+const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 import LiveBoard from "../raceMode/LiveBoard";
 import { getScheduleWaves } from "../schedule/Schedule";
 import { canViewScreen } from "@/services/live/liveBridge";
@@ -41,7 +43,13 @@ const BoardPage: React.FC = () => {
 
   return (
     <>
-      <RaceTopBar />
+      <RaceTopBar>
+        {serverConfigured && race && (
+          <Suspense fallback={null}>
+            <PublicShareButton raceUuid={raceUuid} raceName={race.name} screen="board" />
+          </Suspense>
+        )}
+      </RaceTopBar>
       <div className={styles.page}>
         {!canViewScreen(raceUuid, "board") ? (
           <p className={styles.note}>Your role in this race does not include this screen.</p>
