@@ -61,6 +61,14 @@ export const categoryKey = (name: string, sub: string | null | undefined) => `${
 export const categoryOfRider = (state: RaceState, r: Pick<SharedRider, "category" | "subCategory">): SharedCategory | undefined =>
   Object.values(state.categories).find((c) => categoryKey(c.name, c.subCategory) === categoryKey(r.category, r.subCategory));
 
+/**
+ * 0.3 rider lock: true once the rider's wave has had its actual GO (their category has a
+ * `startedAt`). Before that — creation, check-in, standing — rider data stays editable.
+ * FINISHED riders are always started, so they are always locked.
+ */
+export const riderStarted = (state: RaceState, r: Pick<SharedRider, "category" | "subCategory">): boolean =>
+  categoryOfRider(state, r)?.startedAt != null;
+
 const ridersOfCategory = (state: RaceState, c: SharedCategory): SharedRider[] =>
   Object.values(state.riders).filter((r) => categoryKey(r.category, r.subCategory) === categoryKey(c.name, c.subCategory));
 
@@ -492,9 +500,12 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
         if (!(RIDER_IDENTITY_FIELDS as readonly string[]).includes(k)) return notApplied("invalid"); // derived fields are never edited
         changes[k] = v;
       }
+      // 0.3: once the rider's wave has had its GO (category startedAt), normal edits are refused.
+      if (riderStarted(state, r)) return notApplied("locked");
       if ("bibNumber" in changes && bibTaken(state, changes.bibNumber as number | null, r.uuid)) return notApplied("invalid");
       const moving = "category" in changes || "subCategory" in changes;
       if (moving && r.lapsCounter > 0) return notApplied("locked");
+      if (moving && riderStarted(state, { ...r, ...changes } as typeof r)) return notApplied("locked"); // can't move into a started wave
       Object.assign(r, changes);
       if (moving) {
         const c = categoryOfRider(state, r);
@@ -509,6 +520,7 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       const r = rider(p.riderUuid);
       if (!r) return notApplied("invalid");
       if (r.lapsCounter > 0) return notApplied("locked"); // riders with laps get a status instead
+      if (riderStarted(state, r)) return notApplied("locked"); // 0.3: no deletes after the wave's GO
       delete state.riders[r.uuid];
       ch.removedRiders.push(r.uuid);
       return { applied: true, changes: ch };

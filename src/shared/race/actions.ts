@@ -61,6 +61,15 @@ export const isActionType = (value: unknown): value is ActionType =>
  */
 export const UNDOABLE_ACTION_TYPES = ["AddLap", "RiderFinished", "LapCountCorrection"] as const satisfies readonly ActionType[];
 
+/**
+ * 0.3: a recorded lap (AddLap / RiderFinished) can be undone by a live Undo only within this
+ * window, measured on the SERVER between receiving the recording and receiving the Undo
+ * (a lap and its Undo sent in the same batch always pass). Later → refused as "locked";
+ * older records are fixed through the audited Results correction instead.
+ */
+export const LAP_UNDO_WINDOW_MS = 30_000;
+export const WINDOWED_UNDO_TYPES: readonly string[] = ["AddLap", "RiderFinished"];
+
 /** Values a `StatusCorrection` can set. "running" = clear back to racing. */
 export type StatusCorrectionValue = "standing" | "running" | "DNF" | "DSQ" | "DNS";
 
