@@ -25,6 +25,7 @@ import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { canForRace } from "@/services/cloud/permissions";
 import { isRaceFinalized } from "@/utils/raceLock";
 import { canViewScreen, isJudgeOnly, isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
+import { useLiveRaceRoom } from "@/services/live/liveRaceRoom";
 // Multi-user (only with a configured server): sharing, members, sync state.
 const SyncBadge = lazy(() => import("../../live/SyncBadge"));
 const ShareRace = lazy(() => import("../../live/ShareRace"));
@@ -79,6 +80,10 @@ const Race: React.FC = () => {
     return () => window.removeEventListener(LIVE_ACCESS_EVENT, onAccess);
   }, []);
   const live = isLiveRace(raceUuid);
+  // 0.3.3: every view of a shared race (RACE / Check-In included, not only LIVE) is in the race's
+  // live room, so other judges' changes (check-ins, statuses, bibs) arrive at once over the socket.
+  // SyncBadge did this only outside Race mode — a judge who lands on RACE never joined.
+  useLiveRaceRoom(raceUuid);
 
   // no-op unless this race is cloud-linked and the user is logged in
   useCloudRaceSync(raceUuid);

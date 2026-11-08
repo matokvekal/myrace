@@ -13,6 +13,20 @@ import { isRiderIgnored } from "@/utils/ignoredWaves";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 import { maxBoardHoldMs, normalizeBoardHoldMs } from "@/stores/boardHoldStore";
 import { isLiveRace, liveAllows, liveDispatch, newActionId } from "@/services/live/liveBridge";
+import { LAP_UNDO_WINDOW_MS } from "../../../../../shared/race/actions";
+
+/**
+ * Shared race (0.3.3): a recorded lap / finish can be undone for 30 s only; the server
+ * enforces it on its own clock, this just says so instead of sending a refused Undo.
+ * Older mistakes are corrected in Results (audited lap correction).
+ */
+export function lapUndoExpired(raceUuid: string, recordedAt: Date | string | number | null | undefined, now = Date.now()): boolean {
+  if (!isLiveRace(raceUuid) || recordedAt == null) return false;
+  const t = new Date(recordedAt).getTime();
+  if (!Number.isFinite(t) || now - t <= LAP_UNDO_WINDOW_MS) return false;
+  toast.warn("Undo is possible for 30 seconds only. Correct older laps in Results.", { toastId: "undo-window" });
+  return true;
+}
 
 /**
  * The lap-recording core of the live heat screen (BUGS.md #29).
@@ -519,6 +533,7 @@ export function useLapRecording({
         toast.info("This lap is still being synced — try again in a moment");
         return false;
       }
+      if (lapUndoExpired(raceUuid, rider.lapsDetails?.[rider.lapsDetails.length - 1]?.endTime ?? snapshot?.timestamp)) return false;
       if (!liveAllows(raceUuid, "Undo", { targetActionId: target })) return false;
       void liveDispatch(raceUuid, "Undo", { targetActionId: target });
     }
@@ -539,6 +554,7 @@ export function useLapRecording({
     if (action.statusChange === "FINISH") {
       if (!rider || !action.prevRider) return null;
       if (isLiveRace(raceUuid)) {
+        if (lapUndoExpired(raceUuid, action.timestamp)) return null;
         if (!action.liveActionId || !liveAllows(raceUuid, "Undo", { targetActionId: action.liveActionId })) return null;
         void liveDispatch(raceUuid, "Undo", { targetActionId: action.liveActionId });
       }
@@ -590,6 +606,7 @@ export function useLapRecording({
 
     if (isLiveRace(raceUuid)) {
       const target = action.liveActionId ?? action.rider.lapsDetails?.[action.rider.lapsDetails.length - 1]?.actionId;
+      if (lapUndoExpired(raceUuid, action.timestamp)) return null;
       if (!target || !liveAllows(raceUuid, "Undo", { targetActionId: target })) return null;
       void liveDispatch(raceUuid, "Undo", { targetActionId: target });
     }

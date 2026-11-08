@@ -11,7 +11,7 @@ import { db, tx } from "../db/pool.js";
 import { ApiError, randomCode, route } from "../lib/core.js";
 import { closeRace, refreshMemberSockets, refreshRaceSockets } from "../realtime/socket.js";
 import { projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
-import { deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
+import { categoryOfRider, deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
 import { accessSummary, isCreatorOf, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
@@ -257,10 +257,14 @@ racesRouter.post("/:raceUuid/actions", route(async (req, res) => {
  * that rider. Hidden waves are never included.
  */
 racesRouter.get("/:raceUuid/history", route(async (req, res) => {
-  const qs = z.object({ afterSeq: z.coerce.number().int().min(0).default(0), riderUuid: z.string().uuid().optional(), limit: z.coerce.number().int().min(1).max(1000).default(500) }).parse(req.query);
+  const qs = z.object({ afterSeq: z.coerce.number().int().min(0).default(0), riderUuid: z.string().uuid().optional(), limit: z.coerce.number().int().min(1).max(1000).default(500), scope: z.enum(["checkin"]).optional() }).parse(req.query);
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
   const state = await loadState(db, m.raceUuid);
   if (!state) throw raceNotFound();
+  if (qs.scope === "checkin") {
+    res.json({ events: await checkInHistory(m, state, qs.limit) });
+    return;
+  }
   const audit = m.access.screens.team.view;
   if (qs.riderUuid) {
     const r = state.riders[qs.riderUuid];
@@ -289,6 +293,44 @@ racesRouter.get("/:raceUuid/history", route(async (req, res) => {
     })),
   });
 }));
+
+/**
+ * 0.3.3 — the RACE screen's Check-In changes, shared by every judge of the race (read-only).
+ * Needs the Check-In screen (view), not Team: only applied start-list changes (status, bib,
+ * name, added rider) of riders this member may see, with the author's display name. No device,
+ * user id, phone or other rider fields. Only before the rider's wave started (GO).
+ * Newest `limit`, returned oldest first.
+ */
+async function checkInHistory(m: Awaited<ReturnType<typeof requireMember>>, state: RaceState, limit: number) {
+  if (!m.access.screens.checkin.view) throw new ApiError(403, "forbidden", "Check-In changes need access to Check-In");
+  const rows = await db.query<{ seq: number; type: string; payload: Record<string, unknown>; heat: number | null; eventAt: string; userName: string | null }>(
+    `SELECT e.seq, e.type, e.payload, e.heat, e."eventAt", u.name AS "userName"
+     FROM race_events e LEFT JOIN users u ON u.id = e."userId"
+     WHERE e."raceUuid" = $1 AND e.applied
+       AND (e.type IN ('StatusCorrection', 'RiderAdded') OR (e.type = 'RiderEdited' AND e.payload->'changes' ?| ARRAY['bibNumber', 'firstName', 'lastName']))
+       AND ($2::int[] IS NULL OR e.heat IS NULL OR e.heat = ANY($2::int[]))
+     ORDER BY e.seq DESC LIMIT $3`,
+    [m.raceUuid, m.access.waves, limit],
+  );
+  const events = [];
+  for (const e of rows.reverse()) {
+    const p = e.payload as { riderUuid?: string; status?: string; changes?: { bibNumber?: unknown; firstName?: unknown; lastName?: unknown }; rider?: { uuid?: string; bibNumber?: unknown; firstName?: unknown; lastName?: unknown } };
+    const riderUuid = e.type === "RiderAdded" ? p.rider?.uuid : p.riderUuid;
+    const r = riderUuid ? state.riders[riderUuid] : undefined;
+    if (!riderUuid || !r || !projectRider(m.access, state, r)) continue;
+    // Check-In changes only: what happened before the rider's wave went (not DNF/DSQ in the race).
+    const startedAt = categoryOfRider(state, r)?.startedAt;
+    if (startedAt != null && new Date(e.eventAt).getTime() >= startedAt) continue;
+    const base = { seq: e.seq, type: e.type, heat: e.heat, eventAt: e.eventAt, userName: e.userName, riderUuid };
+    if (e.type === "StatusCorrection") events.push({ ...base, status: p.status });
+    else if (e.type === "RiderEdited") {
+      const c = p.changes ?? {};
+      events.push({ ...base, bibNumber: c.bibNumber ?? null, ...("firstName" in c ? { firstName: c.firstName ?? null } : {}), ...("lastName" in c ? { lastName: c.lastName ?? null } : {}) });
+    }
+    else events.push({ ...base, bibNumber: p.rider?.bibNumber ?? null, firstName: p.rider?.firstName ?? null, lastName: p.rider?.lastName ?? null });
+  }
+  return events;
+}
 
 /** POST /races/:raceUuid/sync — a Device reports its cursor and queue (team sync view). */
 racesRouter.post("/:raceUuid/sync", route(async (req, res) => {

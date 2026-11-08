@@ -14,7 +14,7 @@ import WaveTimeline from "./WaveTimeline";
 import RaceSheet, { type SheetSize, type SheetView } from "./RaceSheet";
 import type { WaveAction } from "./WaveTimeline";
 import { useNavigate } from "react-router-dom";
-import { canViewScreen } from "@/services/live/liveBridge";
+import { canViewScreen, isLiveRace, readLiveAccess } from "@/services/live/liveBridge";
 import { canForRace } from "@/services/cloud/permissions";
 import { useCheckInChanges, type CheckInChange } from "@/stores/checkInChangesStore";
 import CheckInChanges from "./CheckInChanges";
@@ -143,9 +143,35 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
     if (race) void loadChanges(race);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceUuid, !!race, loadChanges]);
+  // Shared race (0.3.3): the log is the server's, so another judge's change shows up here too.
+  // Re-read it (debounced) only when a not-yet-started rider's bib, name or status changed or a
+  // rider was added: laps in a running wave don't trigger it, and there is no polling.
+  const startListSig = useMemo(
+    () =>
+      isLiveRace(raceUuid)
+        ? raceRiders
+            .filter((r) => r.raceStatus !== "running" && r.raceStatus !== "finished")
+            .map((r) => `${r.id}:${r.bibNumber}:${r.status}:${r.firstName}:${r.lastName}`)
+            .join("|")
+        : "",
+    [raceRiders, raceUuid]
+  );
+  const firstSig = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!race || !startListSig) return;
+    if (firstSig.current === null) {
+      firstSig.current = startListSig; // the mount load above already has it
+      return;
+    }
+    const t = setTimeout(() => void loadChanges(race), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startListSig]);
   const changeCounts = useMemo(() => {
     const counts = new Map<number, number>();
-    if (!canForRace(raceUuid, "EDIT_RACE")) return counts;
+    // Shared race: every judge with Check-In sees the race's changes (read-only); local: as before.
+    const mayView = isLiveRace(raceUuid) ? !!readLiveAccess(raceUuid)?.screens.checkin?.view : canForRace(raceUuid, "EDIT_RACE");
+    if (!mayView) return counts;
     allChanges.forEach((c) => counts.set(c.wave, (counts.get(c.wave) ?? 0) + 1));
     return counts;
   }, [allChanges, raceUuid]);

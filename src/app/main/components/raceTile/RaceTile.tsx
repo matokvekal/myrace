@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Heart } from "lucide-react";
 import type { RaceCardProps } from "@/types/types";
 import { effectiveRaceStatus } from "@/utils/raceStatus";
+import { STATUS_LABEL as LABELS } from "@/utils/statusLabels";
 
 const STATUS_COLOR: Record<string, string> = {
   running: "#3edda4",
@@ -13,9 +14,9 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  running: "Live",
-  upcoming: "Soon",
-  finished: "Done"
+  running: LABELS.running,
+  upcoming: LABELS.upcoming,
+  finished: LABELS.finished
 };
 
 const RaceTile: React.FC<RaceCardProps> = ({

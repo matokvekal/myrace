@@ -34,3 +34,5 @@ member_suspended
 /api/v1/me/account-invitations
 not_org_staff
 organization.race_created
+Check-In changes need access to Check-In
+ARRAY['bibNumber', 'firstName', 'lastName']

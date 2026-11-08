@@ -11,10 +11,11 @@ const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
  * the room is left when another race (or none) is opened.
  */
 export function useLiveRaceRoom(raceUuid: string) {
+  const linked = isLiveRace(raceUuid);
   useEffect(() => {
-    if (!serverConfigured || !isLiveRace(raceUuid)) return;
+    if (!serverConfigured || !linked) return;
     void import("./liveClient").then((m) => m.openLiveRace(raceUuid));
-  }, [raceUuid]);
+  }, [raceUuid, linked]);
 }
 
 /**

@@ -6,6 +6,7 @@ import { getCategoryBibIssues } from "@/utils/bibIssues";
 import { buildTimelineAxis, timelineRange } from "./timelineAxis";
 import { daysSinceRace, waveProblem } from "./waveHealth";
 import styles from "./waveTimeline.module.css";
+import { STATUS_LABEL } from "@/utils/statusLabels";
 
 export type WaveState = "upcoming" | "running" | "finished";
 export type WaveAction = "checkin" | "changes" | "start" | "live" | "finish" | "results" | "board";
@@ -29,7 +30,7 @@ export function waveStats(cats: CategoryProps[], riders: RiderProps[]) {
   };
 }
 
-const STATE_LABEL: Record<WaveState, string> = { upcoming: "Upcoming", running: "Racing", finished: "Done" };
+const STATE_LABEL: Record<WaveState, string> = { upcoming: STATUS_LABEL.upcoming, running: STATUS_LABEL.running, finished: STATUS_LABEL.finished };
 const StateIcon: React.FC<{ s: WaveState; size?: number }> = ({ s, size = 13 }) =>
   s === "running" ? <Radio size={size} /> : s === "finished" ? <CheckCircle2 size={size} /> : <Circle size={size} />;
 

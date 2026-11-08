@@ -13,11 +13,12 @@ import {
   Users
 } from "lucide-react";
 import { effectiveRaceStatus } from "@/utils/raceStatus";
+import { STATUS_LABEL as LABELS } from "@/utils/statusLabels";
 
 const STATUS_LABEL: Record<string, string> = {
-  running: "Live",
-  upcoming: "Upcoming",
-  finished: "Finished"
+  running: LABELS.running,
+  upcoming: LABELS.upcoming,
+  finished: LABELS.finished
 };
 
 const RaceCard: React.FC<RaceCardProps> = ({

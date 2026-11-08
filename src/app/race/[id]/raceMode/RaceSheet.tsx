@@ -4,12 +4,13 @@ import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory } from "../schedule/Schedule";
 import type { WaveState } from "./WaveTimeline";
 import styles from "./raceSheet.module.css";
+import { STATUS_LABEL } from "@/utils/statusLabels";
 
 export type SheetSize = "half" | "full";
 export type SheetView = "summary" | "checkin";
 
 const OUT = ["DNS", "DNF", "DSQ"];
-const STATE_LABEL: Record<WaveState, string> = { upcoming: "Upcoming", running: "Racing", finished: "Completed" };
+const STATE_LABEL: Record<WaveState, string> = { upcoming: STATUS_LABEL.upcoming, running: STATUS_LABEL.running, finished: STATUS_LABEL.finished };
 
 interface Props {
   wave: number;

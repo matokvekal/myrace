@@ -11,6 +11,7 @@ import Icons from "@/constants/Icons";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import { canForRace } from "@/services/cloud/permissions";
 import { logCheckInChange } from "@/stores/checkInChangesStore";
+import { canOnScreen } from "@/services/live/liveBridge";
 import { riderInCategory } from "../schedule/Schedule";
 
 interface Props {
@@ -57,6 +58,9 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   const [bibDraft, setBibDraft] = useState("");
   const [bibError, setBibError] = useState("");
   const [savedBibId, setSavedBibId] = useState<number | null>(null);
+  // 0.3.3: name correction before GO (judges: the race-scoped riders.update, never Create)
+  const [nameEdit, setNameEdit] = useState<{ id: number; firstName: string; lastName: string } | null>(null);
+  const [nameError, setNameError] = useState("");
 
   useEffect(() => { getRiders(raceUuid); }, [raceUuid, getRiders]);
 
@@ -121,6 +125,8 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   // `undefined` = closed, `null` = open with the category picker.
   const [addFor, setAddFor] = useState<CategoryProps | null | undefined>(undefined);
   const canAdd = !isRaceActive && canAddRider(raceUuid);
+  // Bib and name edits = rider management (riders.update), only before this wave's GO.
+  const canEditRiders = !isRaceActive && canOnScreen(raceUuid, "riders", "update");
   const addBtn = (cat: CategoryProps | null, label: string) =>
     canAdd ? (
       <button
@@ -213,7 +219,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
   };
 
   const saveBib = async (rider: RiderProps) => {
-    if (!canForRace(raceUuid, "CHECKIN_RIDER")) return;
+    if (!canForRace(raceUuid, "CHECKIN_RIDER") || !canEditRiders) return;
     const bib = Number(bibDraft);
     if (!bibDraft.trim() || !Number.isInteger(bib) || bib <= 0) {
       setBibError("Enter a valid bib number");
@@ -259,6 +265,29 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
     setTimeout(() => setSavedBibId((id) => (id === rider.id ? null : id)), 2500);
   };
 
+  const saveName = async () => {
+    if (!nameEdit || !canEditRiders) return;
+    const current = riders.find((r) => r.id === nameEdit.id);
+    if (!current) return setNameEdit(null);
+    const firstName = nameEdit.firstName.trim();
+    const lastName = nameEdit.lastName.trim();
+    if (!firstName && !lastName) return setNameError("Enter a name");
+    if (firstName === (current.firstName ?? "") && lastName === (current.lastName ?? "")) return setNameEdit(null);
+    await updateRider({ ...current, firstName, lastName });
+    // The store refuses (silently) what the role or the GO lock doesn't allow.
+    const saved = useRiderStore.getState().riders.find((r) => r.id === current.id);
+    if (saved?.firstName !== firstName || saved?.lastName !== lastName) return setNameError("You can't change this rider");
+    logCheckInChange(raceUuid, {
+      kind: "name",
+      wave: waveNum,
+      rider: { ...current, firstName, lastName },
+      text: `${current.lastName} ${current.firstName} → ${lastName} ${firstName}`,
+      before: { firstName: current.firstName, lastName: current.lastName },
+      after: { firstName, lastName },
+    });
+    setNameEdit(null);
+  };
+
   const renderBib = (rider: RiderProps, card = false) => {
     if (editingBibId === rider.id) {
       return (
@@ -286,7 +315,7 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
       <span className={styles.bibWrap}>
         {!card && <span className={styles.bib}>{rider.bibNumber}</span>}
         {savedBibId === rider.id && <span className={styles.bibSaved}>✓ Saved</span>}
-        {!isRaceActive && (
+        {canEditRiders && (
           <button
             className={styles.bibEditBtn}
             onClick={() => startEditBib(rider)}
@@ -324,6 +353,15 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
           <span className={styles.name} dir="auto">
             {rider.lastName} {rider.firstName}
             {st != null && <span className={styles.standing} title="Standing">S{st}</span>}
+            {canEditRiders && (
+              <button
+                className={styles.bibEditBtn}
+                onClick={() => { setNameError(""); setNameEdit({ id: rider.id, firstName: rider.firstName ?? "", lastName: rider.lastName ?? "" }); }}
+                title="Edit name"
+                aria-label={`Edit name of #${rider.bibNumber}`}
+                data-testid={`checkin-editname-${rider.bibNumber}`}
+              ><Pencil size={13} aria-hidden="true" /></button>
+            )}
           </span>
           {showCat && <span className={styles.cat} dir="auto">{rider.category}</span>}
         </span>
@@ -537,6 +575,29 @@ const CheckIn: React.FC<Props> = ({ raceUuid, waveNum, categories, slots }) => {
 
       {/* No riders yet: no toolbar or counts, just each category with its Add button */}
       <div className={styles.groupWrap}>{slotList.map(renderSlot)}</div>
+
+      {nameEdit && createPortal(
+        <div className={styles.addOverlay} onClick={() => setNameEdit(null)}>
+          <div className={styles.addModal} role="dialog" aria-modal="true" aria-label="Edit rider name" onClick={(e) => e.stopPropagation()} data-testid="checkin-name-modal">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12 }}>
+              <strong>Edit name</strong>
+              <input className={styles.bibInput} style={{ width: "100%" }} dir="auto" placeholder="First name" autoFocus
+                value={nameEdit.firstName} data-testid="checkin-name-first"
+                onChange={(e) => { setNameEdit({ ...nameEdit, firstName: e.target.value }); setNameError(""); }} />
+              <input className={styles.bibInput} style={{ width: "100%" }} dir="auto" placeholder="Last name"
+                value={nameEdit.lastName} data-testid="checkin-name-last"
+                onChange={(e) => { setNameEdit({ ...nameEdit, lastName: e.target.value }); setNameError(""); }}
+                onKeyDown={(e) => { if (e.key === "Enter") void saveName(); }} />
+              {nameError && <span className={styles.bibError} role="alert">{nameError}</span>}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button className={styles.bibCancel} onClick={() => setNameEdit(null)} aria-label="Cancel">✕</button>
+                <button className={styles.bibSave} onClick={() => void saveName()} aria-label="Save name" data-testid="checkin-name-save">✓</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {selectedRider && (
         <StatusModal

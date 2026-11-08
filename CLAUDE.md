@@ -410,6 +410,23 @@ still open).
   `PublicLink` with `screen` → `/share/<token>?tab=board|results` (SharePage reads `?tab`). Others: "ask the
   organizer" (share-link API is owner-only). Guest API stays GET-only (`server/test/public-readonly.test.ts`).
 
+### Judges on RACE (0.3.3) — real-time Check-In, shared change log, GO lock, Undo window
+- **Bug fixed:** RACE (Race mode) never joined the race's Socket.IO room — only SyncBadge (not rendered in
+  Race mode) and LIVE/Board/Results did — so a judge landing on RACE got no `race:changes`. `race/[id]/page.tsx`
+  now calls `useLiveRaceRoom(raceUuid)` for every view (hook re-runs when the race becomes shared).
+- **Judge permissions = existing roles** start + counter + checkin (no EDIT_RACE): `riders.create/update`
+  (add, bib, name), `checkin.update`, `live` (laps, Undo, DNF/DSQ), `start` (GO). No categories/info/settings
+  writes, no rider delete, no Team. Name pencil on Check-In (`checkin-editname-*`) next to the bib pencil, both
+  gated by `canOnScreen(race, "riders", "update")` and hidden after the wave's GO.
+- **Shared Check-In change log:** `GET /races/:uuid/history?scope=checkin` (needs `checkin.view`, not Team):
+  applied StatusCorrection / RiderAdded / RiderEdited(bib/name) before the rider's wave GO, with author name and
+  time only. `checkInChangesStore.load` uses it for shared races (device log = local races / offline fallback);
+  RaceMode re-reads it (debounced) when a not-started rider's bib/name/status changes — no polling.
+- **GO lock + 30 s Undo** (engine `riderStarted` → RiderEdited/Deleted `locked`; server `undoWindowExpired` on
+  `serverReceivedAt`). LIVE refuses an older Undo itself (`lapUndoExpired`) instead of sending a refused one.
+- **Status wording:** `utils/statusLabels.ts` — NOT STARTED / STANDING / RUNNING / FINISHED for race/wave status.
+- Tests: `server/test/db/judge-checkin-sync.test.ts`, `services/live/__tests__/raceCheckInSync.test.ts`.
+
 ### App version
 - Single source of truth: `src/app/version.json` (`{ version, date }`), imported
   by `components/Version/Version.tsx` and shown in the side-menu footer. Edit it

@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import type { CheckInChange, CheckInChangeKind } from "@/stores/checkInChangesStore";
 import styles from "./checkInChanges.module.css";
 
-const KIND_LABEL: Record<CheckInChangeKind, string> = { status: "Status", bib: "Bib", added: "Added" };
+const KIND_LABEL: Record<CheckInChangeKind, string> = { status: "Status", bib: "Bib", added: "Added", name: "Name" };
 
 const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -32,7 +32,7 @@ const CheckInChanges: React.FC<{ wave: number; changes: CheckInChange[]; onClose
         <div className={styles.list}>
           {changes.map((c, i) => (
             <div key={`${c.timestamp}-${i}`} className={styles.row} data-testid="checkin-change">
-              <span className={`${styles.kind} ${styles[`kind_${c.kind}`]}`}>{KIND_LABEL[c.kind]}</span>
+              <span className={`${styles.kind} ${styles[`kind_${c.kind}`] ?? styles.kind_bib}`}>{KIND_LABEL[c.kind]}</span>
               <span className={styles.main}>
                 <span className={styles.who} dir="auto">{c.bib} · {c.riderName}</span>
                 <span className={styles.text} dir="auto">{c.text}</span>

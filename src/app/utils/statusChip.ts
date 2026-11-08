@@ -1,3 +1,5 @@
+import { STATUS_LABEL } from "./statusLabels";
+
 export type CategoryChipStatus = "upcoming" | "running" | "finished" | null | undefined;
 
 export interface StatusChipInfo {
@@ -9,11 +11,11 @@ export interface StatusChipInfo {
 export function getCategoryStatusInfo(status: CategoryChipStatus): StatusChipInfo {
   switch (status) {
     case "running":
-      return { label: "Running", color: "#3edda4" };
+      return { label: STATUS_LABEL.running, color: "#3edda4" };
     case "finished":
-      return { label: "Finished", color: "#8a8fa3" };
+      return { label: STATUS_LABEL.finished, color: "#8a8fa3" };
     default:
-      return { label: "Not Started", color: "#63a6fc" };
+      return { label: STATUS_LABEL.upcoming, color: "#63a6fc" };
   }
 }
 
@@ -25,7 +27,7 @@ export function getWaveStatusInfo(categoryStatuses: CategoryChipStatus[]): Statu
   // Some categories finished, none running, rest never started: the wave is
   // partly done — never call it "Not Started" once races have been run.
   if (categoryStatuses.some((s) => s === "finished"))
-    return { label: "Partly Finished", color: "#ffc107" };
+    return { label: "PARTLY FINISHED", color: "#ffc107" };
   return getCategoryStatusInfo("upcoming");
 }
 

@@ -14,6 +14,7 @@ import { freezeDerivedWaves, riderInCategory } from "../schedule/Schedule";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
 import { isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
+import { statusLabel } from "@/utils/statusLabels";
 
 interface Props {
   raceUuid: string;
@@ -1476,7 +1477,7 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
                             🚴 {accounted}/{total}
                           </span>
                         )}
-                        <span className={`${styles.statusTag}`}>{cat.status ?? "upcoming"}</span>
+                        <span className={`${styles.statusTag}`}>{statusLabel(cat.status)}</span>
                         {issues.length > 0 && (
                           <span className={styles.catWarnIcon} title={issues.join(" · ")}>
                             <AlertTriangle size={13} />

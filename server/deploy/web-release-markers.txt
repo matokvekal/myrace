@@ -18,3 +18,7 @@ google-signin
 invite-judges-btn
 judge-link-create
 public-share-ask-owner
+checkin-editname-
+history?scope=checkin
+Undo is possible for 30 seconds only
+NOT STARTED

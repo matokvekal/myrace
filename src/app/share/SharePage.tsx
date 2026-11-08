@@ -19,6 +19,7 @@ import { guestPollingOpen } from "../../shared/race/guestPolling";
 import type { SharedCategory, SharedRace, SharedRider } from "../../shared/race/state";
 import { safeHttpUrl } from "@/utils/safeUrl";
 import styles from "./sharePage.module.css";
+import { STATUS_LABEL } from "@/utils/statusLabels";
 
 type Rider = Partial<SharedRider>;
 type Tab = "info" | "riders" | "categories" | "schedule" | "board" | "results";
@@ -56,9 +57,9 @@ function statusText(r: Rider): string {
 }
 
 function categoryState(c: SharedCategory): string {
-  if (c.status === "running") return "Racing";
-  if (c.status === "finished") return c.startedAt != null ? "Finished" : "Not started";
-  return "Upcoming";
+  if (c.status === "running") return STATUS_LABEL.running;
+  if (c.status === "finished") return c.startedAt != null ? STATUS_LABEL.finished : STATUS_LABEL.upcoming;
+  return STATUS_LABEL.upcoming;
 }
 
 export default function SharePage() {

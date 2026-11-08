@@ -1765,6 +1765,9 @@ export const team = {
   devices: (local: string) => api<{ devices: Record<string, unknown>[] }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/devices`),
   history: (local: string, riderUuid?: string) =>
     api<{ events: Record<string, unknown>[] }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/history${riderUuid ? `?riderUuid=${riderUuid}` : ""}`),
+  /** 0.3.3: the race's Check-In changes (status, bib, added) — any judge with Check-In, read-only. */
+  checkInHistory: (local: string) =>
+    api<{ events: SharedCheckInEvent[] }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/history?scope=checkin&limit=1000`),
   finalize: (local: string) => api<{ official: Record<string, unknown> }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/finalize`),
   amend: (local: string, reason: string, includeActionIds: string[]) =>
     api<{ official: Record<string, unknown> }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/amend`, { reason, includeActionIds }),
@@ -1778,6 +1781,19 @@ export const team = {
     return r;
   },
 };
+
+export interface SharedCheckInEvent {
+  seq: number;
+  type: "StatusCorrection" | "RiderEdited" | "RiderAdded";
+  heat: number | null;
+  eventAt: string;
+  userName: string | null;
+  riderUuid: string;
+  status?: string;
+  bibNumber?: number | null;
+  firstName?: string | null;
+  lastName?: string | null;
+}
 
 export interface Member {
   userId: string;
