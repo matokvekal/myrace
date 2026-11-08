@@ -393,6 +393,13 @@ still open).
   is no longer shown (sync downloads every account race anyway).
 - Live Cards | Keypad switch = real tabs (`role="tab"`, underline on the active one).
 
+### Google sign-in (0.3.1)
+- `live/GoogleSignInButton.tsx` (El Niño GIS loader pattern) on Sign in / New account (`SignInForm`) and the
+  signed-out invite page. Hidden when `VITE_GOOGLE_CLIENT_ID` is empty — never a dead button.
+- Client id is public, committed in `.env.production`; the server needs the SAME id in `GOOGLE_CLIENT_IDS`
+  (else `/auth/google` → 503 `google_not_configured`). Google consent screen must be Published.
+- Accepting an invitation sets `raceModeRace` → the race opens on its RACE screen.
+
 ### App version
 - Single source of truth: `src/app/version.json` (`{ version, date }`), imported
   by `components/Version/Version.tsx` and shown in the side-menu footer. Edit it

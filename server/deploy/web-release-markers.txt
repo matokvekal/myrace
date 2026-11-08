@@ -13,3 +13,5 @@ race-publish-status
 actFinishPrimary
 rapid-key-enter
 Recording mode: Cards or Keypad
+google-signin
+309442632847-s6vn7mliu05v8l48dhnk4s9lc1jr3jrp
