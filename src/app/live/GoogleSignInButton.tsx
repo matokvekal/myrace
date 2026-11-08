@@ -63,7 +63,7 @@ export function forgetGoogleSession(): void {
 }
 
 export default function GoogleSignInButton({ onToken }: { onToken: (idToken: string) => void }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const onTokenRef = useRef(onToken);
   onTokenRef.current = onToken;
@@ -90,15 +90,14 @@ export default function GoogleSignInButton({ onToken }: { onToken: (idToken: str
           text: "continue_with",
           shape: "pill",
           logo_alignment: "left",
-          width,
-          locale: i18n.language,
+          width, // no `locale`: Google follows the browser language (the app's i18n code can differ from what is shown)
         });
       })
       .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
     };
-  }, [clientId, i18n.language]);
+  }, [clientId]);
 
   if (!clientId) return null;
   return (
