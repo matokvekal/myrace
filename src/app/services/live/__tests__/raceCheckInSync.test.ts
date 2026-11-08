@@ -90,7 +90,7 @@ describe("LIVE Undo window on the device (server is the authority)", () => {
   it("shared race: a lap older than 30 s is not undone; local races are never limited", async () => {
     vi.doUnmock("../liveBridge");
     vi.doMock("@/services/live/liveBridge", () => ({ isLiveRace: (id: string) => id === "shared", liveAllows: () => true, liveDispatch: vi.fn(), newActionId: () => "x" }));
-    const { lapUndoExpired } = await import("@/race/[id]/heat/[heatId]/useLapRecording");
+    const { lapUndoExpired } = await import("../../../race/[id]/heat/[heatId]/useLapRecording");
     const now = 1_000_000;
     expect(lapUndoExpired("shared", now - 30_000, now)).toBe(false);
     expect(lapUndoExpired("shared", now - 30_001, now)).toBe(true);

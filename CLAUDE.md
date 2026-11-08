@@ -490,7 +490,8 @@ still open).
   the last applied seq; local race → re-read IndexedDB, no network.
 - Board: no wave filter (every wave; `?wave=N` only scrolls to it); "All results (N)"
   / "Top 5" replaces the old +/- per category.
-- Limitation: viewers must be signed-in race members; there is no anonymous
+- Limitation (in-app Board/Results): viewers must be signed-in race members. Anonymous
+  spectators use the public share page instead (no socket, see below);
   read-only feed on the server, so public mass viewing needs a backend change.
 
 ### Local ids and waves (missing rider cards, 2026-11-04)
@@ -603,8 +604,9 @@ still open).
 - **Guests (signed out, server builds):** `live/AccountOnly.tsx` guards `/main` and every
   `/race/*` route → `/account?reason=guest&next=…`. A guest reads ONE race only through
   its share link `/share/:token` (`app/share/SharePage.tsx`, standalone: plain fetches of
-  `/api/v1/public/*`, no session, no socket, no IndexedDB). Tabs: Info, Riders,
-  Categories, Schedule, Board, Results.
+  `/api/v1/public/*`, no session, no socket, no IndexedDB). Since 0.3.4 it is the
+  spectator page: exactly two tabs, RESULTS (default) and RACE; see "Public spectator
+  page (0.3.4)" below.
 - **Share links:** `server/src/public/shareToken.ts` — `base64url(uuid).HMAC` (stable,
   no table; `SHARE_LINK_SECRET`, default derived from `JWT_ACCESS_SECRET` — changing it
   breaks every link). A link opens ONLY a **published**, not deleted race
@@ -615,7 +617,8 @@ still open).
 - **Guest polling:** `shared/race/guestPolling.ts` is the ONE rule (client stops, server
   answers 410 `polling_closed`): open until the race is finished or 24 h after its
   scheduled start (race date + earliest of race/category start time, Asia/Jerusalem;
-  dates `YYYY-MM-DD` or `DD/MM/YYYY`). Every 10 s, paused while the tab is hidden.
+  dates `YYYY-MM-DD` or `DD/MM/YYYY`). The server still advertises 10 s; the 0.3.4
+  page ignores that and uses `share/publicRefresh.ts` (below).
 - **My Races** lists only the signed-in account's races (+ never-uploaded ones):
   `raceVisibleToAccount` / `commissaire.live.accountRaces.<userId>`.
 
@@ -718,3 +721,24 @@ still open).
   blue-gradient Enter; dark/night = midnight navy + gold Enter. Digit keys have no plate/border
   (whole cell still the touch target). All colours are `--re-*` tokens scoped to
   `div[data-entry-mode="keypad"]` in `rapidEntry.module.css`; sizes/layout unchanged.
+
+### Public spectator page (0.3.4)
+- `share/SharePage.tsx` (route `/share/:token`, remounted per token): exactly two tabs,
+  RESULTS (default) and RACE. `?tab=race` opens RACE; a 0.3.2 `?tab=board` link opens
+  RACE too (`shareTabFromParam`); the tab is written to the URL so refresh keeps it.
+  The Board's Share button now produces `?tab=race`, Results' `?tab=results` (`PublicLink`).
+- RESULTS: ranked per category (server `position_category`, then on course, then
+  DNF/DSQ/DNS); tap a rider → `RiderLapTable` (the app's lap breakdown; public riders
+  are mapped `id = uuid`). Category `<select>` + Podium toggle (top 3 ⇄ 5, classified
+  riders only). Started categories carry a **Provisional** chip. Nothing on the page says
+  approved/official — per-category approval is 0.3.5 (server-side).
+- RACE: waves with NOT STARTED / RUNNING / FINISHED (rider-level STANDING in RESULTS),
+  red edge while running, green stripes when finished, per-category progress. No controls.
+- Refresh (`share/publicRefresh.ts` + `share/usePublicRaceFeed.ts`): 60 s while any
+  category runs, 5 min between waves, none once guest polling has closed (410 → load once,
+  stop). One request at a time; paused while hidden; returning revalidates if the data is
+  ≥15 s old; manual Refresh throttled to one per 10 s after the last answer. No socket.
+- Other Bike Races: `share/otherRaces.ts`, localStorage `commissaire.otherRaces.v1`
+  (token, name, date, location; max 20). Listed at the bottom of the spectator page and on
+  My Races (`live/OtherBikeRaces.tsx`), separate from the account's races; no server table.
+- Tests: `share/__tests__/spectatorPage.test.tsx`, `tests/guest-share.spec.ts` (mocked API).

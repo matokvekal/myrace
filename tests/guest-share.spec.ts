@@ -5,10 +5,12 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  * server URL (E2E_SERVER_URL, default http://localhost:4999) whose public API is
  * MOCKED here, so no server or database is touched:
  *  - signed out, race lists and management routes send you to sign in;
- *  - a shared race (/share/:token) is read-only: Info, Riders, Categories,
- *    Schedule, Board, Results — no edit, start, finish or live controls;
- *  - guest polling applies updates, then stops for good on 410 (window closed)
- *    or once the race is finished; an invalid or unpublished link says so.
+ *  - a shared race (/share/:token) is the 0.3.4 spectator page: exactly RESULTS
+ *    (default) and RACE, `?tab=race` survives a reload, rider rows expand to lap
+ *    details — no edit, start, finish, check-in or live controls;
+ *  - updates (≈60 s while racing, or Refresh — throttled to one per 10 s) apply,
+ *    then stop for good on 410 (window closed) or once the race is finished; an
+ *    invalid or unpublished link says so.
  * Run: E2E_BASE_URL=<app built with VITE_SERVER_URL=E2E_SERVER_URL> npx playwright test tests/guest-share.spec.ts
  */
 const SERVER = process.env.E2E_SERVER_URL ?? "http://localhost:4999";
@@ -31,6 +33,7 @@ const polling = (open = true) => ({ open, endsAt: open ? Date.now() + 3_600_000 
 
 async function mockRace(page: Page, opts: { finished?: boolean; changes?: ((n: number) => { status: number; body: unknown })[] } = {}) {
   const calls = { changes: 0, snapshot: 0 };
+  let closed = false; // after a 410 the race reloads with updates closed
   // Registered FIRST (Playwright tries the latest route first). Anything else on the server would be a management call: a guest must never make one.
   const forbidden: string[] = [];
   await page.route(`${SERVER}/api/v1/**`, (r: Route) => {
@@ -39,12 +42,13 @@ async function mockRace(page: Page, opts: { finished?: boolean; changes?: ((n: n
   });
   await page.route(`${SERVER}/api/v1/public/races/${TOKEN}`, (r: Route) => {
     calls.snapshot++;
-    return r.fulfill({ json: { lastSeq: 5, serverTime: Date.now(), polling: polling(!opts.finished && calls.snapshot === 1), race: race(opts.finished ? { status: "finished" } : {}), categories, riders } });
+    return r.fulfill({ json: { lastSeq: 5, serverTime: Date.now(), polling: polling(!opts.finished && !closed), race: race(opts.finished ? { status: "finished" } : {}), categories, riders } });
   });
   await page.route(`${SERVER}/api/v1/public/races/${TOKEN}/changes*`, (r: Route) => {
     const step = opts.changes?.[calls.changes] ?? (() => ({ status: 410, body: { error: { code: "polling_closed", message: "ended" } } }));
     calls.changes++;
     const { status, body } = step(calls.changes);
+    if (status === 410) closed = true;
     return r.fulfill({ status, json: body });
   });
   return { calls, forbidden };
@@ -62,27 +66,40 @@ for (const vp of [{ name: "PC", width: 1280, height: 860 }, { name: "phone", wid
       }
     });
 
-    test("a shared race is read-only with every public tab, and polling stops on 410", async ({ page }) => {
+    test("spectator page: RESULTS + RACE only, read-only, rider details, updates then stop on 410", async ({ page }) => {
       const { calls, forbidden } = await mockRace(page, {
         changes: [() => ({ status: 200, body: { lastSeq: 6, serverTime: Date.now(), polling: polling(), riders: [rider("r2", 12, "Beta", "Elite", { position_category: 1, lapsCounter: 3 })] } })],
       });
       await page.goto(`/share/${TOKEN}`);
       await expect(page.getByTestId("share-page")).toBeVisible();
       await expect(page.getByRole("heading", { name: "Guest Cup" })).toBeVisible();
-      for (const tab of ["info", "riders", "categories", "schedule", "board", "results"]) {
-        await page.getByTestId(`share-tab-${tab}`).click();
-        await expect(page.getByTestId(`share-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
-      }
-      await page.getByTestId("share-tab-riders").click();
+      await expect(page.getByRole("tab")).toHaveText(["Results", "Race"]);
+      await expect(page.getByTestId("share-tab-results")).toHaveAttribute("aria-selected", "true");
       await expect(page.getByText("Test Gamma")).toBeVisible();
-      // Read-only: no management controls anywhere.
-      for (const name of [/finish/i, /start/i, /edit/i, /delete/i, /check-?in/i, /save/i]) await expect(page.getByRole("button", { name })).toHaveCount(0);
-      await expect(page.locator("input:not([placeholder^='Search'])")).toHaveCount(0);
 
-      // One update arrives (Beta now leads with 3 laps), then the window closes (410) → final reload, polling ends.
-      await page.getByTestId("share-tab-board").click();
-      await expect(page.getByText("Lap 3/3")).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByTestId("share-live-state")).toHaveAttribute("data-live", "off", { timeout: 15_000 });
+      // Rider details expand in place.
+      await page.getByTestId("share-rider-row").first().click();
+      await expect(page.getByTestId("share-rider-details")).toBeVisible();
+
+      // RACE tab, kept in the URL across a reload.
+      await page.getByTestId("share-tab-race").click();
+      await expect(page).toHaveURL(/\?tab=race/);
+      await expect(page.getByTestId("share-wave")).toHaveCount(2);
+      await page.reload();
+      await expect(page.getByTestId("share-tab-race")).toHaveAttribute("aria-selected", "true");
+
+      // Read-only: no management controls anywhere.
+      for (const name of [/finish/i, /start/i, /edit/i, /delete/i, /check-?in/i, /save/i, /approve/i]) await expect(page.getByRole("button", { name })).toHaveCount(0);
+      await expect(page.locator("input")).toHaveCount(0);
+
+      // One update arrives (Beta now leads with 3 laps), then the window closes (410) → final reload, updates end.
+      await page.getByTestId("share-tab-results").click();
+      await page.waitForTimeout(10_500);
+      await page.getByTestId("share-refresh").click();
+      await expect(page.getByText("3/3 laps")).toBeVisible();
+      await page.waitForTimeout(10_500);
+      await page.getByTestId("share-refresh").click();
+      await expect(page.getByTestId("share-live-state")).toHaveAttribute("data-live", "off");
       await expect(page.getByTestId("share-live-state")).toContainText("Live updates ended");
       const after = calls.changes;
       await page.waitForTimeout(3_000);
@@ -93,7 +110,7 @@ for (const vp of [{ name: "PC", width: 1280, height: 860 }, { name: "phone", wid
     test("a finished race shows final results and never polls", async ({ page }) => {
       const { calls } = await mockRace(page, { finished: true });
       await page.goto(`/share/${TOKEN}`);
-      await expect(page.getByTestId("share-live-state")).toContainText("Final results");
+      await expect(page.getByTestId("share-live-state")).toContainText("Race finished");
       await page.waitForTimeout(2_500);
       expect(calls.changes).toBe(0);
     });

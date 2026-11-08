@@ -22,3 +22,6 @@ checkin-editname-
 history?scope=checkin
 Undo is possible for 30 seconds only
 NOT STARTED
+commissaire.otherRaces.v1
+share-podium-toggle
+Show top 5

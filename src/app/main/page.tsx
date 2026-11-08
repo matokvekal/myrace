@@ -26,6 +26,8 @@ import {
 // Multi-user (only with a configured server): My shared races and invitations.
 // The signed-in account's races from the server, every visit, with a visible state.
 const AccountSync = lazy(() => import("../live/AccountSync"));
+// Public races opened through share links in this browser (localStorage only, 0.3.4).
+const OtherBikeRaces = lazy(() => import("../live/OtherBikeRaces"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
 
 type SortKey = "date" | "name" | "status";
@@ -212,6 +214,9 @@ const MainPage = () => {
           </div>
         </Suspense>
       )}
+      <Suspense fallback={null}>
+        <OtherBikeRaces />
+      </Suspense>
 
       {isEmpty ? (
         <>

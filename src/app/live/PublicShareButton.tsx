@@ -1,7 +1,7 @@
 /**
  * Share Public Results (0.3.2) — the Share icon at the top of BOARD and RESULTS.
  * A read-only link for parents, riders and spectators: no sign-in, opens that screen
- * (`/share/<token>?tab=board|results`), served only by the guest endpoints
+ * (`/share/<token>?tab=race|results` — Board opens RACE since 0.3.4), served only by the guest endpoints
  * (`/api/v1/public/*`, GET only, published races only). Grants NO judge access —
  * that is Invite Judges.
  *

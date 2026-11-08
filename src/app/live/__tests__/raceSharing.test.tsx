@@ -82,6 +82,12 @@ describe("Share public Board / Results", () => {
     await waitFor(() => expect((screen.getByTestId("race-share-url") as HTMLInputElement).value).toBe("https://commissaire.us/share/TOK?tab=results"));
   });
 
+  it("owner: the Board's public link opens the spectator page on RACE (0.3.4)", async () => {
+    render(<PublicShareButton raceUuid="r1" raceName="Race" screen="board" />);
+    await userEvent.click(screen.getByTestId("public-share-board"));
+    await waitFor(() => expect((screen.getByTestId("race-share-url") as HTMLInputElement).value).toBe("https://commissaire.us/share/TOK?tab=race"));
+  });
+
   it("a judge can't publish: told to ask the organizer, no share API call", async () => {
     s.isOwner = false;
     render(<PublicShareButton raceUuid="r1" raceName="Race" screen="board" />);

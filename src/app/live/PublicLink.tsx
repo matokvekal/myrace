@@ -29,7 +29,7 @@ export function PublicLink({
   onChange,
   screen,
 }: {
-  /** 0.3.2: open the guest page on this screen (`?tab=board|results`). */
+  /** Open the spectator page on RESULTS (`?tab=results`) or, from Board, on RACE (`?tab=race`, 0.3.4). */
   screen?: "board" | "results";
   raceUuid: string;
   raceName: string;
@@ -47,7 +47,7 @@ export function PublicLink({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const url = info ? (screen ? `${info.url}${info.url.includes("?") ? "&" : "?"}tab=${screen}` : info.url) : "";
+  const url = info ? (screen ? `${info.url}${info.url.includes("?") ? "&" : "?"}tab=${screen === "board" ? "race" : "results"}` : info.url) : "";
 
   const load = useCallback(async () => {
     setError(null);
