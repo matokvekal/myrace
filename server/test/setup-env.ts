@@ -14,5 +14,7 @@ process.env.SMS_ENABLED = "false";
 process.env.APP_URL = "http://app.test";
 process.env.GOOGLE_CLIENT_IDS = "test-client";
 process.env.AUTH_RATE_LIMIT = "10000";
+process.env.TRIAL_RATE_LIMIT = "10000";
 process.env.DB_POOL_MAX = "4";
 process.env.LOG_LEVEL = "silent";
+process.env.TRIAL_ACCESS_ENABLED = "true"; // Quick Trial Access (014); one test switches it off to check the shutdown

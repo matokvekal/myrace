@@ -59,6 +59,16 @@ export function attachRealtime(http: HttpServer): Server {
       if (!m || m.revoked || !canSeeAnything(m.access)) return ack?.({ ok: false, error: "not_member" });
       dataOf(socket).races.set(raceUuid, m);
       await socket.join(room(raceUuid));
+      // Quick Trial Access (014): the joined room is cached, so close it when the trial ends.
+      if (m.trialUntil) {
+        const ms = Math.min(Math.max(m.trialUntil.getTime() - Date.now(), 0), 2_147_000_000);
+        setTimeout(() => {
+          if (!socket.connected || !dataOf(socket).races.has(raceUuid)) return;
+          dataOf(socket).races.delete(raceUuid);
+          void socket.leave(room(raceUuid));
+          socket.emit("race:revoked", { raceUuid, trialEnded: true });
+        }, ms).unref?.();
+      }
       const last = await db.one<{ lastSeq: number }>(`SELECT "lastSeq" FROM races WHERE uuid = $1`, [raceUuid]);
       ack?.({ ok: true, lastSeq: last?.lastSeq ?? 0, access: accessSummary(m) });
     });

@@ -83,6 +83,15 @@ const schema = z.object({
   // Signs race share links (/share/<token>). Unset: derived from JWT_ACCESS_SECRET, so
   // links stay stable without new configuration. Changing it invalidates every link.
   SHARE_LINK_SECRET: z.string().optional().default(""),
+  // Quick Trial Access (014): race owners create links that let a new judge try the race
+  // without registering. Off = no links are created or opened, and every trial session stops.
+  TRIAL_ACCESS_ENABLED: bool,
+  // Who may create trial links (verified account email, lowercase, comma-separated) — only
+  // for races they own. Default: the platform owner's account only.
+  TRIAL_LINK_ISSUERS: z
+    .string()
+    .optional()
+    .transform((v) => (v ?? "mictavim@gmail.com").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)),
   RESULTS_SIGNING_KEY_ID: z.string().default("dev"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });

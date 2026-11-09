@@ -40,3 +40,7 @@ category_approvals
 Results changed after approval
 does not allow approving results
 RiderNameCorrected
+/api/v1/trial
+/trial-links
+trial_link_unavailable
+trial_issuer_only

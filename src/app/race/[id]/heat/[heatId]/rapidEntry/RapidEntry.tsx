@@ -25,6 +25,7 @@ import {
   UNDO_ARM_MS,
 } from "./rapidEntryConfig";
 import styles from "./rapidEntry.module.css";
+import { isCustomKeypadLayout, keypadLayoutById, useKeypadLayoutStore } from "./keypadLayouts";
 
 export type EntryStatus = "recorded" | "invalid" | "tooSoon" | "blocked" | "undone";
 
@@ -67,6 +68,10 @@ interface Props {
   /** The rider's current lap count in the store (undo only the latest lap). */
   lapsNow: (riderId: number) => number | null;
   undo: (actionId: string) => boolean;
+  /** Settings → Keyboard preview: show this layout instead of the saved one. */
+  layoutId?: string;
+  /** The Settings preview instance (its own fake recorder); the real keypad yields the keyboard to it. */
+  preview?: boolean;
 }
 
 const storageKey = (k: string) => `commissaire.rapidEntry.${k}`;
@@ -94,7 +99,11 @@ const vibrate = (p: number | number[]) => {
 
 export default function RapidEntry(props: Props) {
   const { t } = useTranslation();
-  const { persistKey, active, waveRiders, startedRiders, raceRiders, waveOfRider, getCatColor, record, actionIds, lapsNow, undo } = props;
+  const { persistKey, active, waveRiders, startedRiders, raceRiders, waveOfRider, getCatColor, record, actionIds, lapsNow, undo, preview = false } = props;
+  // Keyboard layout (Settings → Keyboard): Original = today's markup, untouched.
+  const savedLayoutId = useKeypadLayoutStore((s) => s.layoutId);
+  const layout = keypadLayoutById(props.layoutId ?? savedLayoutId);
+  const custom = isCustomKeypadLayout(layout) ? layout : null;
 
   // ── history, per wave (key change → that wave's own list; never written under the wrong key)
   const [hist, setHist] = useState(() => ({ key: persistKey, entries: loadHistory(persistKey) }));
@@ -294,6 +303,8 @@ export default function RapidEntry(props: Props) {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // The Keyboard preview (Settings) is open over Live: its keys never reach the real keypad.
+      if (!preview && useKeypadLayoutStore.getState().previewOpen) return;
       const el = e.target as HTMLElement | null;
       if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
       const h = handlers.current;
@@ -313,7 +324,7 @@ export default function RapidEntry(props: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active]);
+  }, [active, preview]);
 
   // ── fill the screen below the header, no page scroll
   const rootRef = useRef<HTMLDivElement>(null);
@@ -463,8 +474,9 @@ export default function RapidEntry(props: Props) {
           {hint && <span className={styles.hint} dir="auto">{hint}</span>}
         </div>
 
-        <div className={styles.pad}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+        {/* Original layout: no attributes at all — exactly the keypad as it always was. */}
+        <div className={styles.pad} data-layout={custom?.variant} dir={custom ? "ltr" : undefined}>
+          {(custom ? custom.digits : ["1", "2", "3", "4", "5", "6", "7", "8", "9"]).map((d) => (
             <span key={d} className={styles.cell}>{key(d, () => pressDigit(d), { testId: `rapid-key-${d}` })}</span>
           ))}
           <span className={styles.zeroCell}>{key("0", () => pressDigit("0"), { testId: "rapid-key-0" })}</span>

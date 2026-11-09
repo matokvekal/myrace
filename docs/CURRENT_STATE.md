@@ -1,6 +1,24 @@
 # Commissaire — Current State (resume here)
 
-**Updated:** 2026-11-07 · **Read with:** `AGENTS.md` (rules + procedures), `CLAUDE.md` (detailed feature notes)
+**Updated:** 2026-11-09 · **Read with:** `AGENTS.md` (rules + procedures), `CLAUDE.md` (detailed feature notes)
+
+## V1.0 — FINAL RELEASE (feature freeze, 2026-11-09)
+| Item | Value |
+|---|---|
+| App version | **1.0.0** (`src/app/version.json`) |
+| Branch / tag | `feature/trial-access` (based on 0.3.6 `ba62014`), tag **`v1.0`** — not merged into `main` |
+| Scope | everything in 0.3.6 + **Keyboard Layouts** (10 layouts, Settings → KEYBOARD preview, per-device choice, Original A1 unchanged) + **Quick Trial Access** (migration **014**) + Cards / Keypad segmented control (CSS only) |
+| Migrations | 013 `category-approvals` (0.3.5) and **014 `trial-access`** — additive, apply in order |
+| Production env | `TRIAL_ACCESS_ENABLED=true`; `TRIAL_LINK_ISSUERS` defaults to `mictavim@gmail.com` (must be a VERIFIED email on that account) |
+| Deployment | Linux production agent only (AGENTS.md §6). Never from Windows. |
+
+**After V1.0:** Version 1 is frozen — bug fixes and user-feedback improvements only; enhancements go to the V1.1 backlog
+(`docs/v2/DEVLOG.md`). Known V1.1 candidates from the release QA: owner can PATCH a trial judge to admin
+(members route doesn't refuse it); client issuer check is a constant (`TrialLinks.tsx`) — keep it in step with
+`TRIAL_LINK_ISSUERS`; KeyboardStudio texts not translated to Hebrew; a device already in a trial ignores a link to
+another race; a person can get a new trial from the same link while uses remain (bounded by maxUses / link expiry).
+
+---
 
 ## 1. Version, branch, commit, release
 | Item | Value |

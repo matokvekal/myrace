@@ -46,8 +46,9 @@ membersRouter.get("/members", route(async (req, res) => {
   const m = await requireMember(db, raceUuidOf(req), authed(req).userId, ["team", "view"]);
   const members = await db.query(
     `SELECT m."userId", u.name, u.email, m.roles, m.permissions, m."createdAt", m."updatedAt", m."revokedAt",
-            (r."ownerUserId" = m."userId") AS "isOwner"
+            (r."ownerUserId" = m."userId") AS "isOwner", t."expiresAt" AS "trialUntil", t."revokedAt" AS "trialRevokedAt"
      FROM race_members m JOIN users u ON u.id = m."userId" JOIN races r ON r.uuid = m."raceUuid"
+     LEFT JOIN temporary_users t ON t."userId" = m."userId"
      WHERE m."raceUuid" = $1 ORDER BY "isOwner" DESC, m."createdAt"`,
     [m.raceUuid],
   );

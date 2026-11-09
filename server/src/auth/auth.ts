@@ -12,6 +12,7 @@ import { type NextFunction, type Request, type Response, Router } from "express"
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db, type Db, tx } from "../db/pool.js";
+import { trialEnded } from "../races/access.js";
 import {
   ApiError,
   badRequest,
@@ -45,12 +46,18 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const header = req.headers.authorization ?? "";
     if (!header.startsWith("Bearer ")) throw new ApiError(401, "unauthorized", "Sign in first");
     const claims = await verifyAccessToken(header.slice(7));
-    const ok = await db.one(
-      `SELECT 1 FROM sessions s JOIN users u ON u.id = s."userId"
+    const ok = await db.one<{ trialRace: string | null; trialExpiresAt: Date | null; trialRevokedAt: Date | null }>(
+      `SELECT t."raceUuid" AS "trialRace", t."expiresAt" AS "trialExpiresAt", t."revokedAt" AS "trialRevokedAt"
+       FROM sessions s JOIN users u ON u.id = s."userId" LEFT JOIN temporary_users t ON t."userId" = u.id
        WHERE s.id = $1 AND s."userId" = $2 AND s."revokedAt" IS NULL AND u."isActive"`,
       [claims.sessionId, claims.userId],
     );
     if (!ok) throw new ApiError(401, "unauthorized", "Sign in again");
+    if (ok.trialRace) {
+      // Quick Trial Access (014): a temporary user works in its one race, until the trial ends.
+      if (trialEnded({ expiresAt: ok.trialExpiresAt!, revokedAt: ok.trialRevokedAt })) throw trialEndedError();
+      if (!trialRequestAllowed(req)) throw new ApiError(403, "trial_not_allowed", "Not available in trial access. Register for a full account.");
+    }
     (req as AuthedRequest).userId = claims.userId;
     (req as AuthedRequest).sessionId = claims.sessionId;
     next();
@@ -61,12 +68,38 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
 export const authed = (req: Request) => req as AuthedRequest;
 
+/** A temporary user's trial is over (403, not 401: refreshing the token can't help). */
+export const trialEndedError = () => new ApiError(403, "trial_ended", "Your trial access to this race has ended");
+
+/**
+ * What a temporary user (014) may call. Reads are allowed (each race route still checks
+ * membership, so only the trial race answers); writes only to race data through the
+ * existing paths, never account-level ones: no races, invitations, trial links, profile,
+ * identities, contacts or organizations — a trial user never becomes a permanent account.
+ */
+const TRIAL_ACCOUNT_PATHS = /^\/api\/v1\/(accounts|organizations|account-invitations|me\/account-invitations|me\/contacts|me\/groups|me\/users)(\/|$)/i;
+const TRIAL_WRITES: RegExp[] = [
+  /^\/api\/v1\/auth\/logout(-all)?$/,
+  /^\/api\/v1\/me\/preferences\/[^/]+$/,
+  /^\/api\/v1\/races\/[0-9a-f-]{36}\/(actions|sync)$/i,
+  // Podium approval: the existing role rule (canApproveCategory) decides, as for any judge.
+  /^\/api\/v1\/races\/[0-9a-f-]{36}\/categories\/[0-9a-f-]{36}\/approval$/i,
+];
+export function trialRequestAllowed(req: Request): boolean {
+  const path = req.originalUrl.split("?")[0];
+  if (TRIAL_ACCOUNT_PATHS.test(path)) return false;
+  if (req.method === "GET" || req.method === "HEAD") return true;
+  return TRIAL_WRITES.some((re) => re.test(path));
+}
+
 export interface PublicUser {
   id: string;
   email: string | null;
   name: string;
   createdAt: string;
   identities: { provider: string; email: string | null; emailVerified: boolean }[];
+  /** Quick Trial Access (014): set only for a temporary user — its one race and when the trial ends. */
+  trial?: { raceUuid: string; expiresAt: string };
 }
 
 export async function loadUser(d: Db, userId: string): Promise<PublicUser> {
@@ -79,7 +112,8 @@ export async function loadUser(d: Db, userId: string): Promise<PublicUser> {
     `SELECT provider, email, "emailVerified" FROM user_identities WHERE "userId" = $1 ORDER BY "createdAt"`,
     [userId],
   );
-  return { ...u, createdAt: u.createdAt.toISOString(), identities };
+  const trial = await d.one<{ raceUuid: string; expiresAt: Date }>(`SELECT "raceUuid", "expiresAt" FROM temporary_users WHERE "userId" = $1`, [userId]);
+  return { ...u, createdAt: u.createdAt.toISOString(), identities, ...(trial ? { trial: { raceUuid: trial.raceUuid, expiresAt: trial.expiresAt.toISOString() } } : {}) };
 }
 
 const ctx = (req: Request) => ({

@@ -159,6 +159,7 @@ export const RACE_TABLES = [
   "official_versions", "sync_cursors", "race_snapshots", "race_events",
   "race_members", "invitations", "riders", "categories",
   "category_approvals", // 013
+  "trial_links", "temporary_users", // 014
 ] as const;
 
 /**

@@ -91,3 +91,28 @@ plans/quotas/billing, advanced org admin, nonessential management screens.
 - Tests at release: server 178/178, client 617/617, typecheck clean (2 baseline), builds OK, event E2E all steps
   pass except a live-clock column comparison (test artifact).
 - Next task: Rapid Lap Entry (spec with OPEN questions: docs/v2/rapid-lap-entry.md). Not started.
+
+## 2026-11-09 — Quick Trial Access (user-approved design)
+- **Goal:** a new judge tries the system with no registration: open the owner's trial link →
+  temporary user + session → the existing race page (Check-In / Live). Separate from invitations.
+- **Decisions (user):** default roles start/counter/check-in/results (never admin); the "Judges can
+  record" switch is unchanged (owner controls it — trial judges only view while it is off); a device
+  signed in to an account is never switched (private-window message); defaults 10 uses / link open
+  7 days (configurable) / trial access 24 h from each judge's first activation (V1.0 decision,
+  superseding "12 h after race day"); any race owner may create links (superseded: issuer only, below);
+  link expiry is separate from trial-user expiry (an expired link never ends an active trial).
+- **Design:** trial user = `users` row (no email/identities) + ordinary `race_members` row + session
+  capped at access-until. Existing authorization/sync/audit unchanged. Trial-specific checks only in
+  `requireAuth` (allowed writes: race actions, sync, preferences, logout), `refreshSession`,
+  `loadMembership` (ended trial = removed member) and a socket timer. Transfer to a trial user refused.
+  Revoking a link ends its trials (403 `trial_ended`; sessions are not revoked so the device learns why).
+- **Schema:** `server/sql/014-trial-access.sql` (`trial_links`, `temporary_users`; additive, no FKs).
+  Env `TRIAL_ACCESS_ENABLED` (default off; off = no links, no opening, every trial session ends).
+- **Tests:** `server/test/db/trial-access.test.ts` (12), `src/app/services/live/__tests__/trialSession.test.ts` (4);
+  browser smoke on the local stack (open link → race page, resume, signed-in device kept, withdraw →
+  ended screen, used link → friendly error).
+- **2026-11-09 V1.0 integration (user):** rebased onto 0.3.6 (`feature/keyboard-layouts` @ ba62014) with the
+  uncommitted Keyboard Layouts work; migration renumbered 014 (013 = category approvals). Changes: only
+  `TRIAL_LINK_ISSUERS` (default mictavim@gmail.com, verified email) creates links, own races only (server +
+  client); trial entry opens RACE mode; Cards | Keypad is a segmented control (CSS only). Trial judges may
+  delete riders under existing rules; only race deletion is forbidden.

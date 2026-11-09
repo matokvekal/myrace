@@ -212,7 +212,9 @@ function HeaderMain() {
                 {user ? user.name : t("nav.guest", "Guest")}
               </div>
               <div className={styles.avatarSub} dir="auto">
-                {user ? (user.email || t("nav.signedIn", "Signed in")) : t("nav.notSignedIn", "Not signed in")}
+                {user?.trial
+                  ? t("trial.badge", "Trial judge · until {{until}}", { until: new Date(user.trial.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" }) })
+                  : user ? (user.email || t("nav.signedIn", "Signed in")) : t("nav.notSignedIn", "Not signed in")}
               </div>
             </div>
           </div>

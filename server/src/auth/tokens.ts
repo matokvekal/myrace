@@ -4,6 +4,7 @@ import { jwtVerify, SignJWT } from "jose";
 import { env } from "../config/env.js";
 import type { Db } from "../db/pool.js";
 import { ApiError, logger, randomToken, sha256 } from "../lib/core.js";
+import { trialEnded } from "../races/access.js";
 
 const secret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const ISSUER = "commissaire";
@@ -46,12 +47,14 @@ export interface SessionTokens {
 
 const refreshExpiry = () => new Date(Date.now() + env.REFRESH_TOKEN_DAYS * 86_400_000);
 
-export async function createSession(db: Db, userId: string, deviceId: string | null, userAgent: string | null): Promise<SessionTokens> {
+/** `expiresAt`: an earlier end than the usual refresh lifetime (a trial user's session ends with its trial, 014). */
+export async function createSession(db: Db, userId: string, deviceId: string | null, userAgent: string | null, expiresAt?: Date): Promise<SessionTokens> {
   const refreshToken = randomToken();
+  const end = expiresAt && expiresAt < refreshExpiry() ? expiresAt : refreshExpiry();
   const s = await db.one<{ id: string }>(
     `INSERT INTO sessions ("userId", "refreshTokenHash", "deviceId", "userAgent", "expiresAt")
      VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [userId, sha256(refreshToken), deviceId, userAgent, refreshExpiry()],
+    [userId, sha256(refreshToken), deviceId, userAgent, end],
   );
   return { accessToken: await signAccessToken({ userId, sessionId: s!.id }), refreshToken, expiresIn: 15 * 60 };
 }
@@ -64,23 +67,30 @@ export class RefreshReuseError extends ApiError {
 
 /** Rotates a refresh token. Re-using an already-rotated token revokes the whole chain. */
 export async function refreshSession(db: Db, refreshToken: string): Promise<SessionTokens & { userId: string }> {
-  const s = await db.one<{ id: string; userId: string; revokedAt: Date | null; expiresAt: Date; replacedBy: string | null; isActive: boolean }>(
-    `SELECT s.id, s."userId", s."revokedAt", s."expiresAt", s."replacedBy", u."isActive"
-     FROM sessions s JOIN users u ON u.id = s."userId" WHERE s."refreshTokenHash" = $1`,
+  const s = await db.one<{ id: string; userId: string; revokedAt: Date | null; expiresAt: Date; replacedBy: string | null; isActive: boolean; trialExpiresAt: Date | null; trialRevokedAt: Date | null }>(
+    `SELECT s.id, s."userId", s."revokedAt", s."expiresAt", s."replacedBy", u."isActive",
+            t."expiresAt" AS "trialExpiresAt", t."revokedAt" AS "trialRevokedAt"
+     FROM sessions s JOIN users u ON u.id = s."userId" LEFT JOIN temporary_users t ON t."userId" = u.id
+     WHERE s."refreshTokenHash" = $1`,
     [sha256(refreshToken)],
   );
   if (!s) throw new ApiError(401, "unauthorized", "Sign in again");
+  // A trial user's session never outlives its trial (014), whatever the refresh lifetime.
+  if (s.trialExpiresAt && trialEnded({ expiresAt: s.trialExpiresAt, revokedAt: s.trialRevokedAt })) {
+    throw new ApiError(403, "trial_ended", "Your trial access to this race has ended");
+  }
   if (s.revokedAt || s.replacedBy) {
     // Token reuse: someone holds an old token. The caller revokes every session of
     // this user OUTSIDE this transaction, so the revocation is not rolled back.
     throw new RefreshReuseError(s.userId);
   }
   if (s.expiresAt < new Date() || !s.isActive) throw new ApiError(401, "unauthorized", "Sign in again");
+  const nextExpiry = s.trialExpiresAt && s.trialExpiresAt < refreshExpiry() ? s.trialExpiresAt : refreshExpiry();
   const nextToken = randomToken();
   const next = await db.one<{ id: string }>(
     `INSERT INTO sessions ("userId", "refreshTokenHash", "deviceId", "userAgent", "expiresAt")
      SELECT "userId", $2, "deviceId", "userAgent", $3 FROM sessions WHERE id = $1 RETURNING id`,
-    [s.id, sha256(nextToken), refreshExpiry()],
+    [s.id, sha256(nextToken), nextExpiry],
   );
   await db.query(`UPDATE sessions SET "revokedAt" = now(), "replacedBy" = $2 WHERE id = $1`, [s.id, next!.id]);
   return {

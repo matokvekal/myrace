@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../../src/db/pool";
 import { RACE_TABLES } from "../../src/races/repo";
+import { env } from "../../src/config/env";
 import { action, addMember, api, auth, newUser, publishRace, send, startServer, stopServer, type TestUser } from "./helpers";
 
 let owner: TestUser, counter: TestUser, other: TestUser;
@@ -41,6 +42,16 @@ describe("race delete keeps every row (no cascades, no hard delete)", () => {
     await addMember(owner, a.raceUuid, counter, ["counter"]);
     await addMember(owner, b.raceUuid, counter, ["counter"]);
     const pendingLink = await api().post(`/api/v1/races/${a.raceUuid}/invitations`).set(auth(owner.token)).send({ link: true, roles: ["viewer"], sendEmail: false });
+    // A trial judge (014): its link and temporary user are race rows too.
+    await db.query(`UPDATE user_identities SET "emailVerified" = true WHERE "userId" = $1`, [owner.id]);
+    const issuers = env.TRIAL_LINK_ISSUERS;
+    env.TRIAL_LINK_ISSUERS = [owner.email.toLowerCase()];
+    try {
+      const trialLink = await api().post(`/api/v1/races/${a.raceUuid}/trial-links`).set(auth(owner.token)).send({});
+      expect((await api().post(`/api/v1/trial/${trialLink.body.url.split("/trial/")[1]}/start`).send({})).status).toBe(201);
+    } finally {
+      env.TRIAL_LINK_ISSUERS = issuers;
+    }
     const r1 = a.riders.find((r) => r.heat === 1)!;
     await send(owner, a.raceUuid, action(a.raceUuid, "WaveStarted", { heat: 1 }));
     await send(owner, a.raceUuid, action(a.raceUuid, "AddLap", { riderUuid: r1.uuid }, { at: new Date(Date.now() + 90_000).toISOString() }));

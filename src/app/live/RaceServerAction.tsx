@@ -17,6 +17,7 @@ import { AlertTriangle, CloudCheck, CloudUpload, Loader2 } from "lucide-react";
 import { isPendingPublish, openLiveRace, saveRaceToServer, useLiveStore } from "@/services/live/liveClient";
 import { isLiveRace, LIVE_ACCESS_EVENT } from "@/services/live/liveBridge";
 import PublishControl from "./PublishControl";
+import TrialLinks from "./TrialLinks";
 import styles from "./raceServerAction.module.css";
 
 export default function RaceServerAction({ raceUuid, raceName }: { raceUuid: string; raceName: string }) {
@@ -128,6 +129,7 @@ function OnServer({ raceUuid, raceName }: { raceUuid: string; raceName: string }
         </div>
       </div>
       {isOwner && <PublishControl raceUuid={raceUuid} raceName={raceName} />}
+      {isOwner && <TrialLinks raceUuid={raceUuid} />}
     </section>
   );
 }

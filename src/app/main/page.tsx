@@ -1,5 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import CreateRaceGate, { type GateState } from "./components/createRaceGate/CreateRaceGate";
 import { useTranslation } from "react-i18next";
 import styles from "./main.module.css";
@@ -78,6 +79,11 @@ const MainPage = () => {
     const live = await import("@/services/live/liveClient");
     if (!live.isSignedIn()) {
       navigate(`/account?reason=create&next=${encodeURIComponent("/main?create=1")}`);
+      return;
+    }
+    // Quick Trial Access: a trial judge works in one race and can't create races (the server refuses too).
+    if (live.isTrialUser()) {
+      toast.info(t("trial.noCreate", "Trial judges can't create races. Register for a free account to create your own."), { toastId: "trial-no-create" });
       return;
     }
     await syncThenCreate();

@@ -622,6 +622,24 @@ still open).
 - **My Races** lists only the signed-in account's races (+ never-uploaded ones):
   `raceVisibleToAccount` / `commissaire.live.accountRaces.<userId>`.
 
+### Quick Trial Access (014) — try judging without registering
+- ONLY the issuer account (`TRIAL_LINK_ISSUERS`, default `mictavim@gmail.com`, must be a VERIFIED
+  email) on races it OWNS: Info → server panel → "Quick Trial Access" (`live/TrialLinks.tsx`, hidden for
+  everyone else) creates a link `/trial/<token>` (only the hash is stored; URL shown once). API
+  `POST|GET /races/:uuid/trial-links`, `DELETE …/:id`, `POST /trial/:token/start` (no auth) —
+  `server/src/races/trialAccess.ts`. A link stops working if its creator is no longer an issuer.
+- Opening it (`live/TrialPage.tsx`) creates a temporary user (`temporary_users`) + an ORDINARY
+  `race_members` row with the link's roles + a session capped at access-until, then opens the race
+  page in RACE mode (Start / Check-In / Board). No new permission system: existing roles, the "Judges can record" switch, sync and audit apply.
+- Trial-only rules: `requireAuth` (no races, invitations, trial links, profile/identities, contacts,
+  orgs), `refreshSession`, `loadMembership` (ended = removed member), socket timer, no transfer to a
+  trial user. Ended trial → 403 `trial_ended` → client drops ONLY the trial session and shows
+  `TrialEnded` (marker `commissaire.trial.ended`). A device with an account is never switched.
+- Link expiry (7 days, configurable) ≠ access expiry: each trial judge gets 24 h from their OWN first
+  activation, whatever the race date (`TRIAL_ACCESS_HOURS`). Revoking a link ends its trials;
+  users/members/events never deleted.
+  `TRIAL_ACCESS_ENABLED` (server env, default off).
+
 ### Race deletion (never hard delete)
 - `DELETE /races/:uuid` never removes rows. Owner + ACTIVE race → soft delete
   (`deletedAt`, also unpublished); everyone gets `410 race_deleted` (from

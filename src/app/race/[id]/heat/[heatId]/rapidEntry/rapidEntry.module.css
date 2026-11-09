@@ -47,6 +47,7 @@
   --re-switch-ink: #5b6f8c;
   --re-switch-ink-on: #1d4ed8;
   --re-switch-tab-on: #1d4ed8;
+  --re-switch-tab-ink: #ffffff;
 
   /* Keypad digits: a soft, rounded, light-weight face — friendly, but a plain sans
      for instant number recognition. System fonts only (offline at the venue). */
@@ -400,27 +401,36 @@
   justify-content: space-between;
   gap: 8px;
   padding: 0 6px;
-  min-height: 40px;
+  min-height: 50px;
   border-bottom: 1px solid rgba(100, 116, 139, 0.25);
 }
 
-/* 0.3: two real tabs (alternative views) with an underline on the active one. */
+/* Cards | Keypad — a two-option segmented control (the two Live recording modes).
+   The selected mode is a solid filled segment; the other one is a clear, full-size
+   target on the track. 44 px tall, compact width. Colours only: same markup, tabs,
+   swipe and behaviour as before. */
 .modeSwitch {
   display: flex;
   flex: 0 1 260px;
   min-width: 0;
+  align-self: center;
+  gap: 3px;
+  padding: 3px;
+  margin: 3px 0;
+  border-radius: 10px;
+  background: #e6eefa;
+  border: 1px solid rgba(29, 78, 216, 0.18);
 }
 
 .modeBtn {
   flex: 1 1 0;
   min-width: 96px;
-  height: 40px;
+  height: 38px;
   padding: 0 12px;
   border: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -1px;
+  border-radius: 8px;
   background: transparent;
-  color: #64748b;
+  color: #334155;
   font-weight: 800;
   font-size: 15px;
   letter-spacing: 0.02em;
@@ -429,14 +439,20 @@
   justify-content: center;
   gap: 6px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
+
+.modeBtn:not([aria-selected="true"]):hover { background: rgba(29, 78, 216, 0.08); }
 
 .modeBtn[aria-selected="true"] {
-  color: #1d4ed8;
-  border-bottom-color: #2563eb;
+  color: #ffffff;
+  background: #1d4ed8;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  cursor: default;
 }
 
-.modeBtn:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.modeBtn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 
 .modeInfo, .modeSync { align-self: center; }
 
@@ -449,10 +465,14 @@
 }
 
 /* Keypad mode only: the same bar in the keypad theme (cards mode keeps the rules above). */
+:global(div[data-entry-mode="keypad"]) .modeSwitch {
+  background: var(--re-switch-bg);
+  border-color: transparent;
+}
 :global(div[data-entry-mode="keypad"]) .modeBtn { color: var(--re-switch-ink); }
 :global(div[data-entry-mode="keypad"]) .modeBtn[aria-selected="true"] {
-  color: var(--re-switch-tab-on, var(--re-switch-on));
-  border-bottom-color: var(--re-switch-tab-on, var(--re-switch-on));
+  color: var(--re-switch-tab-ink, var(--re-switch-ink-on));
+  background: var(--re-switch-tab-on, var(--re-switch-on));
 }
 :global(div[data-entry-mode="keypad"]) .modeInfo { color: var(--re-ink); }
 
@@ -462,3 +482,111 @@
   gap: 6px;
   min-width: 0;
 }
+
+/* ── Keyboard layouts (Settings → Keyboard) ──────────────
+   Only a chosen layout other than Original sets data-layout (and dir="ltr") on .pad;
+   the Original keypad has neither, so nothing below can touch it.
+   Sizes are derived from the Original grid: one Original column = (100% - 3 gaps) / 4,
+   one Original row = (pad height - 3 gaps) / 4. "Compact" digit keys = 80% of both. */
+.pad[data-layout] { direction: ltr; }
+
+/* Enter on the left: tall Enter in column 1, digits shift right. */
+.pad[data-layout="enterLeft"] .enterCell,
+.pad[data-layout="enterLeftCompact"] .enterCell { grid-column: 1; }
+.pad[data-layout="enterLeft"] .zeroCell,
+.pad[data-layout="enterLeftCompact"] .zeroCell { grid-column: 2 / span 3; }
+
+/* Compact: digit keys at 80% (width and height), Enter keeps its Original width,
+   the block sits at the bottom next to Enter (right or left). */
+.pad[data-layout="compact"] {
+  grid-template-columns: repeat(3, calc((100% - 24px) / 4 * 0.8)) calc((100% - 24px) / 4);
+  grid-template-rows: repeat(4, max(45px, calc((100% - 24px) / 4 * 0.8)));
+  justify-content: end;
+  align-content: end;
+}
+.pad[data-layout="enterLeftCompact"] {
+  grid-template-columns: calc((100% - 24px) / 4) repeat(3, calc((100% - 24px) / 4 * 0.8));
+  grid-template-rows: repeat(4, max(45px, calc((100% - 24px) / 4 * 0.8)));
+  justify-content: start;
+  align-content: end;
+}
+
+/* Enter on top: a horizontal Enter above the digits; Original-size digit columns move
+   right into half the space the side Enter freed. One extra row: the pad grows by it
+   (the history above gives the room), so digit keys keep their Original height. */
+.pad[data-layout="enterTop"] {
+  grid-template-columns: repeat(3, calc((100% - 24px) / 4));
+  grid-template-rows: minmax(56px, 0.8fr) repeat(4, minmax(56px, 1fr));
+  justify-content: center;
+  height: calc(clamp(260px, 48dvh, 400px) + 64px);
+}
+.pad[data-layout="enterTop"] .enterCell { grid-column: 1 / span 3; grid-row: 1; }
+.pad[data-layout="enterTop"] .zeroCell { grid-row: 5; }
+
+@media (min-width: 900px) {
+  .pad[data-layout="enterTop"] { height: 444px; }
+}
+/* Phone landscape: the pad fills the side column (height auto) — keep that for every layout. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .pad[data-layout="compact"],
+  .pad[data-layout="enterLeftCompact"] { grid-template-rows: repeat(4, minmax(45px, 1fr)); align-content: stretch; }
+  .pad[data-layout="enterTop"] { height: auto; }
+}
+
+/* ── Keyboard preview (Settings → Keyboard): full screen over everything ── */
+.studio {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--re-ink);
+}
+.studioBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 6px;
+}
+.studioClose,
+.studioNav {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--re-surface-edge);
+  background: var(--re-surface);
+  color: var(--re-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.studioNav:disabled { opacity: 0.35; cursor: default; }
+.studioTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.studioName { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.studioPos { font-size: 12px; color: var(--re-ink-soft); font-variant-numeric: tabular-nums; }
+.studioUse {
+  display: block;
+  margin: 0 10px 6px;
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: var(--re-accent);
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+.studioUse:disabled { background: var(--re-surface); color: var(--re-ok); border: 1px solid var(--re-surface-edge); cursor: default; }
+.studioNote { margin: 0 10px 4px; font-size: 12px; color: var(--re-ink-soft); text-align: center; }

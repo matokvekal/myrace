@@ -7,6 +7,16 @@ import { useEffect, useState } from "react";
 
 export const SESSION_KEY = "commissaire.live.session";
 export const SESSION_EVENT = "commissaire:session";
+/** Quick Trial Access: set when this device's trial ended (liveClient), cleared when the judge moves on. */
+export const TRIAL_ENDED_KEY = "commissaire.trial.ended";
+
+export function trialEndedOnThisDevice(): boolean {
+  try {
+    return !!localStorage.getItem(TRIAL_ENDED_KEY);
+  } catch {
+    return false;
+  }
+}
 
 export function hasSession(): boolean {
   try {

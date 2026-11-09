@@ -15,6 +15,7 @@ import { preferencesRouter } from "./preferences/routes.js";
 import { publicRouter } from "./public/routes.js";
 import { racesRouter } from "./races/routes.js";
 import { resultsRouter } from "./results/routes.js";
+import { trialLinksRouter, trialRouter } from "./races/trialAccess.js";
 
 export function createApp() {
   const app = express();
@@ -53,6 +54,9 @@ export function createApp() {
   app.use("/api/v1/accounts", accountsRouter);
   app.use("/api/v1/organizations", organizationsRouter);
   app.use("/api/v1/account-invitations", accountInvitationsRouter);
+  // Quick Trial Access (014): open a trial link without an account; owners manage links per race.
+  app.use("/api/v1/trial", trialRouter);
+  app.use("/api/v1/races/:raceUuid", trialLinksRouter);
   app.use("/api/v1/races/:raceUuid", membersRouter);
   app.use("/api/v1/races/:raceUuid", resultsRouter);
   app.use("/api/v1/races", racesRouter);

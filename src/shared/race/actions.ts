@@ -136,7 +136,11 @@ export type RaceAdminPayload =
   | { op: "memberWritesChanged"; enabled: boolean }
   /** 0.3.5 official podium approval per category (typed APPROVED), and its automatic invalidation. */
   | { op: "categoryApproved"; categoryUuid: CategoryUuid; categoryName: string }
-  | { op: "approvalInvalidated"; categoryUuid: CategoryUuid; categoryName: string; cause: string };
+  | { op: "approvalInvalidated"; categoryUuid: CategoryUuid; categoryName: string; cause: string }
+  /** Quick Trial Access (014): a link created / revoked by the owner, a trial user created by opening it. */
+  | { op: "trialLinkCreated"; linkId: string; roles: MemberRole[]; maxUses: number; expiresAt: string; accessUntil: string }
+  | { op: "trialLinkRevoked"; linkId: string; endedUsers: number }
+  | { op: "trialUserStarted"; linkId: string; userId: UserId; accessUntil: string };
 
 /** Stable codes for an Action stored as not applied (same strings as API errors). */
 export const NOT_APPLIED_REASONS = [

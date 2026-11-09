@@ -486,6 +486,10 @@ racesRouter.post("/:raceUuid/transfer", route(async (req, res) => {
     if (!(await d.one(`SELECT 1 FROM races WHERE uuid = $1 FOR UPDATE`, [m.raceUuid]))) throw raceNotFound();
     const ok = await d.one(`SELECT 1 FROM race_members WHERE "raceUuid" = $1 AND "userId" = $2 AND "revokedAt" IS NULL`, [m.raceUuid, target]);
     if (!ok) throw new ApiError(400, "invalid", "The new owner must be an active member of the race");
+    // A trial user (014) expires and can't become a permanent account, so it can't own a race.
+    if (await d.one(`SELECT 1 FROM temporary_users WHERE "userId" = $1`, [target])) {
+      throw new ApiError(400, "invalid", "A trial judge can't become the race owner");
+    }
     await d.query(`UPDATE races SET "ownerUserId" = $2 WHERE uuid = $1`, [m.raceUuid, target]);
     const auditSeq = await logServerEvent(d, m.raceUuid, m.userId, "RaceAdmin", { op: "ownerTransferred", from: m.userId, to: target });
     await d.query(

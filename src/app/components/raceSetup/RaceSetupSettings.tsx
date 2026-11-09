@@ -4,7 +4,7 @@
  * screen — Live included — reaches the same controls and the same persisted
  * stores (useJokerMode, boardHoldStore, voiceSettingsStore). Don't fork it.
  */
-import React, { useId, useState } from "react";
+import React, { Suspense, lazy, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Info } from "lucide-react";
 import { useJokerMode } from "@/hooks/useJokerMode";
@@ -12,6 +12,10 @@ import { BOARD_HOLD_OPTIONS, CARD_COVER_OPTIONS, DEFAULT_CARD_COVER_MS, useBoard
 import { useVoiceSettingsStore } from "@/stores/voiceSettingsStore";
 import { isIos, isStandalone } from "@/components/pwa/usePwaInstall";
 import styles from "./raceSetupSettings.module.css";
+import { keypadLayoutById, useKeypadLayoutStore } from "../../race/[id]/heat/[heatId]/rapidEntry/keypadLayouts";
+
+// Settings → Keyboard: full-screen preview of the real Live keypad (loaded on demand).
+const KeyboardStudio = lazy(() => import("../../race/[id]/heat/[heatId]/rapidEntry/KeyboardStudio"));
 
 /** The board hold that ships as default (boardHoldStore). */
 const DEFAULT_HOLD_MS = 2000;
@@ -56,6 +60,8 @@ export default function RaceSetupSettings() {
   const { holdMs, setHoldMs, coverMs, setCoverMs } = useBoardHold();
   const { settings: voiceSettings, setLanguage: setVoiceLanguage, setAutoConfirm, setEnabled: setVoiceEnabled } = useVoiceSettingsStore();
   const seconds = (ms: number) => t("prefs.seconds", "{{n}} s", { n: ms / 1000 });
+  const keypadLayout = keypadLayoutById(useKeypadLayoutStore((s) => s.layoutId));
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   return (
     <div className={styles.root}>
@@ -124,6 +130,21 @@ export default function RaceSetupSettings() {
           ))}
         </select>
       </div>
+
+      {/* Keypad layout on Live (Rapid Entry) — keypadLayouts store, this device only */}
+      <div className={styles.settingRow}>
+        <span className={styles.settingLabel} dir="auto">
+          {t("prefs.keyboard", "Keypad layout")}: {keypadLayout.name}
+        </span>
+        <button type="button" className={styles.segment} onClick={() => setKeyboardOpen(true)} data-testid="open-keyboard-settings">
+          {t("prefs.keyboardBtn", "KEYBOARD")}
+        </button>
+      </div>
+      {keyboardOpen && (
+        <Suspense fallback={null}>
+          <KeyboardStudio onClose={() => setKeyboardOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Voice input on Live — voiceSettingsStore, read live by the heat page */}
       <div className={styles.subLabel}>{t("prefs.groupVoice", "Voice input")}</div>

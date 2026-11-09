@@ -35,7 +35,7 @@ import { applyingRemote, LIVE_ACCESS_EVENT, LIVE_LINKS_KEY, readLinks, setLiveBr
 
 const SERVER = String(import.meta.env.VITE_SERVER_URL ?? "").replace(/\/$/, "");
 const API = `${SERVER}/api/v1`;
-import { SESSION_EVENT, SESSION_KEY } from "../../live/sessionPresence";
+import { SESSION_EVENT, SESSION_KEY, TRIAL_ENDED_KEY } from "../../live/sessionPresence";
 const ACCESS_KEY_PREFIX = "commissaire.live.access.";
 const ACCESS_KEY = (local: string) => `${ACCESS_KEY_PREFIX}${local}`;
 /** The account last signed in on this device: a different one clears the per-account state. */
@@ -50,6 +50,8 @@ export interface LiveUser {
   email: string | null;
   name: string;
   identities: { provider: string; email: string | null; emailVerified: boolean }[];
+  /** Quick Trial Access: a temporary user — its one race and when the trial ends. */
+  trial?: { raceUuid: string; expiresAt: string };
 }
 
 export interface AccessSummary {
@@ -63,6 +65,8 @@ export interface AccessSummary {
   screens: EffectiveAccess["screens"];
   waves: number[] | null;
   categories: string[] | null;
+  /** Quick Trial Access: set for a temporary user (when its trial ends). */
+  trialUntil?: string;
 }
 
 export interface RaceSync {
@@ -160,6 +164,29 @@ function saveSession(s: Session | null) {
   window.dispatchEvent(new Event(SESSION_EVENT)); // route guards (live/sessionPresence.ts)
 }
 
+/**
+ * Quick Trial Access: the trial on this device has ended (expired, revoked, switched off).
+ * The temporary session is dropped and this marker lets the app say why, instead of
+ * sending the judge to a sign-in page. Only the trial session is touched.
+ */
+function markTrialEnded() {
+  try {
+    localStorage.setItem(TRIAL_ENDED_KEY, JSON.stringify({ at: new Date().toISOString(), raceUuid: session?.user.trial?.raceUuid ?? null }));
+  } catch {
+    /* storage unavailable: the guard still sends the judge away */
+  }
+  socket?.disconnect();
+  socket = null;
+  saveSession(null);
+}
+export const clearTrialEnded = () => {
+  try {
+    localStorage.removeItem(TRIAL_ENDED_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
 export class LiveApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
     super(message);
@@ -177,7 +204,9 @@ async function refreshTokens(): Promise<boolean> {
         body: JSON.stringify({ refreshToken: session!.refreshToken }),
       });
       if (!r.ok) {
-        saveSession(null);
+        const code = r.status === 403 ? ((await r.json().catch(() => null)) as { error?: { code?: string } } | null)?.error?.code : null;
+        if (code === "trial_ended") markTrialEnded();
+        else saveSession(null);
         return false;
       }
       const t = (await r.json()) as { accessToken: string; refreshToken: string };
@@ -215,6 +244,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   }
   if (!r.ok) {
     const e = (data as { error?: { code?: string; message?: string } })?.error;
+    if (r.status === 403 && e?.code === "trial_ended" && session?.user.trial) markTrialEnded();
     throw new LiveApiError(r.status, e?.code ?? "error", e?.message ?? `Request failed (${r.status})`);
   }
   return data as T;
@@ -228,6 +258,7 @@ const signedIn = (r: AuthResponse) => {
   const prev = localStorage.getItem(LAST_USER_KEY);
   if (prev && prev !== String(r.user.id)) clearAccountState();
   localStorage.setItem(LAST_USER_KEY, String(r.user.id));
+  clearTrialEnded(); // any new sign-in (or new trial) replaces an ended trial's notice
   saveSession({ accessToken: r.accessToken, refreshToken: r.refreshToken, user: r.user });
   void purgeApiCache();
   void flushAll();
@@ -319,6 +350,8 @@ export const auth = {
 };
 
 export const isSignedIn = () => !!session;
+/** Quick Trial Access: the signed-in user is a temporary trial judge (one race, no account features). */
+export const isTrialUser = () => !!session?.user.trial;
 
 // ---------------------------------------------------------------------------
 // Links
@@ -1407,7 +1440,11 @@ function ensureSocket(): Socket | null {
       void loadSnapshot(local); // waves or screens may have changed what we may hold
     }
   });
-  socket.on("race:revoked", (msg: { raceUuid: string; deleted?: boolean }) => {
+  socket.on("race:revoked", (msg: { raceUuid: string; deleted?: boolean; trialEnded?: boolean }) => {
+    if (msg.trialEnded && session?.user.trial) {
+      markTrialEnded();
+      return;
+    }
     const local = localUuidOf(msg.raceUuid);
     if (!local) return;
     setSync(local, { revoked: true });
@@ -1752,6 +1789,36 @@ export async function finalizeShared(local: string): Promise<number> {
 }
 
 // --- members, invitations, directory (thin wrappers for the Team screens) ---
+
+/** Quick Trial Access: the owner's trial links, and opening one without an account. */
+export interface TrialLink {
+  id: string;
+  url?: string;
+  roles: MemberRole[];
+  waves: number[] | null;
+  maxUses: number;
+  useCount: number;
+  createdAt: string;
+  expiresAt: string;
+  accessUntil: string;
+  revokedAt?: string | null;
+  status: "valid" | "expired" | "used" | "revoked";
+  activeUsers: number;
+}
+export const trial = {
+  links: (local: string) =>
+    api<{ links: TrialLink[]; defaults: { roles: MemberRole[]; maxUses: number; linkExpiresInDays: number } }>(
+      "GET", `/races/${linkOf(local)!.serverRaceUuid}/trial-links`),
+  create: (local: string, body: { roles?: MemberRole[]; maxUses?: number; linkExpiresInDays?: number } = {}) =>
+    api<TrialLink & { url: string }>("POST", `/races/${linkOf(local)!.serverRaceUuid}/trial-links`, body),
+  revoke: (local: string, id: string) => api<{ endedUsers: number }>("DELETE", `/races/${linkOf(local)!.serverRaceUuid}/trial-links/${id}`),
+  /** Opens a trial link: a temporary user + session (no account). Never call with a session on the device. */
+  start: async (token: string, name?: string): Promise<{ raceUuid: string; user: LiveUser }> => {
+    if (session) throw new LiveApiError(409, "signed_in", "Already signed in on this device");
+    const r = await api<AuthResponse & { raceUuid: string }>("POST", `/trial/${encodeURIComponent(token)}/start`, { deviceId: deviceId(), ...(name ? { name } : {}) });
+    return { raceUuid: r.raceUuid, user: signedIn(r) };
+  },
+};
 
 export const team = {
   members: (local: string) => api<{ members: Member[] }>("GET", `/races/${linkOf(local)!.serverRaceUuid}/members`),

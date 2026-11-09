@@ -38,6 +38,7 @@ const AppToasts = lazy(() => import("./app/components/toast/AppToasts"));
 // Multi-user screens: only reachable when a Commissaire server is configured.
 const LiveAccountPage = lazy(() => import("./app/live/AccountPage"));
 const LiveInvitePage = lazy(() => import("./app/live/InvitePage"));
+const TrialPage = lazy(() => import("./app/live/TrialPage"));
 // Guests: one race, read-only, through its share link (Race Access Rules).
 const SharePage = lazy(() => import("./app/share/SharePage"));
 const serverConfigured = !!import.meta.env.VITE_SERVER_URL;
@@ -100,6 +101,8 @@ export default function App() {
           {serverConfigured && <Route path="/race/:id/team" element={<AccountOnly><TeamPage /></AccountOnly>} />}
           {serverConfigured && <Route path="/account" element={<LiveAccountPage />} />}
           {serverConfigured && <Route path="/invite/:token" element={<LiveInvitePage />} />}
+          {/* Quick Trial Access: a new judge opens the race with no account (no AccountOnly on purpose). */}
+          {serverConfigured && <Route path="/trial/:token" element={<TrialPage />} />}
           {serverConfigured && <Route path="/share/:token" element={<SharePage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

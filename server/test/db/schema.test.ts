@@ -12,13 +12,13 @@ describe("schema", () => {
     const rows = await db.query<{ version: string }>(verify[0]);
     expect(rows.map((r) => r.version)).toEqual([
       "001-users-auth", "002-races", "003-members-invitations-contacts", "004-race-events", "005-official-results",
-      "006-remove-foreign-keys", "007-add-basic-indexes", "008-recover-missing-schema", "009-waves-bibs-laps-preferences", "010-race-deletion-publishing", "011-team-phase1", "012-organizations", "013-category-approvals",
+      "006-remove-foreign-keys", "007-add-basic-indexes", "008-recover-missing-schema", "009-waves-bibs-laps-preferences", "010-race-deletion-publishing", "011-team-phase1", "012-organizations", "013-category-approvals", "014-trial-access",
     ]);
   });
 
   it("every table exists", async () => {
     const rows = await db.query<{ missing: boolean }>(verify[1]);
-    expect(rows).toHaveLength(24);
+    expect(rows).toHaveLength(26);
     expect(rows.every((r) => !r.missing)).toBe(true);
   });
 
@@ -28,7 +28,7 @@ describe("schema", () => {
 
   it("every race-data table has a NOT NULL, indexed raceUuid", async () => {
     const rows = await db.query<{ nullable: string; indexed: boolean }>(verify[3]);
-    expect(rows.length).toBe(9);
+    expect(rows.length).toBe(11);
     expect(rows.every((r) => r.nullable === "NO" && r.indexed)).toBe(true);
   });
 

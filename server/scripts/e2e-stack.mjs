@@ -117,6 +117,7 @@ const apiEnv = {
   APP_URL: `http://localhost:${APP_PORT}`,
   CORS_ORIGINS: `http://localhost:${APP_PORT},http://127.0.0.1:${APP_PORT}`,
   AUTH_RATE_LIMIT: "100000",
+  TRIAL_ACCESS_ENABLED: "true", // Quick Trial Access (014)
   PORT: String(API_PORT),
   HOST: "127.0.0.1",
   LOG_LEVEL: "info",

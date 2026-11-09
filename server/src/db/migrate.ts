@@ -43,6 +43,7 @@ export const REQUIRED_TABLES = [
   "race_hidden", // 010
   "accounts", "account_members", "account_invitations", "audit_logs", // 012
   "category_approvals", // 013
+  "trial_links", "temporary_users", // 014
 ];
 
 /**

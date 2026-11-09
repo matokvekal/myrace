@@ -59,13 +59,19 @@ function SignedIn({ next }: { next: string | null }) {
           <div className={styles.spread}>
             <div>
               <h1 className={styles.title} dir="auto">{user.name}</h1>
-              <p className={styles.muted} dir="ltr">{user.email}</p>
+              {user.trial ? (
+                <p className={styles.muted} dir="auto" data-testid="trial-badge">
+                  {t("trial.badge", "Trial judge · until {{until}}", { until: new Date(user.trial.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" }) })}
+                </p>
+              ) : (
+                <p className={styles.muted} dir="ltr">{user.email}</p>
+              )}
             </div>
             <button className={styles.secondary} onClick={() => void auth.logout()}>{t("live.signOut", "Sign out")}</button>
           </div>
         </div>
         {error && <p className={styles.error} dir="auto">{error}</p>}
-        {pending.length > 0 && (
+        {pending.length > 0 && !user.trial && (
           <div className={styles.card}>
             <h2 className={styles.subtitle}>{t("live.invitations", "Invitations")}</h2>
             <ul className={styles.list}>

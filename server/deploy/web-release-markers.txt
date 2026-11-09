@@ -30,3 +30,7 @@ approve-confirm
 share-podium-pending
 correct-name-save
 RiderNameCorrected
+trial-link-create
+trial-ended
+open-keyboard-settings
+commissaire.keypadLayout

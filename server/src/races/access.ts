@@ -2,6 +2,7 @@
  * Who may do what in a race, read fresh from race_members on every request
  * (AD-20). A non-member and an unknown race get the same 404.
  */
+import { env } from "../config/env.js";
 import type { Db } from "../db/pool.js";
 import { ApiError } from "../lib/core.js";
 import {
@@ -26,7 +27,13 @@ export interface Membership {
   permissions: MemberPermissions;
   revoked: boolean;
   access: EffectiveAccess;
+  /** Quick Trial Access (014): a temporary user's access ends at this time; null for every other user. */
+  trialUntil: Date | null;
 }
+
+/** A temporary user's access is over: expired, revoked, or the feature switched off. */
+export const trialEnded = (t: { expiresAt: Date; revokedAt: Date | null }, now = new Date()): boolean =>
+  !env.TRIAL_ACCESS_ENABLED || t.revokedAt !== null || t.expiresAt <= now;
 
 export const raceNotFound = () => new ApiError(404, "not_member", "You're not a member of this race");
 /** A soft-deleted race, answered to its owner and members so their devices remove their copy. */
@@ -35,9 +42,11 @@ export const raceDeleted = () => new ApiError(410, "race_deleted", "This race wa
 /** The user's membership in the race, or null (also null when the race does not exist). */
 export async function loadMembership(d: Db, raceUuid: string, userId: string): Promise<Membership | null> {
   if (!/^[0-9a-f-]{36}$/i.test(raceUuid)) return null;
-  const row = await d.one<{ ownerUserId: string; createdByUserId: string | null; memberWrites: boolean; roles: MemberRole[] | null; permissions: MemberPermissions | null; revokedAt: Date | null; deletedAt: Date | null }>(
-    `SELECT r."ownerUserId", r."createdByUserId", r."memberWrites", m.roles, m.permissions, m."revokedAt", r."deletedAt"
+  const row = await d.one<{ ownerUserId: string; createdByUserId: string | null; memberWrites: boolean; roles: MemberRole[] | null; permissions: MemberPermissions | null; revokedAt: Date | null; deletedAt: Date | null; trialExpiresAt: Date | null; trialRevokedAt: Date | null; trialRace: string | null }>(
+    `SELECT r."ownerUserId", r."createdByUserId", r."memberWrites", m.roles, m.permissions, m."revokedAt", r."deletedAt",
+            t."expiresAt" AS "trialExpiresAt", t."revokedAt" AS "trialRevokedAt", t."raceUuid" AS "trialRace"
      FROM races r LEFT JOIN race_members m ON m."raceUuid" = r.uuid AND m."userId" = $2
+     LEFT JOIN temporary_users t ON t."userId" = $2
      WHERE r.uuid = $1`,
     [raceUuid, userId],
   );
@@ -47,7 +56,11 @@ export async function loadMembership(d: Db, raceUuid: string, userId: string): P
   // Soft-deleted (migration 010): nothing is served or accepted any more, and the 410 tells
   // the owner's and members' devices to remove their copy — an offline device can't bring it back.
   if (row.deletedAt) throw raceDeleted();
-  const revoked = !isOwner && row.revokedAt !== null;
+  // A temporary user (014) is an ordinary member of ONE race until its trial ends; after
+  // that it is treated exactly like a removed member (its history stays).
+  const trial = row.trialExpiresAt ? { expiresAt: row.trialExpiresAt, revokedAt: row.trialRevokedAt } : null;
+  const trialOver = !!trial && (row.trialRace !== raceUuid || trialEnded(trial));
+  const revoked = !isOwner && (row.revokedAt !== null || trialOver);
   const roles = row.roles ?? [];
   const permissions = row.permissions ?? {};
   return {
@@ -60,6 +73,7 @@ export async function loadMembership(d: Db, raceUuid: string, userId: string): P
     permissions,
     revoked,
     access: revoked ? noAccess() : phaseAccess(effectiveAccess({ isOwner, roles, permissions }), isOwner, row.memberWrites),
+    trialUntil: trial?.expiresAt ?? null,
   };
 }
 
@@ -126,4 +140,5 @@ export const accessSummary = (m: Membership) => ({
   screens: m.access.screens,
   waves: m.access.waves,
   categories: m.access.categories,
+  ...(m.trialUntil ? { trialUntil: m.trialUntil.toISOString() } : {}),
 });
