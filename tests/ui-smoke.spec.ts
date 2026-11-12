@@ -16,7 +16,7 @@ test.describe("UI smoke", () => {
     await page.getByTestId("race-menu-btn").click();
     const ids = ["all", "setup", "race", "live"];
     const labels = await Promise.all(ids.map((id) => page.getByTestId(`race-nav-${id}`).innerText()));
-    expect(labels.map((l) => l.trim())).toEqual(["All Races", "Create", "Race", "Live"]);
+    expect(labels.map((l) => l.trim())).toEqual(["My Races", "Create", "Race", "Live"]);
     await expect(page.getByTestId("race-nav-setup")).toHaveAttribute("aria-current", "page");
     await page.getByTestId("race-nav-setup").click();
     await expect(page.getByRole("button", { name: "Results", exact: true })).toHaveCount(0);

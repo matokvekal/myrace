@@ -294,7 +294,7 @@ test.describe("Full race day", () => {
             .filter({ hasText: cat.name })
             .first();
           await expect(block).toBeVisible();
-          await expect(block).toContainText("Finished");
+          await expect(block).toContainText("FINISHED"); // statusLabels.ts (0.3.3)
         }
       }
 

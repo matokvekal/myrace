@@ -11,9 +11,12 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  *  - updates (≈60 s while racing, or Refresh — throttled to one per 10 s) apply,
  *    then stop for good on 410 (window closed) or once the race is finished; an
  *    invalid or unpublished link says so.
- * Run: E2E_BASE_URL=<app built with VITE_SERVER_URL=E2E_SERVER_URL> npx playwright test tests/guest-share.spec.ts
+ * Default run: playwright.config.ts starts a second dev server on :3001 with
+ * VITE_SERVER_URL=E2E_SERVER_URL, and this spec uses it.
+ * Against your own build: E2E_BASE_URL=<app built with VITE_SERVER_URL=E2E_SERVER_URL> npx playwright test tests/guest-share.spec.ts
  */
 const SERVER = process.env.E2E_SERVER_URL ?? "http://localhost:4999";
+test.use({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3001" });
 const TOKEN = "AAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB";
 
 const race = (over: Record<string, unknown> = {}) => ({

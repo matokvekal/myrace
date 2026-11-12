@@ -162,7 +162,7 @@ test.describe("Waves, leaderboard, winners & finisher times", () => {
 
     const block = resultsCategory(page, "Elite Men");
     await expect(block).toBeVisible();
-    await expect(block).toContainText("Finished");
+    await expect(block).toContainText("FINISHED"); // statusLabels.ts (0.3.3)
     // Every Elite Man crossed, so the block carries clock times (BUGS.md #30).
     await expect(block.locator('[class*="time"]').first()).toContainText(/\d{2}:\d{2}:\d{2}/);
   });

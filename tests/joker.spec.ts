@@ -31,6 +31,14 @@ async function enableJokerMode(page: Page) {
   await page.getByRole("button", { name: "Close menu" }).click();
 }
 
+/**
+ * V1.0: the Joker ("Unknown Rider") button lives in Live's Cards entry row, which is
+ * hidden since 0.2.2 (`SHOW_CARD_INFO_INPUT = false` in heat/[heatId]/page.tsx, user request).
+ * The feature code stays, but the button can't be reached, so the tests that press it are
+ * skipped until the row comes back. Flip this to false when SHOW_CARD_INFO_INPUT is true again.
+ */
+const JOKER_ROW_HIDDEN = true;
+
 test.describe("Joker button", () => {
   test("stays hidden until enabled in the side menu", async ({ page }) => {
     await page.clock.install({ time: new Date("2026-07-21T09:00:00") });
@@ -41,6 +49,7 @@ test.describe("Joker button", () => {
   test("stamps a Joker and resolves it to a bib using the original captured time, undo works", async ({
     page,
   }) => {
+    test.skip(JOKER_ROW_HIDDEN, "Joker button hidden in V1.0 (SHOW_CARD_INFO_INPUT = false)");
     await page.clock.install({ time: new Date("2026-07-21T09:00:00") });
     await page.goto("/main");
     await acceptTerms(page);
@@ -86,6 +95,7 @@ test.describe("Joker button", () => {
   test("blocks resolving a Joker to a bib with a more recent lap already recorded", async ({
     page,
   }) => {
+    test.skip(JOKER_ROW_HIDDEN, "Joker button hidden in V1.0 (SHOW_CARD_INFO_INPUT = false)");
     await page.clock.install({ time: new Date("2026-07-21T09:00:00") });
     await page.goto("/main");
     await acceptTerms(page);
@@ -114,6 +124,7 @@ test.describe("Joker button", () => {
   });
 
   test("Delete removes an unresolved Joker without touching any rider", async ({ page }) => {
+    test.skip(JOKER_ROW_HIDDEN, "Joker button hidden in V1.0 (SHOW_CARD_INFO_INPUT = false)");
     await page.clock.install({ time: new Date("2026-07-21T09:00:00") });
     await page.goto("/main");
     await acceptTerms(page);

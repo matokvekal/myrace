@@ -41,7 +41,7 @@ test.describe("Create race", () => {
     const backdrop = page.getByTestId("sheet-backdrop");
     if (await backdrop.isVisible().catch(() => false)) await backdrop.click({ position: { x: 5, y: 5 } });
     await page.getByTestId("race-menu-btn").click();
-    await page.getByRole("button", { name: "All Races" }).click();
+    await page.getByRole("button", { name: "My Races" }).click();
     await page.waitForURL(/\/main/);
 
     await page.getByRole("button", { name: /Create new race|^Add$/ }).first().click();

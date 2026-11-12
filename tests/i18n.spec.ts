@@ -46,7 +46,9 @@ test.describe("i18n", () => {
     await acceptTerms(page);
 
     await page.getByRole("button", { name: "Open menu" }).click();
-    await expect(page.getByText("Register / Login")).toBeVisible();
+    // "Register / Login" shows only when accounts are enabled (server builds); "My Races" always does.
+    const menu = (name: string) => page.getByRole("button", { name, exact: true });
+    await expect(menu("My Races")).toBeVisible();
 
     await page.getByTestId("prefs-language").click();
     await page.getByTestId("language-select").selectOption("es");
@@ -54,7 +56,7 @@ test.describe("i18n", () => {
     // No remount required — react-i18next re-renders on the language-change
     // event, same requirement that drove boardHoldStore to be a zustand store
     // rather than component state.
-    await expect(page.getByText("Registrarse / Iniciar sesión")).toBeVisible();
-    await expect(page.getByText("Register / Login")).not.toBeVisible();
+    await expect(menu("Mis carreras")).toBeVisible();
+    await expect(menu("My Races")).toHaveCount(0);
   });
 });

@@ -30,10 +30,22 @@ export default defineConfig({
     },
   ],
   // E2E_BASE_URL points the suite at an already-deployed site, so no dev server.
-  webServer: process.env.E2E_BASE_URL ? undefined : {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: process.env.E2E_BASE_URL ? undefined : [
+    {
+      command: "npm run dev",
+      url: "http://localhost:3000",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      // tests/guest-share.spec.ts: the same app with a server URL configured (guest
+      // routing only exists in server builds). That server's API is MOCKED by the spec
+      // with page.route, so nothing has to listen on E2E_SERVER_URL.
+      command: "npx vite --port 3001 --strictPort",
+      url: "http://localhost:3001",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: { VITE_SERVER_URL: process.env.E2E_SERVER_URL ?? "http://localhost:4999" },
+    },
+  ],
 });
