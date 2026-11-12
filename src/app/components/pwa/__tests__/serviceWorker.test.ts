@@ -54,8 +54,9 @@ function boot() {
   new Function("self", "caches", "fetch", SRC)(self, fakeCaches(), (globalThis as { fetch: typeof fetch }).fetch);
 }
 
-async function dispatchFetch(url: string, mode: RequestMode = "cors") {
-  let responded: Promise<Response> | null = null;
+async function dispatchFetch(url: string, mode: RequestMode = "cors"): Promise<Response | null> {
+  // `as` keeps TS from narrowing to `null`: it's assigned inside the respondWith callback.
+  let responded = null as Promise<Response> | null;
   const request = { url, method: "GET", mode } as unknown as Request;
   listeners.fetch({ request, respondWith: (p: Promise<Response>) => (responded = p) });
   return responded ? await responded : null;

@@ -13,7 +13,8 @@
       "@/types/*": ["src/app/types/*"],
       "@/helpers/*": ["src/app/stores/indexDb/*"],
       "@/hooks/*": ["src/app/hooks/*"],
-      "@/test/*": ["src/app/test/*"]
+      "@/test/*": ["src/app/test/*"],
+      "@/race/*": ["src/app/race/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts", "src/vite-env.d.ts"],
