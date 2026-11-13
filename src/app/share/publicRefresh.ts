@@ -6,6 +6,8 @@
  *    so a spectator sees the next wave start without keeping a fast poll.
  *  - Nothing once guest polling is closed (race finished, or 24 h after its start —
  *    shared/race/guestPolling.ts, also enforced by the server with 410).
+ *  - 2.0: about every 20 s while a wave is RUNNING and the LIVE tab is open (`liveTab`);
+ *    every other tab keeps the rule above.
  * The page pauses while the tab is hidden and revalidates when it comes back.
  * Anonymous spectators never open a WebSocket.
  */
@@ -13,6 +15,8 @@ import { guestPollingOpen } from "../../shared/race/guestPolling";
 
 export const PUBLIC_REFRESH_RUNNING_MS = 60_000;
 export const PUBLIC_REFRESH_IDLE_MS = 5 * 60_000;
+/** 2.0: LIVE tab open while a wave runs. */
+export const PUBLIC_REFRESH_LIVE_MS = 20_000;
 /** A manual Refresh is ignored when the last request is younger than this. */
 export const PUBLIC_MANUAL_REFRESH_MIN_MS = 10_000;
 /** Returning to the tab refreshes only when the data is older than this. */
@@ -27,15 +31,17 @@ export function publicRefreshDelay(
   race: RaceLike | null | undefined,
   categories: CategoryLike[],
   now = Date.now(),
+  opts: { liveTab?: boolean } = {},
 ): number | null {
   if (!pollingOpen || !race || !guestPollingOpen(race, categories, now)) return null;
-  return categories.some((c) => c.status === "running") ? PUBLIC_REFRESH_RUNNING_MS : PUBLIC_REFRESH_IDLE_MS;
+  if (!categories.some((c) => c.status === "running")) return PUBLIC_REFRESH_IDLE_MS;
+  return opts.liveTab ? PUBLIC_REFRESH_LIVE_MS : PUBLIC_REFRESH_RUNNING_MS;
 }
 
-export type ShareTab = "results" | "race";
+export type ShareTab = "race" | "results" | "live";
 
 /**
- * `?tab=` of a shared link. RESULTS is the default; `race` opens RACE. A 0.3.2 Board
- * link (`?tab=board`, the race-progress screen) opens RACE too.
+ * `?tab=` of a shared link. 2.0: RACE is the default; `results` opens RESULTS, `live` LIVE.
+ * A 0.3.2 Board link (`?tab=board`, the race-progress screen) opens RACE.
  */
-export const shareTabFromParam = (p: string | null): ShareTab => (p === "race" || p === "board" ? "race" : "results");
+export const shareTabFromParam = (p: string | null): ShareTab => (p === "results" ? "results" : p === "live" ? "live" : "race");

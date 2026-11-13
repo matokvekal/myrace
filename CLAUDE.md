@@ -752,7 +752,7 @@ still open).
   (whole cell still the touch target). All colours are `--re-*` tokens scoped to
   `div[data-entry-mode="keypad"]` in `rapidEntry.module.css`; sizes/layout unchanged.
 
-### Public spectator page (0.3.4)
+### Public spectator page (0.3.4 — tabs, default tab and RESULTS timing superseded by 2.0 above)
 - `share/SharePage.tsx` (route `/share/:token`, remounted per token): exactly two tabs,
   RESULTS (default) and RACE. `?tab=race` opens RACE; a 0.3.2 `?tab=board` link opens
   RACE too (`shareTabFromParam`); the tab is written to the URL so refresh keeps it.
@@ -772,6 +772,29 @@ still open).
   (token, name, date, location; max 20). Listed at the bottom of the spectator page and on
   My Races (`live/OtherBikeRaces.tsx`), separate from the account's races; no server table.
 - Tests: `share/__tests__/spectatorPage.test.tsx`, `tests/guest-share.spec.ts` (mocked API).
+
+### Public race page 2.0 — RACE · RESULTS · LIVE + TV broadcast (client only, branch feature/public-race-2)
+- `share/SharePage.tsx`: tabs RACE (default) · RESULTS · LIVE; `?tab=race|results|live` (old `?tab=board` →
+  RACE); tab changes PUSH history (Back/Forward). `?view=tv` = `share/broadcast/` full-screen presentation.
+  No server, API or DB change — everything comes from `usePublicRaceFeed`.
+- Waves: `share/waves/activeWaves.ts` is the ONE rule (wave = `category.heat`; ACTIVE = a category with
+  `status === "running"`). RACE shows `ActiveWaveStrip` above the old schedule.
+- RESULTS shows NOTHING until `race.status === "finished"` (Finish Race) → "Race in progress" + LIVE link.
+  After: the old results/approval/podium UI + Only Finishers / Filter by Wave (`results/resultFilterRules.ts`,
+  hide rows only). The RESULTS order moved unchanged to `results/officialOrder.ts` (shared with TV).
+- LIVE (`share/live/`): provisional only. `liveRanking.ts` ranks ONE wave: laps desc, then race time
+  (`riderElapsedMs`, own lap-1 start → last crossing, laps sorted by number), bib, uuid; not crossed = no
+  position/time; DNF→DSQ→DNS at the bottom; By category uses server `position_category` first.
+  `useLiveTrend` compares only when new data makes a new ranking (view change resets).
+- Refresh: 20 s ONLY while the LIVE tab is open + a wave runs (`publicRefreshDelay(..., {liveTab})`); other
+  tabs keep 60 s / 5 min. Freshness (`share/feedStatus.ts`): offline or > 2 intervals + 10 s → stale (dimmed,
+  dated); polling ended on an unfinished race → "ended".
+- Clock: `waves/raceClock.tsx` — wave `startedAt` (server ms) + feed `clockOffsetMs` (server − device from
+  each answer's `serverTime`); ticks in its own component only.
+- TV: font = min(100vh/54, 100vw/96), all sizes in em (1080p = 4K layout). `useFitRows` measures rows
+  (ROW_EM 2.75 ↔ CSS row 2.5em + 0.25em gap: change together); `paging.pagePlan` pins top 3 when ≥ 8 rows fit;
+  pages rotate every 10 s; wake lock; controls auto-hide; Esc (not fullscreen) exits.
+- Tests: `share/__tests__/{spectatorPage,liveRanking,publicRace2}.test.*`, `tests/guest-share.spec.ts`.
 
 ### Official podium approval + audited name correction (0.3.5)
 - Table `category_approvals` (migration 013, one current row per race+category, in `RACE_TABLES`).

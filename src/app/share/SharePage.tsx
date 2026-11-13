@@ -5,9 +5,11 @@
  * the management API, the local stores, IndexedDB or a socket, so nothing here can
  * change a race.
  *
- * Exactly two tabs: RESULTS (default) and RACE (schedule + wave progress).
- * `?tab=race` opens RACE (a 0.3.2 `?tab=board` link too); the choice stays in the
- * URL so refresh and direct links keep it.
+ * 2.0: three tabs — RACE (default: active wave + schedule), RESULTS (official, only once the
+ * race is finished; Only Finishers / Filter by Wave) and LIVE (provisional standings of the
+ * running wave, computed in the browser). `?tab=race|results|live` (a 0.3.2 `?tab=board`
+ * link opens RACE); tab changes are history entries so Back/Forward work. `?view=tv` is the
+ * full-screen broadcast presentation (broadcast/), same data and rules.
  *
  * 0.3.5: a category is APPROVED only when the server says so (a judge typed APPROVED and
  * the result hasn't changed since); otherwise its rankings show as PROVISIONAL. The podium
@@ -15,7 +17,7 @@
  */
 import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { BadgeCheck, Calendar, ChevronDown, Clock, MapPin, Radio, RefreshCw, Trophy } from "lucide-react";
+import { BadgeCheck, Calendar, ChevronDown, Clock, MapPin, Radio, RefreshCw, Trophy, Tv } from "lucide-react";
 import type { SharedCategory } from "../../shared/race/state";
 import type { CategoryApprovalView } from "../../shared/race/approval";
 import type { RiderProps } from "@/types/types";
@@ -25,11 +27,23 @@ import { usePublicRaceFeed, type PublicRider } from "./usePublicRaceFeed";
 import { shareTabFromParam, type ShareTab } from "./publicRefresh";
 import { listOtherRaces, rememberOtherRace, type OtherRace } from "./otherRaces";
 import styles from "./sharePage.module.css";
+import { ridersByCategory, summarizeWaves, categoryKey as waveCategoryKey } from "./waves/activeWaves";
+import { ActiveWaveStrip } from "./waves/ActiveWaveStrip";
+import { useTicker } from "./waves/raceClock";
+import { feedFreshness } from "./feedStatus";
+import { LiveTab } from "./live/LiveTab";
+import liveStyles from "./live/live.module.css";
+import { ResultsFilters } from "./results/ResultsFilters";
+import { filterResultCategories, filterResultRiders, NO_RESULTS_FILTER, resultWaves, type ResultsFilterState } from "./results/resultFilterRules";
+import resultStyles from "./results/results.module.css";
+import { rankRiders } from "./results/officialOrder";
+import { BroadcastView, enterFullscreen } from "./broadcast/BroadcastView";
 
 type Rider = PublicRider;
 const TABS: { key: ShareTab; label: string }[] = [
-  { key: "results", label: "Results" },
   { key: "race", label: "Race" },
+  { key: "results", label: "Results" },
+  { key: "live", label: "Live" },
 ];
 
 const OUT = ["DNF", "DSQ", "DNS"];
@@ -39,17 +53,7 @@ const fullName = (r: Rider) => [r.firstName, r.middleName, r.lastName].filter(Bo
 const catLabel = (c: Pick<SharedCategory, "name" | "subCategory">) => (c.subCategory ? `${c.name} ${c.subCategory}` : c.name);
 const started = (c: SharedCategory) => c.status === "running" || c.startedAt != null;
 
-/** Classified first (by the server's category position), then on course by laps, then DNF/DSQ/DNS. */
-function rankRiders(list: Rider[]): Rider[] {
-  const score = (r: Rider) => (isOut(r) ? 2 : r.position_category ? 0 : 1);
-  return [...list].sort(
-    (a, b) =>
-      score(a) - score(b) ||
-      (a.position_category ?? 1e9) - (b.position_category ?? 1e9) ||
-      (b.lapsCounter ?? 0) - (a.lapsCounter ?? 0) ||
-      (a.bibNumber ?? 1e9) - (b.bibNumber ?? 1e9),
-  );
-}
+// rankRiders (the RESULTS order) lives in results/officialOrder.ts, shared with the TV broadcast.
 
 type CatState = "upcoming" | "running" | "finished";
 function categoryState(c: SharedCategory): CatState {
@@ -73,19 +77,24 @@ export default function SharePage() {
 }
 
 function SpectatorRace({ token }: { token: string }) {
-  const feed = usePublicRaceFeed(token);
-  const { race, categories, riders, error, offline, updatedAt, refreshing, live } = feed;
   const [params, setParams] = useSearchParams();
   const tab = shareTabFromParam(params.get("tab"));
-  const selectTab = (t: ShareTab) =>
-    setParams(
-      (p) => {
-        const n = new URLSearchParams(p);
-        n.set("tab", t);
-        return n;
-      },
-      { replace: true },
-    );
+  const tv = params.get("view") === "tv";
+  const feed = usePublicRaceFeed(token, { liveTab: tab === "live" });
+  const { race, categories, riders, error, offline, updatedAt, refreshing, live } = feed;
+  // 2.0: a tab change is a history entry, so Back/Forward move between tabs.
+  const setParam = (key: string, value: string | null) =>
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      if (value == null) n.delete(key);
+      else n.set(key, value);
+      return n;
+    });
+  const selectTab = (t: ShareTab) => setParam("tab", t);
+  const openTv = () => {
+    enterFullscreen(); // needs this click (user gesture)
+    setParam("view", "tv");
+  };
 
   // Other Bike Races: remember this public race in this browser only.
   const [others, setOthers] = useState<OtherRace[]>([]);
@@ -112,6 +121,12 @@ function SpectatorRace({ token }: { token: string }) {
     [categories],
   );
 
+  // 2.0 shared model for RACE / LIVE / TV: waves from category.heat, categories by key.
+  const waves = useMemo(() => summarizeWaves(sortedCats, ridersByCategory(riders.values())), [sortedCats, riders]);
+  const categoriesByKey = useMemo(() => new Map(sortedCats.map((c) => [waveCategoryKey(c.name, c.subCategory), c])), [sortedCats]);
+  const now = useTicker(5_000, tab === "live" || tv);
+  const freshness = feedFreshness({ offline, updatedAt, delayMs: feed.delayMs, raceFinished: race?.status === "finished", now });
+
   if (error) {
     return (
       <div className={styles.page}>
@@ -126,6 +141,24 @@ function SpectatorRace({ token }: { token: string }) {
   if (!race) return <div className={styles.page}><div className={styles.loading}>Loading race…</div></div>;
 
   const finished = race.status === "finished";
+  if (tv) {
+    return (
+      <BroadcastView
+        race={race}
+        tab={tab}
+        waves={waves}
+        categories={sortedCats}
+        ridersByCat={ridersByCat}
+        categoriesByKey={categoriesByKey}
+        approvals={feed.approvals}
+        clockOffsetMs={feed.clockOffsetMs}
+        freshness={freshness}
+        updatedAt={updatedAt}
+        onSelectTab={selectTab}
+        onExit={() => setParam("view", null)}
+      />
+    );
+  }
   const liveLabel = finished ? "Race finished" : live ? (offline ? "Reconnecting…" : "Live") : "Live updates ended";
 
   return (
@@ -154,20 +187,41 @@ function SpectatorRace({ token }: { token: string }) {
           >
             <RefreshCw size={14} className={refreshing ? styles.spin : undefined} aria-hidden="true" />
           </button>
+          <button type="button" className={`${styles.refreshBtn} ${liveStyles.tvBtn}`} onClick={openTv} aria-label="TV broadcast mode" title="TV broadcast mode" data-testid="share-tv">
+            <Tv size={14} aria-hidden="true" />
+          </button>
         </div>
       </header>
 
       <nav className={styles.tabs} role="tablist">
         {TABS.map((t) => (
           <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? styles.tabOn : styles.tab} onClick={() => selectTab(t.key)} data-testid={`share-tab-${t.key}`}>
+            {t.key === "live" && waves.some((w) => w.state === "running") && <span className={liveStyles.tabLiveDot} aria-label="wave running" />}
             {t.label}
           </button>
         ))}
       </nav>
 
-      <main className={styles.content}>
+      <main className={`${styles.content} ${tab === "live" ? liveStyles.wideContent : ""}`}>
         <div className={styles.stack}>
-          {tab === "results" ? <ResultsTab categories={sortedCats} ridersByCat={ridersByCat} approvals={feed.approvals} /> : <RaceTab categories={sortedCats} ridersByCat={ridersByCat} />}
+          {tab === "results" ? (
+            <ResultsTab categories={sortedCats} ridersByCat={ridersByCat} approvals={feed.approvals} raceFinished={finished} onOpenLive={() => selectTab("live")} />
+          ) : tab === "live" ? (
+            <LiveTab
+              waves={waves}
+              categoriesByKey={categoriesByKey}
+              clockOffsetMs={feed.clockOffsetMs}
+              freshness={freshness}
+              updatedAt={updatedAt}
+              raceFinished={finished}
+              onOpenResults={() => selectTab("results")}
+            />
+          ) : (
+            <>
+              <ActiveWaveStrip waves={waves} clockOffsetMs={feed.clockOffsetMs} raceFinished={finished} onOpenLive={() => selectTab("live")} />
+              <RaceTab categories={sortedCats} ridersByCat={ridersByCat} />
+            </>
+          )}
           {others.length > 0 && <OtherRaces races={others} />}
         </div>
       </main>
@@ -182,23 +236,40 @@ const StateChip = ({ state }: { state: CatState }) => (
   <span className={styles.stateChip} data-state={state}>{STATUS_LABEL[state]}</span>
 );
 
-function ResultsTab({ categories, ridersByCat, approvals }: { categories: SharedCategory[]; ridersByCat: Map<string, Rider[]>; approvals: Map<string, CategoryApprovalView> }) {
+function ResultsTab({
+  categories,
+  ridersByCat,
+  approvals,
+  raceFinished,
+  onOpenLive,
+}: {
+  categories: SharedCategory[];
+  ridersByCat: Map<string, Rider[]>;
+  approvals: Map<string, CategoryApprovalView>;
+  raceFinished: boolean;
+  onOpenLive: () => void;
+}) {
   const withRiders = categories.filter((c) => (ridersByCat.get(catKey(c.name, c.subCategory)) ?? []).length > 0);
   const [filter, setFilter] = useState("");
   const [podium, setPodium] = useState(false);
   const [podiumSize, setPodiumSize] = useState<Record<string, 3 | 5>>({});
   const [openRider, setOpenRider] = useState<string | null>(null);
+  const [rf, setRf] = useState<ResultsFilterState>(NO_RESULTS_FILTER);
 
+  // 2.0: RESULTS is official only — nothing before the race is officially finished (Finish Race).
+  if (!raceFinished) return <ResultsPending onOpenLive={onOpenLive} />;
   if (withRiders.length === 0) return <p className={styles.empty}>No results yet.</p>;
-  const shown = filter && withRiders.some((c) => c.uuid === filter) ? withRiders.filter((c) => c.uuid === filter) : withRiders;
+  const visible = filterResultCategories(withRiders, ridersByCat, rf);
+  const shown = filter && visible.some((c) => c.uuid === filter) ? visible.filter((c) => c.uuid === filter) : visible;
 
   return (
     <>
+      <ResultsFilters value={rf} waves={resultWaves(withRiders)} onChange={setRf} />
       <div className={styles.toolbar}>
-        {withRiders.length > 1 && (
+        {visible.length > 1 && (
           <select className={styles.catFilter} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Category" data-testid="share-category-filter">
             <option value="">All categories</option>
-            {withRiders.map((c) => (
+            {visible.map((c) => (
               <option key={c.uuid} value={c.uuid}>{catLabel(c)}</option>
             ))}
           </select>
@@ -208,6 +279,7 @@ function ResultsTab({ categories, ridersByCat, approvals }: { categories: Shared
         </button>
       </div>
 
+      {shown.length === 0 && <p className={styles.empty} data-testid="share-results-none">No riders match these filters.</p>}
       {shown.map((c) => {
         const state = categoryState(c);
         const all = rankRiders(ridersByCat.get(catKey(c.name, c.subCategory)) ?? []);
@@ -215,7 +287,8 @@ function ResultsTab({ categories, ridersByCat, approvals }: { categories: Shared
         const approval = approvals.get(c.uuid);
         // The podium is published only once the category is APPROVED (0.3.5); rankings stay visible.
         const showPodium = podium && !!approval;
-        const list = podium ? (approval ? all.filter((r) => !isOut(r) && r.position_category).slice(0, size) : []) : all;
+        // Filters hide rows only, after the official selection (podium eligibility unchanged).
+        const list = filterResultRiders(podium ? (approval ? all.filter((r) => !isOut(r) && r.position_category).slice(0, size) : []) : all, rf);
         const field = all.map(asBreakdownRider);
         return (
           <section key={c.uuid} className={styles.card} data-testid="share-results-category">
@@ -280,6 +353,19 @@ function ResultsTab({ categories, ridersByCat, approvals }: { categories: Shared
         );
       })}
     </>
+  );
+}
+
+function ResultsPending({ onOpenLive }: { onOpenLive: () => void }) {
+  return (
+    <section className={resultStyles.pending} data-testid="share-results-pending">
+      <span className={resultStyles.pendingIcon} aria-hidden="true"><Trophy size={26} /></span>
+      <h2>Race in progress</h2>
+      <p>Results are published here once the race is officially finished. Follow the provisional standings on LIVE.</p>
+      <button type="button" className={resultStyles.followLive} onClick={onOpenLive} data-testid="share-follow-live">
+        Follow LIVE standings
+      </button>
+    </section>
   );
 }
 

@@ -8,6 +8,9 @@
  *  - Paused while the tab is hidden; returning revalidates if the data is older
  *    than 15 s. Manual Refresh is throttled (10 s).
  *  - 410 from /changes (window closed): load the race one last time, then stop.
+ *  - 2.0: `liveTab` (LIVE tab open) refreshes every 20 s while a wave runs; switching to it
+ *    revalidates at once when the data is older than that. `clockOffsetMs` = server clock −
+ *    device clock (from each answer's `serverTime`), for the race clock.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchPublicChanges, fetchPublicRace, PublicApiError, type PublicPolling } from "@/services/live/publicRace";
@@ -17,7 +20,11 @@ import { PUBLIC_FOCUS_REVALIDATE_MIN_MS, PUBLIC_MANUAL_REFRESH_MIN_MS, publicRef
 
 export type PublicRider = Partial<SharedRider>;
 
-export function usePublicRaceFeed(token: string) {
+/** Ignore clock-offset changes smaller than this (no re-render for network jitter). */
+const CLOCK_OFFSET_JITTER_MS = 250;
+
+export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean } = {}) {
+  const liveTab = !!opts.liveTab;
   const [race, setRace] = useState<Partial<SharedRace> | null>(null);
   const [categories, setCategories] = useState<Map<string, SharedCategory>>(new Map());
   const [riders, setRiders] = useState<Map<string, PublicRider>>(new Map());
@@ -26,6 +33,12 @@ export function usePublicRaceFeed(token: string) {
   const [offline, setOffline] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
+  const noteServerTime = useCallback((serverTime: number | undefined, sentAt: number) => {
+    if (typeof serverTime !== "number" || !Number.isFinite(serverTime)) return;
+    const offset = Math.round(serverTime - (sentAt + Date.now()) / 2);
+    setClockOffsetMs((o) => (Math.abs(o - offset) < CLOCK_OFFSET_JITTER_MS ? o : offset));
+  }, []);
   /** 0.3.5: VALID official approvals by category uuid (the server sends only those). */
   const [approvals, setApprovals] = useState<Map<string, CategoryApprovalView>>(new Map());
   const setApprovalList = (list: CategoryApprovalView[] | undefined) =>
@@ -38,7 +51,9 @@ export function usePublicRaceFeed(token: string) {
   const lastRequest = useRef(0);
 
   const loadAll = useCallback(async () => {
+    const sentAt = Date.now();
     const r = await fetchPublicRace(token);
+    noteServerTime(r.serverTime, sentAt);
     seq.current = r.lastSeq;
     loaded.current = true;
     pollingOpen.current = !!r.polling?.open;
@@ -47,11 +62,13 @@ export function usePublicRaceFeed(token: string) {
     setRiders(new Map(r.riders.filter((x) => x.uuid).map((x) => [x.uuid!, x])));
     setApprovalList(r.approvals);
     setPolling(r.polling);
-  }, [token]);
+  }, [token, noteServerTime]);
 
   const loadChanges = useCallback(async () => {
     try {
+      const sentAt = Date.now();
       const ch = await fetchPublicChanges(token, seq.current);
+      noteServerTime(ch.serverTime, sentAt);
       if (ch.full) {
         seq.current = ch.lastSeq;
         setRace(ch.race ?? null);
@@ -77,7 +94,7 @@ export function usePublicRaceFeed(token: string) {
       }
       throw e;
     }
-  }, [token, loadAll]);
+  }, [token, loadAll, noteServerTime]);
 
   /** One request at a time; a call while one runs returns that one. */
   const fetchNow = useCallback((): Promise<void> => {
@@ -113,7 +130,7 @@ export function usePublicRaceFeed(token: string) {
   }, [fetchNow]);
 
   const categoryList = useMemo(() => [...categories.values()], [categories]);
-  const delay = publicRefreshDelay(polling?.open, race, categoryList);
+  const delay = publicRefreshDelay(polling?.open, race, categoryList, Date.now(), { liveTab });
 
   // Automatic refresh: paused while hidden, revalidate on return.
   useEffect(() => {
@@ -137,14 +154,16 @@ export function usePublicRaceFeed(token: string) {
         void run();
       } else if (!timer) schedule();
     };
-    schedule();
+    // LIVE just opened (20 s rule) on data older than that: revalidate now, not 20 s later.
+    if (liveTab && loaded.current && Date.now() - lastRequest.current >= delay) void run();
+    else schedule();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       stopped = true;
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [delay, fetchNow]);
+  }, [delay, fetchNow, liveTab]);
 
   /** Refresh button: throttled, never overlapping. Returns false when ignored. */
   const refresh = useCallback((): boolean => {
@@ -153,5 +172,7 @@ export function usePublicRaceFeed(token: string) {
     return true;
   }, [fetchNow]);
 
-  return { race, categories: categoryList, riders, approvals, polling, error, offline, updatedAt, refreshing, live: delay != null, refresh };
+  return { race, categories: categoryList, riders, approvals, polling, error, offline, updatedAt, refreshing, live: delay != null, delayMs: delay, clockOffsetMs, refresh };
 }
+
+export type PublicRaceFeed = ReturnType<typeof usePublicRaceFeed>;

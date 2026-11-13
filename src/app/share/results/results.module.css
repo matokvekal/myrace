@@ -1,0 +1,102 @@
+/* RESULTS additions (public page 2.0): filters and the "not yet official" state. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.check input { width: 18px; height: 18px; accent-color: #14243c; cursor: pointer; }
+.waveSelect {
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+.check input:focus-visible,
+.waveSelect:focus-visible,
+.clear:focus-visible,
+.followLive:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.activeSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.activeDot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; }
+.clear {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 34px 20px;
+  text-align: center;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+}
+.pending h2 { margin: 0; font-size: 1.15rem; }
+.pending p { margin: 0; max-width: 36ch; color: var(--text-secondary); font-size: 0.9rem; }
+.pendingIcon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--bg-surface-3);
+  color: var(--text-secondary);
+}
+.followLive {
+  min-height: 42px;
+  margin-top: 6px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: #e5484d;
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.officialBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(216, 165, 58, 0.14);
+  border: 1px solid rgba(216, 165, 58, 0.5);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+:global([data-theme="dark"]) .check input { accent-color: #3b82f6; }

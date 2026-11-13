@@ -35,3 +35,6 @@ trial-ended
 open-keyboard-settings
 commissaire.keypadLayout
 signing key not configured
+live-provisional
+tv-view
+share-results-pending

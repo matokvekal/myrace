@@ -5,9 +5,10 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  * server URL (E2E_SERVER_URL, default http://localhost:4999) whose public API is
  * MOCKED here, so no server or database is touched:
  *  - signed out, race lists and management routes send you to sign in;
- *  - a shared race (/share/:token) is the 0.3.4 spectator page: exactly RESULTS
- *    (default) and RACE, `?tab=race` survives a reload, rider rows expand to lap
- *    details — no edit, start, finish, check-in or live controls;
+ *  - a shared race (/share/:token) is the spectator page — 2.0: RACE (default, active
+ *    wave), RESULTS (official, only after Finish Race; rider rows expand to lap details)
+ *    and LIVE (provisional standings), `?tab=` survives a reload, TV mode (`?view=tv`)
+ *    — no edit, start, finish, check-in or live controls;
  *  - updates (≈60 s while racing, or Refresh — throttled to one per 10 s) apply,
  *    then stop for good on 410 (window closed) or once the race is finished; an
  *    invalid or unpublished link says so.
@@ -69,37 +70,36 @@ for (const vp of [{ name: "PC", width: 1280, height: 860 }, { name: "phone", wid
       }
     });
 
-    test("spectator page: RESULTS + RACE only, read-only, rider details, updates then stop on 410", async ({ page }) => {
+    test("spectator page: RACE default, RESULTS waits for Finish Race, LIVE, read-only, updates then stop on 410", async ({ page }) => {
       const { calls, forbidden } = await mockRace(page, {
-        changes: [() => ({ status: 200, body: { lastSeq: 6, serverTime: Date.now(), polling: polling(), riders: [rider("r2", 12, "Beta", "Elite", { position_category: 1, lapsCounter: 3 })] } })],
+        changes: [() => ({ status: 200, body: { lastSeq: 6, serverTime: Date.now(), polling: polling(), riders: [rider("r2", 12, "Beta", "Elite", { position_category: 1, lapsCounter: 3, timeArrive: new Date().toISOString() })] } })],
       });
       await page.goto(`/share/${TOKEN}`);
       await expect(page.getByTestId("share-page")).toBeVisible();
       await expect(page.getByRole("heading", { name: "Guest Cup" })).toBeVisible();
-      await expect(page.getByRole("tab")).toHaveText(["Results", "Race"]);
-      await expect(page.getByTestId("share-tab-results")).toHaveAttribute("aria-selected", "true");
-      await expect(page.getByText("Test Gamma")).toBeVisible();
-
-      // Rider details expand in place.
-      await page.getByTestId("share-rider-row").first().click();
-      await expect(page.getByTestId("share-rider-details")).toBeVisible();
-
-      // RACE tab, kept in the URL across a reload.
-      await page.getByTestId("share-tab-race").click();
-      await expect(page).toHaveURL(/\?tab=race/);
-      await expect(page.getByTestId("share-wave")).toHaveCount(2);
-      await page.reload();
+      await expect(page.getByRole("tab")).toHaveText(["Race", "Results", "Live"]);
       await expect(page.getByTestId("share-tab-race")).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByTestId("share-active-wave")).toContainText("Wave 1");
+      await expect(page.getByTestId("share-wave")).toHaveCount(2);
+
+      // RESULTS: not official yet — points to LIVE. Kept in the URL across a reload.
+      await page.getByTestId("share-tab-results").click();
+      await expect(page).toHaveURL(/\?tab=results/);
+      await expect(page.getByTestId("share-results-pending")).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId("share-tab-results")).toHaveAttribute("aria-selected", "true");
 
       // Read-only: no management controls anywhere.
       for (const name of [/finish/i, /start/i, /edit/i, /delete/i, /check-?in/i, /save/i, /approve/i]) await expect(page.getByRole("button", { name })).toHaveCount(0);
       await expect(page.locator("input")).toHaveCount(0);
 
-      // One update arrives (Beta now leads with 3 laps), then the window closes (410) → final reload, updates end.
-      await page.getByTestId("share-tab-results").click();
+      // LIVE: provisional standings; one update arrives (Beta now leads with 3 laps), then the window closes (410) → updates end.
+      await page.getByTestId("share-follow-live").click();
+      await expect(page).toHaveURL(/\?tab=live/);
+      await expect(page.getByTestId("live-provisional")).toBeVisible();
       await page.waitForTimeout(10_500);
       await page.getByTestId("share-refresh").click();
-      await expect(page.getByText("3/3 laps")).toBeVisible();
+      await expect(page.getByTestId("live-row").first()).toHaveAttribute("aria-label", /^Position 1, bib 12, .*3\/3 laps/);
       await page.waitForTimeout(10_500);
       await page.getByTestId("share-refresh").click();
       await expect(page.getByTestId("share-live-state")).toHaveAttribute("data-live", "off");
@@ -110,12 +110,32 @@ for (const vp of [{ name: "PC", width: 1280, height: 860 }, { name: "phone", wid
       expect(forbidden).toEqual([]);
     });
 
-    test("a finished race shows final results and never polls", async ({ page }) => {
+    test("a finished race shows final results (with filters, rider details) and never polls", async ({ page }) => {
       const { calls } = await mockRace(page, { finished: true });
-      await page.goto(`/share/${TOKEN}`);
+      await page.goto(`/share/${TOKEN}?tab=results`);
       await expect(page.getByTestId("share-live-state")).toContainText("Race finished");
+      await expect(page.getByText("Test Gamma")).toBeVisible();
+      await page.getByTestId("share-rider-row").first().click();
+      await expect(page.getByTestId("share-rider-details")).toBeVisible();
+      await page.getByTestId("share-only-finishers").check();
+      await expect(page.getByTestId("share-results-filters")).toContainText("Finishers only");
       await page.waitForTimeout(2_500);
       expect(calls.changes).toBe(0);
+    });
+
+    test("TV mode: full screen broadcast, no page scrolling, exit back", async ({ page }) => {
+      await mockRace(page);
+      await page.goto(`/share/${TOKEN}?tab=live`);
+      await page.getByTestId("share-tv").click();
+      await expect(page).toHaveURL(/view=tv/);
+      await expect(page.getByTestId("tv-title")).toHaveText("Guest Cup");
+      await expect(page.getByTestId("tv-tag")).toContainText("Provisional");
+      const overflow = await page.evaluate(() => ({ x: document.documentElement.scrollWidth > window.innerWidth, y: document.documentElement.scrollHeight > window.innerHeight }));
+      expect(overflow).toEqual({ x: false, y: false });
+      await page.mouse.move(10, 10);
+      await page.getByTestId("tv-exit").click();
+      await expect(page).not.toHaveURL(/view=tv/);
+      await expect(page.getByTestId("share-page")).toBeVisible();
     });
 
     test("an invalid or unpublished link says so", async ({ page }) => {

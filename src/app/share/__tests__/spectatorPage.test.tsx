@@ -1,5 +1,6 @@
 /**
- * 0.3.4 — public spectator page: two tabs (RESULTS default, RACE), ?tab links,
+ * 0.3.4 — public spectator page; 2.0: three tabs (RACE default, RESULTS only once the race is
+ * officially finished, LIVE), ?tab links with history entries,
  * read-only, rider details, refresh rule (≈60 s while running, paused when hidden,
  * revalidate on return, no overlapping requests, throttled manual refresh), and
  * Other Bike Races (browser-local).
@@ -88,52 +89,71 @@ afterEach(() => {
 });
 
 describe("public navigation", () => {
-  it("exactly two tabs, RESULTS by default; ?tab=race opens RACE and the choice stays in the URL", async () => {
+  it("2.0: three tabs, RACE by default; ?tab=results / ?tab=live open them and the choice stays in the URL", async () => {
     mount();
     await flush();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Results", "Race"]);
-    expect(screen.getByTestId("share-tab-results").getAttribute("aria-selected")).toBe("true");
-    expect(screen.getAllByTestId("share-results-category")).toHaveLength(2);
-
-    fireEvent.click(screen.getByTestId("share-tab-race"));
-    expect(where).toBe(`/share/${TOKEN}?tab=race`);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Race", "Results", "Live"]);
+    expect(screen.getByTestId("share-tab-race").getAttribute("aria-selected")).toBe("true");
     expect(screen.getAllByTestId("share-wave").map((w) => w.getAttribute("data-wave-state"))).toEqual(["running", "upcoming"]);
     expect(screen.getAllByText("RUNNING").length).toBeGreaterThan(0);
     expect(screen.getAllByText("NOT STARTED").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByTestId("share-tab-results"));
+    expect(where).toBe(`/share/${TOKEN}?tab=results`);
+    fireEvent.click(screen.getByTestId("share-tab-live"));
+    expect(where).toBe(`/share/${TOKEN}?tab=live`);
     cleanup();
 
-    mount(`/share/${TOKEN}?tab=race`);
+    mount(`/share/${TOKEN}?tab=results`);
     await flush();
-    expect(screen.getByTestId("share-tab-race").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("share-tab-results").getAttribute("aria-selected")).toBe("true");
   });
 
-  it("link params: results / race; an old Board link opens RACE; anything else RESULTS", () => {
-    expect(shareTabFromParam(null)).toBe("results");
+  it("link params: race (default) / results / live; an old Board link opens RACE; anything else RACE", () => {
+    expect(shareTabFromParam(null)).toBe("race");
     expect(shareTabFromParam("results")).toBe("results");
+    expect(shareTabFromParam("live")).toBe("live");
     expect(shareTabFromParam("race")).toBe("race");
     expect(shareTabFromParam("board")).toBe("race");
-    expect(shareTabFromParam("info")).toBe("results");
+    expect(shareTabFromParam("info")).toBe("race");
   });
 
   it("read-only: no judge or management controls, no text inputs, only public GETs", async () => {
-    mount();
+    api.fetchPublicRace.mockResolvedValue(snapshot({ elite: "finished", open: false, race: { status: "finished" } }));
+    mount(`/share/${TOKEN}?tab=results`);
     await flush();
-    // Buttons other than the rider rows (which only expand details) and the two tabs: Refresh, Podium.
+    // Buttons other than the rider rows (which only expand details) and the tabs: Refresh, TV mode, Podium.
     const controls = screen.getAllByRole("button").filter((b) => b.getAttribute("data-testid") !== "share-rider-row");
-    expect(controls.map((b) => b.getAttribute("data-testid"))).toEqual(["share-refresh", "share-podium-toggle"]);
-    expect(document.querySelectorAll("input")).toHaveLength(0);
+    expect(controls.map((b) => b.getAttribute("data-testid"))).toEqual(["share-refresh", "share-tv", "share-podium-toggle"]);
+    // 2.0: the only inputs are the two presentation filters (checkboxes) — no text inputs.
+    expect([...document.querySelectorAll("input")].map((i) => i.type)).toEqual(["checkbox", "checkbox"]);
     fireEvent.click(screen.getByTestId("share-tab-race"));
     expect(document.querySelectorAll("input")).toHaveLength(0);
-    expect(screen.getAllByRole("button").map((b) => b.getAttribute("data-testid"))).toEqual(["share-refresh"]);
-    // Nothing claims official approval in 0.3.4.
-    expect(document.body.textContent).not.toMatch(/approved|official/i);
+    expect(screen.getAllByRole("button").map((b) => b.getAttribute("data-testid"))).toEqual(["share-refresh", "share-tv"]);
+    expect(api.fetchPublicChanges).not.toHaveBeenCalled();
   });
 });
 
+/** RESULTS shows the official results only once the race is finished (Finish Race). */
+const finishedSnapshot = (over: { elite?: string; approvals?: unknown[] } = {}) => snapshot({ ...over, open: false, race: { status: "finished" } });
+const mountResults = async () => {
+  mount(`/share/${TOKEN}?tab=results`);
+  await flush();
+};
+
 describe("RESULTS", () => {
+  it("2.0: nothing before the race is officially finished — a pointer to LIVE instead", async () => {
+    await mountResults(); // race running
+    expect(screen.getByTestId("share-results-pending").textContent).toMatch(/Race in progress/);
+    expect(screen.queryAllByTestId("share-rider-row")).toHaveLength(0);
+    expect(screen.queryByTestId("share-results-filters")).toBeNull();
+    fireEvent.click(screen.getByTestId("share-follow-live"));
+    expect(where).toBe(`/share/${TOKEN}?tab=live`);
+  });
+
   it("ranked list with place, bib, name, time and statuses; provisional; tap a rider for lap details", async () => {
-    mount();
-    await flush();
+    api.fetchPublicRace.mockResolvedValue(finishedSnapshot());
+    await mountResults();
     const rows = screen.getAllByTestId("share-rider-row");
     expect(rows.slice(0, 3).map((r) => r.textContent)).toEqual([
       expect.stringMatching(/^111Test Alpha.*20:00/),
@@ -153,8 +173,8 @@ describe("RESULTS", () => {
   });
 
   it("category filter; the podium stays hidden while results are PROVISIONAL (0.3.5)", async () => {
-    mount();
-    await flush();
+    api.fetchPublicRace.mockResolvedValue(finishedSnapshot());
+    await mountResults();
     fireEvent.change(screen.getByTestId("share-category-filter"), { target: { value: "c2" } });
     expect(screen.getAllByTestId("share-results-category")).toHaveLength(1);
     expect(screen.getByText("Test Gamma")).toBeTruthy();
@@ -166,10 +186,9 @@ describe("RESULTS", () => {
     expect(screen.queryByTestId("share-approved")).toBeNull();
   });
 
-  it("APPROVED (from the server) shows the podium, top 3 ⇄ top 5; an update without it withdraws it", async () => {
-    api.fetchPublicRace.mockResolvedValue(snapshot({ elite: "finished", approvals: [{ categoryUuid: "c1", status: "approved", approvedAt: new Date().toISOString() }] }));
-    mount();
-    await flush();
+  it("APPROVED (from the server) shows the podium, top 3 ⇄ top 5; a reload without it withdraws it", async () => {
+    api.fetchPublicRace.mockResolvedValue(finishedSnapshot({ elite: "finished", approvals: [{ categoryUuid: "c1", status: "approved", approvedAt: new Date().toISOString() }] }));
+    await mountResults();
     expect(screen.getAllByTestId("share-approved")).toHaveLength(1);
     expect(screen.queryAllByTestId("share-provisional")).toHaveLength(0); // Kids never started: no chip
     fireEvent.click(screen.getByTestId("share-podium-toggle"));
@@ -178,11 +197,11 @@ describe("RESULTS", () => {
     expect(screen.getByText("Top 5")).toBeTruthy();
     expect(screen.getByTestId("share-podium-pending")).toBeTruthy(); // Kids: not approved
 
-    // A correction voided it on the server: the next update carries no approval for c1.
-    api.fetchPublicChanges.mockResolvedValue({ lastSeq: 9, serverTime: Date.now(), polling: polling(), riders: [], approvals: [] });
-    api.fetchPublicRace.mockResolvedValue(snapshot({ elite: "finished" }));
-    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
-    await flush();
+    // A correction voided it on the server (a finished race no longer polls): the next load has no approval for c1.
+    cleanup();
+    api.fetchPublicRace.mockResolvedValue(finishedSnapshot({ elite: "finished" }));
+    await mountResults();
+    fireEvent.click(screen.getByTestId("share-podium-toggle"));
     expect(screen.queryByTestId("share-approved")).toBeNull();
     expect(screen.queryAllByTestId("share-rider-row")).toHaveLength(0);
   });
