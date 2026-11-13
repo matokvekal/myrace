@@ -32,6 +32,7 @@ import { canForRace } from "@/services/cloud/permissions";
 import useCloudRaceSync from "@/hooks/useCloudRaceSync";
 import { useJokerMode } from "@/hooks/useJokerMode";
 import { useBoardHold } from "@/stores/boardHoldStore";
+import { sharedQueueOrder, useQueueReconcile } from "./liveQueue";
 import { useJokerQueue, type JokerEntry } from "./useJokerQueue";
 import JokerCard from "./jokerCard/JokerCard";
 import JokerResolveModal from "./JokerResolveModal";
@@ -603,30 +604,40 @@ const Heat: React.FC = () => {
       : catFiltered;
   }, [runningRiders, searchTerm, filterCats]);
 
-  // Seed brand-new riders into the manual queue (category then bib, as a starting point)
-  // and drop anyone no longer running (finished/DNF/DSQ/DNS). Reordering itself only ever
-  // happens explicitly, from a tap moving one id to the end — never from a bulk re-sort —
-  // so "tap it, it goes last" always means the literal last position.
+  // Seed brand-new riders into the queue and drop anyone no longer running
+  // (finished/DNF/DSQ/DNS). A first load starts straight from the shared order.
   const runningIdsKey = [...runningRiders.map((r) => r.id)].sort((a, b) => a - b).join(",");
+  // The order every judge's device agrees on, from synced data only (liveQueue.ts):
+  // a lap recorded on ANOTHER device now moves the card too, not only a local tap.
+  const queueOrder = useMemo(
+    () => sharedQueueOrder(runningRiders, (r) => catOrderMap.get(riderCatKey(r)) ?? 999),
+    [runningRiders, catOrderMap]
+  );
+  const queueOrderRef = useRef(queueOrder);
+  queueOrderRef.current = queueOrder;
+
   useEffect(() => {
     const stillRunning = new Set(runningRiders.map((r) => r.id));
     setDisplayOrder((prev) => {
       const kept = prev.filter((id) => stillRunning.has(id));
       const keptSet = new Set(kept);
-      const newcomers = runningRiders
-        .filter((r) => !keptSet.has(r.id))
-        .sort((a, b) => {
-          const catA = catOrderMap.get(riderCatKey(a)) ?? 999;
-          const catB = catOrderMap.get(riderCatKey(b)) ?? 999;
-          if (catA !== catB) return catA - catB;
-          return a.bibNumber - b.bibNumber;
-        })
-        .map((r) => r.id);
+      const newcomers = queueOrderRef.current.filter((id) => !keptSet.has(id));
       if (newcomers.length === 0 && kept.length === prev.length) return prev;
-      return [...kept, ...newcomers];
+      return kept.length === 0 ? [...queueOrderRef.current] : [...kept, ...newcomers];
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runningIdsKey]);
+
+  // Converge on the shared order under the same board hold as a local tap: never while
+  // this device's own taps are held; a remote change lands as one move after a quiet hold.
+  useQueueReconcile({
+    queueOrder,
+    displayOrder,
+    setDisplayOrder,
+    holding: pendingMoveIds.length > 0,
+    holdMs: boardHoldMs,
+    disabled: clearedWave,
+  });
 
   // Cards tapped during the current board hold. They keep their place on the
   // board, so each one has to show that it registered — the drop to the bottom

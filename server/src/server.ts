@@ -5,6 +5,7 @@ import { closePool, pool } from "./db/pool.js";
 import { checkSchema } from "./db/migrate.js";
 import { logger } from "./lib/core.js";
 import { attachRealtime, closeRealtime } from "./realtime/socket.js";
+import { signingKeyStatus } from "./results/routes.js";
 
 const stop = async (msg: string, details: object) => {
   logger.fatal(details, msg);
@@ -25,6 +26,13 @@ try {
   }
   if (schema.foreignKeys > 0) logger.warn({ foreignKeys: schema.foreignKeys }, "database has foreign keys; policy is none (run 006)");
   logger.info("database schema check passed");
+  // Official results signing (Finish Race). A malformed key would only fail when the
+  // owner finishes a race, so refuse to start; a missing one is shouted at start-up.
+  const signing = signingKeyStatus();
+  if (signing === "invalid") await stop("RESULTS_SIGNING_KEY is not a valid Ed25519 private key (PEM, \\n-escaped) — Finish Race could not sign results", {});
+  if (signing === "missing" && env.NODE_ENV === "production") {
+    logger.error("RESULTS_SIGNING_KEY is not set: Finish Race will fail with 503 signing_key_missing (generate one: openssl genpkey -algorithm ed25519)");
+  }
   if (env.NODE_ENV === "production" && env.MAIL_TRANSPORT === "log") {
     logger.error("MAIL_TRANSPORT=log in production: sign-in and password-reset codes cannot be emailed (set MAIL_TRANSPORT=smtp and SMTP_URL)");
   }

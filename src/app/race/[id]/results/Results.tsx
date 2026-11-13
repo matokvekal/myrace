@@ -15,7 +15,7 @@ import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps }
 import { Trophy, SlidersHorizontal, ListFilter, Check, RefreshCw, BadgeCheck } from "lucide-react";
 import { refreshRaceData } from "@/services/live/liveRaceRoom";
 import { getRiderStatusInfo, getCategoryStatusInfo } from "@/utils/statusChip";
-import { parseClockTime } from "@/utils/timeUtils";
+import { parseClockTime, riderElapsedMs } from "@/utils/timeUtils";
 
 interface Props {
   raceUuid: string;
@@ -92,10 +92,15 @@ function riderSpeedKph(rider: RiderProps): string {
 }
 
 function riderElapsed(rider: RiderProps): number {
-  // `timeStartRace` is a wall-clock string ("08:04:31"), NOT a date — feeding it
-  // to `new Date()` yields Invalid Date, so every elapsed time came out NaN and
-  // rendered as "—" (and the Time sort silently compared NaN). Parse it with the
-  // shared helper that already handles this format (BUGS.md #30).
+  // A rider with a recorded crossing: the race time from absolute instants
+  // (wave start → last crossing), identical on every device — see riderElapsedMs.
+  // Re-anchoring the "HH:MM:SS" start clock to today made every time "—" once the
+  // results were viewed on another day or in another timezone than the starter's.
+  if (rider.timeArrive) {
+    const ms = riderElapsedMs(rider);
+    return ms !== null ? ms : Infinity;
+  }
+  // Still on course (no crossing yet): live time since the start clock.
   const start = parseClockTime(rider.timeStartRace);
   if (!start) return Infinity;
   const end = rider.timeArrive ? new Date(rider.timeArrive).getTime() : Date.now();

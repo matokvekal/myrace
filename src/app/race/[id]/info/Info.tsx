@@ -120,14 +120,12 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
   const handleFinishRace = async () => {
     if (isLiveRace(race.uuid)) {
       // Shared race: the server closes every wave, computes and signs the official result.
-      try {
-        const { finalizeShared } = await import("@/services/live/liveClient");
-        const n = await finalizeShared(race.uuid);
-        setShowFinishRace(false);
-        toast.success(`Race finished — ${n} results are official (signed by the server).`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not finish the race");
-      }
+      // Errors are RETHROWN: FinishRaceModal shows them and re-enables its buttons.
+      // Swallowing them here left the modal stuck on "Finishing…" (no Cancel, no retry).
+      const { finalizeShared } = await import("@/services/live/liveClient");
+      const n = await finalizeShared(race.uuid);
+      setShowFinishRace(false);
+      toast.success(`Race finished — ${n} results are official (signed by the server).`);
       return;
     }
     const result = await finalizeRace(race, actingUser);

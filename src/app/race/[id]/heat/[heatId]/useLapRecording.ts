@@ -347,7 +347,13 @@ export function useLapRecording({
     const liveActionId = isLiveRace(raceUuid) && rider.uuid ? newActionId() : undefined;
 
     const lapsCounter = (rider.lapsCounter || 0) + 1;
-    const raceStart = parseClockTime(rider.timeStartRace) ?? clickTime;
+    // Lap 1 starts at the wave's OFFICIAL start: a shared race's category.startedAt (server-
+    // aligned, what every other device and the server use). `timeStartRace` is only the
+    // starter's own uncorrected clock as "HH:MM:SS" — kept for local races / older data.
+    const startedAt = useCategoryStore.getState().categories.find(
+      (c) => c.raceUuid === rider.raceUuid && c.name === rider.category && (c.subCategory ?? null) === (rider.subCategory ?? null),
+    )?.startedAt;
+    const raceStart = (startedAt ? new Date(startedAt) : null) ?? parseClockTime(rider.timeStartRace) ?? clickTime;
     const lastLapStart = rider.timeArrive ? new Date(rider.timeArrive) : raceStart;
     const lapMs = clickTime.getTime() - lastLapStart.getTime();
     const lapTime = formatTime(lapMs / 1000);

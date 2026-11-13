@@ -43,6 +43,25 @@ function key(): KeyObject {
   }
   return signingKey;
 }
+/**
+ * Start-up check of the results signing key (server.ts). "invalid" = a key is set but
+ * is not a usable Ed25519 private key — Finish Race would fail on the day, so the API
+ * refuses to start. "missing" in production = Finish Race answers 503 signing_key_missing.
+ */
+let configuredStatus: "ok" | "missing" | "invalid" | null = null;
+export function signingKeyStatus(raw?: string): "ok" | "missing" | "invalid" {
+  if (raw === undefined) return (configuredStatus ??= signingKeyStatus(env.RESULTS_SIGNING_KEY));
+  if (!raw) return "missing";
+  try {
+    const k = createPrivateKey(raw.replace(/\\n/g, "\n"));
+    if (k.asymmetricKeyType !== "ed25519") return "invalid";
+    sign(null, Buffer.from("self-check"), k);
+    return "ok";
+  } catch {
+    return "invalid";
+  }
+}
+
 export const publicKeyPem = () => createPublicKey(key()).export({ type: "spki", format: "pem" }).toString();
 
 /** riderResultsDigest from utils/raceSignature.ts, keyed by the rider uuid. */

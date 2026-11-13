@@ -17,6 +17,8 @@ vi.mock("@/services/analytics/analyticsClient", () => ({ logAnalyticsEvent: vi.f
 vi.mock("react-toastify", () => ({ toast }));
 
 import { useLapRecording } from "../useLapRecording";
+import useCategoryStore from "@/stores/categoryStore";
+import type { CategoryProps } from "@/types/types";
 import { makeRider } from "@/test/factories";
 import type { RiderProps } from "@/types/types";
 
@@ -130,5 +132,21 @@ describe("concurrent taps from two devices", () => {
 
     expect(store.current.find((r) => r.id === 1)!.raceStatus).toBe("finished");
     expect(store.current.find((r) => r.id === 2)!.lapsCounter).toBe(1);
+  });
+
+  it("lap 1 runs from the category's official start, not the starter's HH:MM:SS clock", () => {
+    // The starter's phone was 15 s fast: its clock string says 10:00:15, the server-aligned start is 10:00:00.
+    const official = START.getTime();
+    const prev = useCategoryStore.getState().categories;
+    useCategoryStore.setState({ categories: [{ name: "M", subCategory: null, raceUuid: "race-1", startedAt: official } as unknown as CategoryProps] });
+    try {
+      const a = started({ id: 1, bibNumber: 1, timeStartRace: "23:59:59" });
+      const { hook, store } = mount([a]);
+      act(() => hook.result.current.recordLap(a)); // system time = START + 5 min
+      expect(store.current[0].elapsedLastLap).toBe("05:00");
+      expect(new Date(store.current[0].lapsDetails![0].startTime as Date).getTime()).toBe(official);
+    } finally {
+      useCategoryStore.setState({ categories: prev });
+    }
   });
 });

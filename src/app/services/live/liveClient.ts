@@ -871,7 +871,7 @@ function toLocalCategory(s: SharedCategory, local: string, existing?: CategoryPr
     uuid: s.uuid, raceUuid: local, name: s.name, subCategory: s.subCategory, laps: s.laps, startTime: s.startTime, color: s.color,
     heat: s.heat, status: s.status ?? "upcoming", linkedFinish: s.linkedFinish ?? undefined, linkGroup: s.linkGroup ?? undefined,
     ignored: s.ignored ?? false, bibColor: s.bibColor ?? null, bibTextColor: s.bibTextColor ?? null,
-    finishedAt: s.finishedAt ?? undefined, importOrder: s.importOrder ?? undefined, id: existing?.id ?? newLocalId(),
+    finishedAt: s.finishedAt ?? undefined, startedAt: s.startedAt ?? undefined, importOrder: s.importOrder ?? undefined, id: existing?.id ?? newLocalId(),
   } as CategoryProps;
 }
 
@@ -1770,7 +1770,22 @@ export async function openSharedRace(serverRaceUuid: string): Promise<string> {
  */
 export async function finalizeShared(local: string): Promise<number> {
   await flush(local); // send queued laps first, so they are in the official result
-  const { official } = await team.finalize(local);
+  let official: Record<string, unknown>;
+  try {
+    ({ official } = await team.finalize(local));
+  } catch (e) {
+    if (e instanceof LiveApiError && e.code === "signing_key_missing") {
+      // Server configuration, not the user's doing. Nothing was saved (one transaction).
+      throw new LiveApiError(e.status, e.code, "The server can't sign official results yet (signing key not configured). Nothing was changed — the race is still open. Contact the administrator, then try again.");
+    }
+    // Idempotent retry: the race was finalized by an earlier attempt whose answer never
+    // arrived (lost connection). Adopt the server's official record instead of failing.
+    if (!(e instanceof LiveApiError && e.code === "already_official")) throw e;
+    const { versions } = await team.official(local);
+    const first = versions.find((v) => Number(v.officialVersion) === 1) ?? versions[0];
+    if (!first) throw e;
+    official = first;
+  }
   await catchUp(local);
   const race = useRaceStore.getState().races.find((r) => r.uuid === local);
   const o = official as unknown as Record<string, unknown>;

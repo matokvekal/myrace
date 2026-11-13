@@ -4,7 +4,7 @@ import { CategoryProps, RiderProps } from "@/types/types";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
 import calculatePositions from "@/utils/calculatePosition";
-import { parseClockTime } from "@/utils/timeUtils";
+import { parseClockTime, riderElapsedMs } from "@/utils/timeUtils";
 import { riderInCategory, withCategoryLaps, buildSchedule, DEFAULT_WAVE_GAP_MINUTES } from "../schedule/Schedule";
 import { buildCategoryResults } from "@/utils/boardResults";
 import { Trophy, Flag, Zap, SlidersHorizontal, RefreshCw } from "lucide-react";
@@ -44,6 +44,8 @@ function loadVisibleFields(): Set<BoardField> {
 }
 
 function elapsedMs(rider: RiderProps): number {
+  // Recorded crossing: absolute instants, same on every device (see riderElapsedMs).
+  if (rider.timeArrive) return riderElapsedMs(rider) ?? Infinity;
   const start = parseClockTime(rider.timeStartRace);
   if (!start) return Infinity;
   const end = rider.timeArrive ? new Date(rider.timeArrive) : new Date();

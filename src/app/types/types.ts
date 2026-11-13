@@ -203,6 +203,7 @@ export interface CategoryProps {
   bibColor?: string | null;
   bibTextColor?: string | null;
   finishedAt?: number; // epoch ms when race was finished
+  startedAt?: number; // shared race: epoch ms of the official (server-aligned) start
   /** Position of the category's first rider in the uploaded file (0-based) — the file's schedule order. */
   importOrder?: number;
 }

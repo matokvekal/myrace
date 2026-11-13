@@ -122,24 +122,67 @@ export const formatElapsedSince = (
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 };
 
-/**
- * The total elapsed time to display for a rider: computed live from the
- * start clock → last-lap arrival, falling back to the stored string.
- * Returns "—" when nothing usable is available.
- */
-export const riderTotalTime = (rider: {
+/** "MM:SS" / "H:MM:SS" / "HH:MM:SS" duration string → ms, or null (also for 0). */
+const durationMs = (s: string | null | undefined): number | null => {
+  if (!s) return null;
+  const parts = s.split(":").map(Number);
+  if (parts.length < 2 || parts.length > 3 || parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
+  const [h, m, sec] = parts.length === 3 ? parts : [0, parts[0], parts[1]];
+  const ms = ((h * 60 + m) * 60 + sec) * 1000;
+  return ms > 0 ? ms : null;
+};
+
+type ElapsedRider = {
   timeStartRace: string | null;
   timeArrive: string | null;
   elapsedTimeFromStart: string | null;
-}): string => {
-  const start = parseClockTime(rider.timeStartRace);
-  const end = rider.timeArrive ? new Date(rider.timeArrive) : null;
-  if (start && end && !isNaN(end.getTime())) {
-    const ms = end.getTime() - start.getTime();
-    if (ms >= 0) return formatTime(ms / 1000);
+  lapsDetails?: { startTime?: string | Date | null }[] | null;
+};
+
+/**
+ * A rider's race time (wave start → last recorded crossing) in ms, or null.
+ *
+ * Built from ABSOLUTE instants only, so every device shows the same value
+ * whatever its own clock, timezone or date:
+ *  1. lap 1's `startTime` (= the wave's official start; the engine writes it from
+ *     `category.startedAt`) → `timeArrive`;
+ *  2. the stored `elapsedTimeFromStart` (computed by the engine/server the same way);
+ *  3. last resort, the wall-clock `timeStartRace` anchored to the ARRIVAL's day.
+ * `timeStartRace` is a bare "HH:MM:SS" of the starter's local clock: re-anchoring
+ * it to TODAY in the viewer's timezone (the old code) made every time "—" when the
+ * results were viewed on another day or in another timezone.
+ */
+export const riderElapsedMs = (rider: ElapsedRider): number | null => {
+  const end = rider.timeArrive ? new Date(rider.timeArrive).getTime() : NaN;
+  if (Number.isFinite(end)) {
+    // Local laps keep a Date object here, shared ones an ISO string.
+    const first = rider.lapsDetails?.[0]?.startTime as string | Date | null | undefined;
+    const start = first ? new Date(first).getTime() : NaN;
+    if (Number.isFinite(start) && end >= start) return end - start;
   }
-  const stored = rider.elapsedTimeFromStart;
-  return stored && stored !== "00:00" && stored !== "00:00:00" ? stored : "—";
+  const stored = durationMs(rider.elapsedTimeFromStart);
+  if (stored !== null) return stored;
+  if (Number.isFinite(end)) {
+    const clock = parseClockTime(rider.timeStartRace);
+    if (clock && !rider.timeStartRace?.includes("T")) {
+      const start = new Date(end);
+      start.setHours(clock.getHours(), clock.getMinutes(), clock.getSeconds(), 0);
+      let ms = end - start.getTime();
+      if (ms < 0) ms += 24 * 3600 * 1000; // started before midnight
+      return ms;
+    }
+    if (clock && end >= clock.getTime()) return end - clock.getTime();
+  }
+  return null;
+};
+
+/**
+ * The total elapsed time to display for a rider (see `riderElapsedMs`).
+ * Returns "—" when nothing usable is available.
+ */
+export const riderTotalTime = (rider: ElapsedRider): string => {
+  const ms = riderElapsedMs(rider);
+  return ms !== null ? formatTime(ms / 1000) : "—";
 };
 
 /**

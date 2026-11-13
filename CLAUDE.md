@@ -240,6 +240,18 @@ still open).
   `WaveBlockedNotice` (Back to Race / Go to Active Wave); on the Start screen the
   Start buttons stay tappable and open the same notice, plus a banner (both layouts).
 
+### Shared card order + race times (2026-11-13, demo fixes)
+- Card order is derived from synced data on every device (`heat/[heatId]/liveQueue.ts`): not
+  crossed yet first (category, bib), then last `timeArrive`, oldest first. `useQueueReconcile`
+  applies it under the board hold (never while local taps are held). Remote laps move cards too.
+- Race time = `riderElapsedMs` (`utils/timeUtils.ts`): lap 1 `startTime` → `timeArrive`, then the
+  server's `elapsedTimeFromStart`. Never re-anchor `timeStartRace` ("HH:MM:SS" of the starter's
+  uncorrected clock) to today — that blanked every time on another day/timezone.
+- Local lap 1 starts at `category.startedAt` (server-aligned, copied by `toLocalCategory`).
+- Finish Race: `signing_key_missing` rolls back the whole transaction; the modal shows errors
+  (Info rethrows) and a retry after a lost answer adopts the record (`already_official`).
+  `/api/v1/health` reports `resultsSigning`; an invalid key stops the API at start-up.
+
 ### Card cover (heat page)
 - How long a tapped card stays washed out: 10 s / 30 s / 2 min / 4 min, default 10 s
   (`coverMs` in `boardHoldStore`, set in Race Setup). Separate from the board hold:

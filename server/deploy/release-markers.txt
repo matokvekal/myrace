@@ -44,3 +44,5 @@ RiderNameCorrected
 /trial-links
 trial_link_unavailable
 trial_issuer_only
+resultsSigning
+RESULTS_SIGNING_KEY is not a valid Ed25519 private key

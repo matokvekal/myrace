@@ -34,3 +34,4 @@ trial-link-create
 trial-ended
 open-keyboard-settings
 commissaire.keypadLayout
+signing key not configured

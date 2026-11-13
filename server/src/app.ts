@@ -14,7 +14,7 @@ import { invitationsRouter, membersRouter, myInvitationsRouter } from "./members
 import { preferencesRouter } from "./preferences/routes.js";
 import { publicRouter } from "./public/routes.js";
 import { racesRouter } from "./races/routes.js";
-import { resultsRouter } from "./results/routes.js";
+import { resultsRouter, signingKeyStatus } from "./results/routes.js";
 import { trialLinksRouter, trialRouter } from "./races/trialAccess.js";
 
 export function createApp() {
@@ -36,7 +36,8 @@ export function createApp() {
   app.get("/api/v1/health", async (_req, res) => {
     await db.one("SELECT 1");
     // release: the deployed commit (PM2 sets it from the release's REVISION); deployments check it.
-    res.json({ ok: true, time: Date.now(), release: process.env.COMMISSAIRE_RELEASE ?? "dev" });
+    // resultsSigning: Finish Race can sign official results ("ok"); no key material.
+    res.json({ ok: true, time: Date.now(), release: process.env.COMMISSAIRE_RELEASE ?? "dev", resultsSigning: signingKeyStatus() });
   });
   // Clock alignment over HTTP (AD-9); the socket has a "time" event too.
   app.get("/api/v1/time", (_req, res) => res.json({ now: Date.now() }));
