@@ -74,7 +74,7 @@ beforeEach(() => {
 
 describe("service worker: account data", () => {
   it("never answers /api/* or /socket.io/* (the browser goes to the network)", async () => {
-    store.set("commissire-v4", new Map([[`${ORIGIN}/api/v1/me`, new Response('{"email":"other@x"}')]]));
+    store.set("commissire-v5", new Map([[`${ORIGIN}/api/v1/me`, new Response('{"email":"other@x"}')]]));
     expect(await dispatchFetch(`${ORIGIN}/api/v1/me`)).toBeNull();
     expect(await dispatchFetch(`${ORIGIN}/api/v1/races`)).toBeNull();
     expect(await dispatchFetch(`${ORIGIN}/socket.io/?EIO=4&transport=polling`)).toBeNull();
@@ -84,13 +84,13 @@ describe("service worker: account data", () => {
     const r = await dispatchFetch(`${ORIGIN}/assets/index-abc.js`);
     expect(await r!.text()).toBe("net");
     await new Promise((res) => setTimeout(res, 0));
-    expect(store.get("commissire-v4")!.has(`${ORIGIN}/assets/index-abc.js`)).toBe(true);
+    expect(store.get("commissire-v5")!.has(`${ORIGIN}/assets/index-abc.js`)).toBe(true);
   });
 
-  it("activates at once and drops the v2 cache's API responses, keeping its static files", async () => {
+  it("activates at once and drops the previous cache's API responses, keeping its static files", async () => {
     listeners.install({ waitUntil: () => {} });
     expect(skipWaiting).toHaveBeenCalled();
-    store.set("commissire-v3", new Map([
+    store.set("commissire-v4", new Map([
       [`${ORIGIN}/api/v1/me`, new Response("giladdlv")],
       [`${ORIGIN}/api/v1/races/x/snapshot`, new Response("private")],
       [`${ORIGIN}/assets/old-chunk.js`, new Response("old")],
@@ -98,8 +98,8 @@ describe("service worker: account data", () => {
     let done: Promise<unknown> = Promise.resolve();
     listeners.activate({ waitUntil: (p: Promise<unknown>) => (done = p) });
     await done;
-    expect(store.has("commissire-v3")).toBe(false);
-    const v3 = [...store.get("commissire-v4")!.keys()];
+    expect(store.has("commissire-v4")).toBe(false);
+    const v3 = [...store.get("commissire-v5")!.keys()];
     expect(v3).toContain(`${ORIGIN}/assets/old-chunk.js`);
     expect(v3.some((u) => u.includes("/api/"))).toBe(false);
   });

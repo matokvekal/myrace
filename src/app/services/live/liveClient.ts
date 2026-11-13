@@ -36,6 +36,7 @@ import { applyingRemote, LIVE_ACCESS_EVENT, LIVE_LINKS_KEY, readLinks, setLiveBr
 const SERVER = String(import.meta.env.VITE_SERVER_URL ?? "").replace(/\/$/, "");
 const API = `${SERVER}/api/v1`;
 import { SESSION_EVENT, SESSION_KEY, TRIAL_ENDED_KEY } from "../../live/sessionPresence";
+import { refreshSharedSession, type RefreshOutcome } from "./sessionRefresh";
 const ACCESS_KEY_PREFIX = "commissaire.live.access.";
 const ACCESS_KEY = (local: string) => `${ACCESS_KEY_PREFIX}${local}`;
 /** The account last signed in on this device: a different one clears the per-account state. */
@@ -112,6 +113,8 @@ const setSync = (local: string, patch: Partial<RaceSync>) =>
 interface Session {
   accessToken: string;
   refreshToken: string;
+  /** Pending refresh proof (sessionRefresh.ts); cleared once a refresh is answered. */
+  refreshRequestId?: string;
   user: LiveUser;
 }
 
@@ -156,6 +159,47 @@ let session: Session | null = (() => {
 useLiveStore.setState({ user: session?.user ?? null });
 if (session) localStorage.setItem(LAST_USER_KEY, String(session.user.id));
 
+/** The session as stored right now (another tab may have refreshed or signed out). */
+function readStoredSession(): Session | null {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null") as Session | null;
+    return s && typeof s.accessToken === "string" && typeof s.refreshToken === "string" ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Takes over the stored session written by another tab (refresh, sign-in, sign-out),
+ * so no tab keeps using a refresh token that was already rotated.
+ */
+function adoptStoredSession() {
+  const s = readStoredSession();
+  if (s?.accessToken === session?.accessToken && s?.refreshToken === session?.refreshToken && s?.user.id === session?.user.id) {
+    if (s) session = s; // e.g. only refreshRequestId changed
+    return;
+  }
+  // Another account signed in from another tab: this tab's in-memory per-race state
+  // (access, sync, open race) belongs to the previous account — start clean.
+  if (s && session && String(s.user.id) !== String(session.user.id)) {
+    session = s;
+    window.location.reload();
+    return;
+  }
+  session = s;
+  useLiveStore.setState({ user: s?.user ?? null });
+  if (!s) {
+    socket?.disconnect();
+    socket = null;
+  }
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key === SESSION_KEY || e.key === null) adoptStoredSession();
+  });
+}
+
 function saveSession(s: Session | null) {
   session = s;
   if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
@@ -193,34 +237,44 @@ export class LiveApiError extends Error {
   }
 }
 
-let refreshing: Promise<boolean> | null = null;
-async function refreshTokens(): Promise<boolean> {
-  if (!session) return false;
+let refreshing: Promise<RefreshOutcome> | null = null;
+/** A refresh that never answers must not hold the cross-tab lock: give up (transient) after this. */
+export const REFRESH_TIMEOUT_MS = 20_000;
+async function postRefresh(body: { refreshToken: string; requestId: string }): Promise<Response> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), REFRESH_TIMEOUT_MS);
+  try {
+    return await fetch(`${API}/auth/refresh`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: ctl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+/**
+ * Refreshes the access token, coordinated with every other tab (sessionRefresh.ts).
+ * A transient failure keeps the session: only the server's 401 signs this device out.
+ */
+function refreshSession(): Promise<RefreshOutcome> {
+  if (!session) return Promise.resolve("signedOut");
+  const held = session.refreshToken;
   refreshing ??= (async () => {
     try {
-      const r = await fetch(`${API}/auth/refresh`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ refreshToken: session!.refreshToken }),
+      const outcome = await refreshSharedSession<Session>(held, {
+        read: readStoredSession,
+        write: saveSession,
+        post: (body) => postRefresh(body),
+        locks: typeof navigator !== "undefined" && navigator.locks ? navigator.locks : null,
       });
-      if (!r.ok) {
-        const code = r.status === 403 ? ((await r.json().catch(() => null)) as { error?: { code?: string } } | null)?.error?.code : null;
-        if (code === "trial_ended") markTrialEnded();
-        else saveSession(null);
-        return false;
-      }
-      const t = (await r.json()) as { accessToken: string; refreshToken: string };
-      saveSession({ ...session!, accessToken: t.accessToken, refreshToken: t.refreshToken });
-      return true;
+      if (outcome === "adopted" || outcome === "signedOut") adoptStoredSession();
+      else if (outcome === "trialEnded") markTrialEnded();
+      return outcome;
     } catch {
-      return false; // offline: keep the session, try later
+      return "transient";
     } finally {
       refreshing = null;
     }
   })();
   return refreshing;
 }
-
 export async function api<T = unknown>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
   let r: Response;
   try {
@@ -233,7 +287,12 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   } catch {
     throw new LiveApiError(0, "offline", "No connection to the server");
   }
-  if (r.status === 401 && retry && session && (await refreshTokens())) return api<T>(method, path, body, false);
+  if (r.status === 401 && retry && session) {
+    const o = await refreshSession();
+    if (o === "refreshed" || o === "adopted") return api<T>(method, path, body, false);
+    // Couldn't refresh right now (offline, 5xx, 429): still signed in — callers treat it as offline and retry.
+    if (o === "transient") throw new LiveApiError(0, "offline", "No connection to the server");
+  }
   const text = await r.text();
   let data: unknown = null;
   try {
@@ -1404,6 +1463,8 @@ async function loadSnapshotNow(local: string): Promise<void> {
 // Socket
 
 let socket: Socket | null = null;
+/** One pending reconnect after a refused handshake whose refresh failed transiently. */
+let socketRetry: ReturnType<typeof setTimeout> | null = null;
 
 function ensureSocket(): Socket | null {
   if (!session) return null;
@@ -1422,7 +1483,16 @@ function ensureSocket(): Socket | null {
   });
   socket.on("disconnect", () => useLiveStore.setState({ socketConnected: false }));
   socket.on("connect_error", async (err) => {
-    if (err.message === "unauthorized" && (await refreshTokens())) socket?.connect();
+    if (err.message !== "unauthorized") return; // network errors: socket.io reconnects by itself
+    const o = await refreshSession();
+    if (o === "refreshed" || o === "adopted") socket?.connect();
+    // A refused handshake is not retried by socket.io: try again once the server is reachable.
+    else if (o === "transient" && !socketRetry) {
+      socketRetry = setTimeout(() => {
+        socketRetry = null;
+        if (session && socket && !socket.connected) socket.connect();
+      }, 10_000);
+    }
   });
   socket.on("race:changes", async (msg: ChangeSet & { raceUuid: string; seq: number; results?: unknown[] }) => {
     const local = localUuidOf(msg.raceUuid);

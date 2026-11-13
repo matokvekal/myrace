@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { jwtVerify, SignJWT } from "jose";
 import { env } from "../config/env.js";
@@ -60,18 +60,49 @@ export async function createSession(db: Db, userId: string, deviceId: string | n
 }
 
 export class RefreshReuseError extends ApiError {
-  constructor(readonly userId: string) {
+  constructor(readonly userId: string, readonly replayAttempted = false) {
     super(401, "unauthorized", "Sign in again");
   }
 }
 
-/** Rotates a refresh token. Re-using an already-rotated token revokes the whole chain. */
-export async function refreshSession(db: Db, refreshToken: string): Promise<SessionTokens & { userId: string }> {
-  const s = await db.one<{ id: string; userId: string; revokedAt: Date | null; expiresAt: Date; replacedBy: string | null; isActive: boolean; trialExpiresAt: Date | null; trialRevokedAt: Date | null }>(
+/**
+ * Lost refresh answers (BUG: Nov 13 2026 sign-outs). A device sends its refresh token
+ * with a random `requestId` it saved BEFORE sending. The replacement token is then
+ * derived from both (HMAC with a server-only key), not random. If the answer is lost
+ * and the device retries with the SAME token and SAME requestId, the server can prove
+ * the retry is the request it already served and hands back that same replacement —
+ * but only while the replacement has never been used (not rotated, not revoked, not
+ * expired) and within REFRESH_REPLAY_MS of the rotation. Anything else (no requestId,
+ * another requestId, a replacement already used, too late) is reuse: every session
+ * of the user is revoked, as before.
+ */
+export const REFRESH_REPLAY_MS = 12 * 60 * 60_000;
+const rotationKey = createHmac("sha256", env.JWT_ACCESS_SECRET).update("commissaire.refresh-rotation.v1").digest();
+const REQUEST_ID = /^[A-Za-z0-9_-]{22,128}$/;
+/** A valid requestId (≥ 128 bits base64url) or null: a short or odd value never derives a token. */
+export const refreshRequestId = (v: unknown): string | null => (typeof v === "string" && REQUEST_ID.test(v) ? v : null);
+const rotatedToken = (refreshToken: string, requestId: string) =>
+  createHmac("sha256", rotationKey).update(refreshToken).update("\0").update(requestId).digest("base64url");
+
+type SessionRow = {
+  id: string; userId: string; revokedAt: Date | null; expiresAt: Date; replacedBy: string | null; isActive: boolean;
+  trialExpiresAt: Date | null; trialRevokedAt: Date | null;
+};
+
+/**
+ * Rotates a refresh token. Re-using an already-rotated token revokes the whole chain,
+ * except the exact replay of a lost answer described above.
+ */
+export async function refreshSession(db: Db, refreshToken: string, rawRequestId?: unknown): Promise<SessionTokens & { userId: string; replayed: boolean }> {
+  const requestId = refreshRequestId(rawRequestId);
+  // FOR UPDATE: two refreshes of one token (two tabs, a retry racing its original) are
+  // serialized, so the second always sees the first one's rotation.
+  const s = await db.one<SessionRow>(
     `SELECT s.id, s."userId", s."revokedAt", s."expiresAt", s."replacedBy", u."isActive",
             t."expiresAt" AS "trialExpiresAt", t."revokedAt" AS "trialRevokedAt"
      FROM sessions s JOIN users u ON u.id = s."userId" LEFT JOIN temporary_users t ON t."userId" = u.id
-     WHERE s."refreshTokenHash" = $1`,
+     WHERE s."refreshTokenHash" = $1
+     FOR UPDATE OF s`,
     [sha256(refreshToken)],
   );
   if (!s) throw new ApiError(401, "unauthorized", "Sign in again");
@@ -80,13 +111,17 @@ export async function refreshSession(db: Db, refreshToken: string): Promise<Sess
     throw new ApiError(403, "trial_ended", "Your trial access to this race has ended");
   }
   if (s.revokedAt || s.replacedBy) {
+    const replay = requestId && s.replacedBy && s.revokedAt && Date.now() - s.revokedAt.getTime() <= REFRESH_REPLAY_MS && s.isActive
+      ? await replayRotation(db, s, refreshToken, requestId)
+      : null;
+    if (replay) return replay;
     // Token reuse: someone holds an old token. The caller revokes every session of
     // this user OUTSIDE this transaction, so the revocation is not rolled back.
-    throw new RefreshReuseError(s.userId);
+    throw new RefreshReuseError(s.userId, !!requestId);
   }
   if (s.expiresAt < new Date() || !s.isActive) throw new ApiError(401, "unauthorized", "Sign in again");
   const nextExpiry = s.trialExpiresAt && s.trialExpiresAt < refreshExpiry() ? s.trialExpiresAt : refreshExpiry();
-  const nextToken = randomToken();
+  const nextToken = requestId ? rotatedToken(refreshToken, requestId) : randomToken();
   const next = await db.one<{ id: string }>(
     `INSERT INTO sessions ("userId", "refreshTokenHash", "deviceId", "userAgent", "expiresAt")
      SELECT "userId", $2, "deviceId", "userAgent", $3 FROM sessions WHERE id = $1 RETURNING id`,
@@ -98,6 +133,27 @@ export async function refreshSession(db: Db, refreshToken: string): Promise<Sess
     accessToken: await signAccessToken({ userId: s.userId, sessionId: next!.id }),
     refreshToken: nextToken,
     expiresIn: 15 * 60,
+    replayed: false,
+  };
+}
+
+/** The same answer again, only if the replacement this exact request created is still untouched. */
+async function replayRotation(db: Db, s: SessionRow, refreshToken: string, requestId: string) {
+  const token = rotatedToken(refreshToken, requestId);
+  const r = await db.one<{ id: string }>(
+    `SELECT id FROM sessions
+     WHERE id = $1 AND "refreshTokenHash" = $2 AND "revokedAt" IS NULL AND "replacedBy" IS NULL AND "expiresAt" > now()
+     FOR UPDATE`,
+    [s.replacedBy, sha256(token)],
+  );
+  if (!r) return null;
+  logger.info({ userId: s.userId }, "refresh answer replayed after a lost response");
+  return {
+    userId: s.userId,
+    accessToken: await signAccessToken({ userId: s.userId, sessionId: r.id }),
+    refreshToken: token,
+    expiresIn: 15 * 60,
+    replayed: true,
   };
 }
 

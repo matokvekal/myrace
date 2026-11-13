@@ -2,6 +2,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { action, addMember, api, auth, newUser, publishRace, send, snapshot, socketFor, startServer, stopServer, type TestUser } from "./helpers";
 import * as messaging from "../../src/lib/messaging";
+import { db } from "../../src/db/pool";
+import { sha256 } from "../../src/lib/core";
+import { REFRESH_REPLAY_MS } from "../../src/auth/tokens";
 
 beforeAll(startServer);
 afterAll(stopServer);
@@ -28,6 +31,76 @@ describe("accounts and sessions", () => {
     const reuse = await api().post("/api/v1/auth/refresh").send({ refreshToken: u.refreshToken });
     expect(reuse.status).toBe(401);
     expect((await api().get("/api/v1/me").set(auth(r1.body.accessToken))).status).toBe(401);
+  });
+
+  describe("lost refresh answers (2026-11-13 sign-outs)", () => {
+    const rid = () => `req-${Date.now()}-${Math.random().toString(36).slice(2)}-padding`;
+    const refresh = (refreshToken: string, requestId?: string) => api().post("/api/v1/auth/refresh").send({ refreshToken, requestId });
+
+    it("a retry with the same token + requestId gets the SAME answer back; nothing is revoked", async () => {
+      const u = await newUser("Replay");
+      const phone = await api().post("/api/v1/auth/login").send({ email: u.email, password: "password-123" }); // the user's other device
+      const id = rid();
+      const first = await refresh(u.refreshToken, id); // the device never received this answer
+      expect(first.status).toBe(200);
+      const retry = await refresh(u.refreshToken, id);
+      expect(retry.status).toBe(200);
+      expect(retry.body.refreshToken).toBe(first.body.refreshToken);
+      expect((await api().get("/api/v1/me").set(auth(retry.body.accessToken))).status).toBe(200);
+      expect((await api().get("/api/v1/me").set(auth(phone.body.accessToken))).status).toBe(200); // the other device is untouched
+      expect((await refresh(retry.body.refreshToken, rid())).status).toBe(200); // the chain goes on
+    });
+
+    it("concurrent identical retries are serialized and all get the same token", async () => {
+      const u = await newUser("ReplayRace");
+      const id = rid();
+      const rs = await Promise.all([refresh(u.refreshToken, id), refresh(u.refreshToken, id), refresh(u.refreshToken, id)]);
+      expect(rs.map((r) => r.status)).toEqual([200, 200, 200]);
+      expect(new Set(rs.map((r) => r.body.refreshToken)).size).toBe(1);
+    });
+
+    it("genuine reuse still revokes everything: another requestId, no requestId, or a replacement already used", async () => {
+      for (const attack of ["other-id", "no-id", "used"] as const) {
+        const u = await newUser(`Reuse-${attack}`);
+        const id = rid();
+        const first = await refresh(u.refreshToken, id);
+        expect(first.status).toBe(200);
+        if (attack === "used") expect((await refresh(first.body.refreshToken, rid())).status).toBe(200);
+        const replay = await refresh(u.refreshToken, attack === "other-id" ? rid() : attack === "no-id" ? undefined : id);
+        expect(replay.status, attack).toBe(401);
+        expect((await api().get("/api/v1/me").set(auth(u.token))).status, attack).toBe(401); // every session revoked
+      }
+    });
+
+    it("two different requests racing on one token: exactly one wins, the other is treated as reuse", async () => {
+      const u = await newUser("TwoTabsNoLock");
+      const rs = await Promise.all([refresh(u.refreshToken, rid()), refresh(u.refreshToken, rid())]);
+      expect(rs.map((r) => r.status).sort()).toEqual([200, 401]);
+    });
+
+    it("after the replay window, the same token + requestId is reuse (every session revoked)", async () => {
+      const u = await newUser("ReplayLate");
+      const id = rid();
+      expect((await refresh(u.refreshToken, id)).status).toBe(200);
+      await db.query(`UPDATE sessions SET "revokedAt" = now() - make_interval(secs => $2::double precision / 1000 + 60) WHERE "refreshTokenHash" = $1`, [sha256(u.refreshToken), REFRESH_REPLAY_MS]);
+      expect((await refresh(u.refreshToken, id)).status).toBe(401);
+      expect((await api().get("/api/v1/me").set(auth(u.token))).status).toBe(401);
+    });
+
+    it("no replay once the user signed out everywhere (the unused replacement was revoked)", async () => {
+      const u = await newUser("ReplayAfterLogoutAll");
+      const id = rid();
+      const first = await refresh(u.refreshToken, id);
+      expect((await api().post("/api/v1/auth/logout-all").set(auth(first.body.accessToken))).status).toBe(204);
+      expect((await refresh(u.refreshToken, id)).status).toBe(401);
+    });
+
+    it("a short or malformed requestId never derives a token (falls back to a random one)", async () => {
+      const u = await newUser("BadId");
+      const first = await refresh(u.refreshToken, "short");
+      expect(first.status).toBe(200);
+      expect((await refresh(u.refreshToken, "short")).status).toBe(401);
+    });
   });
 
   it("logout ends the session", async () => {

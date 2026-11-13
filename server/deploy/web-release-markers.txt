@@ -38,4 +38,5 @@ signing key not configured
 live-provisional
 tv-view
 share-results-pending
+commissaire.auth.refresh
 motionActive

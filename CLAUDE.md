@@ -567,6 +567,20 @@ still open).
 - `tests/race-persistence.spec.ts` and `tests/cloud-sync.spec.ts` (PC ↔ phone sync) need a real API (`E2E_API_URL`); skipped otherwise.
 - Dead-code check: `npx knip` (2026-11-04 cleanup removed 33 unreferenced files and 13 unused deps). Shared-code exports look unused to knip only because `server/` is outside its scan.
 
+### Session refresh across tabs (fix for the 2026-11-13 sign-out)
+- The server rotates the refresh token on every use; re-sending a rotated one revokes EVERY session of
+  the account (all devices). Prod logged 3 "refresh token reuse" warnings at 15:31 UTC: a second tab
+  refreshed with the token another tab had already rotated.
+- Client: `services/live/sessionRefresh.ts` — Web Lock `commissaire.auth.refresh`, then the LATEST stored
+  session is read: a different token there = adopt it, never send the old one. liveClient also adopts other
+  tabs' sessions through the `storage` event. Only the server's 401 signs out; offline/5xx/429/garbled
+  answers keep the session (`api()` then throws status 0 `offline`, so the outbox just retries).
+- Lost answers: the client stores a random `refreshRequestId` BEFORE sending. The server derives the next
+  token as HMAC(token, requestId) (`auth/tokens.ts`), so the same token + requestId within 12 h, while the
+  replacement is still unused, gets the same answer back (logged "refresh answer replayed…"). Anything else
+  is still reuse → all sessions revoked. Sessions row is `FOR UPDATE`. No migration.
+- Tests: `services/live/__tests__/{sessionRefresh,sessionSync}.test.ts`, `server/test/db/auth-isolation.test.ts`.
+
 ### Account isolation on one device (0.1.15 security fix)
 - `public/sw.js` NEVER caches or answers `/api/*` or `/socket.io/*` (`isPrivate`). Before v3 it
   served same-origin GETs cache-first, so a phone replayed a previous account's `/me` (wrong email

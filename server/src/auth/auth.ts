@@ -347,14 +347,14 @@ authRouter.post("/sms-code/verify", route(async (req, res) => {
 }));
 
 authRouter.post("/refresh", route(async (req, res) => {
-  const { refreshToken } = z.object({ refreshToken: z.string().min(10) }).parse(req.body);
+  const { refreshToken, requestId } = z.object({ refreshToken: z.string().min(10), requestId: z.string().max(200).optional() }).parse(req.body);
   let out;
   try {
-    out = await tx((d) => refreshSession(d, refreshToken));
+    out = await tx((d) => refreshSession(d, refreshToken, requestId));
   } catch (err) {
     if (err instanceof RefreshReuseError) {
       await revokeAllSessions(db, err.userId);
-      logger.warn({ userId: err.userId }, "refresh token reuse — all sessions revoked");
+      logger.warn({ userId: err.userId, replayAttempted: err.replayAttempted }, "refresh token reuse — all sessions revoked");
     }
     throw err;
   }
