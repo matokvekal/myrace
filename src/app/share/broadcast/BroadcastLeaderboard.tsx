@@ -3,12 +3,14 @@
  * (live/liveRanking.ts, one wave at a time, never mixed); the screen decides how many rows
  * fit, the leaders stay pinned and the rest cycles page by page.
  */
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import type { SharedCategory, SharedRace } from "../../../shared/race/state";
 import { activeWaves, nextWave, waveLabel, type WaveSummary } from "../waves/activeWaves";
 import { formatGap, formatRaceTime, lapsText, rankLive, type LiveEntry } from "../live/liveRanking";
 import { useLiveTrend } from "../live/useLiveTrend";
-import { trendLabel } from "../live/LiveRow";
+import { ringDelayMs, trendLabel } from "../live/LiveRow";
+import { showsArrow, type RankMotion } from "../live/rankMotion";
+import { useRankFlip } from "../live/useRankFlip";
 import { categoryLabel } from "../waves/activeWaves";
 import type { FeedFreshness } from "../feedStatus";
 import { BroadcastHeader, type BroadcastStatus } from "./BroadcastHeader";
@@ -53,7 +55,15 @@ export function BroadcastLive(props: BroadcastCommon) {
   const rankings = useMemo(() => active.map((w) => ({ wave: w, ranking: rankLive(w.riders, categoriesByKey, "overall") })), [active, categoriesByKey]);
   const combined = useMemo(() => rankings.flatMap((r) => r.ranking), [rankings]);
   const viewKey = active.map((w) => w.key).join(",");
-  const trend = useLiveTrend(combined, viewKey);
+  // Riders are compared only within their own wave (waves are never mixed).
+  const waveOf = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const { wave, ranking } of rankings) for (const e of ranking) m.set(e.uuid, wave.key);
+    return m;
+  }, [rankings]);
+  const trend = useLiveTrend(combined, viewKey, (e) => waveOf.get(e.uuid) ?? "");
+  const boardEl = useRef<HTMLDivElement>(null);
+  useRankFlip(boardEl, trend, { stale: freshness !== "fresh" });
 
   const pages: Page[] = useMemo(
     () =>
@@ -116,20 +126,20 @@ export function BroadcastLive(props: BroadcastCommon) {
       <div className={styles.rule} aria-hidden="true" />
       <main className={styles.main} ref={boardRef} data-testid="tv-live-board">
         {freshness !== "fresh" && <StaleFlag freshness={freshness} updatedAt={updatedAt} />}
-        <div className={styles.board} data-stale={freshness !== "fresh" ? "true" : undefined}>
+        <div ref={boardEl} className={styles.board} data-stale={freshness !== "fresh" ? "true" : undefined}>
           <div className={`${styles.liveRow} ${styles.headRow}`} aria-hidden="true">
             <span>Pos</span><span>Bib</span><span>Rider</span><span>Category</span><span className={styles.num}>Laps</span>
             <span className={styles.num}>Time</span><span className={styles.num}>Gap</span><span className={styles.statusCol}>Status</span>
           </div>
           <ol className={styles.rows} aria-label={`${waveLabel(wave.key)} provisional standings`}>
             {pinnedRows.map((e) => (
-              <TvLiveRow key={e.uuid} entry={e} delta={trend.deltas.get(e.uuid)} version={trend.version} />
+              <TvLiveRow key={e.uuid} entry={e} delta={trend.deltas.get(e.uuid)} motion={trend.motions.get(e.uuid)} version={trend.version} />
             ))}
           </ol>
           {pinned > 0 && <div className={styles.pinDivider} aria-hidden="true" />}
           <ol key={`${wave.key}:${page}`} className={`${styles.rows} ${styles.pageIn}`} data-testid="tv-page-rows">
             {pageRows.map((e) => (
-              <TvLiveRow key={e.uuid} entry={e} delta={trend.deltas.get(e.uuid)} version={trend.version} />
+              <TvLiveRow key={e.uuid} entry={e} delta={trend.deltas.get(e.uuid)} motion={trend.motions.get(e.uuid)} version={trend.version} />
             ))}
           </ol>
         </div>
@@ -155,8 +165,9 @@ export function StaleFlag({ freshness, updatedAt }: { freshness: FeedFreshness; 
   );
 }
 
-function TvLiveRow({ entry, delta, version }: { entry: LiveEntry; delta?: number; version: number }) {
+function TvLiveRow({ entry, delta, motion, version }: { entry: LiveEntry; delta?: number; motion?: RankMotion; version: number }) {
   const { rider, position, group, category } = entry;
+  const arrow = showsArrow(motion) ? motion.delta : 0;
   const last = rider.lastName ?? "";
   const first = [rider.firstName, rider.middleName].filter(Boolean).join(" ");
   const total = entry.totalLaps;
@@ -166,14 +177,17 @@ function TvLiveRow({ entry, delta, version }: { entry: LiveEntry; delta?: number
       data-group={group}
       data-podium={position != null && position <= 3 ? String(position) : undefined}
       data-finished={entry.finished ? "true" : undefined}
-      data-moved={delta ? (delta > 0 ? "up" : "down") : undefined}
+      data-moved={arrow ? (arrow > 0 ? "up" : "down") : undefined}
+      data-motion={motion?.kind}
+      data-uuid={entry.uuid}
       aria-label={[position != null ? `Position ${position}` : entry.status, rider.bibNumber != null ? `bib ${rider.bibNumber}` : null, `${first} ${last}`, trendLabel(delta)].filter(Boolean).join(", ")}
       data-testid="tv-row"
     >
-      {delta ? <span key={version} className={styles.flash} aria-hidden="true" /> : null}
+      {arrow ? <span key={version} className={styles.flash} aria-hidden="true" /> : null}
+      {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} style={{ animationDelay: `${ringDelayMs(motion!)}ms` }} aria-hidden="true" /> : null}
       <span className={styles.pos}>
         {position ?? "–"}
-        {delta ? <span className={styles.trend} data-trend={delta > 0 ? "up" : "down"}>{delta > 0 ? "▲" : "▼"}{Math.abs(delta)}</span> : null}
+        {arrow ? <span className={styles.trend} data-trend={arrow > 0 ? "up" : "down"}>{arrow > 0 ? "▲" : "▼"}{Math.abs(arrow)}</span> : null}
       </span>
       <span className={styles.bibCell}><span className={styles.bib}>{rider.bibNumber ?? "—"}</span></span>
       <span className={styles.name} dir="auto">

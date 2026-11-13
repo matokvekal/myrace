@@ -492,3 +492,24 @@
   .pageTimer { animation: none; display: none; }
   .board, .controls { transition: none; }
 }
+
+/* ---- Ranking motion (live/rankMotion.ts, live/useRankFlip.ts) ----------------------------
+   Transforms only; the board is the FLIP container (ghosts of rows leaving the page are
+   positioned in it). A travelling primary row is lifted; its arrival border fades. */
+.board { position: relative; }
+.liveRow[data-motion-active] { z-index: 2; box-shadow: 0 0.4em 1.2em rgba(0, 0, 0, 0.45); }
+.ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.35em;
+  border: 0.12em solid currentColor;
+  pointer-events: none;
+  opacity: 0;
+  animation: tvRing 1.1s ease-out forwards;
+}
+.ring[data-kind="gain"] { color: #3ddc84; }
+.ring[data-kind="loss"] { color: #ff4d55; }
+@keyframes tvRing { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ring { animation-delay: 0s !important; }
+}

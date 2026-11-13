@@ -5,10 +5,11 @@
  *  - Only ACTIVE waves (activeWaves.ts). None → "No Active Wave" (never old standings).
  *  - Several active waves → a wave picker; waves are never mixed in one list.
  *  - Overall | By category; By category shows every category of the wave (sections) or one.
- *  - Position changes compared only between genuine updates (useLiveTrend).
+ *  - Position changes compared only between genuine updates (useLiveTrend); rows glide to
+ *    their new place (useRankFlip): primary movers with arrow + border, others silently.
  *  - Stale or ended feed → the last standings stay, dimmed, with when they're from.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { AlertTriangle, Flag, Radio, Timer } from "lucide-react";
 import type { SharedCategory } from "../../../shared/race/state";
 import { STATUS_LABEL } from "@/utils/statusLabels";
@@ -17,6 +18,7 @@ import { RaceClock } from "../waves/raceClock";
 import type { FeedFreshness } from "../feedStatus";
 import { rankLive, type LiveEntry, type LiveMode } from "./liveRanking";
 import { useLiveTrend } from "./useLiveTrend";
+import { useRankFlip } from "./useRankFlip";
 import { LiveHeaderRow, LiveRow } from "./LiveRow";
 import styles from "./live.module.css";
 
@@ -136,6 +138,8 @@ function Board({
     [riders, onlyCategory, categoriesByKey, mode],
   );
   const trend = useLiveTrend(ranking, viewKey);
+  const listRef = useRef<HTMLOListElement>(null);
+  useRankFlip(listRef, trend, { stale });
   const noLaps = ranking.every((e) => e.group !== "racing");
   return (
     <section className={styles.board} data-stale={stale ? "true" : undefined} data-testid="live-board">
@@ -148,11 +152,11 @@ function Board({
       )}
       {noLaps && <p className={styles.emptySmall} data-testid="live-no-laps">No lap recorded yet — positions appear after the first crossing.</p>}
       <LiveHeaderRow />
-      <ol className={styles.list} aria-label={title ? `${categoryLabel(title)} live standings` : "Live standings"}>
+      <ol ref={listRef} className={styles.list} aria-label={title ? `${categoryLabel(title)} live standings` : "Live standings"}>
         {ranking.map((e, i) => (
           <React.Fragment key={e.uuid}>
             {groupStart(ranking, i) && <li className={styles.divider} aria-hidden="true">{e.group === "waiting" ? "Not crossed yet" : "DNF · DSQ · DNS"}</li>}
-            <LiveRow entry={e} delta={trend.deltas.get(e.uuid)} version={trend.version} />
+            <LiveRow entry={e} delta={trend.deltas.get(e.uuid)} motion={trend.motions.get(e.uuid)} version={trend.version} />
           </React.Fragment>
         ))}
       </ol>

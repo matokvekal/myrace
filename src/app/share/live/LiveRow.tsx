@@ -9,6 +9,8 @@
 import React, { memo } from "react";
 import { formatGap, formatRaceTime, lapsText, riderName, type LiveEntry } from "./liveRanking";
 import { categoryLabel } from "../waves/activeWaves";
+import { showsArrow, type RankMotion } from "./rankMotion";
+import { MAX_STAGGER_STEPS, MOTION_MS, STAGGER_MS } from "./useRankFlip";
 import styles from "./live.module.css";
 
 export function trendLabel(delta: number | undefined): string | null {
@@ -17,12 +19,21 @@ export function trendLabel(delta: number | undefined): string | null {
   return `${delta > 0 ? "up" : "down"} ${n} place${n === 1 ? "" : "s"}`;
 }
 
-function LiveRowImpl({ entry, delta, version }: { entry: LiveEntry; delta?: number; version: number }) {
+/** When the arrival border of a primary mover starts: once its glide (and stagger) is nearly done. */
+export const ringDelayMs = (m: RankMotion) => Math.round(MOTION_MS.primary * 0.85) + Math.min(m.order, MAX_STAGGER_STEPS) * STAGGER_MS;
+
+/**
+ * `delta` = places gained since the last genuine update (spoken for every rider: a fact);
+ * `motion` = primary movement only (rankMotion.ts) - the arrow, highlight and border are
+ * reserved for it; displaced riders just glide.
+ */
+function LiveRowImpl({ entry, delta, motion, version }: { entry: LiveEntry; delta?: number; motion?: RankMotion; version: number }) {
   const { rider, position, group, category } = entry;
   const cat = category ? categoryLabel(category) : rider.category ?? "";
   const gap = group === "racing" ? formatGap(entry.gap) : "—";
   const time = formatRaceTime(entry.elapsedMs);
   const trend = trendLabel(delta);
+  const arrow = showsArrow(motion) ? motion.delta : 0;
   const out = group === "out";
   const label = [
     position != null ? `Position ${position}` : out ? entry.status : "No position yet",
@@ -42,11 +53,14 @@ function LiveRowImpl({ entry, delta, version }: { entry: LiveEntry; delta?: numb
       data-group={group}
       data-finished={entry.finished ? "true" : undefined}
       data-podium={position != null && position <= 3 ? String(position) : undefined}
-      data-moved={delta ? (delta > 0 ? "up" : "down") : undefined}
+      data-moved={arrow ? (arrow > 0 ? "up" : "down") : undefined}
+      data-motion={motion?.kind}
+      data-uuid={entry.uuid}
       aria-label={label}
       data-testid="live-row"
     >
-      {delta ? <span key={version} className={styles.flash} aria-hidden="true" /> : null}
+      {arrow ? <span key={version} className={styles.flash} aria-hidden="true" /> : null}
+      {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} style={{ animationDelay: `${ringDelayMs(motion!)}ms` }} aria-hidden="true" /> : null}
       <span className={styles.pos} aria-hidden="true">{position ?? "–"}</span>
       <span className={styles.bib} aria-hidden="true">{rider.bibNumber ?? "—"}</span>
       <span className={styles.main} aria-hidden="true">
@@ -67,8 +81,8 @@ function LiveRowImpl({ entry, delta, version }: { entry: LiveEntry; delta?: numb
         <span className={styles.elapsed}>{time}</span>
       </span>
       <span className={styles.status} aria-hidden="true" data-status={entry.status}>{entry.status}</span>
-      <span className={styles.trend} aria-hidden="true" data-trend={delta ? (delta > 0 ? "up" : "down") : "none"}>
-        {delta ? `${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}` : ""}
+      <span className={styles.trend} aria-hidden="true" data-trend={arrow ? (arrow > 0 ? "up" : "down") : "none"}>
+        {arrow ? `${arrow > 0 ? "▲" : "▼"}${Math.abs(arrow)}` : ""}
       </span>
     </li>
   );

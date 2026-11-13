@@ -796,6 +796,19 @@ still open).
   pages rotate every 10 s; wake lock; controls auto-hide; Esc (not fullscreen) exits.
 - Tests: `share/__tests__/{spectatorPage,liveRanking,publicRace2}.test.*`, `tests/guest-share.spec.ts`.
 
+### LIVE ranking motion (1.1.1) — public LIVE tab + TV
+- `share/live/rankMotion.ts` (pure): between two GENUINE updates of one view, a rider whose own data
+  changed (new crossing/lap/status) and whose position changed is a primary mover (gain/loss: arrow,
+  glide, fading border). DNF/DSQ/DNS → `out` (slides sideways, stays in the status section). Riders
+  pushed along are displaced: they glide, no arrow (their spoken label still says "down 1 place").
+  A move nothing in the data explains is shown with `cause: "unknown"` — never claim a cause.
+- `share/live/useRankFlip.ts`: FLIP by `data-uuid` inside ONE container (mobile `ol`, TV `.board`),
+  layout read via `offsetTop` (ignores in-flight transforms), Web Animations transform/opacity only.
+  Never on mount, view/filter change, page flip, tab switch, hidden tab, or the first update after a
+  stale period; `prefers-reduced-motion` = no movement. TV rows leaving the visible page fade out as
+  inert ghosts (`data-ghost`, no testid/uuid). Positions in the DOM are always the current ranking.
+- Tests: `share/__tests__/liveMotion.test.tsx`, `tests/live-motion.spec.ts` (real browser, mocked API).
+
 ### Official podium approval + audited name correction (0.3.5)
 - Table `category_approvals` (migration 013, one current row per race+category, in `RACE_TABLES`).
   History = `race_events` RaceAdmin `categoryApproved` / `approvalInvalidated` (who, when, cause).

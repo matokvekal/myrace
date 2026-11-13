@@ -316,3 +316,24 @@
 
 /* Header TV button: sits right after Refresh (Refresh's own auto margin pushes both to the end). */
 .tvBtn.tvBtn { margin-inline-start: 0; }
+
+/* ---- Ranking motion (rankMotion.ts / useRankFlip.ts) -------------------------------------
+   Rows are moved by transforms only; these rules only lift a travelling row above the others
+   and draw the brief arrival border of a primary mover (delay = its glide, set inline). */
+.list { position: relative; }
+.row[data-motion-active] { z-index: 2; background: var(--bg-card); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); border-radius: 6px; }
+.ring {
+  position: absolute;
+  inset: 1px;
+  border-radius: 6px;
+  border: 2px solid currentColor;
+  pointer-events: none;
+  opacity: 0;
+  animation: ring 1s ease-out forwards;
+}
+.ring[data-kind="gain"] { color: #1f9d55; }
+.ring[data-kind="loss"] { color: #d64545; }
+@keyframes ring { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ring { animation-delay: 0s !important; }
+}

@@ -4,14 +4,18 @@
  * riders, which keep their identity when an update brings nothing). Switching view (wave,
  * mode, category) resets the baseline, so a filter change never shows fake arrows.
  *
- * Returns uuid → places gained (positive = moved up), plus a version that changes on each
+ * Returns uuid → places gained (positive = moved up), the ranking motions (rankMotion.ts:
+ * primary movers, riders leaving for DNF/DSQ/DNS), plus a version that changes on each
  * genuine update (used to replay the short highlight).
  */
 import { useMemo, useRef } from "react";
 import type { LiveEntry } from "./liveRanking";
+import { classifyMotion, type ContextOf, type RankMotion } from "./rankMotion";
 
 export interface LiveTrend {
   deltas: Map<string, number>;
+  /** Only riders with a primary movement or leaving the ranking; displaced riders are absent. */
+  motions: Map<string, RankMotion>;
   version: number;
 }
 
@@ -38,9 +42,9 @@ export function trendDeltas(prev: Map<string, number>, next: Map<string, number>
   return d;
 }
 
-const EMPTY: LiveTrend = { deltas: new Map(), version: 0 };
+const EMPTY: LiveTrend = { deltas: new Map(), motions: new Map(), version: 0 };
 
-export function useLiveTrend(ranking: LiveEntry[], viewKey: string): LiveTrend {
+export function useLiveTrend(ranking: LiveEntry[], viewKey: string, contextOf?: ContextOf): LiveTrend {
   const memo = useRef<Memo>({ viewKey: "", ranking: null, positions: new Map(), trend: EMPTY });
   return useMemo(() => {
     const m = memo.current;
@@ -51,8 +55,10 @@ export function useLiveTrend(ranking: LiveEntry[], viewKey: string): LiveTrend {
       return EMPTY;
     }
     const deltas = trendDeltas(m.positions, positions);
-    const trend = { deltas, version: m.trend.version + 1 };
+    const trend = { deltas, motions: classifyMotion(m.ranking, ranking, contextOf), version: m.trend.version + 1 };
     memo.current = { viewKey, ranking, positions, trend };
     return trend;
+    // contextOf is a pure lookup that follows the ranking; it never triggers a comparison itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ranking, viewKey]);
 }

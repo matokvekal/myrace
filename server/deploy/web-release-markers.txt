@@ -38,3 +38,4 @@ signing key not configured
 live-provisional
 tv-view
 share-results-pending
+motionActive
