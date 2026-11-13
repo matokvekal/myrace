@@ -752,7 +752,7 @@ still open).
   (whole cell still the touch target). All colours are `--re-*` tokens scoped to
   `div[data-entry-mode="keypad"]` in `rapidEntry.module.css`; sizes/layout unchanged.
 
-### Public spectator page (0.3.4 — tabs, default tab and RESULTS timing superseded by 2.0 above)
+### Public spectator page (0.3.4 — tabs, default tab and RESULTS timing superseded by 2.0 below)
 - `share/SharePage.tsx` (route `/share/:token`, remounted per token): exactly two tabs,
   RESULTS (default) and RACE. `?tab=race` opens RACE; a 0.3.2 `?tab=board` link opens
   RACE too (`shareTabFromParam`); the tab is written to the URL so refresh keeps it.
