@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ImportProgress, ValidationIssue, RiderFieldKey } from "@/types/csv.types";
 import styles from "./importProgressStep.module.css";
+import ImportStages, { type ImportStage } from "./ImportStages";
 
 interface ImportProgressStepProps {
   progress: ImportProgress;
@@ -10,6 +11,13 @@ interface ImportProgressStepProps {
   /** A shared race's import refused as a whole: nothing was imported; the rows to fix. */
   refusal?: { message: string; problems: string[] } | null;
   onClose: () => void;
+  /** What is running while saving (Phase 2 stages). */
+  stage?: ImportStage | null;
+  stageDetail?: string;
+  /** True only when processed/total really counts (split by day); otherwise the bar is indeterminate. */
+  measurable?: boolean;
+  /** After a refusal: back to the preview with the file and mapping kept. */
+  onBackToPreview?: () => void;
 }
 
 // Group issues by row number
@@ -60,7 +68,11 @@ export default function ImportProgressStep({
   progress,
   skippedIssues,
   refusal,
-  onClose
+  onClose,
+  stage,
+  stageDetail,
+  measurable = false,
+  onBackToPreview
 }: ImportProgressStepProps) {
   const [showLog, setShowLog] = useState(false);
 
@@ -80,8 +92,17 @@ export default function ImportProgressStep({
         ) : (
           <p dir="auto">{refusal.message}</p>
         )}
-        <p className={styles.refusalHint}>Fix these rows in the file and import it again.</p>
+        <p className={styles.refusalHint}>
+          {onBackToPreview
+            ? "Nothing was saved. Go back to fix the mapping or the bibs and try again — the file stays loaded."
+            : "Fix these rows in the file and import it again."}
+        </p>
         <div className={styles.completedActions}>
+          {onBackToPreview && (
+            <button onClick={onBackToPreview} className={styles.closeButton} data-testid="import-back-to-preview">
+              Back to preview
+            </button>
+          )}
           <button onClick={onClose} className={styles.closeButton}>Close</button>
         </div>
       </div>
@@ -90,10 +111,6 @@ export default function ImportProgressStep({
 
   const isComplete = progress.status === "completed";
   const hasSkipped = progress.failed > 0;
-  const percentage =
-    progress.total > 0
-      ? Math.round((progress.processed / progress.total) * 100)
-      : 0;
 
   const rowGroups = groupByRow(skippedIssues);
   const sortedRows = [...rowGroups.keys()].sort((a, b) => a - b);
@@ -104,16 +121,13 @@ export default function ImportProgressStep({
         <>
           <div className={styles.header}>
             <h3>Importing Riders...</h3>
-            <p>Please wait while riders are saved.</p>
+            <p>Please keep this screen open until it finishes.</p>
           </div>
-          <div className={styles.progressContainer}>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${percentage}%` }} />
-            </div>
-            <div className={styles.progressText}>
-              {progress.processed} / {progress.total} ({percentage}%)
-            </div>
-          </div>
+          <ImportStages
+            stage={stage ?? "saving"}
+            detail={stageDetail}
+            progress={measurable ? { done: progress.processed, total: progress.total } : undefined}
+          />
         </>
       ) : (
         <>

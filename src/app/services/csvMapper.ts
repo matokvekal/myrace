@@ -83,32 +83,28 @@ async function saveMappingMemory(
 }
 
 /**
- * Get mapping from memory if exists
+ * Every learned mapping, by normalized header, read in ONE IndexedDB request.
+ *
+ * This used to open the database once per header and then `get` every stored key
+ * one by one (headers × memories round trips) — the main reason a wide file took
+ * seconds to reach the mapping step. When a header was remembered for more than
+ * one field, the most recently used one wins.
  */
-async function getMappingFromMemory(
-   sourceColumn: string
-): Promise<ColumnMappingMemory | null> {
+async function loadMappingMemories(): Promise<Map<string, ColumnMappingMemory>> {
+   const byHeader = new Map<string, ColumnMappingMemory>();
    try {
       const db = await initMappingDB();
-      const normalized = normalize(sourceColumn);
-
-      // Try exact match first
-      const id = await db.getAllKeys(STORE_NAME);
-
-      for (const key of id) {
-         const memory = await db.get(STORE_NAME, key as string);
-         if (memory && normalize(memory.sourceColumn) === normalized) {
-            db.close();
-            return memory;
-         }
-      }
-
+      const all = (await db.getAll(STORE_NAME)) as ColumnMappingMemory[];
       db.close();
-      return null;
+      for (const m of all) {
+         const key = normalize(m.sourceColumn);
+         const prev = byHeader.get(key);
+         if (!prev || new Date(m.lastUsed).getTime() > new Date(prev.lastUsed).getTime()) byHeader.set(key, m);
+      }
    } catch (error) {
-      console.error('Failed to get mapping from memory:', error);
-      return null;
+      console.error('Failed to read mapping memory:', error);
    }
+   return byHeader;
 }
 
 /**
@@ -299,6 +295,7 @@ export async function autoMapColumns(
 
    const candidates: Candidate[] = [];
    const noneUsed = new Set<RiderFieldKey>();
+   const memories = await loadMappingMemories();
 
    for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
@@ -308,7 +305,7 @@ export async function autoMapColumns(
       // unmapped and can't steal another field by fuzzy match.
       if (isIdColumnHeader(header)) continue;
 
-      const memory = await getMappingFromMemory(header);
+      const memory = memories.get(normalize(header));
       if (memory) {
          candidates.push({
             columnIndex: i,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense, lazy } from "react";
+import { useRef, useState, Suspense, lazy } from "react";
 import type {
   CSVParseResult,
   ColumnMapping,
@@ -27,6 +27,7 @@ import PreviewStep from "./PreviewStep";
 import ImportProgressStep from "./ImportProgressStep";
 import MultiDayDialog from "./MultiDayDialog";
 import BibConflictStep from "./BibConflictStep";
+import ImportStages, { type ImportStage } from "./ImportStages";
 import {
   findBibConflicts,
   type BibConflictGroup,
@@ -87,6 +88,23 @@ export default function CSVImportWizard({
   const [multiDayValues, setMultiDayValues] = useState<string[]>([]);
   const [multiDayRowCounts, setMultiDayRowCounts] = useState<Record<string, number>>({});
   const [prepared, setPrepared] = useState<PreparedImport | null>(null);
+  // What is running now (null = idle). The ref is the double-submit guard: state
+  // updates are async, a second tap in the same frame must already see "busy".
+  const [stage, setStage] = useState<ImportStage | null>(null);
+  const [stageDetail, setStageDetail] = useState<string | undefined>(undefined);
+  const busyRef = useRef(false);
+  const [splitting, setSplitting] = useState(false);
+  const begin = (s: ImportStage, detail?: string) => {
+    setStage(s);
+    setStageDetail(detail);
+  };
+  /** Lets React paint the new stage before a long synchronous step. */
+  const paint = () => new Promise<void>((r) => setTimeout(r, 0));
+  const finish = () => {
+    busyRef.current = false;
+    setStage(null);
+    setStageDetail(undefined);
+  };
 
   const insertRiders = useRiderStore((state) => state.insertRiders);
   const rebuildCategoriesFromRiders = useCategoryStore((state) => state.rebuildCategoriesFromRiders);
@@ -96,13 +114,19 @@ export default function CSVImportWizard({
   const clubDictionary = useClubDictionaryStore;
 
   const handleFileUpload = async (file: File, template?: MappingTemplate) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+      // Excel needs the xlsx parser (~430 kB) the first time: say so, it's the slow part.
+      begin("reading", isExcel ? `Reading ${file.name} (loading the Excel reader)…` : `Reading ${file.name}…`);
       const result = isExcel
         ? await (await import("@/utils/xlsxParser")).parseXLSXFile(file)
         : await parseCSVFile(file);
-      setParseResult(result);
+      begin("mapping", `Matching ${result.headers.length} columns…`);
+      await paint();
       const autoMappings = await autoMapColumns(result.headers, result.rows);
+      setParseResult(result);
       setSuggestedName(file.name.replace(/\.(xlsx?|csv)$/i, ""));
 
       if (template) {
@@ -126,6 +150,8 @@ export default function CSVImportWizard({
     } catch (error) {
       console.error("Failed to parse file:", error);
       alert("Failed to parse file. Please check the file format.");
+    } finally {
+      finish();
     }
   };
 
@@ -168,7 +194,19 @@ export default function CSVImportWizard({
   };
 
   const handleSplitByDay = async () => {
+    if (!parseResult || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await splitByDay();
+    } finally {
+      finish();
+    }
+  };
+
+  const splitByDay = async () => {
     if (!parseResult) return;
+    begin("saving", "Creating one race per day…");
+    setSplitting(true);
     setShowMultiDayDialog(false);
     setCurrentStep("importing");
 
@@ -186,6 +224,7 @@ export default function CSVImportWizard({
     }
 
     let totalSuccessful = 0;
+    let processedRows = 0;
     const totalRows = parseResult.rows.length;
 
     setImportProgress({ total: totalRows, processed: 0, successful: 0, failed: 0, status: "importing" });
@@ -223,6 +262,9 @@ export default function CSVImportWizard({
       await insertRiders(riders);
       await rebuildCategoriesFromRiders(targetRaceUuid);
       totalSuccessful += riders.length;
+      processedRows += rows.length;
+      // Measurable here: one race per day, so the bar is real.
+      setImportProgress({ total: totalRows, processed: processedRows, successful: totalSuccessful, failed: 0, status: "importing" });
     }
 
     setImportProgress({
@@ -273,23 +315,53 @@ export default function CSVImportWizard({
   };
 
   const handleStartImport = async (validation: ValidationResult) => {
-    const prep = await prepareImport(validation);
-    if (!prep) return;
-    setPrepared(prep);
-    setRefusal(null);
-    if (prep.conflicts.length > 0) {
-      setCurrentStep("bibs"); // the organizer decides; nothing is saved yet
+    if (busyRef.current) return; // a second tap on Import does nothing
+    busyRef.current = true;
+    let prep: PreparedImport | null = null;
+    try {
+      begin("validating", "Checking the riders…");
+      await paint();
+      prep = await prepareImport(validation);
+      if (!prep) return;
+      begin("duplicates", "Checking bib numbers across the race…");
+      setPrepared(prep);
+      setRefusal(null);
+      if (prep.conflicts.length > 0) {
+        setCurrentStep("bibs"); // the organizer decides; nothing is saved yet
+        return;
+      }
+    } catch (err) {
+      console.error("Could not prepare the import:", err);
+      alert(`Could not prepare the import: ${err instanceof Error ? err.message : String(err)}`);
+      prep = null; // stays on Preview with everything as it was
       return;
+    } finally {
+      if (!prep || prep.conflicts.length > 0) finish();
     }
-    await runImport(prep, []);
+    await runImport(prep, [], true);
   };
 
   /** Saves the prepared batch with the confirmed renumbering applied. */
-  const runImport = async (prep: PreparedImport, corrections: BibCorrection[]) => {
+  const runImport = async (prep: PreparedImport, corrections: BibCorrection[], guarded = false) => {
+    if (!guarded) {
+      if (busyRef.current) return;
+      busyRef.current = true;
+    }
+    try {
+      await saveImport(prep, corrections);
+    } finally {
+      finish();
+    }
+  };
+
+  const saveImport = async (prep: PreparedImport, corrections: BibCorrection[]) => {
     const { totalInFile, failedCount } = prep;
     const fix = new Map(corrections.map((c) => [c.index, c]));
     const riders = prep.riders.map((r, i) => (fix.has(i) ? { ...r, bibNumber: fix.get(i)!.correctedBib } : r));
 
+    begin("saving", isLiveRace(raceUuid)
+      ? `Sending ${riders.length} riders to the server…`
+      : `Saving ${riders.length} riders on this device…`);
     setCurrentStep("importing");
     setRefusal(null);
     setSkippedIssues(prep.errorIssues);
@@ -403,9 +475,10 @@ export default function CSVImportWizard({
               />
             </Suspense>
           ) : (
-            <UploadStep
-              onFileUpload={(file, tpl) => handleFileUpload(file, tpl)}
-            />
+            <>
+              {stage && <ImportStages stage={stage} detail={stageDetail} />}
+              <UploadStep busy={!!stage} onFileUpload={(file, tpl) => handleFileUpload(file, tpl)} />
+            </>
           ))}
         {currentStep === "mapping" && parseResult && (
           <ColumnMappingStep
@@ -419,12 +492,16 @@ export default function CSVImportWizard({
           />
         )}
         {currentStep === "preview" && parseResult && (
-          <PreviewStep
-            parseResult={parseResult}
-            mappings={columnMappings}
-            onStartImport={handleStartImport}
-            onBack={handleBack}
-          />
+          <>
+            {stage && <ImportStages stage={stage} detail={stageDetail} />}
+            <PreviewStep
+              parseResult={parseResult}
+              mappings={columnMappings}
+              onStartImport={handleStartImport}
+              onBack={handleBack}
+              busy={!!stage}
+            />
+          </>
         )}
         {currentStep === "bibs" && prepared && (
           <BibConflictStep
@@ -433,6 +510,7 @@ export default function CSVImportWizard({
             existing={prepared.existing}
             onCancel={() => setCurrentStep("preview")}
             onConfirm={(corrections) => runImport(prepared, corrections)}
+            busy={!!stage}
           />
         )}
         {currentStep === "importing" && importProgress && (
@@ -441,6 +519,11 @@ export default function CSVImportWizard({
             skippedIssues={skippedIssues}
             refusal={refusal}
             onClose={handleClose}
+            stage={stage}
+            stageDetail={stageDetail}
+            measurable={splitting}
+            // Nothing was saved: go back with the file and the mapping as they were.
+            onBackToPreview={parseResult ? () => { setRefusal(null); setImportProgress(null); setCurrentStep("preview"); } : undefined}
           />
         )}
       </div>

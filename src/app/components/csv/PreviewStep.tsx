@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import type {
   CSVParseResult,
@@ -17,6 +17,8 @@ interface PreviewStepProps {
   mappings: ColumnMapping[];
   onStartImport: (validation: ValidationResult) => void;
   onBack: () => void;
+  /** The wizard is preparing / saving: Import can not be pressed twice. */
+  busy?: boolean;
 }
 
 interface ParsedRider {
@@ -60,15 +62,31 @@ export default function PreviewStep({
   parseResult,
   mappings,
   onStartImport,
-  onBack
+  onBack,
+  busy = false
 }: PreviewStepProps) {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [activeTab, setActiveTab] = useState<"mapped" | "original">("mapped");
 
   useEffect(() => {
-    validateData();
+    // Next tick: the step paints ("Validating…") before a long file is checked.
+    setValidation(null);
+    const t = setTimeout(validateData, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parseResult, mappings]);
+
+  // Issues by file line, built once per validation (was a scan of every issue for every row on every render).
+  const issuesByLine = useMemo(() => {
+    const m = new Map<number, ValidationIssue[]>();
+    for (const i of validation?.issues ?? []) {
+      const list = m.get(i.row);
+      if (list) list.push(i);
+      else m.set(i.row, [i]);
+    }
+    return m;
+  }, [validation]);
 
   const parseRowToRider = (row: string[]): ParsedRider => {
     const rider: ParsedRider = {};
@@ -163,7 +181,7 @@ export default function PreviewStep({
   };
 
   const handleStartImport = () => {
-    if (!validation) return;
+    if (!validation || busy) return;
     if (validation.summary.errors > 0) {
       const confirmImport = window.confirm(
         `There are ${validation.summary.errors} errors in the data. Rows with errors will be skipped. Continue?`
@@ -174,20 +192,17 @@ export default function PreviewStep({
   };
 
   const getVisibleRows = () => {
-    if (!showOnlyErrors || !validation) return parseResult.rows;
+    if (!showOnlyErrors || !validation) return parseResult.rows.map((row, index) => ({ row, index }));
     const errorRows = new Set(
       validation.issues
         .filter((i) => i.severity === "error")
         .map((i) => i.row - parseResult.detection.headerRow - 1)
     );
-    return parseResult.rows.filter((_, index) => errorRows.has(index));
+    return parseResult.rows.map((row, index) => ({ row, index })).filter(({ index }) => errorRows.has(index));
   };
 
-  const getRowIssues = (rowIndex: number): ValidationIssue[] => {
-    if (!validation) return [];
-    const lineNumber = rowIndex + 1 + parseResult.detection.headerRow;
-    return validation.issues.filter((i) => i.row === lineNumber);
-  };
+  const getRowIssues = (rowIndex: number): ValidationIssue[] =>
+    issuesByLine.get(rowIndex + 1 + parseResult.detection.headerRow) ?? [];
 
   const visibleRows = getVisibleRows();
   const mappedFields = mappings.filter((m) => m.targetField !== null);
@@ -197,6 +212,7 @@ export default function PreviewStep({
       {/* Header */}
       <div className={styles.header}>
         <h3>Preview</h3>
+        {!validation && <span className={styles.stat} data-testid="preview-validating">Validating…</span>}
         {validation && (
           <span className={styles.stat} data-testid="preview-summary">
             {validation.summary.total} rows
@@ -270,8 +286,7 @@ export default function PreviewStep({
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRows.map((row, rowIndex) => {
-                    const actualRowIndex = showOnlyErrors ? parseResult.rows.indexOf(row) : rowIndex;
+                  {visibleRows.map(({ row, index: actualRowIndex }) => {
                     const issues = getRowIssues(actualRowIndex);
                     const hasError = issues.some((i) => i.severity === "error");
                     return (
@@ -375,6 +390,7 @@ export default function PreviewStep({
           className={styles.importButton}
           data-testid="preview-import"
           disabled={
+            busy ||
             !validation ||
             mappedFields.length === 0 ||
             (validation.summary.errors > 0 && validation.summary.errors === validation.summary.total)

@@ -1,4 +1,3 @@
-import { initIndexedDB } from "@/stores/indexDb/indexedDbHelper";
 import useRiderStore from "@/stores/ridersStore";
 import { RiderProps } from "@/types/types";
 import { RiderFieldKey } from "@/types/csv.types";
@@ -99,13 +98,9 @@ export const saveRidersFromRows = async (
          riders[c.index] = { ...r, bibNumber: c.correctedBib };
       }
 
-      // Save riders to IndexedDB
-      const db = await initIndexedDB();
-      for (const rider of riders) {
-         await db.add("riders", rider);
-      }
-      db.close();
-
+      // ONE IndexedDB transaction for the whole list (insertRiders). This used to
+      // `db.add` every rider in its own transaction first and then write them all
+      // again — 2 × N writes, the slow part of creating a race from a long list.
       const { insertRiders } = useRiderStore.getState();
       await insertRiders(riders);
       if (skipped.length) console.warn(`Import: ${skipped.length} row(s) skipped`, skipped);

@@ -10,6 +10,8 @@ import styles from "./uploadStep.module.css";
 interface UploadStepProps {
   onFileUpload: (file: File, template?: MappingTemplate) => void;
   onScanClick?: () => void;
+  /** A file is being read: a second drop / pick is ignored (no duplicate submission). */
+  busy?: boolean;
 }
 
 const SUPPORTED_EXTS = ['.csv', '.xlsx', '.xls'];
@@ -23,7 +25,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProps) {
+export default function UploadStep({ onFileUpload, onScanClick, busy = false }: UploadStepProps) {
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [templates, setTemplates] = useState<MappingTemplate[]>([]);
@@ -43,6 +45,7 @@ export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProp
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    if (busy) return;
     const file = e.dataTransfer.files?.[0];
     if (file) {
       if (isSupported(file.name)) onFileUpload(file, selectedTemplate ?? undefined);
@@ -52,10 +55,13 @@ export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProp
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onFileUpload(file, selectedTemplate ?? undefined);
+    e.target.value = ""; // the same file can be picked again after a failure
+    if (file && !busy) onFileUpload(file, selectedTemplate ?? undefined);
   };
 
-  const handleBrowseClick = () => fileInputRef.current?.click();
+  const handleBrowseClick = () => {
+    if (!busy) fileInputRef.current?.click();
+  };
 
   const toggleTemplate = (tpl: MappingTemplate) => {
     setSelectedTemplate((prev) => (prev?.id === tpl.id ? null : tpl));
@@ -121,6 +127,8 @@ export default function UploadStep({ onFileUpload, onScanClick }: UploadStepProp
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={handleBrowseClick}
+        aria-disabled={busy || undefined}
+        style={busy ? { opacity: 0.5, pointerEvents: "none" } : undefined}
       >
         <input
           ref={fileInputRef}
