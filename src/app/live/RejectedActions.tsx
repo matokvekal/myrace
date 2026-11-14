@@ -9,7 +9,7 @@ import styles from "./live.module.css";
  * for review — e.g. a lap recorded offline after the judge's access was removed — and leave
  * only when the user dismisses them. Opened from the sync badge; never a modal during a race.
  */
-export default function RejectedActions({ raceUuid, count, onClose }: { raceUuid: string; count: number; onClose: () => void }) {
+export default function RejectedActions({ raceUuid, count, onClose, statusText }: { raceUuid: string; count: number; onClose: () => void; statusText?: string }) {
   const { t } = useTranslation();
   const [items, setItems] = useState<RejectedAction[]>([]);
   const riders = useRiderStore((s) => s.riders);
@@ -34,6 +34,12 @@ export default function RejectedActions({ raceUuid, count, onClose }: { raceUuid
         <strong>{t("live.notAppliedTitle", "Not applied")}</strong>
         <button className={styles.link} onClick={onClose}>{t("live.close", "Close")}</button>
       </div>
+      {/* Opened from the compact Live badge: the sync state it replaces, then the count. */}
+      {statusText && (
+        <p className={styles.muted} dir="auto" data-testid="rejected-status">
+          {statusText} · {t("live.notAppliedCount", "{{n}} not applied", { n: count })}
+        </p>
+      )}
       <p className={styles.muted}>
         {t("live.notAppliedHelp", "The server refused these. They are kept here so nothing recorded is lost silently; dismiss them once checked.")}
       </p>

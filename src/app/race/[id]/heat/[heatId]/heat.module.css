@@ -614,6 +614,33 @@
   background: var(--bg-surface);
 }
 
+/* Right column of the timer row: Redo finish · Find a rider. */
+.timerTools {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Find a rider (read-only look-up): a 40 px round icon button. */
+.lookupBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.lookupBtn:hover { background: var(--bg-surface); }
+.lookupBtn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
 .waveInfoLabel {
   font-size: 11px;
   font-weight: 800;

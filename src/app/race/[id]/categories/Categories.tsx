@@ -8,7 +8,6 @@ import useCategoryStore from "@/stores/categoryStore";
 import useRiderStore from "@/stores/ridersStore";
 import useRaceStore from "@/stores/racesStore";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, toMinutes, normalizeTime } from "../schedule/Schedule";
-import { getCategoryStatusInfo } from "@/utils/statusChip";
 import { getCategoryLocks } from "@/utils/categoryLocks";
 import { finishGroupLabel } from "@/utils/finishGroups";
 import { normalizeColor } from "@/utils/bibColors";
@@ -558,17 +557,15 @@ const Categories: React.FC<CategoriesProps> = ({ raceUuid }) => {
             const riderCount = riderCounts.find((rc) => rc.id === cat.id)?.count || 0;
             const locks = getCategoryLocks(cat, raceRiders);
             const isDone = cat.status === "finished";
-            const info = getCategoryStatusInfo(cat.status);
             return (
               <React.Fragment key={cat.id}>
                 <div className={`${styles.row} ${isDone ? styles.rowDone : ""}`} role="row">
                   {colorCell(cat.id, cat.color, locks.color, (code) => void updateCategoryAndSyncRiders({ ...cat, color: code }))}
                   <div className={styles.nameCell} dir="auto">
                     {isDone && <Flag size={12} className={styles.doneFlag} aria-hidden="true" />}
+                    {/* CREATE is configuration: no RUNNING/FINISHED chip here (it covered the name);
+                        category status stays on RACE / LIVE / Results. */}
                     <span className={styles.catName}>{cat.name}{cat.subCategory ? ` · ${cat.subCategory}` : ""}</span>
-                    {cat.status && cat.status !== "upcoming" && (
-                      <span className={styles.statusChip} style={{ background: `${info.color}1f`, color: info.color }}>{info.label}</span>
-                    )}
                   </div>
                   {lapsStepper(cat.laps ?? 0, locks.laps, (n) => void updateCategoryAndSyncRiders({ ...cat, laps: n }), cat.name)}
                   <button

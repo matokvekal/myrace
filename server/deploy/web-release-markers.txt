@@ -40,3 +40,5 @@ tv-view
 share-results-pending
 commissaire.auth.refresh
 motionActive
+rider-lookup-open
+sync-alert-open

@@ -42,16 +42,16 @@ import { planWaveFinish } from "@/utils/waveFinish";
 import { useRecapMode, RECAP_MIN_LAP_SECONDS } from "./useRecapMode";
 import { liveFilterOptions } from "./liveFilter";
 import FinishWaveModal from "./FinishWaveModal";
-import { Bike, List, ChevronDown, Flag, LayoutGrid, Grid3x3 } from "lucide-react";
+import { Bike, List, ChevronDown, Flag, LayoutGrid, Grid3x3, Search } from "lucide-react";
 import RapidEntry from "./rapidEntry/RapidEntry";
 import { useLiveEntryMode, useModeSwipe, type LiveEntryMode } from "./rapidEntry/useLiveEntryMode";
 import rapidStyles from "./rapidEntry/rapidEntry.module.css";
-import liveStyles from "../../../../live/live.module.css";
 import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
 import { AuditLogService } from "@/services/auditLog/auditLogService";
 // Shared races: the sync state where it matters most (offline / waiting to send).
 const SyncBadge = lazy(() => import("../../../../live/SyncBadge"));
 const SyncNowButton = lazy(() => import("../../../../live/SyncNowButton"));
+const RiderLookupModal = lazy(() => import("./RiderLookupModal"));
 
 // Category identity is name + subCategory: the same name can exist in several
 // waves with different subcategories (e.g. Master Men 19-29 vs 30-49).
@@ -84,6 +84,9 @@ const Heat: React.FC = () => {
     [storeCategories, raceUuid]
   );
   const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
+  // Find a rider (read-only look-up): EVERY rider and category of this race, ignored waves included.
+  const lookupRiders = useMemo(() => storeRiders.filter((r) => r.raceUuid === raceUuid), [storeRiders, raceUuid]);
+  const lookupCategories = useMemo(() => storeCategories.filter((c) => c.raceUuid === raceUuid), [storeCategories, raceUuid]);
   const { settings: voiceSettings } = useVoiceSettingsStore();
 
   // live cloud sync for this race (no-op when race is local-only)
@@ -94,6 +97,8 @@ const Heat: React.FC = () => {
   const [now, setNow] = useState(new Date());
   const [contextRider, setContextRider] = useState<RiderProps | null>(null);
   const [showWaveInfo, setShowWaveInfo] = useState(false);
+  const [showLookup, setShowLookup] = useState(false);
+  const closeLookup = React.useCallback(() => setShowLookup(false), []);
   const [displayOrder, setDisplayOrder] = useState<number[]>([]);
   const [voiceActive, setVoiceActive] = useState(false);
   const [showMicPrompt, setShowMicPrompt] = useState(false);
@@ -921,20 +926,24 @@ const Heat: React.FC = () => {
             <Grid3x3 size={16} aria-hidden="true" /> Keypad
           </button>
         </div>
-        {entryMode === "keypad" ? (
-          <span className={rapidStyles.modeInfo}>
-            {heatId != null ? `Wave ${heatId} · ` : ""}{elapsedTime}
-          </span>
-        ) : (
-          isLiveRace(raceUuid) && (
+        {/* Right side, never wrapping: (keypad) wave · clock, then the compact sync —
+            status dot + warning icon with count (opens the details / not-applied list);
+            (cards) also the Sync icon. Errors show in BOTH modes. */}
+        <div className={rapidStyles.modeRight}>
+          {entryMode === "keypad" && (
+            <span className={rapidStyles.modeInfo}>
+              {heatId != null ? `Wave ${heatId} · ` : ""}{elapsedTime}
+            </span>
+          )}
+          {isLiveRace(raceUuid) && (
             <Suspense fallback={null}>
-              <div className={`${liveStyles.syncRow} ${rapidStyles.modeSync}`}>
-                <SyncBadge raceUuid={raceUuid} />
-                <SyncNowButton raceUuid={raceUuid} />
+              <div className={rapidStyles.modeSync}>
+                <SyncBadge raceUuid={raceUuid} compact />
+                {entryMode === "cards" && <SyncNowButton raceUuid={raceUuid} compact />}
               </div>
             </Suspense>
-          )
-        )}
+          )}
+        </div>
       </div>
 
       {/* Rider detail modal (double-click) */}
@@ -979,6 +988,13 @@ const Heat: React.FC = () => {
           onDelete={() => removeJoker(resolvingJoker.id)}
           onClose={() => setResolvingJoker(null)}
         />
+      )}
+
+      {/* Find a rider — read-only look-up over every wave; never records a lap */}
+      {showLookup && (
+        <Suspense fallback={null}>
+          <RiderLookupModal riders={lookupRiders} categories={lookupCategories} onClose={closeLookup} />
+        </Suspense>
       )}
 
       {/* Microphone permission pre-prompt */}
@@ -1090,6 +1106,9 @@ const Heat: React.FC = () => {
                 }}
               />
             </div>
+            <p className={styles.timerText}>{elapsedTime}</p>
+            {/* Right column: Redo finish · wave info (hidden) · Find a rider (read-only look-up) */}
+            <div className={styles.timerTools}>
             {redoableFinishes.length > 0 && (
               <button
                 type="button"
@@ -1104,7 +1123,6 @@ const Heat: React.FC = () => {
                 ↷ Redo finish {redoableFinishes[0].rider.bibNumber}
               </button>
             )}
-            <p className={styles.timerText}>{elapsedTime}</p>
             {SHOW_CARD_INFO_INPUT && currentWave && (
             <button className={styles.waveInfoBtn} onClick={() => setShowWaveInfo(true)} title="Wave info">
               {heatId != null && <span className={styles.waveInfoLabel}>Wave {heatId}</span>}
@@ -1116,6 +1134,17 @@ const Heat: React.FC = () => {
                 ))}
             </button>
             )}
+            <button
+              type="button"
+              className={styles.lookupBtn}
+              onClick={() => setShowLookup(true)}
+              aria-label="Find a rider (look-up only, records nothing)"
+              title="Find a rider — look-up only, records nothing"
+              data-testid="rider-lookup-open"
+            >
+              <Search size={20} aria-hidden="true" />
+            </button>
+            </div>
           </div>
 
           {/* Entry row: Unknown Rider · bib (prominent) · RECAP MODE */}

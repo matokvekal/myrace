@@ -852,10 +852,11 @@
   min-width: 0;
 }
 
+/* Always fully readable: long names wrap instead of being cut. */
 .catName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-weight: 500;
 }
 

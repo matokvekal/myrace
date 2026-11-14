@@ -153,11 +153,9 @@ const RiderLiveModal: React.FC<Props> = ({
               🏁 Finish Race
             </button>
           )}
-          {rider.status !== "DNF" && (
-            <button className={`${styles.actionBtn} ${styles.dnf}`} onClick={() => { onStatusChange(rider, "DNF"); onClose(); }}>
-              DNF
-            </button>
-          )}
+          {/* Order (left → right): DSQ · DNS · DNF — DNF, the most used, sits on the right.
+              Their own line, so a narrow phone never wraps DNS/DNF under DSQ. */}
+          <div className={styles.statusRow} data-testid="live-status-row">
           {rider.status !== "DSQ" && (
             <button className={`${styles.actionBtn} ${styles.dsq}`} onClick={() => { onStatusChange(rider, "DSQ"); onClose(); }}>
               DSQ
@@ -168,6 +166,12 @@ const RiderLiveModal: React.FC<Props> = ({
               DNS
             </button>
           )}
+          {rider.status !== "DNF" && (
+            <button className={`${styles.actionBtn} ${styles.dnf}`} onClick={() => { onStatusChange(rider, "DNF"); onClose(); }}>
+              DNF
+            </button>
+          )}
+          </div>
           {isOut && (
             <button className={`${styles.actionBtn} ${styles.clear}`} onClick={() => { onStatusChange(rider, "standing"); onClose(); }}>
               ✓ Clear

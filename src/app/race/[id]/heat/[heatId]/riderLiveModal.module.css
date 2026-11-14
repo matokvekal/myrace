@@ -248,6 +248,15 @@
 .saved { background: #27ae60 !important; }
 
 /* ── Action buttons ── */
+/* DSQ · DNS · DNF on one full-width line, fixed left → right even in Hebrew
+   (an RTL page would otherwise mirror the row and put DNF on the left). */
+.statusRow {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 8px;
+  direction: ltr;
+}
+
 .actions {
   display: flex;
   gap: 8px;

@@ -178,7 +178,8 @@ still open).
 - Every action in the log carries `prevRider` (exact pre-tap snapshot) +
   `prevOrderIndex`. Undo restores from the snapshot — never rebuild state from
   `lapsDetails`, that drops `elapsedTimeFromStart` and `position_category`.
-- Status buttons are ordered DNF → DSQ → DNS (`RiderLiveModal`, `StatusModal`);
+- Status buttons: Live's double-tap `RiderLiveModal` is DSQ → DNS → DNF (DNF on the right, 2026-11-13);
+  `StatusModal` keeps DNF → DSQ → DNS;
   out-statuses come before the internal ones. Check-In offers DSQ (left) | DNS (right)
   and "Standing" only as a way back (`StatusModal` never offers Standing to a standing
   rider). Bibs are edited with the pencil next to the number, phones included.
@@ -251,6 +252,19 @@ still open).
 - Finish Race: `signing_key_missing` rolls back the whole transaction; the modal shows errors
   (Info rethrows) and a retry after a lost answer adopts the record (`already_official`).
   `/api/v1/health` reports `resultsSigning`; an invalid key stops the API at start-up.
+
+### Live UI fixes (1.1.3)
+- Find a rider: magnifier in the timer row (`rider-lookup-open`) → `heat/[heatId]/RiderLookupModal.tsx`,
+  READ-ONLY over every rider of the race (all waves, ignored ones too): bib/name search, category,
+  wave, status. Rows have no action; it never filters the board or records a lap.
+- Sync on Live is compact (`SyncBadge compact`, `SyncNowButton compact`): status dot, a warning icon
+  (+ not-applied count) that opens the details / `RejectedActions`, a refresh icon; the result floats
+  in a bubble. Shown in Cards AND Keypad (no Sync button on the keypad). Same testids as before.
+- Keypad sizing on zoomed touch tablets (globals.css `--tablet-zoom`): vh/dvh and @media widths
+  ignore that zoom, so `RapidEntry` measures its own box and sets `--re-h` (+ `--re-vh`, and
+  `data-zoom="stack|side"` by the ZOOMED shape). The pad is capped by `--re-h`; phones/desktop never
+  get `data-zoom` and keep their rules.
+- CREATE → Categories shows no RUNNING/FINISHED chip (it covered the name); long names wrap.
 
 ### Card cover (heat page)
 - How long a tapped card stays washed out: 10 s / 30 s / 2 min / 4 min, default 10 s

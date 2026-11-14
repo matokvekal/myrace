@@ -328,13 +328,32 @@ export default function RapidEntry(props: Props) {
 
   // ── fill the screen below the header, no page scroll
   const rootRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | null>(null);
+  // The keypad's own box. CSS sizes the pad from it (--re-h), never from the real viewport:
+  // touch tablets zoom the whole body (globals.css --tablet-zoom), and vh/dvh units and
+  // @media widths ignore that zoom — they made the 0 / Enter row fall off a tablet screen.
+  const [box, setBox] = useState<{ height: number; zoomed: null | { vh: number; layout: "stack" | "side" } } | null>(null);
   useLayoutEffect(() => {
     const measure = () => {
       const el = rootRef.current;
       if (!el) return;
       const vh = window.visualViewport?.height ?? window.innerHeight;
-      setHeight(Math.max(360, Math.floor(vh - el.getBoundingClientRect().top - 8)));
+      const vw = window.visualViewport?.width ?? window.innerWidth;
+      // The viewport is in screen px, the height we set is in CSS px (scaled by the zoom), and
+      // engines differ on whether a rect is reported zoomed — compare it with offsetHeight to know.
+      const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+      const rect = el.getBoundingClientRect();
+      const rectIsScreenPx = zoom === 1 || (el.offsetHeight > 0 && rect.height / el.offsetHeight > 1 + (zoom - 1) / 2);
+      const topCss = rectIsScreenPx ? rect.top / zoom : rect.top;
+      // Zoomed tablet: lay out by the ZOOMED size (taller → stacked, wider → side by side).
+      // A zoomed landscape phone keeps its own phone-landscape rules, untouched.
+      const phoneLandscape = window.matchMedia?.("(max-height: 500px) and (orientation: landscape)").matches ?? false;
+      const zoomed = zoom !== 1 && !phoneLandscape ? { vh: vh / zoom, layout: (vw > vh ? "side" : "stack") as "stack" | "side" } : null;
+      // Phones keep the 360 px floor. A zoomed landscape tablet can have less (1024×768 at 175%
+      // ≈ 348 CSS px): the floor would push the 0 / Enter row off-screen, so it fits the space.
+      const height = Math.max(zoomed?.layout === "side" ? 240 : 360, Math.floor(vh / zoom - topCss - 8));
+      setBox((prev) =>
+        prev && prev.height === height && prev.zoomed?.vh === zoomed?.vh && prev.zoomed?.layout === zoomed?.layout ? prev : { height, zoomed },
+      );
     };
     measure();
     window.addEventListener("resize", measure);
@@ -416,7 +435,21 @@ export default function RapidEntry(props: Props) {
   );
 
   return (
-    <div ref={rootRef} className={styles.root} style={height ? { height } : undefined} data-testid="rapid-entry">
+    <div
+      ref={rootRef}
+      className={styles.root}
+      style={
+        box
+          ? ({
+              height: box.height,
+              "--re-h": `${box.height}px`,
+              ...(box.zoomed ? { "--re-vh": `${box.zoomed.vh}px` } : {}),
+            } as React.CSSProperties)
+          : undefined
+      }
+      data-zoom={box?.zoomed?.layout}
+      data-testid="rapid-entry"
+    >
       <div className={styles.history} aria-label={t("rapid.history", "Entries")} data-testid="rapid-history">
         {entries.map((e, i) => {
             const st = statusOf(e);

@@ -41,4 +41,22 @@ describe("SyncNowButton", () => {
       vi.useRealTimers();
     }
   });
+
+  it("compact (Live top bar): icon only, labelled, same sync action and result bubble", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.impl = async () => { throw new (SyncError as unknown as new (c: string) => Error)("offline"); };
+      render(<SyncNowButton raceUuid="r1" compact />);
+      const btn = screen.getByTestId("live-sync-now");
+      expect(btn).toHaveAccessibleName("Sync");
+      expect(btn.textContent).toBe(""); // no visible text in the bar
+      expect(screen.getByTestId("live-sync-now-status")).toBeEmptyDOMElement();
+      await act(async () => { fireEvent.click(btn); });
+      expect(screen.getByTestId("live-sync-now-status")).toHaveTextContent("No connection — changes stay queued");
+      await act(async () => { vi.advanceTimersByTime(6100); });
+      expect(screen.getByTestId("live-sync-now-status")).toBeEmptyDOMElement();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

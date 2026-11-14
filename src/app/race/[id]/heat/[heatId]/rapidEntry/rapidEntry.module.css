@@ -300,6 +300,9 @@
   grid-template-rows: repeat(4, minmax(56px, 1fr));
   gap: 8px;
   height: clamp(260px, 48dvh, 400px);
+  /* Never taller than the keypad's own box leaves for it (--re-h, set from JS):
+     bottom padding 6 + history min 60 + 2 gaps + display 76 = 154. Unset → no cap. */
+  max-height: calc(var(--re-h) - 154px);
   touch-action: manipulation;
 }
 
@@ -377,7 +380,8 @@
   }
   .entry { grid-column: 1; grid-row: 1; align-self: start; }
   .history { grid-column: 2; grid-row: 1; height: 100%; }
-  .pad { height: 380px; }
+  /* bottom padding 16 + display 76 + gap 6 = 98 */
+  .pad { height: 380px; max-height: calc(var(--re-h) - 98px); }
 }
 
 /* Phone landscape: side by side, keypad on the right for the thumb. */
@@ -391,7 +395,56 @@
   .entry { grid-column: 2; grid-row: 1; }
   .display { height: 56px; }
   .digits, .placeholder { font-size: 40px; }
-  .pad { height: auto; flex: 1; }
+  .pad { height: auto; flex: 1; max-height: none; }
+}
+
+/* ── Zoomed touch tablets (data-zoom from JS; globals.css --tablet-zoom) ──
+   @media widths and vh units see the REAL screen, not the zoomed one, so here the
+   layout follows the zoomed shape and every size comes from the keypad's own box
+   (--re-h) or the zoomed viewport (--re-vh). Phones and desktop never get data-zoom. */
+.root[data-zoom="stack"] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 6px 6px;
+}
+.root[data-zoom="stack"] .history { height: auto; }
+.root[data-zoom="stack"] .entry { align-self: auto; }
+.root[data-zoom="stack"] .pad {
+  height: clamp(232px, calc(var(--re-vh) * 0.48), 400px);
+  max-height: calc(var(--re-h) - 154px);
+}
+.root[data-zoom="stack"] .pad[data-layout="enterTop"] {
+  height: calc(clamp(232px, calc(var(--re-vh) * 0.48), 400px) + 64px);
+}
+
+.root[data-zoom="side"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.root[data-zoom="side"] .entry { grid-column: 1; grid-row: 1; align-self: start; }
+.root[data-zoom="side"] .history { grid-column: 2; grid-row: 1; height: 100%; }
+/* The pad fills its column: bottom padding 12 + display 76 + gap 6 = 94. */
+.root[data-zoom="side"] .pad,
+.root[data-zoom="side"] .pad[data-layout="enterTop"] {
+  height: min(444px, calc(var(--re-h) - 94px));
+  max-height: none;
+}
+
+/* Zoomed, the key rows may go a little below the phone minimum (44 CSS px = 77 screen
+   px at 175%: still a large target) so the 0 / Enter row always fits. */
+.root[data-zoom] .pad:not([data-layout="compact"]):not([data-layout="enterLeftCompact"]):not([data-layout="enterTop"]) {
+  grid-template-rows: repeat(4, minmax(44px, 1fr));
+}
+.root[data-zoom] .pad[data-layout="enterTop"] {
+  grid-template-rows: minmax(40px, 0.8fr) repeat(4, minmax(44px, 1fr));
+}
+.root[data-zoom] .pad[data-layout="compact"],
+.root[data-zoom] .pad[data-layout="enterLeftCompact"] {
+  grid-template-rows: repeat(4, max(40px, calc((100% - 24px) / 4 * 0.8)));
 }
 
 /* ── compact top bar: Cards | Keypad + (cards) sync / (keypad) wave · clock ── */
@@ -479,8 +532,27 @@
 .modeSync {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Right side of the bar: (keypad) wave · clock + compact sync. One line, never wraps. */
+.modeRight {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
   min-width: 0;
+}
+
+/* Narrow phones: the Cards | Keypad segments give up their minimum width first,
+   so the bar never overflows or pushes the sync icons onto a second line. */
+@media (max-width: 380px) {
+  .modeBar { gap: 6px; padding: 0 4px; }
+  .modeBtn { min-width: 0; padding: 0 8px; font-size: 14px; }
+  .modeInfo { font-size: 13px; }
 }
 
 /* ── Keyboard layouts (Settings → Keyboard) ──────────────

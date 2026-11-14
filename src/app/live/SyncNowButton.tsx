@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RefreshCw } from "lucide-react";
 import { LiveApiError, SyncError, syncRaceNow } from "@/services/live/liveClient";
 import styles from "./live.module.css";
 
@@ -10,7 +11,7 @@ type State = { kind: "idle" } | { kind: "busy" } | { kind: "ok"; pending: number
  * server (the authoritative copy). Unsent changes stay queued; nothing is discarded.
  * The real-time socket keeps working on its own — this is for "my screen looks wrong".
  */
-export default function SyncNowButton({ raceUuid }: { raceUuid: string }) {
+export default function SyncNowButton({ raceUuid, compact = false }: { raceUuid: string; compact?: boolean }) {
   const { t } = useTranslation();
   const [state, setState] = useState<State>({ kind: "idle" });
   const clearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,6 +42,47 @@ export default function SyncNowButton({ raceUuid }: { raceUuid: string }) {
     }
   };
 
+  const message = (
+    <>
+      {state.kind === "ok" && (
+        <span className={styles.syncNowMsg}>
+          {state.pending > 0
+            ? t("live.syncNowPending", "Synced · {{n}} still waiting to send", { n: state.pending })
+            : t("live.syncNowDone", "Synced")}
+        </span>
+      )}
+      {state.kind === "error" && (
+        <span className={styles.syncNowErr}>
+          {state.message}
+        </span>
+      )}
+    </>
+  );
+
+  // Live top bar: an icon only; the result shows in a small bubble under it (no layout shift).
+  if (compact) {
+    const label = state.kind === "busy" ? t("live.syncNowBusy", "Syncing…") : t("live.syncNow", "Sync");
+    return (
+      <span className={styles.syncNowCompactWrap}>
+        <button
+          type="button"
+          className={`${styles.syncNow} ${styles.syncNowCompact}`}
+          data-testid="live-sync-now"
+          onClick={() => void run()}
+          disabled={state.kind === "busy"}
+          aria-busy={state.kind === "busy"}
+          aria-label={label}
+          title={t("live.syncNowHint", "Send what is waiting, then reload this race from the server")}
+        >
+          {state.kind === "busy" ? <span className={styles.syncNowSpin} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
+        </button>
+        <span role="status" aria-live="polite" dir="auto" data-testid="live-sync-now-status" className={styles.syncNowPop}>
+          {message}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <>
       <button
@@ -56,18 +98,7 @@ export default function SyncNowButton({ raceUuid }: { raceUuid: string }) {
         {state.kind === "busy" ? t("live.syncNowBusy", "Syncing…") : t("live.syncNow", "Sync")}
       </button>
       <span role="status" aria-live="polite" dir="auto" data-testid="live-sync-now-status">
-        {state.kind === "ok" && (
-          <span className={styles.syncNowMsg}>
-            {state.pending > 0
-              ? t("live.syncNowPending", "Synced · {{n}} still waiting to send", { n: state.pending })
-              : t("live.syncNowDone", "Synced")}
-          </span>
-        )}
-        {state.kind === "error" && (
-          <span className={styles.syncNowErr}>
-            {state.message}
-          </span>
-        )}
+        {message}
       </span>
     </>
   );
