@@ -539,6 +539,14 @@ still open).
   (`freezeDerivedWaves`, all at once so nothing renumbers), and the engine starts a
   named wave-less category and gives it the wave.
 
+### Start never writes stale riders (fix/start-stale-riders, 2026-11-14)
+- Production 2026-11-14: 55 "not applied" = `RiderEdited {heat: 0}` sent right after a GO. `startGroup` saved the
+  derived waves, then wrote back the riders it held from render time (still wave 0). Now it reads riders from the
+  STORE after its last await and changes only the start fields (`raceMode/startRiders.ts startRiderPatch`).
+- Sync rule (`liveClient` bridge, `riderWaveOwnedByCategory`): once a rider's category has a wave, a rider-only wave
+  change is never sent — the wave belongs to the category (CategoryEdited / category move). Categories without a wave
+  keep per-rider waves. Test: `raceMode/__tests__/startStaleRiders.test.tsx` (incl. offline → reconnect).
+
 ### Import mapping: start / wave / class
 - Wave (`heat`) is auto-mapped only from an explicit wave header (`גל`, wave, heat).
   `מקצה` is the category; `שעת זינוק` is the start time; a bare `זינוק` is mapped to

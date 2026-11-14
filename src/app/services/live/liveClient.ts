@@ -992,6 +992,17 @@ const draft = (local: string, type: string, payload: Record<string, unknown>) =>
 
 const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+/** The rider's category (exact sub-category first, then by name) has a wave of its own. */
+export function riderWaveOwnedByCategory(
+  cats: Pick<CategoryProps, "name" | "subCategory" | "heat">[],
+  rider: Pick<RiderProps, "category" | "subCategory">,
+): boolean {
+  const cat =
+    cats.find((c) => c.name === rider.category && (c.subCategory ?? null) === (rider.subCategory ?? null)) ??
+    cats.find((c) => c.name === rider.category);
+  return !!cat && Number(cat.heat) > 0;
+}
+
 /** Store writes on a shared race → Actions (or a refusal). Derived fields are left to the server. */
 const bridge: LiveBridge = {
   beforeRiders(kind, before, after) {
@@ -1029,7 +1040,12 @@ const bridge: LiveBridge = {
           if (sameValue(prev[f as keyof RiderProps], next[f as keyof RiderProps])) continue;
           // A category rename or wave change is one CategoryEdited; the riders follow on the server.
           if ((f === "category" || f === "subCategory") && !cats.some((c) => c.name === prev.category && (c.subCategory ?? null) === (prev.subCategory ?? null))) continue;
-          if (f === "heat" && cats.some((c) => c.name === next.category && c.heat === next.heat)) continue;
+          // The wave belongs to the category (CategoryEdited moves its riders on the server, and
+          // a category move re-derives it). Once the rider's category has a wave, a rider-only
+          // wave change is never sent: it can only be a stale copy (e.g. `heat: 0` written back
+          // after Start — 2026-11-14) or a value the server would overwrite anyway. Categories
+          // without a wave yet keep their per-rider waves as before.
+          if (f === "heat" && riderWaveOwnedByCategory(cats, next)) continue;
           changes[f] = next[f as keyof RiderProps] ?? null;
         }
         if (Object.keys(changes).length) actions.push(draft(local, "RiderEdited", { riderUuid: next.uuid, changes }));
