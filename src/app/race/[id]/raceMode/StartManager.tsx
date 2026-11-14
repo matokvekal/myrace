@@ -11,6 +11,7 @@ import Icons from "@/constants/Icons";
 import Button from "@/components/ui/Button";
 import { Plus, Edit2, GripVertical, X, Trash2, AlertTriangle, Play, Pause, Flag, ChevronUp, ChevronDown } from "lucide-react";
 import { freezeDerivedWaves, riderInCategory } from "../schedule/Schedule";
+import { startRiderPatch } from "./startRiders";
 import { planWaveFinish } from "@/utils/waveFinish";
 import { getCategoryBibIssues, describeBibIssues } from "@/utils/bibIssues";
 import { canOnScreen, isLiveRace, liveAllows, liveDispatch } from "@/services/live/liveBridge";
@@ -620,47 +621,43 @@ const [editingStartId, setEditingStartId] = useState<string | null>(null);
     const race = races.find((r) => r.uuid === raceUuid);
     if (race) await updateRace({ ...race, status: "running" });
 
-    const cats = group.categoryIds
-      .map(fresh)
-      .filter(Boolean) as CategoryProps[];
+    const cats = (group.categoryIds.map(fresh).filter(Boolean) as CategoryProps[]).filter((c) => c.status === "upcoming");
 
+    // Riders are read from the STORE, never from this screen's render-time `riders`:
+    // the waves were just saved above and the server moves those riders to the new wave
+    // (a remote change may land during any await). Writing back the stale render-time
+    // copies sent `RiderEdited {heat: 0}` for every rider of the wave after its GO — the
+    // 55 "not applied" of 2026-11-14 (fix/start-stale-riders). Only the start fields change.
+    const raceRiders = () => useRiderStore.getState().riders.filter((r) => r.raceUuid === raceUuid);
+    const startable = (cat: CategoryProps) =>
+      raceRiders().filter((r) => riderInCategory(r, cat) && r.status !== "DNS");
+
+    for (const cat of cats) {
+      await updateCategory({
+        ...cat,
+        status: "running" as const,
+        lapsCounter: 0,
+        riders: startable(cat).length,
+      });
+    }
+
+    // After the last await: one fresh read, one write, nothing stale in between.
+    const allCats = useCategoryStore.getState().categories.filter((c) => c.raceUuid === raceUuid);
     const allUpdatedRiders: RiderProps[] = [];
 
     // Clear the track from the previous wave: any rider whose category already
     // finished but who is still "running" (was on the road when the race ended)
     // is finalized now, so starting a new wave leaves no ghosts behind on Live.
     // They are credited as finishers on the laps they completed — never DNF.
-    riders
-      .filter((r) => r.raceUuid === raceUuid && r.raceStatus === "running")
-      .forEach((r) => {
-        const cat = allCategories.find((c) => c.raceUuid === raceUuid && riderInCategory(r, c));
-        if (cat?.status === "finished") {
-          allUpdatedRiders.push(closeOutRiderOnTrack(r));
-        }
-      });
+    for (const r of raceRiders()) {
+      if (r.raceStatus !== "running") continue;
+      const cat = allCats.find((c) => riderInCategory(r, c));
+      if (cat?.status === "finished") allUpdatedRiders.push(closeOutRiderOnTrack(r));
+    }
 
     for (const cat of cats) {
-      if (cat.status !== "upcoming") continue;
-      const catRiders = riders.filter(
-        (r) =>
-          riderInCategory(r, cat) &&
-          r.raceUuid === raceUuid &&
-          r.status !== "DNS"
-      );
-      await updateCategory({
-        ...cat,
-        status: "running" as const,
-        lapsCounter: 0,
-        riders: catRiders.length,
-      });
-      catRiders.forEach((r, i) => {
-        allUpdatedRiders.push({
-          ...r,
-          raceStatus: "running" as const,
-          timeStartRace: now,
-          lapsCounter: 0,
-          viewOrder: r.position_start ?? i + 1,
-        });
+      startable(cat).forEach((r, i) => {
+        allUpdatedRiders.push(startRiderPatch(r, now, i));
       });
     }
 
