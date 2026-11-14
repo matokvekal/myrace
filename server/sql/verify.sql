@@ -1,11 +1,11 @@
--- verify.sql — read-only checks after running 001–014 on the Commissaire database.
+-- verify.sql — read-only checks after running 001–015 on the Commissaire database.
 -- Run: psql "<commissaire_live connection>" -f verify.sql
 -- Every query should return the "expected" shown in its comment.
 
--- 1. All migrations applied. Expected: 001…014, fourteen rows.
+-- 1. All migrations applied. Expected: 001…015, fifteen rows.
 SELECT version, "appliedAt" FROM schema_migrations ORDER BY version;
 
--- 2. All tables present. Expected: 26 rows, missing = false everywhere.
+-- 2. All tables present. Expected: 27 rows, missing = false everywhere.
 SELECT t AS table_name, to_regclass('public.' || t) IS NULL AS missing
 FROM unnest(ARRAY[
   'schema_migrations', 'users', 'user_identities', 'sessions', 'otp_codes',
@@ -15,7 +15,8 @@ FROM unnest(ARRAY[
   'user_preferences', 'race_hidden',
   'accounts', 'account_members', 'account_invitations', 'audit_logs',
   'category_approvals',
-  'trial_links', 'temporary_users'
+  'trial_links', 'temporary_users',
+  'column_mappings'
 ]) AS t
 ORDER BY 1;
 

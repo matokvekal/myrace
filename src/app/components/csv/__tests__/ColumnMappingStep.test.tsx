@@ -3,9 +3,14 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+const confirmMapping = vi.fn(async () => undefined);
+const rememberSharedMappings = vi.fn(async () => true);
 vi.mock("@/services/csvMapper", async (orig) => ({
   ...(await orig<typeof import("@/services/csvMapper")>()),
-  confirmMapping: async () => undefined,
+  confirmMapping: (...a: unknown[]) => confirmMapping(...(a as [])),
+}));
+vi.mock("@/services/sharedColumnMappings", () => ({
+  rememberSharedMappings: (...a: unknown[]) => rememberSharedMappings(...(a as [])),
 }));
 vi.mock("@/services/templateStorage", () => ({
   getAllTemplates: async () => [],
@@ -113,5 +118,57 @@ describe("ColumnMappingStep", () => {
     setup([mapping("Plate", "bibNumber"), mapping("תעודת זהות", null)]);
     expect(screen.getByTestId("id-column-skipped")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import תעודת זהות" })).not.toBeInTheDocument();
+  });
+
+  describe("Phase 2: remember corrections, confirm shared suggestions", () => {
+    it("a manual correction is NOT saved silently; Continue offers to remember it", async () => {
+      confirmMapping.mockClear();
+      rememberSharedMappings.mockClear();
+      const { user, onConfirm } = setup([mapping("Plate", "bibNumber"), mapping("Who", null)]);
+      await user.click(screen.getByRole("button", { name: "Import Who" }));
+      await user.click(within(screen.getByTestId("map-picker")).getByTestId("map-field-firstName"));
+      expect(confirmMapping).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("map-continue"));
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(screen.getByTestId("map-remember")).toHaveTextContent("Who → First Name");
+      await user.click(screen.getByTestId("map-remember-save"));
+      expect(confirmMapping).toHaveBeenCalledWith("Who", "firstName");
+      expect(rememberSharedMappings).toHaveBeenCalledWith([{ header: "Who", field: "firstName" }]);
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("Not now continues without remembering anything", async () => {
+      confirmMapping.mockClear();
+      rememberSharedMappings.mockClear();
+      const { user, onConfirm } = setup([mapping("Plate", "bibNumber"), mapping("Who", null)]);
+      await user.click(screen.getByRole("button", { name: "Import Who" }));
+      await user.click(within(screen.getByTestId("map-picker")).getByTestId("map-field-firstName"));
+      await user.click(screen.getByTestId("map-continue"));
+      await user.click(screen.getByTestId("map-remember-skip"));
+      expect(confirmMapping).not.toHaveBeenCalled();
+      expect(rememberSharedMappings).not.toHaveBeenCalled();
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("other organizers' suggestion must be confirmed before Continue, then is offered to remember", async () => {
+      const suggested = { ...mapping("Who", "firstName"), source: "shared", sharedUsers: 4, needsConfirmation: true, confidence: 70 } as ColumnMapping;
+      const { user, onConfirm } = setup([mapping("Plate", "bibNumber"), suggested]);
+      expect(screen.getAllByTestId("map-provenance")[0]).toHaveTextContent("Suggested · used by 4 organizers");
+      await user.click(screen.getByTestId("map-continue"));
+      expect(screen.getByTestId("map-shared-unconfirmed")).toBeInTheDocument();
+      expect(onConfirm).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("map-confirm-1"));
+      await user.click(screen.getByTestId("map-continue"));
+      expect(screen.getByTestId("map-remember")).toHaveTextContent("Who → First Name");
+      await user.click(screen.getByTestId("map-remember-skip"));
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("a contested header is flagged", () => {
+      setup([mapping("Plate", "bibNumber"), { ...mapping("Who", null), sharedConflict: true } as ColumnMapping]);
+      expect(screen.getByTestId("map-provenance")).toHaveTextContent("Organizers map this column differently");
+    });
   });
 });

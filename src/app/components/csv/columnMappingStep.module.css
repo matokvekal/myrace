@@ -568,3 +568,50 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Phase 2: where an automatic mapping came from */
+.provenance {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e6b33;
+}
+
+.provenance[data-source="shared"] {
+  color: #8a4b00;
+}
+
+.provenance[data-source="conflict"] {
+  color: #b3261e;
+}
+
+/* Phase 2: "Remember these mappings?" (asked on Continue, never saved silently) */
+.rememberPanel {
+  margin: 8px 0;
+  padding: 12px;
+  border: 1px solid #c9d6ee;
+  border-radius: 6px;
+  background: #f4f7fd;
+  font-size: 13px;
+}
+
+.rememberPanel p {
+  margin: 4px 0 8px;
+  color: #555;
+}
+
+.rememberPanel ul {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.rememberPanel li {
+  padding: 2px 0;
+}
+
+.rememberActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

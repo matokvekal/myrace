@@ -5,11 +5,11 @@ import { Check, ChevronDown, Layers, Plus, Save, Search, X } from "lucide-react"
 import type { ColumnMapping, RiderFieldKey, MappingTemplate } from "@/types/csv.types";
 import { FIELD_KEYWORDS, IGNORED_FIELDS, OPT_IN_FIELDS, isIdColumnHeader } from "@/types/csv.types";
 import {
-  getColumnSuggestions,
   confirmMapping,
   detectNameSplitting,
   resolveColumnRules
 } from "@/services/csvMapper";
+import { rememberSharedMappings } from "@/services/sharedColumnMappings";
 import {
   getAllTemplates,
   saveTemplate,
@@ -71,6 +71,10 @@ export default function ColumnMappingStep({
   const [pickerSearch, setPickerSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const [bibMissing, setBibMissing] = useState(false);
+  // Phase 2: "remember these mappings?" — asked once on Continue, never saved silently.
+  const [rememberAsk, setRememberAsk] = useState<{ index: number; header: string; field: RiderFieldKey; checked: boolean }[] | null>(null);
+  const [remembering, setRemembering] = useState(false);
+  const [sharedUnconfirmed, setSharedUnconfirmed] = useState(false);
 
   useEffect(() => {
     const { shouldSplit } = detectNameSplitting(mappings);
@@ -115,12 +119,29 @@ export default function ColumnMappingStep({
     };
     setMappings(updated);
     if (newField === "bibNumber") setBibMissing(false);
-    // "Keep as info" is a per-file, freeform choice (BUGS.md #7) — don't teach
-    // the fuzzy matcher to auto-map this column to info next time.
-    if (newField && newField !== "infoField") {
-      await confirmMapping(updated[index].sourceColumn, newField);
-    }
+    // Nothing is remembered here any more (Phase 2): Continue OFFERS to remember the
+    // corrections; "Keep as info" is per file and never remembered (BUGS.md #7).
   };
+
+  /** Keeps the suggested field and marks it confirmed. */
+  const confirmSuggested = (index: number) => {
+    setMappings((prev) => prev.map((m, i) => (i === index ? { ...m, needsConfirmation: false, confidence: 100 } : m)));
+  };
+
+  /**
+   * What the organizer decided by hand: a field changed from what was proposed, or other
+   * organizers' suggestion confirmed. Those are worth remembering; untouched built-in
+   * matches are not. Never "Keep as info", never an identity column.
+   */
+  const rememberCandidates = () =>
+    mappings.flatMap((m, index) => {
+      const field = m.targetField;
+      if (!field || field === "infoField" || isIdColumnHeader(m.sourceColumn)) return [];
+      const initial = initialMappings[index];
+      const changed = initial?.targetField !== field;
+      const confirmedShared = m.source === "shared" && !m.needsConfirmation;
+      return changed || confirmedShared ? [{ index, header: m.sourceColumn, field, checked: true }] : [];
+    });
 
   const handleApplyTemplate = async (tpl: MappingTemplate) => {
     const norm = (s: string) => s.toLowerCase().trim();
@@ -168,16 +189,47 @@ export default function ColumnMappingStep({
     setShowTemplates(true);
   };
 
+  const proceed = () =>
+    // Freeze the effective rules so the preview validates exactly what was shown
+    onConfirm(
+      mappings.map((m, i) => ({ ...m, ...resolveColumnRules(m, i, allRows) }))
+    );
+
   const handleConfirm = () => {
     const hasBibNumber = mappings.some((m) => m.targetField === "bibNumber");
     if (!hasBibNumber) {
       setBibMissing(true);
       return;
     }
-    // Freeze the effective rules so the preview validates exactly what was shown
-    onConfirm(
-      mappings.map((m, i) => ({ ...m, ...resolveColumnRules(m, i, allRows) }))
-    );
+    // Other organizers' suggestions are never taken on trust: confirm or change each.
+    if (mappings.some((m) => m.source === "shared" && m.needsConfirmation && m.targetField)) {
+      setSharedUnconfirmed(true);
+      return;
+    }
+    setSharedUnconfirmed(false);
+    const ask = rememberCandidates();
+    if (ask.length > 0 && rememberAsk === null) {
+      setRememberAsk(ask);
+      return;
+    }
+    proceed();
+  };
+
+  const finishRemember = async (save: boolean) => {
+    if (remembering) return;
+    if (save && rememberAsk) {
+      const chosen = rememberAsk.filter((r) => r.checked);
+      setRemembering(true);
+      try {
+        // This device first (works offline), then the account / shared dictionary.
+        await Promise.all(chosen.map((r) => confirmMapping(r.header, r.field)));
+        await rememberSharedMappings(chosen.map((r) => ({ header: r.header, field: r.field })));
+      } finally {
+        setRemembering(false);
+      }
+    }
+    setRememberAsk(null);
+    proceed();
   };
 
   const setRule = (index: number, rule: "required" | "unique", value: boolean) => {
@@ -259,6 +311,18 @@ export default function ColumnMappingStep({
     void handleFieldChange(pickerFor, field);
     setPickerFor(null);
   };
+
+  /** Phase 2: where an automatic mapping came from (only what the organizer should know). */
+  const provenance = (m: ColumnMapping) =>
+    m.source === "personal" && m.isAutoMapped ? (
+      <span className={styles.provenance} data-testid="map-provenance">Your saved mapping</span>
+    ) : m.source === "shared" ? (
+      <span className={styles.provenance} data-source="shared" data-testid="map-provenance">
+        {m.needsConfirmation ? "Suggested" : "Confirmed"} · used by {m.sharedUsers ?? 2} organizers
+      </span>
+    ) : m.sharedConflict ? (
+      <span className={styles.provenance} data-source="conflict" data-testid="map-provenance">Organizers map this column differently</span>
+    ) : null;
 
   const isUsed = (m: ColumnMapping) => m.targetField !== null && !isIdColumnHeader(m.sourceColumn);
   const rows = mappings.map((mapping, index) => ({ mapping, index }));
@@ -449,6 +513,7 @@ export default function ColumnMappingStep({
                   <div className={styles.rowMain}>
                     <strong dir="auto">{mapping.sourceColumn}</strong>
                     <span className={styles.rowSample} dir="auto">{firstValue(index) || "Empty"}</span>
+                    {provenance(mapping)}
                   </div>
                   <span className={styles.equals} aria-hidden="true">=</span>
                   <button
@@ -461,6 +526,18 @@ export default function ColumnMappingStep({
                   >
                     <span>{getFieldLabel(field)}</span>
                   </button>
+                  {mapping.source === "shared" && mapping.needsConfirmation && (
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      aria-label={`Confirm ${getFieldLabel(field)} for ${mapping.sourceColumn}`}
+                      title="Confirm this suggestion"
+                      onClick={() => confirmSuggested(index)}
+                      data-testid={`map-confirm-${index}`}
+                    >
+                      <Check size={16} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={styles.removeBtn}
@@ -521,6 +598,7 @@ export default function ColumnMappingStep({
                     ) : (
                       <span className={styles.rowSample} dir="auto">{firstValue(index) || "Empty"}</span>
                     )}
+                    {!blocked && provenance(mapping)}
                   </div>
                   {!blocked && (
                     <button
@@ -541,6 +619,41 @@ export default function ColumnMappingStep({
           })}
         </section>
       </div>
+
+      {sharedUnconfirmed && (
+        <div className={styles.noteError} role="alert" data-testid="map-shared-unconfirmed">
+          Confirm (✓) or change the columns suggested by other organizers to continue.
+        </div>
+      )}
+
+      {rememberAsk && (
+        <div className={styles.rememberPanel} role="dialog" aria-label="Remember these column mappings" data-testid="map-remember">
+          <strong>Remember {rememberAsk.length === 1 ? "this mapping" : "these mappings"} for next time?</strong>
+          <p>Next imports will read these columns the same way for you. Other organizers only see it as a suggestion they must confirm.</p>
+          <ul>
+            {rememberAsk.map((r) => (
+              <li key={r.index}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={r.checked}
+                    onChange={(e) => setRememberAsk((prev) => prev && prev.map((x) => (x.index === r.index ? { ...x, checked: e.target.checked } : x)))}
+                  />{" "}
+                  <span dir="auto">{r.header}</span> → {getFieldLabel(r.field)}
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className={styles.rememberActions}>
+            <button type="button" className={styles.backButton} onClick={() => void finishRemember(false)} disabled={remembering} data-testid="map-remember-skip">
+              Not now
+            </button>
+            <button type="button" className={styles.confirmButton} onClick={() => void finishRemember(true)} disabled={remembering} data-testid="map-remember-save">
+              {remembering ? "Saving…" : "Remember"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className={styles.actions}>
         <button onClick={onBack} className={styles.backButton}>

@@ -78,6 +78,16 @@ export interface ColumnMapping {
    required?: boolean;
    /** Values must not repeat across rows. Unset → default: no. */
    unique?: boolean;
+   /**
+    * Phase 2: where an automatic mapping came from. "personal" = this organizer confirmed it
+    * (their account, any device); "shared" = other organizers agree (a suggestion: always to
+    * be confirmed). Unset = built-in dictionary / this device's memory.
+    */
+   source?: 'personal' | 'shared';
+   /** "shared": how many other organizers confirmed it. */
+   sharedUsers?: number;
+   /** Other organizers map this header differently: nothing was suggested from them. */
+   sharedConflict?: boolean;
 }
 
 export interface ColumnMappingSuggestion {

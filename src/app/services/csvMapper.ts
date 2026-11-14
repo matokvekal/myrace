@@ -23,6 +23,10 @@ import {
 import { fuzzyMatchScore, normalize, contains } from '@/utils/levenshtein';
 import { detectFieldForHeader } from '@/utils/csvFieldDetector';
 import { openDB, IDBPDatabase } from 'idb';
+import { normalizeHeader, type SharedMappingView } from '../../shared/import/columnMapping';
+
+/** A suggestion other organizers agree on: below the 85 auto-accept line, so it is always confirmed. */
+export const SHARED_SUGGESTION_CONFIDENCE = 70;
 
 const DB_NAME = 'csvMappingMemory';
 const DB_VERSION = 1;
@@ -279,7 +283,14 @@ export function columnLooksLikeTimes(rows: string[][], col: number): boolean {
 export async function autoMapColumns(
    headers: string[],
    /** Data rows (no header), when known: lets a vague header be judged by its values. */
-   sampleRows?: string[][]
+   sampleRows?: string[][],
+   /**
+    * Phase 2: the shared dictionary for these headers (normalized header → view), when the
+    * caller fetched it (the import wizard). My confirmed mapping is a learned mapping at full
+    * confidence; other organizers' agreed field is only a suggestion, below the auto-accept
+    * line, so a built-in match wins and the organizer confirms it; a contested header adds nothing.
+    */
+   shared?: Map<string, SharedMappingView>
 ): Promise<ColumnMapping[]> {
    // Collect every candidate (column → field) BEFORE claiming anything.
    // Assigning left-to-right let a leading seeding column headed "מס'" claim
@@ -291,6 +302,8 @@ export async function autoMapColumns(
       confidence: number;
       /** Learned mappings outrank fresh guesses at equal confidence. */
       fromMemory: boolean;
+      source?: 'personal' | 'shared';
+      sharedUsers?: number;
    };
 
    const candidates: Candidate[] = [];
@@ -312,6 +325,16 @@ export async function autoMapColumns(
             field: memory.targetField,
             confidence: memory.confidence,
             fromMemory: true
+         });
+      }
+
+      const view = shared?.get(normalizeHeader(header));
+      if (view?.mine) {
+         candidates.push({ columnIndex: i, field: view.mine as RiderFieldKey, confidence: 100, fromMemory: true, source: 'personal' });
+      } else if (view?.suggestion && !view.conflict) {
+         candidates.push({
+            columnIndex: i, field: view.suggestion.field as RiderFieldKey, confidence: SHARED_SUGGESTION_CONFIDENCE,
+            fromMemory: false, source: 'shared', sharedUsers: view.suggestion.users,
          });
       }
 
@@ -398,13 +421,16 @@ export async function autoMapColumns(
 
    return headers.map((header, i) => {
       const winner = claimed.get(i);
+      const view = shared?.get(normalizeHeader(header));
+      const conflict = view?.conflict && !view.mine ? { sharedConflict: true } : {};
       if (!winner || OPT_IN_FIELDS.has(winner.field)) {
          return {
             sourceColumn: header,
             targetField: null,
             confidence: 0,
             isAutoMapped: false,
-            needsConfirmation: true
+            needsConfirmation: true,
+            ...conflict
          };
       }
       return {
@@ -412,7 +438,11 @@ export async function autoMapColumns(
          targetField: winner.field,
          confidence: winner.confidence,
          isAutoMapped: true,
-         needsConfirmation: winner.confidence < 85
+         // Others' suggestion: always confirmed by the organizer, whatever its score.
+         needsConfirmation: winner.source === 'shared' || winner.confidence < 85,
+         ...(winner.source ? { source: winner.source } : {}),
+         ...(winner.sharedUsers ? { sharedUsers: winner.sharedUsers } : {}),
+         ...conflict
       };
    });
 }

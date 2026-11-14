@@ -14,6 +14,7 @@ import { parseCSVFile } from "@/utils/csvParser";
 // parseXLSXFile pulls in xlsx (~430 kB) — loaded only when an Excel file is
 // actually uploaded (BUGS.md #1). CSV uploads never touch it.
 import { autoMapColumns } from "@/services/csvMapper";
+import { fetchSharedMappings } from "@/services/sharedColumnMappings";
 import { buildHeatNameMap, filterImportRows, importSkipReason, rowToRider } from "@/services/riderRowMapper";
 import { isLiveRace } from "@/services/live/liveBridge";
 import { touchTemplate } from "@/services/templateStorage";
@@ -125,7 +126,9 @@ export default function CSVImportWizard({
         : await parseCSVFile(file);
       begin("mapping", `Matching ${result.headers.length} columns…`);
       await paint();
-      const autoMappings = await autoMapColumns(result.headers, result.rows);
+      // ONE request for every header (signed in only, short timeout, skipped offline).
+      const shared = await fetchSharedMappings(result.headers);
+      const autoMappings = await autoMapColumns(result.headers, result.rows, shared);
       setParseResult(result);
       setSuggestedName(file.name.replace(/\.(xlsx?|csv)$/i, ""));
 
@@ -158,7 +161,7 @@ export default function CSVImportWizard({
   // Photo-OCR source: same handoff as handleFileUpload, minus file parsing
   const handleOcrParsed = async (result: CSVParseResult) => {
     setParseResult(result);
-    const autoMappings = await autoMapColumns(result.headers, result.rows);
+    const autoMappings = await autoMapColumns(result.headers, result.rows, await fetchSharedMappings(result.headers));
     setSuggestedName("Scanned start list");
     setColumnMappings(autoMappings);
     setScanMode(false);

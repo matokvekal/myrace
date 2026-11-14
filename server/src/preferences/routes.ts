@@ -11,9 +11,12 @@ import { z } from "zod";
 import { authed, requireAuth } from "../auth/auth.js";
 import { db } from "../db/pool.js";
 import { route } from "../lib/core.js";
+import { columnMappingsRouter } from "./columnMappings.js";
 
 export const preferencesRouter = Router();
 preferencesRouter.use(requireAuth);
+// Phase 2: the shared column-mapping dictionary (/me/column-mappings).
+preferencesRouter.use(columnMappingsRouter);
 
 const keyParam = z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/);
 const MAX_BYTES = 64 * 1024;

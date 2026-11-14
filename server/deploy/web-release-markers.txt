@@ -44,3 +44,4 @@ rider-lookup-open
 sync-alert-open
 bib-conflicts-confirm
 import-stage
+map-remember

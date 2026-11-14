@@ -44,6 +44,7 @@ export const REQUIRED_TABLES = [
   "accounts", "account_members", "account_invitations", "audit_logs", // 012
   "category_approvals", // 013
   "trial_links", "temporary_users", // 014
+  "column_mappings", // 015
 ];
 
 /**
