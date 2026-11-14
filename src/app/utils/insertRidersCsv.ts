@@ -5,6 +5,7 @@ import { RiderFieldKey } from "@/types/csv.types";
 import { autoMapColumns } from "@/services/csvMapper";
 import { buildHeatNameMap, filterImportRows, rowToRider } from "@/services/riderRowMapper";
 import Papa from "papaparse";
+import type { BibCorrection } from "./bibConflicts";
 
 /**
  * Start-list import used by the Create Race screen.
@@ -25,12 +26,12 @@ const REQUIRED_ANY: RiderFieldKey[][] = [
    ["firstName", "lastName", "fullName"],
 ];
 
-export const saveRidersFromCsv = async (csvData: string, raceUuid: string) => {
+export const saveRidersFromCsv = async (csvData: string, raceUuid: string, bibCorrections: BibCorrection[] = []) => {
    const parsed = Papa.parse<string[]>(csvData, { skipEmptyLines: true });
    if (!parsed?.data || parsed.data.length < 2) {
       throw new Error("Invalid or empty CSV file.");
    }
-   await saveRidersFromRows(parsed.data as string[][], raceUuid);
+   return saveRidersFromRows(parsed.data as string[][], raceUuid, bibCorrections);
 };
 
 /**
@@ -39,7 +40,12 @@ export const saveRidersFromCsv = async (csvData: string, raceUuid: string) => {
  * on the Create Race screen imports exactly like the equivalent .csv — before
  * this, .xlsx was read as text and silently mangled.
  */
-export const saveRidersFromRows = async (rows: string[][], raceUuid: string) => {
+export const saveRidersFromRows = async (
+   rows: string[][],
+   raceUuid: string,
+   /** Phase 2: duplicate bibs the organizer renumbered in the preview (by rider index). */
+   bibCorrections: BibCorrection[] = []
+) => {
    try {
       if (!rows || rows.length < 2) {
          throw new Error("Invalid or empty file.");
@@ -82,6 +88,17 @@ export const saveRidersFromRows = async (rows: string[][], raceUuid: string) => 
          rowToRider(row, mappings, raceUuid, index, heatNameToNumber)
       );
 
+      // The preview read the same file the same way, so its indexes are these riders.
+      // If a rider no longer has the bib the organizer corrected, the file was read
+      // differently since the preview: refuse rather than renumber the wrong rider.
+      for (const c of bibCorrections) {
+         const r = riders[c.index];
+         if (!r || r.bibNumber !== c.originalBib) {
+            throw new Error("The start list changed since its preview. Open the file again and re-check the duplicate bibs.");
+         }
+         riders[c.index] = { ...r, bibNumber: c.correctedBib };
+      }
+
       // Save riders to IndexedDB
       const db = await initIndexedDB();
       for (const rider of riders) {
@@ -92,7 +109,7 @@ export const saveRidersFromRows = async (rows: string[][], raceUuid: string) => 
       const { insertRiders } = useRiderStore.getState();
       await insertRiders(riders);
       if (skipped.length) console.warn(`Import: ${skipped.length} row(s) skipped`, skipped);
-      return { imported: riders.length, skipped };
+      return { imported: riders.length, skipped, riders };
    } catch (error) {
       if (error instanceof Error) {
          console.error("Error saving riders:", error.message);

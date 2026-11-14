@@ -10,6 +10,7 @@ import { LOCKED_AFTER_GO_TEXT, riderLockedAfterGo } from "@/utils/riderLock";
 import { canOnScreen } from "@/services/live/liveBridge";
 import { recordRaceEvent } from "@/services/cloud/raceEvents";
 import styles from "./riderDetailModal.module.css";
+import ImportBibNote from "./ImportBibNote";
 import { X, Edit2, Save, XCircle, User, Lock, Trash2 } from "lucide-react";
 
 interface Props {
@@ -264,6 +265,8 @@ export default function RiderDetailModal({ rider, onClose, wave, startInEdit = f
             {RACE_STATUS_LABEL[rider.raceStatus ?? "upcoming"]}
           </div>
         </div>
+
+        <ImportBibNote rider={rider} />
 
         {error && <div className={styles.formError} role="alert" data-testid="rider-modal-error">{error}</div>}
 

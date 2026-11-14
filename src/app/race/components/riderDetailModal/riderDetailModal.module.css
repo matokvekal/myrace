@@ -340,3 +340,27 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Phase 2: audited bib renumbering at import */
+.importNote {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 8px 16px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff6e5;
+  border: 1px solid #f0d9a8;
+  color: #5a4210;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.importNote svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.importNoteMeta {
+  color: #7a6a4a;
+}

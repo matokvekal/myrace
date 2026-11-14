@@ -408,3 +408,44 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+/* Phase 2: duplicate bibs in the start list (resolved before the import) */
+.bibConflicts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff4e0;
+  border: 1px solid #f0c987;
+  color: #6b4500;
+  font-size: 13px;
+}
+
+.bibConflicts[data-resolved="true"] {
+  background: #eaf6ec;
+  border-color: #a9d7b2;
+  color: #1e5a2c;
+}
+
+.bibModal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.bibModalBody {
+  width: min(640px, 100%);
+  height: min(80vh, 720px);
+  padding: 16px;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}

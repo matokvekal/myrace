@@ -8,6 +8,8 @@ import { compressImage } from "@/utils/compressImage";
 import useRaceStore from "@/stores/racesStore";
 import { ArrowLeft, ImagePlus } from "lucide-react";
 import { toast } from "react-toastify";
+import BibConflictStep from "@/components/csv/BibConflictStep";
+import type { BibCorrection } from "@/utils/bibConflicts";
 
 interface Props {
   setAddNewwRace: (value: boolean) => void;
@@ -110,6 +112,11 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
   const [preview, setPreview] = useState<StartListPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewConfirmed, setPreviewConfirmed] = useState(false);
+  // Phase 2: duplicate bibs in the file — null until the organizer confirmed the new numbers.
+  const [bibCorrections, setBibCorrections] = useState<BibCorrection[] | null>(null);
+  const [resolvingBibs, setResolvingBibs] = useState(false);
+  const hasBibConflicts = (preview?.bibConflicts.length ?? 0) > 0;
+  const bibsUnresolved = hasBibConflicts && bibCorrections === null;
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -117,6 +124,7 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     setPreview(null);
     setPreviewError(null);
     setPreviewConfirmed(false);
+    setBibCorrections(null);
     if (!file) return;
     setRidersFile(file);
     try {
@@ -131,9 +139,10 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
     setPreview(null);
     setPreviewError(null);
     setPreviewConfirmed(false);
+    setBibCorrections(null);
   };
 
-  const importBlocked = !!ridersFile && (!!previewError || !preview || !previewConfirmed);
+  const importBlocked = !!ridersFile && (!!previewError || !preview || !previewConfirmed || bibsUnresolved);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -151,7 +160,8 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
         ridersFile,
         setAddNewwRace,
         autoColor,
-        raceType
+        raceType,
+        bibCorrections ?? []
       );
       // Say where the race is: only a server answer counts as "saved to the server".
       if (storage?.stored === "server") toast.success("Race saved to the server", { toastId: "race-storage" });
@@ -368,15 +378,47 @@ const AddRace: React.FC<Props> = ({ setAddNewwRace }) => {
                   </p>
                 )}
               </details>
+              {hasBibConflicts && (
+                <div className={styles.bibConflicts} data-testid="import-bib-conflicts" data-resolved={bibCorrections ? "true" : "false"}>
+                  <span dir="auto">
+                    {bibCorrections
+                      ? `Duplicate bibs resolved: ${bibCorrections.length} new number${bibCorrections.length === 1 ? "" : "s"}.`
+                      : `${preview.bibConflicts.length} bib number${preview.bibConflicts.length === 1 ? " is" : "s are"} used more than once. Bibs must be unique in the whole race — resolve them before importing.`}
+                  </span>
+                  <button type="button" className={styles.linkBtn} onClick={() => setResolvingBibs(true)} data-testid="import-bib-resolve">
+                    {bibCorrections ? "Review" : "Resolve duplicates"}
+                  </button>
+                </div>
+              )}
               <label className={styles.previewConfirm}>
                 <input
                   type="checkbox"
-                  checked={previewConfirmed}
+                  disabled={bibsUnresolved}
+                  checked={previewConfirmed && !bibsUnresolved}
                   onChange={(e) => setPreviewConfirmed(e.target.checked)}
                   data-testid="import-preview-confirm"
                 />
                 Looks right — import it
               </label>
+            </div>
+          )}
+          {resolvingBibs && preview && (
+            <div className={styles.bibModal} role="dialog" aria-label="Duplicate bib numbers" onClick={() => setResolvingBibs(false)}>
+              <div className={styles.bibModalBody} onClick={(e) => e.stopPropagation()}>
+                <BibConflictStep
+                  // A fresh resolver each time: it starts from the proposals (or the earlier choices are re-applied below).
+                  groups={bibCorrections
+                    ? preview.bibConflicts.map((g) => ({ ...g, rows: g.rows.map((r) => {
+                        const c = bibCorrections.find((x) => x.index === r.index);
+                        return c ? { ...r, proposed: c.correctedBib } : { ...r, proposed: r.bib };
+                      }) }))
+                    : preview.bibConflicts}
+                  rows={preview.bibRows}
+                  existing={[]}
+                  onCancel={() => setResolvingBibs(false)}
+                  onConfirm={(c) => { setBibCorrections(c); setResolvingBibs(false); }}
+                />
+              </div>
             </div>
           )}
 

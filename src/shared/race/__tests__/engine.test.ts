@@ -302,6 +302,40 @@ describe("setup rules (Story 2.6)", () => {
     expect(state.categories[cat.uuid].laps).toBe(3);
     expect(Object.keys(state.categories)).toHaveLength(2);
   });
+
+  describe("bib corrections at import (Phase 2)", () => {
+    const U = "00000000-0000-4000-8000-00000000f101";
+    const newRider = (bibNumber: number) => ({ uuid: U, firstName: "N", middleName: null, lastName: "Ew", bibNumber, team: null, chipNumber: null, federation: null, points: null, category: "Elite", subCategory: null, heat: 1, standing: null, flag: null, uciPoints: null, uciNumber: null, image: null, comment: null });
+
+    it("accepts a correction that describes a rider of the import with its new bib", () => {
+      const { state } = race();
+      const r = applyAction(state, makeAction("RidersImported", {
+        riders: [newRider(1001)], categories: [],
+        bibCorrections: [{ riderUuid: U, originalBib: 1, correctedBib: 1001, reason: "Duplicate bib at import" }],
+      }), T0);
+      expect(r.applied).toBe(true);
+      expect(state.riders[U].bibNumber).toBe(1001);
+    });
+
+    it("refuses a correction that doesn't match the rider's bib, or names a rider not in the import", () => {
+      for (const c of [
+        { riderUuid: U, originalBib: 1, correctedBib: 2001, reason: "x x x" },
+        { riderUuid: "00000000-0000-4000-8000-00000000f999", originalBib: 1, correctedBib: 1001, reason: "x x x" },
+        { riderUuid: U, originalBib: 1001, correctedBib: 1001, reason: "x x x" },
+      ]) {
+        const { state } = race();
+        const r = applyAction(state, makeAction("RidersImported", { riders: [newRider(1001)], categories: [], bibCorrections: [c] }), T0);
+        expect(r.applied).toBe(false);
+        expect(state.riders[U]).toBeUndefined();
+      }
+    });
+
+    it("still refuses a bib taken by a rider of another wave", () => {
+      const { state } = race(); // riders 1..3 in wave 1
+      const r = applyAction(state, makeAction("RidersImported", { riders: [{ ...newRider(2), heat: 5, category: "Kids" }], categories: [] }), T0);
+      expect(r.applied).toBe(false);
+    });
+  });
 });
 
 describe("positions", () => {

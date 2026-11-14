@@ -84,6 +84,24 @@ describe("shared Check-In change log", () => {
     ]);
     expect(out[0].timestamp).toBe(at(6));
   });
+
+  it("Phase 2: a bib renumbered at import shows as a bib change with original, reason and author — even days before the race", async () => {
+    const { default: useRiderStore } = await import("@/stores/ridersStore");
+    useRiderStore.setState({
+      riders: [{ id: 3, uuid: "r3", raceUuid: "R", bibNumber: 1021, firstName: "Avi", lastName: "Cohen", heat: 3, category: "Kids" }] as never,
+    });
+    const { sharedCheckInChanges, importFixFor } = await import("@/stores/checkInChangesStore");
+    const out = sharedCheckInChanges(
+      [{ seq: 9, type: "RidersImported", heat: null, eventAt: new Date(2026, 10, 1, 12, 0).toISOString(), userName: "Organizer", riderUuid: "r3",
+        bibNumber: 1021, originalBib: 21, reason: "Duplicate bib at import: 21 was also on another row of the file", firstName: "Avi", lastName: "Cohen" }],
+      { uuid: "R", date: "2026-11-08" },
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ kind: "bib", bib: 1021, wave: 3, by: "Organizer", importFix: { originalBib: 21, correctedBib: 1021 } });
+    expect(out[0].text).toContain("Bib 21 → 1021 at import");
+    expect(importFixFor(out, { id: 3, uuid: "r3" })?.importFix?.originalBib).toBe(21);
+    expect(importFixFor(out, { id: 4, uuid: "r4" })).toBeUndefined();
+  });
 });
 
 describe("LIVE Undo window on the device (server is the authority)", () => {

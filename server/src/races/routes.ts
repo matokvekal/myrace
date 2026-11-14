@@ -22,7 +22,7 @@ import { processActions } from "./actions.js";
 import { announceSeq, logServerEvent } from "./audit.js";
 import { insertRace, loadState } from "./repo.js";
 import { logAudit, raceAccountFor } from "../accounts/accounts.js";
-import { newCategory, newRider } from "./schemas.js";
+import { bibCorrections, newCategory, newRider } from "./schemas.js";
 
 export const racesRouter = Router();
 racesRouter.use(requireAuth);
@@ -102,6 +102,8 @@ const publishBody = z.object({
   categories: z.array(newCategory).max(500),
   riders: z.array(newRider.extend({ checked: z.boolean().optional(), status: z.enum(["standing", "DNS"]).optional() })).max(5000),
   accountId: z.string().uuid().optional(),
+  // Phase 2: duplicate bibs renumbered in the start list the race is created with (audited below).
+  bibCorrections: bibCorrections.optional(),
 });
 racesRouter.post("/publish", route(async (req, res) => {
   const body = publishBody.parse(req.body);
@@ -117,6 +119,11 @@ racesRouter.post("/publish", route(async (req, res) => {
     } satisfies SharedCategory;
   }
   const bibs = body.riders.map((r) => r.bibNumber).filter((b) => b != null);
+  const fixes = body.bibCorrections ?? [];
+  for (const c of fixes) {
+    const r = body.riders.find((x) => x.uuid === c.riderUuid);
+    if (!r || r.bibNumber !== c.correctedBib || c.originalBib === c.correctedBib) throw new ApiError(400, "invalid", "A bib correction does not match its rider");
+  }
   for (const r of body.riders) {
     state.riders[r.uuid] = {
       ...r, raceUuid, middleName: r.middleName ?? null, bibNumber: r.bibNumber ?? null, team: r.team ?? null, chipNumber: r.chipNumber ?? null,
@@ -140,6 +147,7 @@ racesRouter.post("/publish", route(async (req, res) => {
     await insertRaceFor(d, state, userId, body.accountId);
     await addOwnerMembership(d, raceUuid, userId);
     await d.query(`INSERT INTO race_snapshots ("raceUuid", seq, data) VALUES ($1, 0, $2)`, [raceUuid, JSON.stringify(state)]);
+    if (fixes.length) await logServerEvent(d, raceUuid, userId, "RaceAdmin", { op: "bibsCorrectedAtImport", bibCorrections: fixes });
   });
   res.status(201).json({ race: state.race, duplicateBibs: bibs.length !== new Set(bibs).size });
 }));
@@ -309,13 +317,26 @@ async function checkInHistory(m: Awaited<ReturnType<typeof requireMember>>, stat
     `SELECT e.seq, e.type, e.payload, e.heat, e."eventAt", u.name AS "userName"
      FROM race_events e LEFT JOIN users u ON u.id = e."userId"
      WHERE e."raceUuid" = $1 AND e.applied
-       AND (e.type IN ('StatusCorrection', 'RiderAdded') OR (e.type = 'RiderEdited' AND e.payload->'changes' ?| ARRAY['bibNumber', 'firstName', 'lastName']))
+       AND (e.type IN ('StatusCorrection', 'RiderAdded') OR (e.type = 'RiderEdited' AND e.payload->'changes' ?| ARRAY['bibNumber', 'firstName', 'lastName'])
+            OR (e.type = 'RidersImported' AND e.payload ? 'bibCorrections')
+            OR (e.type = 'RaceAdmin' AND e.payload->>'op' = 'bibsCorrectedAtImport'))
        AND ($2::int[] IS NULL OR e.heat IS NULL OR e.heat = ANY($2::int[]))
      ORDER BY e.seq DESC LIMIT $3`,
     [m.raceUuid, m.access.waves, limit],
   );
   const events = [];
   for (const e of rows.reverse()) {
+    // Phase 2: one entry per bib the organizer renumbered at import (original → corrected, reason).
+    if (e.type === "RidersImported" || e.type === "RaceAdmin") {
+      const fixes = (e.payload as { bibCorrections?: { riderUuid: string; originalBib: number; correctedBib: number; reason: string }[] }).bibCorrections ?? [];
+      for (const c of fixes) {
+        const r = state.riders[c.riderUuid];
+        if (!r || !projectRider(m.access, state, r)) continue;
+        events.push({ seq: e.seq, type: "RidersImported", heat: r.heat ?? e.heat, eventAt: e.eventAt, userName: e.userName, riderUuid: c.riderUuid,
+          bibNumber: c.correctedBib, originalBib: c.originalBib, reason: c.reason, firstName: r.firstName ?? null, lastName: r.lastName ?? null });
+      }
+      continue;
+    }
     const p = e.payload as { riderUuid?: string; status?: string; changes?: { bibNumber?: unknown; firstName?: unknown; lastName?: unknown }; rider?: { uuid?: string; bibNumber?: unknown; firstName?: unknown; lastName?: unknown } };
     const riderUuid = e.type === "RiderAdded" ? p.rider?.uuid : p.riderUuid;
     const r = riderUuid ? state.riders[riderUuid] : undefined;

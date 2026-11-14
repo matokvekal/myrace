@@ -1,7 +1,8 @@
 import Papa from "papaparse";
 import type { RiderFieldKey } from "@/types/csv.types";
 import { autoMapColumns } from "@/services/csvMapper";
-import { buildHeatNameMap, filterImportRows, rowToRider, type ImportSkipReason } from "@/services/riderRowMapper";
+import { buildHeatNameMap, filterImportRows, importSkipReason, rowToRider, type ImportSkipReason } from "@/services/riderRowMapper";
+import { findBibConflicts, type BibConflictGroup, type ImportBibRow } from "./bibConflicts";
 
 export interface StartListPreview {
   /** How each column was read (header → field, or "—" when not used). */
@@ -13,6 +14,9 @@ export interface StartListPreview {
   categories: { name: string; wave: number; riders: number }[];
   skipped: { row: number; reason: ImportSkipReason }[];
   warnings: string[];
+  /** Phase 2: every rider's bib (index = rider order of the import) and the duplicates among them. */
+  bibRows: ImportBibRow[];
+  bibConflicts: BibConflictGroup[];
 }
 
 const REQUIRED_ANY: RiderFieldKey[][] = [["bibNumber"], ["firstName", "lastName", "fullName"]];
@@ -30,6 +34,8 @@ export async function previewStartListRows(rows: string[][]): Promise<StartListP
     );
   }
   const { rows: dataRows, skipped } = filterImportRows(rows.slice(1), headers, mappings);
+  // File line of each kept row (header = line 1), for the duplicate-bib list.
+  const lineOf = rows.slice(1).map((r, i) => ({ r, line: i + 2 })).filter(({ r }) => !importSkipReason(r, headers, mappings)).map(({ line }) => line);
   const heatMap = buildHeatNameMap(dataRows, mappings);
   const riders = dataRows.map((r, i) => rowToRider(r, mappings, "preview", i, heatMap));
   if (!mapped.has("category")) {
@@ -54,8 +60,12 @@ export async function previewStartListRows(rows: string[][]): Promise<StartListP
   }
 
   const warnings: string[] = [];
-  const bibs = riders.map((r) => r.bibNumber).filter((b) => b > 0);
-  const dupBibs = [...new Set(bibs.filter((b, i) => bibs.indexOf(b) !== i))];
+  const bibRows: ImportBibRow[] = riders.map((r, index) => ({
+    index, row: lineOf[index] ?? index + 2, bib: r.bibNumber,
+    name: [r.firstName, r.lastName].filter(Boolean).join(" "), category: r.category, heat: r.heat ?? null,
+  }));
+  const bibConflicts = findBibConflicts(bibRows, []); // a new race: no riders yet
+  const dupBibs = bibConflicts.map((g) => g.bib);
   if (dupBibs.length) warnings.push(`Duplicate bib numbers: ${dupBibs.slice(0, 10).join(", ")}${dupBibs.length > 10 ? "…" : ""}`);
   const noBib = riders.filter((r) => !(r.bibNumber > 0)).length;
   if (noBib) warnings.push(`${noBib} rider(s) without a bib number`);
@@ -75,6 +85,8 @@ export async function previewStartListRows(rows: string[][]): Promise<StartListP
     categories: [...catCount.values()].sort((a, b) => a.wave - b.wave || a.name.localeCompare(b.name)),
     skipped,
     warnings,
+    bibRows,
+    bibConflicts,
   };
 }
 

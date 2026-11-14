@@ -24,6 +24,19 @@ describe("start-list preview", () => {
     expect(p.warnings.join(" | ")).toMatch(/repeated header row/);
   });
 
+  it("Phase 2: lists the duplicate bibs with their file lines and a proposed free number", async () => {
+    const header = ["Bib", "First Name", "Last Name", "Category", "Heat"];
+    const p = await previewStartListRows([
+      header,
+      ["102", "Noa", "Bar", "Elite", "1"],
+      header, // repeated header (line 3) is skipped but still counts as a line
+      ["102", "Avi", "Cohen", "Juniors", "2"],
+      ["1102", "Dan", "Tal", "Juniors", "2"],
+    ]);
+    expect(p.bibConflicts).toHaveLength(1);
+    expect(p.bibConflicts[0].rows.map((r) => [r.row, r.name, r.proposed])).toEqual([[2, "Noa Bar", 102], [4, "Avi Cohen", 2102]]);
+  });
+
   it("refuses a file without a bib or name column", async () => {
     await expect(previewStartListRows([["Foo", "Bar"], ["1", "2"]])).rejects.toThrow(/Required column/);
   });

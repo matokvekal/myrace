@@ -87,6 +87,13 @@ export const START_EDITABLE_CATEGORY_FIELDS = ["startTime", "heat"] as const sat
 /** A category as created by `CategoryAdded` / `RidersImported` (uuid made on the Device). */
 export type NewCategory = Pick<SharedCategory, "uuid" | "name" | "subCategory" | "laps" | "heat" | "startTime" | "color" | "linkGroup" | "importOrder"> &
   Partial<Pick<SharedCategory, "bibColor" | "bibTextColor">>;
+/**
+ * Phase 2 (Smart Rider Import): a bib the organizer changed at import because it was a
+ * duplicate. Audit only — the rider in `riders` already carries `correctedBib`; the
+ * Action's author and time (race_events) say who and when.
+ */
+export interface ImportBibCorrection { riderUuid: RiderUuid; originalBib: number; correctedBib: number; reason: string }
+
 /** A rider as created by `RiderAdded` / `RidersImported`: identity and start-list fields only. */
 export type NewRider = Pick<SharedRider, "uuid" | Exclude<RiderIdentityField, "bibColor" | "bibTextColor"> | "standing" | "flag" | "uciPoints" | "uciNumber" | "image" | "comment"> &
   Partial<Pick<SharedRider, "bibColor" | "bibTextColor">>;
@@ -112,7 +119,7 @@ export interface ActionPayloads {
   RiderNameCorrected: { riderUuid: RiderUuid; changes: Partial<Pick<SharedRider, RiderNameField>>; reason: string };
   RiderDeleted: { riderUuid: RiderUuid };
   /** Riders plus only the categories that don't exist yet. Never ID/passport fields. */
-  RidersImported: { riders: NewRider[]; categories: NewCategory[] };
+  RidersImported: { riders: NewRider[]; categories: NewCategory[]; bibCorrections?: ImportBibCorrection[] };
   RiderCheckedIn: { riderUuid: RiderUuid; checked: boolean };
   CommentSet: { riderUuid: RiderUuid; comment: string | null };
   RaceEdited: { changes: Partial<Pick<SharedRace, RaceInfoField>> };
@@ -140,7 +147,9 @@ export type RaceAdminPayload =
   /** Quick Trial Access (014): a link created / revoked by the owner, a trial user created by opening it. */
   | { op: "trialLinkCreated"; linkId: string; roles: MemberRole[]; maxUses: number; expiresAt: string; accessUntil: string }
   | { op: "trialLinkRevoked"; linkId: string; endedUsers: number }
-  | { op: "trialUserStarted"; linkId: string; userId: UserId; accessUntil: string };
+  | { op: "trialUserStarted"; linkId: string; userId: UserId; accessUntil: string }
+  /** Phase 2: duplicate bibs renumbered in the start list a race was created (published) with. */
+  | { op: "bibsCorrectedAtImport"; bibCorrections: ImportBibCorrection[] };
 
 /** Stable codes for an Action stored as not applied (same strings as API errors). */
 export const NOT_APPLIED_REASONS = [

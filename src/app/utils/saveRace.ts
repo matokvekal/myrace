@@ -1,7 +1,9 @@
 import useRaceStore from "@/stores/racesStore";
 import useCategoryStore from "@/stores/categoryStore";
 import { DEFAULT_MIN_LAP_SECONDS } from "./minLap";
-import { RaceProps } from "@/types/types";
+import { RaceProps, type RiderProps } from "@/types/types";
+import type { BibCorrection } from "./bibConflicts";
+import { logImportBibCorrections } from "@/stores/checkInChangesStore";
 import { FormEvent } from "react";
 import { saveRidersFromCsv, saveRidersFromRows } from "./insertRidersCsv";
 import { clearRaceState } from "@/utils/clearRaceState";
@@ -45,7 +47,9 @@ export const saveRace = async (
   file: File | null,
   setAddNewwRace: (value: boolean) => void,
   autoColor: boolean = true,
-  raceType: "MTB" | "Gravel" = "MTB"
+  raceType: "MTB" | "Gravel" = "MTB",
+  /** Phase 2: duplicate bibs renumbered (and confirmed) in the start-list preview. */
+  bibCorrections: BibCorrection[] = []
 ): Promise<NewRaceStorage | null> => {
   event.preventDefault();
 
@@ -103,6 +107,7 @@ export const saveRace = async (
     const { insertRace } = useRaceStore.getState();
     await insertRace(newRace);
 
+    let savedRiders: RiderProps[] = [];
     if (file) {
       // Must finish BEFORE the create screen closes (BUGS.md #18). This used to
       // fire a FileReader and return immediately, so opening the new race could
@@ -117,9 +122,9 @@ export const saveRace = async (
         if (/\.xlsx?$/i.test(file.name)) {
           const { parseXLSXFile } = await import("./xlsxParser");
           const { headers, rows } = await parseXLSXFile(file);
-          await saveRidersFromRows([headers, ...rows], newRace.uuid);
+          savedRiders = (await saveRidersFromRows([headers, ...rows], newRace.uuid, bibCorrections)).riders;
         } else {
-          await saveRidersFromCsv(await file.text(), newRace.uuid);
+          savedRiders = (await saveRidersFromCsv(await file.text(), newRace.uuid, bibCorrections)).riders;
         }
         // Categories first, independent of waves: every imported rider must
         // belong to a created category. Zero categories = a failed import.
@@ -140,6 +145,18 @@ export const saveRace = async (
           console.error("Could not roll back the new race", cleanupError);
         }
         throw error;
+      }
+    }
+    // Audit the renumbered duplicates: this device's log now, the server's history with the publish.
+    const fixes = bibCorrections.filter((c) => savedRiders[c.index]).map((c) => ({ c, rider: savedRiders[c.index] }));
+    if (fixes.length) {
+      await logImportBibCorrections(newRace.uuid, fixes.map(({ c, rider }) => ({ rider, originalBib: c.originalBib, reason: c.reason })))
+        .catch((e) => console.warn("Could not log the bib corrections", e));
+      if (import.meta.env.VITE_SERVER_URL) {
+        (await import("@/services/live/liveClient")).setPendingImportBibFixes(
+          newRace.uuid,
+          fixes.map(({ c, rider }) => ({ riderId: rider.id, originalBib: c.originalBib, correctedBib: c.correctedBib, reason: c.reason }))
+        );
       }
     }
     logAnalyticsEvent("race_created", {
@@ -169,6 +186,7 @@ export const saveRace = async (
         storage = { stored: "device", reason: "failed", message: e instanceof Error ? e.message : String(e) };
       }
       if (storage.stored !== "server" && storage.reason !== "timeout") {
+        live.setPendingImportBibFixes(newRace.uuid, []);
         await live.discardUnsavedNewRace(newRace.uuid);
         throw new Error(`The race was not saved to the server: ${storage.message.replace(/\.$/, "")}. Nothing was kept on this device — check the connection and press Done to try again.`);
       }

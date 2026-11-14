@@ -5,6 +5,7 @@ import type {
   CSVParseResult,
   ColumnMapping,
   ValidationResult,
+  ValidationIssue,
   ImportProgress,
   MappingTemplate
 } from "@/types/csv.types";
@@ -25,13 +26,36 @@ import ColumnMappingStep from "./ColumnMappingStep";
 import PreviewStep from "./PreviewStep";
 import ImportProgressStep from "./ImportProgressStep";
 import MultiDayDialog from "./MultiDayDialog";
+import BibConflictStep from "./BibConflictStep";
+import {
+  findBibConflicts,
+  type BibConflictGroup,
+  type BibCorrection,
+  type ExistingBibRider,
+  type ImportBibRow,
+} from "@/utils/bibConflicts";
+import { logImportBibCorrections } from "@/stores/checkInChangesStore";
 // The photo-OCR capture pulls in tesseract.js — load it only when the user
 // actually chooses "scan" (BUGS.md #1).
 const ImageCapture = lazy(() => import("@/components/importImage/ImageCapture"));
 import styles from "./csvImportWizard.module.css";
 import { newLocalId } from "@/utils/localId";
 
-type WizardStep = "upload" | "mapping" | "preview" | "importing";
+type WizardStep = "upload" | "mapping" | "preview" | "bibs" | "importing";
+
+/** Everything the save needs, built once from the preview (kept while the organizer resolves bibs). */
+interface PreparedImport {
+  riders: RiderProps[];
+  rowNumbers: number[];
+  totalInFile: number;
+  failedCount: number;
+  errorIssues: ValidationIssue[];
+  bibRows: ImportBibRow[];
+  existing: ExistingBibRider[];
+  conflicts: BibConflictGroup[];
+}
+
+const riderName = (r: Pick<RiderProps, "firstName" | "lastName">) => [r.firstName, r.lastName].filter(Boolean).join(" ");
 
 interface CSVImportWizardProps {
   raceUuid: string;
@@ -41,7 +65,8 @@ interface CSVImportWizardProps {
   initialMode?: "file" | "scan";
 }
 
-const STEP_ORDER: WizardStep[] = ["upload", "mapping", "preview", "importing"];
+const STEP_ORDER: WizardStep[] = ["upload", "mapping", "preview", "bibs", "importing"];
+const STEP_LABEL: Record<WizardStep, string> = { upload: "Upload", mapping: "Mapping", preview: "Preview", bibs: "Bibs", importing: "Importing" };
 
 export default function CSVImportWizard({
   raceUuid,
@@ -61,6 +86,7 @@ export default function CSVImportWizard({
   const [showMultiDayDialog, setShowMultiDayDialog] = useState(false);
   const [multiDayValues, setMultiDayValues] = useState<string[]>([]);
   const [multiDayRowCounts, setMultiDayRowCounts] = useState<Record<string, number>>({});
+  const [prepared, setPrepared] = useState<PreparedImport | null>(null);
 
   const insertRiders = useRiderStore((state) => state.insertRiders);
   const rebuildCategoriesFromRiders = useCategoryStore((state) => state.rebuildCategoriesFromRiders);
@@ -209,53 +235,74 @@ export default function CSVImportWizard({
     onComplete?.(totalSuccessful);
   };
 
-  const handleStartImport = async (validation: ValidationResult) => {
-    if (!parseResult) return;
-    setCurrentStep("importing");
-    setRefusal(null);
-
+  /** Preview → riders of the batch + their duplicate bibs. Nothing is saved here. */
+  const prepareImport = async (validation: ValidationResult): Promise<PreparedImport | null> => {
+    if (!parseResult) return null;
+    const headerRow = parseResult.detection.headerRow;
     const errorIssues = validation.issues.filter((i) => i.severity === "error");
-    const errorRowIndices = new Set(
-      errorIssues.map((i) => i.row - parseResult.detection.headerRow - 1)
-    );
+    const errorRowIndices = new Set(errorIssues.map((i) => i.row - headerRow - 1));
 
-    const totalInFile = parseResult.rows.length;
     // Rows with validation errors, repeated header rows, blank rows and rows
     // without a bib or a name are all skipped — before text waves are numbered.
-    const { rows: validRows } = filterImportRows(
-      parseResult.rows.filter((_, i) => !errorRowIndices.has(i)),
-      parseResult.headers,
-      columnMappings
-    );
-    const failedCount = totalInFile - validRows.length;
-
-    setSkippedIssues(errorIssues);
-    setImportProgress({
-      total: totalInFile,
-      processed: 0,
-      successful: 0,
-      failed: failedCount,
-      status: "importing"
-    });
+    const kept = parseResult.rows
+      .map((row, i) => ({ row, i }))
+      .filter(({ row, i }) => !errorRowIndices.has(i) && !importSkipReason(row, parseResult.headers, columnMappings));
+    const validRows = kept.map(({ row }) => row);
+    const rowNumbers = kept.map(({ i }) => i + headerRow + 1);
 
     // Text heats → numbers, from the rows that become riders only.
     const heatNameToNumber = buildHeatNameMap(validRows, columnMappings);
+    const riders = validRows.map((row, i) =>
+      rowToRider(row, columnMappings, raceUuid, i, heatNameToNumber, clubDictionary)
+    );
+
+    // Bibs are unique race-wide (every wave, every status — the server counts them all).
+    await useRiderStore.getState().getRiders(raceUuid);
+    const existing: ExistingBibRider[] = useRiderStore.getState().riders
+      .filter((r) => r.raceUuid === raceUuid && r.bibNumber > 0)
+      .map((r) => ({ bib: r.bibNumber, name: riderName(r), category: r.category, heat: r.heat ?? null }));
+    const bibRows: ImportBibRow[] = riders.map((r, index) => ({
+      index, row: rowNumbers[index], bib: r.bibNumber, name: riderName(r), category: r.category, heat: r.heat ?? null,
+    }));
+    return {
+      riders, rowNumbers, errorIssues, existing, bibRows,
+      totalInFile: parseResult.rows.length,
+      failedCount: parseResult.rows.length - validRows.length,
+      conflicts: findBibConflicts(bibRows, existing),
+    };
+  };
+
+  const handleStartImport = async (validation: ValidationResult) => {
+    const prep = await prepareImport(validation);
+    if (!prep) return;
+    setPrepared(prep);
+    setRefusal(null);
+    if (prep.conflicts.length > 0) {
+      setCurrentStep("bibs"); // the organizer decides; nothing is saved yet
+      return;
+    }
+    await runImport(prep, []);
+  };
+
+  /** Saves the prepared batch with the confirmed renumbering applied. */
+  const runImport = async (prep: PreparedImport, corrections: BibCorrection[]) => {
+    const { totalInFile, failedCount } = prep;
+    const fix = new Map(corrections.map((c) => [c.index, c]));
+    const riders = prep.riders.map((r, i) => (fix.has(i) ? { ...r, bibNumber: fix.get(i)!.correctedBib } : r));
+
+    setCurrentStep("importing");
+    setRefusal(null);
+    setSkippedIssues(prep.errorIssues);
+    setImportProgress({ total: totalInFile, processed: 0, successful: 0, failed: failedCount, status: "importing" });
 
     try {
-      const riders = validRows.map((row, i) =>
-        rowToRider(row, columnMappings, raceUuid, i, heatNameToNumber, clubDictionary)
-      );
       if (isLiveRace(raceUuid)) {
         // Shared race: riders AND categories go to the server in one Action, and
         // nothing is saved here until the server confirmed it (no half import).
-        const headerRow = parseResult.detection.headerRow;
-        const rowNumbers = parseResult.rows
-          .map((row, i) => ({ row, i }))
-          .filter(({ row, i }) => !errorRowIndices.has(i) && !importSkipReason(row, parseResult.headers, columnMappings))
-          .map(({ i }) => i + headerRow + 1);
+        // The renumbering travels in the same Action: the server's event is the audit.
         const live = await import("@/services/live/liveClient");
         try {
-          await live.importIntoSharedRace(raceUuid, riders, rowNumbers);
+          await live.importIntoSharedRace(raceUuid, riders, prep.rowNumbers, corrections);
         } catch (err) {
           if (!(err instanceof live.ImportRefused)) throw err;
           setRefusal({ message: err.message, problems: err.problems.map((p) => p.message) });
@@ -265,28 +312,30 @@ export default function CSVImportWizard({
       } else {
         await insertRiders(riders);
         await rebuildCategoriesFromRiders(raceUuid);
+        await logImportBibCorrections(
+          raceUuid,
+          corrections.map((c) => ({ rider: riders[c.index], originalBib: c.originalBib, reason: c.reason }))
+        ).catch((e) => console.warn("Could not log the bib corrections", e));
       }
       setImportProgress({
         total: totalInFile,
         processed: totalInFile,
-        successful: validRows.length,
+        successful: riders.length,
         failed: failedCount,
         status: "completed"
       });
-      onComplete?.(validRows.length);
+      setPrepared(null);
+      onComplete?.(riders.length);
     } catch (err) {
       console.error("Import failed:", err);
-      setImportProgress((prev) =>
-        prev
-          ? { ...prev, processed: prev.total, successful: 0, failed: prev.total, status: "completed" }
-          : null
-      );
+      setRefusal({ message: `Nothing was imported. ${err instanceof Error ? err.message : String(err)}`, problems: [] });
+      setImportProgress({ total: totalInFile, processed: totalInFile, successful: 0, failed: totalInFile, status: "error" });
     }
   };
 
   const handleBack = () => {
     const idx = STEP_ORDER.indexOf(currentStep);
-    if (idx > 0) setCurrentStep(STEP_ORDER[idx - 1]);
+    if (idx > 0) setCurrentStep(STEP_ORDER[idx - 1] === "bibs" ? "preview" : STEP_ORDER[idx - 1]);
   };
 
   const handleClose = () => {
@@ -297,6 +346,7 @@ export default function CSVImportWizard({
     setImportProgress(null);
     setSkippedIssues([]);
     setRefusal(null);
+    setPrepared(null);
     setSuggestedName("");
     setShowMultiDayDialog(false);
     setMultiDayValues([]);
@@ -316,8 +366,8 @@ export default function CSVImportWizard({
       </div>
 
       <div className={styles.progressBar}>
-        {STEP_ORDER.map((step, i) => {
-          const currentIdx = STEP_ORDER.indexOf(currentStep);
+        {STEP_ORDER.filter((step) => step !== "bibs" || currentStep === "bibs").map((step, i, shown) => {
+          const currentIdx = shown.indexOf(currentStep);
           const isActive = currentStep === step;
           const isCompleted = i < currentIdx;
           return (
@@ -326,9 +376,7 @@ export default function CSVImportWizard({
               className={`${styles.step} ${isActive ? styles.active : ""} ${isCompleted ? styles.completed : ""}`}
             >
               <span className={styles.stepNumber}>{i + 1}</span>
-              <span className={styles.stepLabel}>
-                {step.charAt(0).toUpperCase() + step.slice(1)}
-              </span>
+              <span className={styles.stepLabel}>{STEP_LABEL[step]}</span>
             </div>
           );
         })}
@@ -376,6 +424,15 @@ export default function CSVImportWizard({
             mappings={columnMappings}
             onStartImport={handleStartImport}
             onBack={handleBack}
+          />
+        )}
+        {currentStep === "bibs" && prepared && (
+          <BibConflictStep
+            groups={prepared.conflicts}
+            rows={prepared.bibRows}
+            existing={prepared.existing}
+            onCancel={() => setCurrentStep("preview")}
+            onConfirm={(corrections) => runImport(prepared, corrections)}
           />
         )}
         {currentStep === "importing" && importProgress && (

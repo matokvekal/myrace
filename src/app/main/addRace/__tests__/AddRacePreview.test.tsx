@@ -27,4 +27,31 @@ describe("Create Race → start-list preview", () => {
     await user.click(done);
     await waitFor(() => expect(saveRace).toHaveBeenCalledTimes(1));
   });
+
+  it("Phase 2: duplicate bibs across waves must be resolved before the import can be confirmed", async () => {
+    saveRace.mockClear();
+    const user = userEvent.setup();
+    render(<AddRace setAddNewwRace={() => {}} />);
+    const csv = "Bib,First Name,Last Name,Category,Heat\n21,Dana,Levi,Elite,1\n21,Noa,Bar,Juniors,2\n";
+    await user.upload(document.getElementById("ridersFileUpload") as HTMLInputElement, new File([csv], "dups.csv", { type: "text/csv" }));
+
+    const box = await screen.findByTestId("import-bib-conflicts");
+    expect(box).toHaveAttribute("data-resolved", "false");
+    expect(screen.getByTestId("import-preview-confirm")).toBeDisabled();
+
+    // Cancel changes nothing.
+    await user.click(screen.getByTestId("import-bib-resolve"));
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByTestId("import-bib-conflicts")).toHaveAttribute("data-resolved", "false");
+
+    await user.click(screen.getByTestId("import-bib-resolve"));
+    expect(screen.getByTestId("bib-choice-1")).toHaveValue("1021");
+    await user.click(screen.getByTestId("bib-conflicts-confirm"));
+    expect(screen.getByTestId("import-bib-conflicts")).toHaveAttribute("data-resolved", "true");
+
+    await user.click(screen.getByTestId("import-preview-confirm"));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(saveRace).toHaveBeenCalledTimes(1));
+    expect(saveRace.mock.calls[0][10]).toEqual([expect.objectContaining({ index: 1, originalBib: 21, correctedBib: 1021 })]);
+  });
 });

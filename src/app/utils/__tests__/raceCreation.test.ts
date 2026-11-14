@@ -100,6 +100,23 @@ describe("race creation", () => {
     expect(dana).toMatchObject({ bibNumber: 345, category: "Men Elite", lastName: "Levi" });
     expect(dana.standing).toBe(2); // standing is NOT mixed up with the bib
   });
+  it("Phase 2: applies the duplicate-bib renumbering confirmed in the preview", async () => {
+    const csv = ["First Name,Last Name,Bib,Category,Heat", "Dana,Levi,21,Elite,1", "Noa,Cohen,21,Kids,3"].join("\n");
+    const fix = { index: 1, originalBib: 21, correctedBib: 1021, reason: "Duplicate bib at import: 21 was also on another row of the file" };
+    await saveRace({ preventDefault: vi.fn() } as any, "Dups", "2026-06-01", "Park", "upcoming", null, new File([csv], "d.csv"), vi.fn(), true, "MTB", [fix]);
+    const [race] = useRaceStore.getState().races;
+    const riders = useRiderStore.getState().riders.filter((r) => r.raceUuid === race.uuid);
+    expect(riders.map((r) => [r.firstName, r.bibNumber])).toEqual([["Dana", 21], ["Noa", 1021]]);
+  });
+
+  it("Phase 2: refuses a renumbering that no longer matches the file (nothing is kept)", async () => {
+    const csv = ["First Name,Last Name,Bib,Category", "Dana,Levi,21,Elite", "Noa,Cohen,22,Kids"].join("\n");
+    const fix = { index: 1, originalBib: 21, correctedBib: 1021, reason: "Duplicate bib at import" };
+    await expect(
+      saveRace({ preventDefault: vi.fn() } as any, "Stale", "2026-06-01", "Park", "upcoming", null, new File([csv], "d.csv"), vi.fn(), true, "MTB", [fix])
+    ).rejects.toThrow(/changed since its preview/);
+    expect(useRaceStore.getState().races).toHaveLength(0);
+  });
 });
 
 describe("start-list import validation", () => {

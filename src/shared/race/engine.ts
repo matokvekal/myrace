@@ -473,6 +473,11 @@ export function applyAction(state: RaceState, action: RaceAction, atMs: number):
       const { riders, categories } = action.payload;
       const bibs = riders.map((r) => r.bibNumber).filter((b) => b != null);
       if (new Set(bibs).size !== bibs.length || riders.some((r) => state.riders[r.uuid] || bibTaken(state, r.bibNumber))) return notApplied("invalid");
+      // Each audited renumbering must describe a rider of THIS import, with the bib it now has.
+      for (const c of action.payload.bibCorrections ?? []) {
+        const n = riders.find((r) => r.uuid === c.riderUuid);
+        if (!n || n.bibNumber !== c.correctedBib || c.originalBib === c.correctedBib) return notApplied("invalid");
+      }
       for (const n of categories) {
         // Only categories that don't exist yet; existing ones are never rebuilt.
         if (Object.values(state.categories).some((c) => categoryKey(c.name, c.subCategory) === categoryKey(n.name, n.subCategory ?? null))) continue;

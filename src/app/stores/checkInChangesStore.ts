@@ -24,6 +24,11 @@ export interface CheckInChange {
   riderName: string;
   text: string;
   by: string;
+  /** Phase 2: set on a bib renumbered at import because it was a duplicate. */
+  importFix?: { originalBib: number; correctedBib: number; reason: string };
+  /** Which rider (local id for a local race, uuid for a shared one) — Rider Details finds its note by it. */
+  riderId?: number;
+  riderUuid?: string;
 }
 
 interface State {
@@ -56,7 +61,7 @@ export const useCheckInChanges = create<State>((set) => ({
     const entries = await AuditLogService.readEntries(race).catch(() => []);
     const changes = entries
       .filter((e) => KIND_OF_ACTION[e.action])
-      .map((e) => ({
+      .map((e): CheckInChange => ({
         timestamp: e.timestamp,
         kind: KIND_OF_ACTION[e.action],
         wave: Number(e.details.wave),
@@ -64,6 +69,8 @@ export const useCheckInChanges = create<State>((set) => ({
         riderName: String(e.details.riderName ?? ""),
         text: String(e.details.text ?? ""),
         by: e.performedBy.userName,
+        riderId: e.entityId != null && e.entityId !== "" ? Number(e.entityId) : undefined,
+        ...(e.details.importFix ? { importFix: e.details.importFix as CheckInChange["importFix"] } : {}),
       }))
       .reverse();
     set({ raceUuid: race.uuid, changes });
@@ -105,6 +112,18 @@ export function sharedCheckInChanges(events: SharedCheckInEvent[], race: Pick<Ra
     const prevName = name.get(e.riderUuid);
     const hasName = e.lastName != null || e.firstName != null;
     const fullName = hasName ? `${e.lastName ?? r?.lastName ?? ""} ${e.firstName ?? r?.firstName ?? ""}`.trim() : null;
+    if (e.type === "RidersImported") {
+      // A duplicate bib renumbered at import: shown whatever the day (imports happen before race day).
+      if (typeof e.bibNumber === "number") bib.set(e.riderUuid, e.bibNumber);
+      if (typeof e.bibNumber === "number" && typeof e.originalBib === "number") {
+        out.push(importFixChange({
+          timestamp: e.eventAt, wave: Number(wave), bib: e.bibNumber,
+          riderName: fullName ?? (r ? `${r.lastName} ${r.firstName}` : ""), by: e.userName ?? "UNKNOWN",
+          riderUuid: e.riderUuid, originalBib: e.originalBib, reason: e.reason ?? "Duplicate bib at import",
+        }));
+      }
+      continue;
+    }
     if (e.type === "StatusCorrection" && e.status) status.set(e.riderUuid, e.status === "running" ? "standing" : e.status);
     if (typeof e.bibNumber === "number") bib.set(e.riderUuid, e.bibNumber);
     if (fullName) name.set(e.riderUuid, fullName);
@@ -130,6 +149,52 @@ export function sharedCheckInChanges(events: SharedCheckInEvent[], race: Pick<Ra
     }
   }
   return out.reverse();
+}
+
+function importFixChange(c: {
+  timestamp: string; wave: number; bib: number; riderName: string; by: string;
+  riderUuid?: string; riderId?: number; originalBib: number; reason: string;
+}): CheckInChange {
+  return {
+    timestamp: c.timestamp, kind: "bib", wave: c.wave, bib: c.bib, riderName: c.riderName, by: c.by,
+    text: `Bib ${c.originalBib} → ${c.bib} at import (${c.reason.replace(/^Duplicate bib at import: /, "duplicate: ")})`,
+    importFix: { originalBib: c.originalBib, correctedBib: c.bib, reason: c.reason },
+    riderUuid: c.riderUuid, riderId: c.riderId,
+  };
+}
+
+/** The import's renumbering note for one rider (newest), if any. */
+export function importFixFor(changes: CheckInChange[], rider: Pick<RiderProps, "id" | "uuid">): CheckInChange | undefined {
+  return changes.find((c) => c.importFix && ((rider.uuid && c.riderUuid === rider.uuid) || c.riderId === rider.id));
+}
+
+/**
+ * Phase 2: audits the duplicate bibs renumbered at import on a LOCAL race (a shared race's
+ * audit is the server's RidersImported event). One entry per rider, then ONE reload.
+ */
+export async function logImportBibCorrections(
+  raceUuid: string,
+  fixes: { rider: Pick<RiderProps, "id" | "uuid" | "bibNumber" | "firstName" | "lastName" | "heat">; originalBib: number; reason: string }[]
+): Promise<void> {
+  const race = useRaceStore.getState().races.find((r) => r.uuid === raceUuid);
+  if (!race || fixes.length === 0) return;
+  await Promise.all(fixes.map(({ rider, originalBib, reason }) => {
+    const change = importFixChange({ timestamp: "", wave: Number(rider.heat ?? 0), bib: rider.bibNumber, riderName: "", by: "", originalBib, reason });
+    return AuditLogService.log({
+      race,
+      action: ACTION.bib,
+      screen: "Import",
+      entityType: "rider",
+      entityId: rider.id,
+      before: { bibNumber: originalBib },
+      after: { bibNumber: rider.bibNumber },
+      details: {
+        wave: rider.heat ?? 0, bib: rider.bibNumber, riderName: `${rider.lastName} ${rider.firstName}`,
+        text: change.text, importFix: change.importFix, riderUuid: rider.uuid ?? null,
+      },
+    });
+  }));
+  await useCheckInChanges.getState().load(race);
 }
 
 export function logCheckInChange(

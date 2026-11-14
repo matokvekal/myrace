@@ -1581,6 +1581,16 @@ export function publishRace(local: string, opts: { allowEmpty?: boolean } = {}):
 }
 const publishingRaces = new Map<string, Promise<string>>();
 
+/**
+ * Phase 2: duplicate bibs renumbered in the start list of a race created on this Device
+ * (by local rider id), sent once with its publish so the server's history records them.
+ */
+const pendingImportBibFixes = new Map<string, { riderId: number; originalBib: number; correctedBib: number; reason: string }[]>();
+export function setPendingImportBibFixes(local: string, fixes: { riderId: number; originalBib: number; correctedBib: number; reason: string }[]): void {
+  if (fixes.length) pendingImportBibFixes.set(local, fixes);
+  else pendingImportBibFixes.delete(local);
+}
+
 async function publishRaceOnce(local: string, { allowEmpty = false }: { allowEmpty?: boolean }): Promise<string> {
   if (!session) throw new LiveApiError(401, "unauthorized", "Sign in to share a race");
   if (linkOf(local)) throw new LiveApiError(409, "already_published", "This race is already shared");
@@ -1606,11 +1616,19 @@ async function publishRaceOnce(local: string, { allowEmpty = false }: { allowEmp
   info.autoColor = race.autoColor ?? null;
   info.leaderFinishAll = race.leaderFinishAll ?? null;
   info.minLapSeconds = race.minLapSeconds ?? null;
+  const uuidOfRider = new Map(ridersWithUuid.map((r) => [r.id, r]));
+  const bibCorrections = (pendingImportBibFixes.get(local) ?? [])
+    .map((f) => ({ r: uuidOfRider.get(f.riderId), f }))
+    // Only what still holds (the rider is there with the corrected bib).
+    .filter(({ r, f }) => r && r.bibNumber === f.correctedBib && f.originalBib !== f.correctedBib)
+    .map(({ r, f }) => ({ riderUuid: r!.uuid!, originalBib: f.originalBib, correctedBib: f.correctedBib, reason: f.reason.slice(0, 300) }));
   const res = await api<{ race: SharedRace }>("POST", "/races/publish", {
     race: { ...info, name: race.name || "Race" },
     categories: catsWithUuid.map(toNewCategory),
     riders: ridersWithUuid.map((r) => ({ ...toNewRider(r), checked: !!r.checked, status: r.status === "DNS" ? "DNS" : "standing" })),
+    ...(bibCorrections.length ? { bibCorrections } : {}),
   });
+  pendingImportBibFixes.delete(local);
   setLink(local, { serverRaceUuid: res.race.uuid, lastSeq: 0, linkedAt: new Date().toISOString() });
   await openLiveRace(null);
   await openLiveRace(local);
@@ -1759,7 +1777,13 @@ const lastImport = new Map<string, { fingerprint: string; actionId: string }>();
  * applied it; then the race is caught up, so riders and categories arrive here
  * exactly as every other device gets them. A refusal names the rows.
  */
-export async function importIntoSharedRace(local: string, riders: RiderProps[], rowNumbers: number[]): Promise<{ riders: number; categories: number }> {
+export async function importIntoSharedRace(
+  local: string,
+  riders: RiderProps[],
+  rowNumbers: number[],
+  /** Phase 2: duplicate bibs the organizer renumbered (by index in `riders`), sent for the audit. */
+  bibCorrections: { index: number; originalBib: number; correctedBib: number; reason: string }[] = [],
+): Promise<{ riders: number; categories: number }> {
   const link = linkOf(local);
   if (!link) throw new Error("Not a shared race");
   if (!session) throw new ImportRefused([], "Nothing was imported. Sign in to import into this race.");
@@ -1786,7 +1810,14 @@ export async function importIntoSharedRace(local: string, riders: RiderProps[], 
   lastImport.set(local, { fingerprint, actionId });
   const action = {
     actionId, raceUuid: link.serverRaceUuid, type: "RidersImported",
-    payload: { riders: withUuid.map(toNewRider), categories: categories.map(toNewCategory) },
+    payload: {
+      riders: withUuid.map(toNewRider),
+      categories: categories.map(toNewCategory),
+      // Only when there is something to say: an older server refuses unknown fields.
+      ...(bibCorrections.length ? {
+        bibCorrections: bibCorrections.map((c) => ({ riderUuid: withUuid[c.index].uuid!, originalBib: c.originalBib, correctedBib: c.correctedBib, reason: c.reason.slice(0, 300) })),
+      } : {}),
+    },
     deviceTime: localIso(Date.now()), clockOffsetMs, deviceId: deviceId(), protocolVersion: PROTOCOL_VERSION,
   } as RaceAction;
 
@@ -1943,7 +1974,7 @@ export const team = {
 
 export interface SharedCheckInEvent {
   seq: number;
-  type: "StatusCorrection" | "RiderEdited" | "RiderAdded";
+  type: "StatusCorrection" | "RiderEdited" | "RiderAdded" | "RidersImported";
   heat: number | null;
   eventAt: string;
   userName: string | null;
@@ -1952,6 +1983,9 @@ export interface SharedCheckInEvent {
   bibNumber?: number | null;
   firstName?: string | null;
   lastName?: string | null;
+  /** RidersImported (Phase 2): a duplicate bib renumbered at import. */
+  originalBib?: number;
+  reason?: string;
 }
 
 export interface Member {

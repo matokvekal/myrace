@@ -42,3 +42,4 @@ commissaire.auth.refresh
 motionActive
 rider-lookup-open
 sync-alert-open
+bib-conflicts-confirm

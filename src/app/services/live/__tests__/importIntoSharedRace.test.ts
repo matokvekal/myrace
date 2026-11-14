@@ -54,6 +54,20 @@ describe("Import into a shared race", () => {
     expect(sent[0].payload.categories.map((c) => [c.name, c.heat]).sort()).toEqual([["Elite", 1], ["Masters", 2]]);
   });
 
+  it("sends the confirmed bib corrections in the same Action, keyed by the rider's uuid", async () => {
+    const { live } = await load();
+    const file = [rider(21, "Elite"), rider(1021, "Elite", 2)];
+    await live.importIntoSharedRace(LOCAL, file, [2, 3], [{ index: 1, originalBib: 21, correctedBib: 1021, reason: "Duplicate bib at import: 21 was also on another row of the file" }]);
+    const p = sent[0].payload as unknown as { riders: { uuid: string; bibNumber: number }[]; bibCorrections: { riderUuid: string; originalBib: number; correctedBib: number }[] };
+    expect(p.bibCorrections).toEqual([expect.objectContaining({ riderUuid: p.riders[1].uuid, originalBib: 21, correctedBib: 1021 })]);
+  });
+
+  it("no corrections → no bibCorrections field (an older server refuses unknown fields)", async () => {
+    const { live } = await load();
+    await live.importIntoSharedRace(LOCAL, [rider(1, "Elite")], [2]);
+    expect("bibCorrections" in sent[0].payload).toBe(false);
+  });
+
   it("a bad file is refused by row before anything is sent or saved", async () => {
     const { live, useRiderStore } = await load();
     const err = await live.importIntoSharedRace(LOCAL, [rider(7, "Elite"), rider(7, "Elite"), rider(8, "")], [2, 3, 4]).catch((e) => e);

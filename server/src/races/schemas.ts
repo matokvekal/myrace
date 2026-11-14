@@ -47,7 +47,15 @@ export const newRider = z.strictObject({
   comment: nullable(text(1000)),
 });
 
-const riderIdentityChanges = newRider.omit({ uuid: true, standing: true, flag: true, uciPoints: true, image: true, comment: true }).partial();
+/** Phase 2: duplicate bibs renumbered at import (RidersImported and publish). Audit only. */
+export const bibCorrections = z.array(z.strictObject({
+  riderUuid: uuid,
+  originalBib: z.number().int().min(0).max(999999),
+  correctedBib: z.number().int().min(1).max(999999),
+  reason: z.string().trim().min(3).max(300),
+})).max(5000);
+
+const riderIdentityChanges =newRider.omit({ uuid: true, standing: true, flag: true, uciPoints: true, image: true, comment: true }).partial();
 
 const raceInfoShape = Object.fromEntries(RACE_INFO_FIELDS.map((f) => [f, z.unknown()])) as Record<(typeof RACE_INFO_FIELDS)[number], z.ZodUnknown>;
 
@@ -83,7 +91,12 @@ const payloads = {
   RiderAdded: z.strictObject({ rider: newRider }),
   RiderEdited: z.strictObject({ riderUuid: uuid, changes: z.strictObject(riderIdentityChanges.shape) }),
   RiderDeleted: z.strictObject({ riderUuid: uuid }),
-  RidersImported: z.strictObject({ riders: z.array(newRider).max(5000), categories: z.array(newCategory).max(500) }),
+  RidersImported: z.strictObject({
+    riders: z.array(newRider).max(5000),
+    categories: z.array(newCategory).max(500),
+    // Phase 2: duplicate bibs the organizer renumbered at import (audit; the engine checks them).
+    bibCorrections: bibCorrections.optional(),
+  }),
   RiderCheckedIn: z.strictObject({ riderUuid: uuid, checked: z.boolean() }),
   CommentSet: z.strictObject({ riderUuid: uuid, comment: text(1000).nullable() }),
   RiderNameCorrected: z.strictObject({
