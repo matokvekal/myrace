@@ -49,6 +49,13 @@ On the server, as the admin:
    BEFORE starting the new server: `psql -1 -v ON_ERROR_STOP=1 -f sql/011-team-phase1.sql`, then
    `psql -1 -v ON_ERROR_STOP=1 -f sql/012-organizations.sql` (`-1` = single transaction, so a
    failure leaves nothing half-applied). The new API refuses to start until both are recorded.
+   **1.2.0 (migration 015, Smart Rider Import):** `psql -1 -v ON_ERROR_STOP=1 -f sql/015-column-mappings.sql`
+   (additive: one new table `column_mappings`, no foreign keys, safe to re-run) BEFORE the new API;
+   `migrate-cli --check` and the API's start-up check refuse a database without it.
+   **Order is binding: migration → API → App.** The 1.1.x API refuses the 1.2.0 app's
+   `RidersImported.bibCorrections` (strict schema: an import with renumbered duplicate bibs into a
+   shared race would be refused as a whole) and silently drops publish `bibCorrections` (audit lost).
+   The old app works unchanged on the new API (every new field is optional).
 4. **API**: unpack to a new release folder, link `server/.env` to the shared
    production `.env` (template: `server/deploy/production.env.example`), point
    PM2's `server-commissaire` at it (`server/deploy/ecosystem.config.cjs`; it reads
