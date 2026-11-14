@@ -35,7 +35,9 @@ async function createRace(page: Page, name: string) {
 test("duplicate bibs: resolved at Create Race and at import, never saved twice", async ({ page }) => {
   await page.goto("/main");
   await acceptTerms(page);
-  test.skip(await page.getByTestId("signin-reason-create").isVisible().catch(() => false), "server build: Create Race needs an account");
+  // Server builds need an account to browse / create (the shared-race path is covered by
+  // race-persistence.spec.ts "start list imported …" against a real API).
+  test.skip(/\/account/.test(page.url()) || !!process.env.E2E_API_URL, "server build: needs an account");
 
   await createRace(page, `Dups ${Date.now()}`);
   await expect(page.getByText("Riders (3)")).toBeVisible();

@@ -176,17 +176,25 @@ test("signed in: a start list imported into the new race goes to the server with
   expect(snap.riders.map((r: { bibNumber: number }) => r.bibNumber).sort()).toEqual([901, 902, 903]);
   expect(snap.categories.map((c: { name: string }) => c.name)).toEqual(["E2E Test Cat"]);
 
-  // The same file again, and a file with a duplicate bib: refused by row, nothing added anywhere.
+  // Phase 2: the same file again → its bibs are already in the race: the duplicate step opens
+  // BEFORE anything is sent; Back cancels and nothing is added anywhere.
   await importFile(page, START_LIST);
-  await expect(page.getByTestId("import-refused")).toContainText("Row 1: bib 901 is already in this race"); // rows numbered as in the import preview
-  await page.getByRole("button", { name: "Close" }).click();
-  await importFile(page, { name: "dup.csv", mimeType: "text/csv", buffer: Buffer.from("bib,first name,last name,category,heat\n950,A,One,Juniors,2\n950,B,Two,Juniors,2\n") });
-  await expect(page.getByTestId("import-refused")).toContainText("Bib 950 appears on rows 1, 2");
-  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByTestId("bib-group-901")).toContainText("Already in this race");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByTestId("preview-import")).toBeVisible();
+  await page.getByRole("button", { name: "✕" }).click();
   snap = await snapshotOf(email);
   expect(snap.riders).toHaveLength(3);
   expect(snap.categories).toHaveLength(1);
-  await expect(page.getByText("Riders (3)")).toBeVisible();
+
+  // A file with a duplicate bib: the organizer confirms 950 → 1950; one Action, audited on the server.
+  await importFile(page, { name: "dup.csv", mimeType: "text/csv", buffer: Buffer.from("bib,first name,last name,category,heat\n950,A,One,Juniors,2\n950,B,Two,Juniors,2\n") });
+  await expect(page.getByTestId("bib-choice-1")).toHaveValue("1950");
+  await page.getByTestId("bib-conflicts-confirm").click();
+  await expect(page.getByText("Riders (5)")).toBeVisible();
+  snap = await snapshotOf(email);
+  expect(snap.riders.map((r: { bibNumber: number }) => r.bibNumber).sort((a: number, b: number) => a - b)).toEqual([901, 902, 903, 950, 1950]);
+  expect(snap.categories).toHaveLength(2);
 
   // A second browser sees the riders and the category.
   const ctx = await browser.newContext();
@@ -197,7 +205,8 @@ test("signed in: a start list imported into the new race goes to the server with
   await other.getByPlaceholder("Email").fill(email);
   await other.getByPlaceholder(/Password/).fill(PASSWORD);
   await other.getByRole("button", { name: "Sign in" }).click();
-  await expect(other.getByTestId("shared-races-synced")).toBeVisible({ timeout: 30_000 }); // synced in at sign-in, listed once
+  // Synced in at sign-in (My Races syncs silently since 0.3; SharedRacesSection is no longer shown).
+  await expect(other.getByText("Import Race").first()).toBeVisible({ timeout: 30_000 });
   await other.getByText("Import Race").first().click();
   await expect(other.getByText("McTestface").first()).toBeVisible();
   await other.getByRole("button", { name: "Categories", exact: true }).click();

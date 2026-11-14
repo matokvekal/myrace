@@ -471,6 +471,14 @@ still open).
   ".csv,.txt"`). The 4-step wizard (`CSVImportWizard`) handles xlsx via
   `parseXLSXFile`. All three share `rowToRider` / `autoMapColumns` (BUGS.md #20).
 
+### Smart Rider Import (Phase 2, 2026-11-14) — see docs/csv-import.md
+- Duplicate bibs are resolved BEFORE saving (wizard step `bibs`, Create Race preview): `utils/bibConflicts.ts`
+  proposes 21→1021→2021; the organizer edits/confirms. Audited via `RidersImported.bibCorrections` /
+  publish `bibCorrections` (RaceAdmin `bibsCorrectedAtImport`), listed in Check-In changes + Rider Details.
+- Import stages (`ImportStages`), double-submit guard, "Back to preview" after a refusal.
+- Shared column dictionary (migration 015 `column_mappings`, `/me/column-mappings`): mine applies to me,
+  others' only as an agreed suggestion that must be confirmed; nothing saved without "Remember".
+
 ### Import: fields we try not to collect
 - `OPT_IN_FIELDS` (`types/csv.types.ts`: birth date, UCI ID, bib colours) are never
   auto-mapped, not even from a learned mapping, so Create Race never imports them
