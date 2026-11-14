@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import path from "path";
-import { acceptTerms } from "./helpers";
+import { acceptTerms, expectSignedIn } from "./helpers";
 
 /**
  * Create Race persistence and sign-in against a REAL Commissaire API (not run in CI).
@@ -55,8 +55,9 @@ test("signed in: Create Race waits for the server, and the race opens in a secon
   await other.getByPlaceholder("Email").fill(email);
   await other.getByPlaceholder(/Password/).fill(PASSWORD);
   await other.getByRole("button", { name: "Sign in" }).click();
-  // Signed in → All Races; the account's races are synced in, listed once.
-  await expect(other.getByTestId("shared-races-synced")).toBeVisible({ timeout: 30_000 });
+  // Signed in → All Races; the account's races are synced in (silently, AccountSync), listed once.
+  await expectSignedIn(other);
+  await expect(other.getByText("Phone Race").first()).toBeVisible({ timeout: 30_000 });
   await expect(other.getByText("Phone Race")).toHaveCount(1);
   await other.getByText("Phone Race").click();
   await expect(other).toHaveURL(/\/race\//);
@@ -64,14 +65,16 @@ test("signed in: Create Race waits for the server, and the race opens in a secon
   await ctx.close();
 });
 
-test("signed out: browsing works; Create Race asks to sign in, syncs the account's races, then opens the form", async ({ page }) => {
+test("signed out: All Races needs an account; the Create Race link asks to sign in, syncs, then opens the form", async ({ page }) => {
   const email = `later.${Date.now()}@x.test`;
   await page.goto("/main");
   await acceptTerms(page);
+  // Since 0.3 browsing needs an account (guests only open shared links): /main sends a guest to sign in.
   await page.goto("/main");
-  await expect(page.getByRole("button", { name: /Try Demo Race/i })).toBeVisible(); // public browsing, no account
-  await page.getByRole("button", { name: /Create new race|Add/ }).first().click();
-  await expect(page).toHaveURL(/\/account\?reason=create&next=/);
+  await expect(page).toHaveURL(/\/account\?reason=guest&next=/);
+  await expect(page.getByTestId("signin-reason-guest")).toBeVisible();
+  // The app's own Create Race link for a signed-out user (main/page.tsx requestCreate).
+  await page.goto(`/account?reason=create&next=${encodeURIComponent("/main?create=1")}`);
   await expect(page.getByTestId("signin-reason-create")).toContainText("to create a race");
   await register(page, email);
   // Straight on to Create Race, after the account's races were synced.
@@ -125,9 +128,9 @@ test("phone: Create Race signed out → sign in → form (mobile size)", async (
   const email = `phone.${Date.now()}@x.test`;
   await page.goto("/main");
   await acceptTerms(page);
-  await page.goto("/main");
-  await page.getByRole("button", { name: /Create new race|Add/ }).first().click();
-  await expect(page.getByTestId("signin-reason-create")).toBeVisible();
+  // Signed out, a Create Race link (?create=1) goes through sign-in and continues to the form.
+  await page.goto("/main?create=1");
+  await expect(page).toHaveURL(/\/account\?reason=guest&next=/);
   await register(page, email);
   await expect(page.getByPlaceholder("Race Name")).toBeVisible({ timeout: 20_000 });
   await ctx.close();
@@ -214,26 +217,31 @@ test("signed in: a start list imported into the new race goes to the server with
   await ctx.close();
 });
 
-test("side menu: Register / Login opens /account; Logout signs out and keeps local races", async ({ page }) => {
+test("side menu: shows the account; Logout signs out and keeps the races on this device", async ({ page }) => {
+  // Since 0.3 a signed-out user never reaches the side menu (All Races needs an account), so the
+  // menu's Login entry is covered by accountUi.test.tsx; here: sign in, a race on the device, Logout.
   await page.goto("/main");
   await acceptTerms(page);
-  // A race on this device (the demo: creating one now needs an account).
+  await page.goto("/account");
+  await register(page, `menu.${Date.now()}@x.test`, "Menu User");
+  await expectSignedIn(page);
+  // A race on this device: the demo, offered on an empty My Races.
   await page.getByRole("button", { name: /Try Demo Race/i }).click();
   await page.waitForURL(/\/race\//);
-  await page.goto("/main");
-  await page.locator("#main-menu-button").click();
-  await page.getByTestId("menu-login").click();
-  await expect(page).toHaveURL(/\/account$/);
-  await register(page, `menu.${Date.now()}@x.test`, "Menu User");
-  await expect(page).toHaveURL(/\/main/, { timeout: 20_000 }); // signed in → All Races
 
   await page.goto("/main");
   await page.locator("#main-menu-button").click();
   await expect(page.getByText("Menu User").first()).toBeVisible();
   await page.getByTestId("menu-logout").click();
   await expect(page.getByText(/Signed out/)).toBeVisible();
-  await page.locator("#main-menu-button").click();
-  await expect(page.getByTestId("menu-login")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByText("Demo Race").first()).toBeVisible();
+  // Signed out: the session is gone, All Races asks to sign in again…
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("commissaire.live.session"))).toBeNull();
+  await page.goto("/main");
+  await expect(page).toHaveURL(/\/account\?reason=guest/);
+  // …and the race is still on this device (IndexedDB), nothing was deleted.
+  const names = await page.evaluate(async () => {
+    const { getAllRacesFromDb } = await import("/src/app/stores/indexDb/indexedDbHelper.ts");
+    return (await getAllRacesFromDb()).map((r: { name: string }) => r.name);
+  });
+  expect(names.some((n) => /Demo/i.test(n))).toBe(true);
 });

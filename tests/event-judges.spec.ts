@@ -174,6 +174,38 @@ async function boardText(d: Dev): Promise<string> {
   return (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim()).join(" | ");
 }
 
+/** A Board read and when it was taken (for riders still on a running clock, see sameBoard). */
+async function boardRead(d: Dev): Promise<{ text: string; at: number }> {
+  const text = await boardText(d);
+  return { text, at: Date.now() };
+}
+
+const clockSeconds = (t: string) => t.split(":").map(Number).reduce((s, n) => s * 60 + n, 0);
+
+/**
+ * Two Boards show the same results. Every row must match exactly (position, bib, name, laps,
+ * time) — except the time of a rider with NO crossing yet ("0/N"): LiveBoard shows them
+ * `now − start`, a running clock, so a later read is ahead by the time between the reads.
+ * That difference is bounded by the MEASURED gap (+1 s display rounding), not a guessed slack.
+ */
+function sameBoard(earlier: { text: string; at: number }, later: { text: string; at: number }, who: string) {
+  const a = earlier.text.split(" | ");
+  const b = later.text.split(" | ");
+  expect(b.length, `${who}: rows`).toBe(a.length);
+  const gap = Math.ceil(Math.abs(later.at - earlier.at) / 1000) + 1;
+  const row = /^(.* 0\/\d+) (\d+(?::\d\d){1,2})$/; // no crossing: "… 0/3 00:35"
+  a.forEach((ra, i) => {
+    const rb = b[i];
+    if (ra === rb) return;
+    const ma = row.exec(ra);
+    const mb = row.exec(rb);
+    expect(ma && mb && ma[1] === mb[1], `${who} row ${i + 1}: "${rb}" vs owner "${ra}"`).toBeTruthy();
+    const ahead = clockSeconds(mb![2]) - clockSeconds(ma![2]);
+    expect(ahead, `${who} row ${i + 1}: running clock ${mb![2]} vs ${ma![2]} (reads ${gap - 1}s apart)`).toBeGreaterThanOrEqual(0);
+    expect(ahead, `${who} row ${i + 1}: running clock ${mb![2]} vs ${ma![2]} (reads ${gap - 1}s apart)`).toBeLessThanOrEqual(gap);
+  });
+}
+
 /** The last email the API "sent" to this address (MAIL_TRANSPORT=log), as text. */
 function lastMailTo(to: string): string {
   const lines = fs.readFileSync(API_LOG, "utf8").split(/\r?\n/).filter((l) => l.includes(to) && l.includes("mail (log transport"));
@@ -507,11 +539,11 @@ test("event day: owner + three judges run one race at the same time", async ({ b
       await shot(A.page, "09-owner-results");
       expect(await order(S)).toBe(ownerView);
       expect(await order(R)).toBe(ownerView);
-      const ownerBoard = await boardText(A);
-      expect(ownerBoard.split(" | "), ownerBoard).toHaveLength(WAVE1.length);
+      const ownerBoard = await boardRead(A);
+      expect(ownerBoard.text.split(" | "), ownerBoard.text).toHaveLength(WAVE1.length);
       await shot(A.page, "10-owner-board");
-      expect(await boardText(S)).toBe(ownerBoard);
-      expect(await boardText(R)).toBe(ownerBoard);
+      sameBoard(ownerBoard, await boardRead(S), "Start judge");
+      sameBoard(ownerBoard, await boardRead(R), "Results judge");
     });
   } finally {
     for (const d of all) await d.ctx.close().catch(() => undefined);

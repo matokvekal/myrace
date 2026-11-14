@@ -182,6 +182,9 @@ test("PC creates, phone runs the race, both stay in sync; logout + cleared stora
 
   await test.step("server: wave 1 started there too, laps and statuses arrived", async () => {
     await expect.poll(async () => (await serverRace()).riders.filter((r) => r.lapsCounter === 1).length, { timeout: SYNC_MS }).toBe(39);
+    // The DNF is sent AFTER the laps, so the laps poll above can finish before it lands: wait for it
+    // the same way (same SYNC_MS). Still exact — a status that never reaches the server fails here.
+    await expect.poll(async () => (await serverRace()).riders.find((r) => r.bibNumber === DNF_BIB)?.status, { timeout: SYNC_MS }).toBe("DNF");
     const s = await serverRace();
     for (const c of s.categories) expect(c, c.name).toMatchObject({ heat: 1, status: "running" });
     const byBib = new Map(s.riders.map((r) => [r.bibNumber, r]));

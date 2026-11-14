@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { TERMS_VERSION } from "../src/app/legal/terms";
-import { racingCard, gotoRaceMode, openRaceView, selectWave } from "./helpers";
+import { racingCard, gotoRaceMode, openRaceView, selectWave, expectSignedIn } from "./helpers";
 
 /**
  * A NEW race is persisted to PostgreSQL by itself, end to end through the app UI:
@@ -59,7 +59,7 @@ test("a new race, its waves, laps and finishes are saved to PostgreSQL and survi
     await page.getByPlaceholder("Password (8+ characters)").fill("password-persist");
     await page.getByPlaceholder("Repeat password").fill("password-persist");
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByText("My shared races")).toBeVisible();
+    await expectSignedIn(page);
   });
 
   let local = "";

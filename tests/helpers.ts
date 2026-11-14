@@ -223,3 +223,15 @@ export async function setStatusAtCheckIn(
   await modal.getByText(status, { exact: true }).click();
   await expect(row.getByRole("button", { name: status })).toBeVisible();
 }
+
+/**
+ * Signed in (server builds): sign-in / sign-up land on All Races (/main) and the session is
+ * stored. Checks the session itself, not UI wording ("My shared races" is no longer shown
+ * since 0.3: My Races syncs silently).
+ */
+export async function expectSignedIn(page: Page, timeout = 20_000) {
+  await expect(page).toHaveURL(/\/main/, { timeout });
+  await expect
+    .poll(() => page.evaluate(() => !!JSON.parse(localStorage.getItem("commissaire.live.session") ?? "null")?.accessToken), { timeout })
+    .toBe(true);
+}

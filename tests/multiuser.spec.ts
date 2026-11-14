@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { TERMS_VERSION } from "../src/app/legal/terms";
-import { racingCard, gotoRaceMode, openRaceView, selectWave } from "./helpers";
+import { racingCard, gotoRaceMode, openRaceView, selectWave, expectSignedIn } from "./helpers";
 
 /**
  * Multi-user race, end to end through the real app UI, with two independently
@@ -36,7 +36,7 @@ async function signUp(page: Page, name: string) {
   await page.getByPlaceholder("Password (8+ characters)").fill(`password-${name}`);
   await page.getByPlaceholder("Repeat password").fill(`password-${name}`);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByText("My shared races")).toBeVisible();
+  await expectSignedIn(page); // lands on All Races (the "My shared races" list is no longer shown)
 }
 
 /** A local race made through the app's own stores (synthetic riders, checked in). */
@@ -193,18 +193,16 @@ test("two commissaires run one shared race live, both ways, within their waves",
     await expect.poll(() => lapsOn(B.page, 303), { timeout: 15_000 }).toBe(1);
   });
 
-  await test.step("a Joker resolved on the counter's phone lands on the owner's", async () => {
-    await B.page.goto("/main");
-    await B.page.getByRole("button", { name: "Open menu" }).click();
-    await B.page.getByTestId("prefs-timing").click();
-    await B.page.getByRole("checkbox", { name: /Show Joker button/i }).check();
-    await B.page.getByRole("button", { name: "Close menu" }).click();
+  // The Joker ("Unknown Rider") entry row is hidden on Live since 0.2.2 (SHOW_CARD_INFO_INPUT =
+  // false in heat/[heatId]/page.tsx), so a lap typed on the counter's phone goes through the
+  // Keypad — the current entry path. Same assertion: it lands on the owner's device.
+  await test.step("a lap typed on the counter's keypad lands on the owner's", async () => {
     await B.page.goto(`/race/${sharedUuid}/heat/1`);
-    await B.page.getByRole("button", { name: "Unknown Rider" }).click();
-    await B.page.locator('[data-testid="joker-card-1"]').click();
-    await B.page.getByPlaceholder("Bib").fill("304");
-    await B.page.getByRole("button", { name: "Save", exact: true }).click();
+    await B.page.getByTestId("mode-keypad").click();
+    await expect(B.page.getByTestId("rapid-entry")).toBeVisible();
+    for (const d of "304") await B.page.getByTestId(`rapid-key-${d}`).dispatchEvent("pointerdown");
     await expect.poll(() => lapsOn(A.page, 304), { timeout: 15_000 }).toBe(1);
+    await B.page.getByTestId("mode-cards").click(); // back to Cards for the steps below
   });
 
   await test.step("undo on the counter's phone removes exactly that lap on the owner's", async () => {

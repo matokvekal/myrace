@@ -2,7 +2,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from "@pla
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { acceptTerms, checkInRow, finishedCard, gotoRaceMode, openRaceView, racingCard, setStatusAtCheckIn } from "./helpers";
+import { acceptTerms, expectSignedIn, checkInRow, finishedCard, gotoRaceMode, openRaceView, racingCard, setStatusAtCheckIn } from "./helpers";
 
 /**
  * LIVE sync audit: ONE account on a PC and a phone at the same time, real API.
@@ -88,7 +88,7 @@ test("one account, PC + phone: live sync of check-in, start, laps, statuses, off
     await pc.page.getByPlaceholder("Password (8+ characters)").fill(PASSWORD);
     await pc.page.getByPlaceholder("Repeat password").fill(PASSWORD);
     await pc.page.getByRole("button", { name: "Create account" }).click();
-    await expect(pc.page.getByRole("button", { name: "Sign out" }).or(pc.page.locator("text=All Races")).first()).toBeVisible({ timeout: 20_000 });
+    await expectSignedIn(pc.page);
     await pc.page.goto("/main");
     await pc.page.getByRole("button", { name: /Create new race|Add/ }).first().click();
     await pc.page.getByPlaceholder("Race Name").fill(RACE_NAME);
@@ -106,10 +106,11 @@ test("one account, PC + phone: live sync of check-in, start, laps, statuses, off
     await phone.page.getByPlaceholder("Email").fill(EMAIL);
     await phone.page.getByPlaceholder(/Password/).fill(PASSWORD);
     await phone.page.getByRole("button", { name: "Sign in" }).click();
-    await expect(phone.page.getByRole("button", { name: "Sign out" })).toBeVisible({ timeout: 20_000 }); // signed in (this build stays on the account page)
-    const row = phone.page.locator("li").filter({ hasText: RACE_NAME }).first();
-    await expect(row).toBeVisible({ timeout: 20_000 });
-    await row.getByRole("button", { name: "Open" }).click();
+    await expectSignedIn(phone.page);
+    // My Races syncs the account's races in on arrival (AccountSync); the card opens the race.
+    const card = phone.page.getByText(RACE_NAME).first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await card.click();
     await expect(phone.page).toHaveURL(/\/race\//, { timeout: 30_000 });
   });
 
