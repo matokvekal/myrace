@@ -210,6 +210,38 @@
   font-size: 12.5px;
 }
 
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #fff6e0;
+  color: #6b4a00;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(180, 128, 26, 0.3);
+  border-top-color: #b4801a;
+  border-radius: 50%;
+  animation: finishSpin 0.8s linear infinite;
+}
+
+@keyframes finishSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
+
 .actions {
   display: flex;
   gap: 12px;

@@ -15,7 +15,7 @@
  * The typed confirmation is the same pattern as DeleteConfirmModal, with a
  * different word so muscle memory from deleting a race can't fire here.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import styles from "./finishRaceModal.module.css";
 import { AlertTriangle, Flag, Lock } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
@@ -25,7 +25,8 @@ interface Props {
   raceName: string;
   riders: RiderProps[];
   categories: CategoryProps[];
-  onConfirm: () => Promise<void>;
+  /** `progress` updates the line shown while finishing (e.g. "Sending 3 laps…"). */
+  onConfirm: (progress: (text: string) => void) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -41,8 +42,11 @@ const FinishRaceModal: React.FC<Props> = ({
   const [input, setInput] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+  // Synchronous guard: two clicks in the same tick both still see `working === false`.
+  const busy = useRef(false);
 
-  const plan = useMemo(() => planFinalization(riders, categories), [riders, categories]);
+  const plan =useMemo(() => planFinalization(riders, categories), [riders, categories]);
   const stats = {
     onRoad: plan.toFinish.length,
     toDNS: plan.toDNS.length,
@@ -54,14 +58,19 @@ const FinishRaceModal: React.FC<Props> = ({
   const isValid = input.trim().toUpperCase() === CONFIRM_WORD;
 
   const handleConfirm = async () => {
-    if (!isValid || working) return;
+    if (!isValid || working || busy.current) return;
+    busy.current = true;
     setWorking(true);
     setError(null);
+    setProgress("Finishing…");
     try {
-      await onConfirm();
+      await onConfirm(setProgress);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not finish the race.");
       setWorking(false);
+      setProgress(null);
+    } finally {
+      busy.current = false;
     }
   };
 
@@ -164,7 +173,13 @@ const FinishRaceModal: React.FC<Props> = ({
           />
         </div>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {working && progress && (
+          <div className={styles.progress} role="status" aria-live="polite" data-testid="finish-race-progress" dir="auto">
+            <span className={styles.spinner} aria-hidden="true" />
+            {progress}
+          </div>
+        )}
+        {error && <div className={styles.error} role="alert" data-testid="finish-race-error" dir="auto">{error}</div>}
 
         <div className={styles.actions}>
           <button className={styles.cancelBtn} onClick={onCancel} disabled={working}>

@@ -117,17 +117,29 @@ const Info: React.FC<Props> = ({ race, onDeleteRace }) => {
     // would re-hash on every unrelated store write.
   }, [finalized, storedDigest]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleFinishRace = async () => {
+  const handleFinishRace = async (progress: (text: string) => void) => {
     if (isLiveRace(race.uuid)) {
       // Shared race: the server closes every wave, computes and signs the official result.
       // Errors are RETHROWN: FinishRaceModal shows them and re-enables its buttons.
       // Swallowing them here left the modal stuck on "Finishing…" (no Cancel, no retry).
+      // finalizeShared refuses (and changes nothing) while this device still has unsent laps.
       const { finalizeShared } = await import("@/services/live/liveClient");
-      const n = await finalizeShared(race.uuid);
+      const n = await finalizeShared(race.uuid, (s) =>
+        progress(
+          s.stage === "sending"
+            ? s.pending > 0
+              ? `Sending ${s.pending} recorded change${s.pending === 1 ? "" : "s"} to the server…`
+              : "Checking everything reached the server…"
+            : s.stage === "finalizing"
+              ? "Computing and signing the official results…"
+              : "Loading the official results…",
+        ),
+      );
       setShowFinishRace(false);
       toast.success(`Race finished — ${n} results are official (signed by the server).`);
       return;
     }
+    progress("Locking and signing the results on this device…");
     const result = await finalizeRace(race, actingUser);
     AuditLogService.log({
       race,

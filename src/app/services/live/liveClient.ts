@@ -1885,12 +1885,48 @@ export async function openSharedRace(serverRaceUuid: string): Promise<string> {
  * Owner: finish a shared race on the server (closes every wave, signs the result),
  * then bring the local copy up to date and stamp it with the official record.
  */
-export async function finalizeShared(local: string): Promise<number> {
+/** Where Finish Race is, for the dialog's progress line. */
+export type FinishStage =
+  | { stage: "sending"; pending: number }
+  | { stage: "finalizing" }
+  | { stage: "updating" };
+
+const changesText = (n: number) => `${n} recorded change${n === 1 ? "" : "s"} (laps, statuses…)`;
+
+/**
+ * Finish Race for a shared race. The official result is computed on the SERVER, so every
+ * lap this device recorded must be there first: a lap still in the outbox would otherwise
+ * be refused later as `race_official` and be missing from the signed result.
+ *
+ * Nothing is finalized while this account's queue is not empty after a send attempt —
+ * offline, server unreachable, or a send that failed. The queue is left exactly as it is,
+ * so pressing Finish Race again (e.g. after reconnecting) sends it and continues.
+ * Changes the server already answered as "not applied" are not waiting to be sent: they
+ * stay in review (`rejectedActions`) and never block finishing.
+ */
+export async function finalizeShared(local: string, onStage?: (s: FinishStage) => void): Promise<number> {
+  const waiting = async () => (await outboxList(local)).filter(mine).length;
+  const before = await waiting();
+  if (!navigator.onLine) {
+    throw new LiveApiError(0, "offline", before > 0
+      ? `No connection — ${changesText(before)} on this device haven't reached the server yet. The race was not finished. Reconnect, then press Finish Race again.`
+      : "No connection to the server. The race was not finished. Reconnect, then press Finish Race again.");
+  }
+  onStage?.({ stage: "sending", pending: before });
   await flush(local); // send queued laps first, so they are in the official result
+  const left = await waiting();
+  if (left > 0) {
+    throw new LiveApiError(0, "pending_actions", `${changesText(left)} on this device couldn't be sent to the server, so the race was not finished. Nothing was lost — check the connection, then press Finish Race again.`);
+  }
+  onStage?.({ stage: "finalizing" });
   let official: Record<string, unknown>;
   try {
     ({ official } = await team.finalize(local));
   } catch (e) {
+    if (e instanceof LiveApiError && e.status === 0) {
+      // The request may or may not have reached the server; a retry adopts the result if it did.
+      throw new LiveApiError(0, "offline", "The server didn't answer. Press Finish Race again: if the race was already finished, its official result is loaded; otherwise it is finished then.");
+    }
     if (e instanceof LiveApiError && e.code === "signing_key_missing") {
       // Server configuration, not the user's doing. Nothing was saved (one transaction).
       throw new LiveApiError(e.status, e.code, "The server can't sign official results yet (signing key not configured). Nothing was changed — the race is still open. Contact the administrator, then try again.");
@@ -1903,6 +1939,7 @@ export async function finalizeShared(local: string): Promise<number> {
     if (!first) throw e;
     official = first;
   }
+  onStage?.({ stage: "updating" });
   await catchUp(local);
   const race = useRaceStore.getState().races.find((r) => r.uuid === local);
   const o = official as unknown as Record<string, unknown>;

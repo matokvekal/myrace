@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import FinishRaceModal from "../FinishRaceModal";
 
-const setup = (onConfirm: () => Promise<void>) => {
+const setup = (onConfirm: (progress: (text: string) => void) => Promise<void>) => {
   const onCancel = vi.fn();
   render(<FinishRaceModal raceName="Demo" riders={[]} categories={[]} onConfirm={onConfirm} onCancel={onCancel} />);
   fireEvent.change(screen.getByLabelText(/to confirm/i), { target: { value: "FINISH" } });
@@ -42,5 +42,32 @@ describe("FinishRaceModal failure and retry", () => {
     expect(confirm.textContent).toMatch(/Finishing/);
     await act(async () => resolve());
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
+  it("ignores a second Enter/click in the same tick (before React re-renders)", async () => {
+    let resolve!: () => void;
+    const onConfirm = vi.fn(() => new Promise<void>((r) => { resolve = r; }));
+    const { confirm } = setup(onConfirm);
+    act(() => {
+      fireEvent.keyDown(screen.getByLabelText(/to confirm/i), { key: "Enter" });
+      fireEvent.click(confirm);
+    });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await act(async () => resolve());
+  });
+
+  it("shows each processing stage with a spinner, and clears it on failure", async () => {
+    let fail!: (e: Error) => void;
+    let report!: (t: string) => void;
+    const onConfirm = vi.fn((progress: (t: string) => void) => { report = progress; return new Promise<void>((_, rej) => { fail = rej; }); });
+    const { confirm } = setup(onConfirm);
+    await act(async () => { fireEvent.click(confirm); });
+    expect(screen.getByTestId("finish-race-progress").textContent).toBe("Finishing…");
+    await act(async () => report("Sending 3 recorded changes to the server…"));
+    expect(screen.getByTestId("finish-race-progress").textContent).toBe("Sending 3 recorded changes to the server…");
+    await act(async () => fail(new Error("3 recorded changes (laps, statuses…) on this device couldn't be sent")));
+    expect(screen.queryByTestId("finish-race-progress")).toBeNull();
+    expect(screen.getByTestId("finish-race-error").textContent).toMatch(/couldn't be sent/);
+    expect((confirm as HTMLButtonElement).disabled).toBe(false); // retry possible
   });
 });
