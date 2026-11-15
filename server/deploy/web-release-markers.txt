@@ -45,3 +45,5 @@ sync-alert-open
 bib-conflicts-confirm
 import-stage
 map-remember
+finish-race-progress
+pending_actions
