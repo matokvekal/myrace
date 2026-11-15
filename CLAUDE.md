@@ -72,6 +72,10 @@ public/data/
 - **IndexedDB** (`commissireDb` v8) is the source of truth — stores: `riders`, `categories`, `races`, `roles`, `users`
 - **Zustand** is the in-memory cache — each store has a custom IDB adapter
 - Load pattern: Zustand cache hit → short-circuit (never touches IDB again)
+- Riders: the persist adapter's `setItem` is a deliberate no-op (it rewrote the whole race on every
+  store update). Each rider-store action writes exactly what it changes; a lap re-ranking writes only
+  riders whose positions changed (`rankingWrites`), and `patchRiders` skips rows identical to memory.
+  Any new path that changes riders must write them itself — nothing rewrites memory to IDB anymore.
 - **WARNING:** IDB VersionError handler currently deletes all data (see BUG-02 in `BUGS.md`)
 
 ### State Stores

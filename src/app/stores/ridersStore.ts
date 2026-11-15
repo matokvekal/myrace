@@ -34,6 +34,25 @@ function liveCheck(current: RiderProps[], updated: RiderProps[]): boolean {
   return lb.beforeRiders("update", pairs.map((r) => byId.get(r.id)!), pairs) !== false;
 }
 
+/**
+ * Same stored content? The cheap fields that change on a lap/status/ranking are checked
+ * first; only rows that match on all of them get the full comparison, so a real change
+ * is never mistaken for "same" (when in doubt it writes).
+ */
+export function sameRider(a: RiderProps, b: RiderProps): boolean {
+  if (a === b) return true;
+  if (
+    a.lapsCounter !== b.lapsCounter || a.timeArrive !== b.timeArrive || a.raceStatus !== b.raceStatus ||
+    a.status !== b.status || a.position_category !== b.position_category || a.position_race !== b.position_race ||
+    a.bibNumber !== b.bibNumber || (a.lapsDetails?.length ?? 0) !== (b.lapsDetails?.length ?? 0)
+  ) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
 interface RiderState {
   riders: RiderProps[];
   lastFetchedRaceUuid: string;
@@ -42,7 +61,12 @@ interface RiderState {
   getRidersByHeat: (raceUuid: string, heat: number) => RiderProps[];
   getRidersByCategory: (raceUuid: string, category: string) => RiderProps[];
   updateRider: (updatedRider: RiderProps) => Promise<void>;
-  updateAllRiders: (updatedRiders: RiderProps[]) => Promise<void>;
+  /**
+   * `persistIds`: write only these riders to IndexedDB (the in-memory update is the same
+   * either way). For a re-ranking where most riders are unchanged clones — see
+   * `rankingWrites` in useLapRecording. Omitted = write every rider passed, as before.
+   */
+  updateAllRiders: (updatedRiders: RiderProps[], persistIds?: ReadonlySet<number>) => Promise<void>;
   patchRiders: (updatedRiders: RiderProps[]) => Promise<void>;
   insertRiders: (newRiders: RiderProps[]) => Promise<void>;
   addNewRider: (newRider: RiderProps) => Promise<void>;
@@ -251,7 +275,15 @@ const useRiderStore = create<RiderState>()(
        * END of the array — the heat screen depends on that to apply a new sort
        * order, so don't "simplify" the two into one.
        */
-      patchRiders: async (updatedRiders) => {
+      patchRiders: async (incoming) => {
+        // A row identical to what this device already holds (e.g. the server's echo of a
+        // lap applied here, or a re-ranking that didn't move this rider) changes nothing:
+        // skip it, so it costs no store update, no re-render and no IndexedDB write.
+        const current = new Map(get().riders.map((r) => [r.id, r]));
+        const updatedRiders = incoming.filter((r) => {
+          const c = current.get(r.id);
+          return !c || !sameRider(c, r);
+        });
         if (updatedRiders.length === 0) return;
         if (blockIfFinalized(updatedRiders, "patch")) return;
         if (!liveCheck(get().riders, updatedRiders)) return;
@@ -273,7 +305,7 @@ const useRiderStore = create<RiderState>()(
         }
       },
 
-      updateAllRiders: async (updatedRiders) => {
+      updateAllRiders: async (updatedRiders, persistIds) => {
         if (blockIfFinalized(updatedRiders, "update")) return;
         if (!liveCheck(get().riders, updatedRiders)) return;
         const updatedIds = new Set(updatedRiders.map((r) => r.id));
@@ -285,11 +317,13 @@ const useRiderStore = create<RiderState>()(
           ],
         }));
 
+        const toWrite = persistIds ? updatedRiders.filter((r) => persistIds.has(r.id)) : updatedRiders;
+        if (toWrite.length === 0) return;
         try {
           const db = await initIndexedDB();
           const tx = db.transaction("riders", "readwrite");
           const store = tx.objectStore("riders");
-          await Promise.all(updatedRiders.map((rider) => store.put(rider)));
+          await Promise.all(toWrite.map((rider) => store.put(rider)));
           await tx.done;
           db.close();
         } catch (error) {

@@ -9,18 +9,15 @@ const riderStorageAdapter = (): PersistStorage<any> => ({
     if (!riders.length) return null;
     return { state: { riders } };
   },
-  setItem: async (_name: string, value: any) => {
-    const riders = value?.state?.riders;
-    if (!Array.isArray(riders) || !riders.length) return;
-    const db = await initIndexedDB();
-    const tx = db.transaction("riders", "readwrite");
-    const store = tx.objectStore("riders");
-    for (const rider of riders) {
-      if (rider.id != null) await store.put(rider);
-    }
-    await tx.done;
-    db.close();
-  },
+  /**
+   * Intentionally writes nothing (perf, 2026-11-15). The persist middleware calls this on
+   * EVERY store update with the whole riders array, so each lap rewrote the entire race
+   * (~1,000-2,000 puts per tap with 500 riders) and IndexedDB fell minutes behind.
+   * Every rider-store action already writes exactly the riders it changes, in its own
+   * transaction (see ridersStore), and every direct `useRiderStore.setState` caller
+   * persists on its own. `getItem` (start-up hydration) is unchanged.
+   */
+  setItem: async () => {},
   removeItem: async (_name: string) => {
     const db = await initIndexedDB();
     const tx = db.transaction("riders", "readwrite");

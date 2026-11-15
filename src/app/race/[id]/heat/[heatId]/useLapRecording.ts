@@ -74,6 +74,27 @@ function loadPersistedActions(key: string | null): RiderAction[] {
   }
 }
 
+/**
+ * Which riders of a re-ranking must be written to IndexedDB.
+ *
+ * `calculatePositions` returns clones of `base` that differ ONLY in `position_category` /
+ * `position_race`. Writing all of them rewrote the whole race on every lap. A rider needs
+ * a write only when one of those two fields differs from what was last written: from
+ * `base` (the store snapshot the ranking was computed from), or — for the rider just
+ * changed — from `written`, the object already passed to `updateRider`.
+ * The in-memory update stays the full ranked list, exactly as before.
+ */
+export function rankingWrites(base: RiderProps[], ranked: RiderProps[], written: RiderProps): Set<number> {
+  const prev = new Map(base.map((r) => [r.id, r]));
+  prev.set(written.id, written);
+  const ids = new Set<number>();
+  for (const r of ranked) {
+    const p = prev.get(r.id);
+    if (!p || p.position_category !== r.position_category || p.position_race !== r.position_race) ids.add(r.id);
+  }
+  return ids;
+}
+
 /** Where a lap came from: a card tap (also Joker resolution), voice, or the Rapid Entry keypad. */
 export type LapSource = "click" | "voice" | "keypad";
 
@@ -124,7 +145,7 @@ interface Params {
    */
   latestRiders?: () => RiderProps[];
   updateRider: (rider: RiderProps) => void;
-  updateAllRiders: (riders: RiderProps[]) => void;
+  updateAllRiders: (riders: RiderProps[], persistIds?: ReadonlySet<number>) => void;
   /** Km per lap, when the race defines a circuit length. */
   circuitKm: number | null;
   /** True when the rider's category has already been flagged off. */
@@ -374,7 +395,8 @@ export function useLapRecording({
       raceStatus: isFinished ? "finished" : "running",
     };
 
-    const allWithUpdated = allNow().map((r) => (r.id === intermediateRider.id ? intermediateRider : r));
+    const base = allNow();
+    const allWithUpdated = base.map((r) => (r.id === intermediateRider.id ? intermediateRider : r));
     const sorted = calculatePositions(allWithUpdated);
     const positionAtLap = sorted.find((r) => r.id === rider.id)?.position_category ?? rider.position_category;
 
@@ -392,7 +414,7 @@ export function useLapRecording({
     // Shared race: the lap goes to the outbox at the tap's time (a Joker keeps its captured time).
     if (liveActionId) void liveDispatch(raceUuid, "AddLap", { riderUuid: rider.uuid! }, { actionId: liveActionId, atMs: clickTime.getTime() });
     updateRider(updatedRider);
-    updateAllRiders(finalSorted);
+    updateAllRiders(finalSorted, rankingWrites(base, finalSorted, updatedRider));
     logAnalyticsEvent("lap_recorded", { source, race_uuid: raceUuid });
     if (race) {
       AuditLogService.log({
@@ -565,8 +587,10 @@ export function useLapRecording({
         void liveDispatch(raceUuid, "Undo", { targetActionId: action.liveActionId });
       }
       const restored = { ...action.prevRider };
+      const base = allNow();
       updateRider(restored);
-      updateAllRiders(calculatePositions(allNow().map((r) => (r.id === restored.id ? restored : r))));
+      const ranked = calculatePositions(base.map((r) => (r.id === restored.id ? restored : r)));
+      updateAllRiders(ranked, rankingWrites(base, ranked, restored));
       setRiderActions((prev) => prev.filter((a) => a.id !== actionId));
       setUndoneFinishes([action, ...undoneFinishes.filter((u) => u.id !== actionId)]);
       if (race) {
@@ -712,13 +736,15 @@ export function useLapRecording({
       timeArrive: finishTime.toISOString(),
       elapsedTimeFromStart: formatTime((finishTime.getTime() - raceStart.getTime()) / 1000),
     };
-    const sorted = calculatePositions(allNow().map((r) => (r.id === finished.id ? finished : r)));
+    const base = allNow();
+    const sorted = calculatePositions(base.map((r) => (r.id === finished.id ? finished : r)));
     const withPos: RiderProps = {
       ...finished,
       position_category: sorted.find((r) => r.id === rider.id)?.position_category ?? rider.position_category,
     };
     updateRider(withPos);
-    updateAllRiders(sorted.map((r) => (r.id === withPos.id ? withPos : r)));
+    const ranked = sorted.map((r) => (r.id === withPos.id ? withPos : r));
+    updateAllRiders(ranked, rankingWrites(base, ranked, withPos));
 
     if (race) {
       AuditLogService.log({
@@ -785,8 +811,10 @@ export function useLapRecording({
     }
     dropPendingMove(action.rider.id);
     const restored = { ...action.rider };
+    const base = allNow();
     updateRider(restored);
-    updateAllRiders(calculatePositions(allNow().map((r) => (r.id === restored.id ? restored : r))));
+    const ranked = calculatePositions(base.map((r) => (r.id === restored.id ? restored : r)));
+    updateAllRiders(ranked, rankingWrites(base, ranked, restored));
     setUndoneFinishes(undoneFinishes.filter((u) => u.id !== actionId));
     setRiderActions((prev) => [{ ...redoAction, rider: restored, timestamp: Date.now() }, ...prev.filter((a) => a.id !== actionId)]);
     void recordRaceEvent({
