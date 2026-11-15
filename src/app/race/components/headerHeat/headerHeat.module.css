@@ -33,7 +33,8 @@
 
 .liveDot {
   font-size: 8px;
-  animation: pulse 1.5s ease-in-out infinite;
+  /* A few beats, then solid: an endless pulse kept the Live screen repainting for hours (Task 4). */
+  animation: pulse 1.5s ease-in-out 4;
 }
 
 @keyframes pulse {

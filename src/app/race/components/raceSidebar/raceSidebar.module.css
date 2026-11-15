@@ -117,7 +117,8 @@
 /* Pulses only while the race is running */
 .liveDotOn {
   opacity: 1;
-  animation: livePulse 1.5s ease-in-out infinite;
+  /* A few beats, then solid: an endless pulse kept the screen repainting for hours (Task 4). */
+  animation: livePulse 1.5s ease-in-out 4;
 }
 
 @keyframes livePulse {
