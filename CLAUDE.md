@@ -191,6 +191,11 @@ still open).
   per wave to localStorage (`commissaire.actionLog.${raceUuid}:heat:${heatId}`) so
   a mid-wave reload restores it. `useLapRecording` takes `persistKey`; it hydrates
   synchronously and guards against writing the previous wave's log under a new key.
+  Since 1.2.1 (Task 3) it is written at most once a second (+ on hide/unmount/wave change) and
+  stored compacted (`actionLogStorage.ts`): old entries keep only the shown fields and their own
+  lap; the newest entry / newest lap per rider and anything < 2 min keep the full undo snapshot.
+  Logs of finalized/deleted races are pruned; a full storage warns once and never blocks a lap.
+  The Log panel ticks only while open.
 
 ### Board hold (heat page) — why tapped cards don't move immediately
 - Problem: at the end of a lap a bunch of ~20 riders crosses together. One

@@ -36,7 +36,6 @@ function formatDuration(ms: number): string {
 
 export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderActionLogProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState<Record<string, number>>({});
   const [sortBy, setSortBy] = useState<'arrival' | 'bib'>('arrival');
   // Desktop: the panel opens next to the Log button, clamped inside the viewport.
   // Phones (≤640px): CSS turns it into a full-width bottom sheet instead.
@@ -68,10 +67,15 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // The clocks and countdowns are only visible while the panel is open: tick only then.
+  // (It used to tick every second AND rebuild a per-entry countdown map every 100 ms for
+  // the whole race, re-rendering this component 11 times a second with the panel closed.)
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    if (!isOpen) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(t);
-  }, []);
+  }, [isOpen]);
 
   // Closing the panel always drops back to the full, unfiltered "Arrival" view
   useEffect(() => {
@@ -97,21 +101,6 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
       String(rider.bibNumber).includes(q)
     );
   };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        const updated = { ...prev };
-        actions.forEach((action) => {
-          const elapsed = Date.now() - action.timestamp;
-          updated[action.id] = Math.max(0, CANCEL_ACTIVE_MS - elapsed);
-        });
-        return updated;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [actions]);
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -230,7 +219,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
                 {actions.filter((a) => matchesSearch(a.rider)).map((action, idx, arr) => {
                   const isConfirming = confirmingId === action.id;
                   const showCancel = showCancelButton(action);
-                  const remaining = timeRemaining[action.id] ?? CANCEL_ACTIVE_MS;
+                  const remaining = Math.max(0, CANCEL_ACTIVE_MS - (now - action.timestamp));
                   // Stable row number: the earliest arrival is #1, and existing rows keep
                   // their number as new arrivals get prepended above them.
                   const rowNumber = arr.length - idx;
@@ -356,7 +345,7 @@ export function RiderActionLog({ actions, isOpen, onToggle, onCancel }: RiderAct
                   const isConfirming = confirmingId === latestAction.id;
                   const showCancel = showCancelButton(latestAction);
                   const canCancelAction = canCancel(latestAction);
-                  const remaining = timeRemaining[latestAction.id] ?? CANCEL_ACTIVE_MS;
+                  const remaining = Math.max(0, CANCEL_ACTIVE_MS - (now - latestAction.timestamp));
 
                   const isOut = !!latestAction.statusChange;
                   const isFinished = !isOut && rider.raceStatus === 'finished';

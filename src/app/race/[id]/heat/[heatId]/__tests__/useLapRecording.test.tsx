@@ -241,6 +241,9 @@ describe("useLapRecording: persisted action log", () => {
     const r = startedRider();
     const first = mount([r], { persistKey: "race-1:heat:1" });
     act(() => first.result.current.lap.recordLap(r));
+    // Writes are batched (at most one a second, Task 3): nothing yet, then the log.
+    expect(localStorage.getItem("commissaire.actionLog.race-1:heat:1")).toBeNull();
+    act(() => { vi.advanceTimersByTime(1000); });
     expect(localStorage.getItem("commissaire.actionLog.race-1:heat:1")).toContain(String(r.id));
     first.unmount();
 

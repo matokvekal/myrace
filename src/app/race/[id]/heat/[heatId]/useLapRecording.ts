@@ -14,6 +14,7 @@ import { AuditLogService } from "@/services/auditLog/auditLogService";
 import { maxBoardHoldMs, normalizeBoardHoldMs } from "@/stores/boardHoldStore";
 import { isLiveRace, liveAllows, liveDispatch, newActionId } from "@/services/live/liveBridge";
 import { LAP_UNDO_WINDOW_MS } from "../../../../../shared/race/actions";
+import { LOG_SAVE_DELAY_MS, REDO_STORAGE_PREFIX, loadStoredActions, pruneWaveStorage, saveStoredActions } from "./actionLogStorage";
 
 /**
  * Shared race (0.3.3): a recorded lap / finish can be undone for 30 s only; the server
@@ -42,16 +43,10 @@ export function lapUndoExpired(raceUuid: string, recordedAt: Date | string | num
 export const MIN_LAP_MS = 60 * 1000;
 
 /**
- * Persisted-log key prefix (BUGS.md #2). The action log is the complete,
- * chronological record of every arrival in a wave — the thing that settles a
- * disputed placing. It used to live only in React state, so a reload mid-wave
- * wiped it. We now mirror it to localStorage per wave.
+ * The action log is the complete, chronological record of every arrival in a wave — the
+ * thing that settles a disputed placing. It is mirrored to localStorage per wave so a
+ * reload mid-wave restores it (BUGS.md #2); see `actionLogStorage.ts` for what is stored.
  */
-const LOG_STORAGE_PREFIX = "commissaire.actionLog.";
-
-/** Manual-finish entries that were undone and can still be redone (per wave). */
-const REDO_STORAGE_PREFIX = "commissaire.finishRedo.";
-
 function loadPersistedRedo(key: string | null): RiderAction[] {
   if (!key || typeof localStorage === "undefined") return [];
   try {
@@ -62,16 +57,19 @@ function loadPersistedRedo(key: string | null): RiderAction[] {
   }
 }
 
-function loadPersistedActions(key: string | null): RiderAction[] {
-  if (!key || typeof localStorage === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(LOG_STORAGE_PREFIX + key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as RiderAction[]) : [];
-  } catch {
-    return [];
-  }
+const loadPersistedActions = loadStoredActions;
+
+/** Logs of finalized / deleted races are removed once per app session (and when storage is full). */
+let prunedThisSession = false;
+function pruneFinishedRaceLogs(currentRace: string): void {
+  const races = useRaceStore.getState().races;
+  if (!races.some((r) => r.uuid === currentRace)) return; // races not loaded yet: judge nothing
+  const byUuid = new Map(races.map((r) => [r.uuid, r]));
+  pruneWaveStorage((uuid) => {
+    if (uuid === currentRace) return "unknown";
+    const r = byUuid.get(uuid);
+    return !r ? "gone" : r.finalized ? "finalized" : "active";
+  });
 }
 
 /**
@@ -215,12 +213,52 @@ export function useLapRecording({
   const persistKeyRef = useRef<string | null>(persistKey);
   const pendingHydrationRef = useRef<RiderAction[] | null>(null);
 
+  // Writes are batched: at most one per LOG_SAVE_DELAY_MS (a bunch of 20 taps used to
+  // re-serialize the whole log 20 times), plus a write when the page hides, the wave
+  // changes or the screen unmounts. Each pending write carries its own key, so it can
+  // never land under another wave's key. Losing at most the last second of LOG entries on
+  // a power cut is accepted: the laps themselves are already in IndexedDB / the outbox.
+  const pendingSaveRef = useRef<{ key: string; actions: RiderAction[] } | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushLogSave = useCallback((): void => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+    const p = pendingSaveRef.current;
+    if (!p) return;
+    pendingSaveRef.current = null;
+    const raceOfKey = p.key.split(":heat:")[0];
+    const result = saveStoredActions(p.key, p.actions, () => pruneFinishedRaceLogs(raceOfKey));
+    if (result === "failed") {
+      toast.warn("This device's storage is full: the Rider Log can't be kept for a reload. Laps are still recorded.", {
+        toastId: "action-log-storage-full",
+      });
+    }
+  }, []);
+
   useEffect(() => {
+    if (!prunedThisSession && raceUuid) {
+      prunedThisSession = true;
+      pruneFinishedRaceLogs(raceUuid);
+    }
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushLogSave();
+    };
+    window.addEventListener("pagehide", flushLogSave);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flushLogSave);
+      document.removeEventListener("visibilitychange", onHide);
+      flushLogSave();
+    };
+  }, [flushLogSave, raceUuid]);
+
+  useEffect(() => {
+    flushLogSave(); // the previous wave's last entries go under the previous wave's key
     persistKeyRef.current = persistKey;
     const loaded = loadPersistedActions(persistKey);
     pendingHydrationRef.current = loaded;
     setRiderActions(loaded);
-  }, [persistKey]);
+  }, [persistKey, flushLogSave]);
 
   useEffect(() => {
     // Skip the write caused by hydration itself; only persist real changes.
@@ -231,12 +269,9 @@ export function useLapRecording({
     if (pendingHydrationRef.current !== null) return; // hydration in flight
     const key = persistKeyRef.current;
     if (!key || typeof localStorage === "undefined") return;
-    try {
-      localStorage.setItem(LOG_STORAGE_PREFIX + key, JSON.stringify(riderActions));
-    } catch {
-      /* quota / serialization — the log is a convenience, never block scoring. */
-    }
-  }, [riderActions]);
+    pendingSaveRef.current = { key, actions: riderActions };
+    if (!saveTimerRef.current) saveTimerRef.current = setTimeout(flushLogSave, LOG_SAVE_DELAY_MS);
+  }, [riderActions, flushLogSave]);
 
   /** Every rider as the store holds them NOW (another judge's lap may have landed since the render). */
   const allNow = (): RiderProps[] => latestRiders?.() ?? riders;

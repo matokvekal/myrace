@@ -164,6 +164,7 @@ describe("manual Finish Race", () => {
   it("persists the log entry so a reload still knows about it", () => {
     const { result } = mount([rider(1, "Man Pro")]);
     act(() => { result.current.lap.finishRider(result.current.byId(1)); });
+    act(() => { vi.advanceTimersByTime(1000); }); // log writes are batched (Task 3)
     const stored = JSON.parse(localStorage.getItem("commissaire.actionLog.race-1:heat:1") ?? "[]");
     expect(stored[0].statusChange).toBe("FINISH");
   });
