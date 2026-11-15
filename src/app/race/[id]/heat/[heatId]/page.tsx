@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from "react";
+import WaveClock from "./WaveClock";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import styles from "./heat.module.css";
@@ -94,7 +95,6 @@ const Heat: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCats, setFilterCats] = useState<Set<string>>(new Set());
-  const [now, setNow] = useState(new Date());
   const [contextRider, setContextRider] = useState<RiderProps | null>(null);
   const [showWaveInfo, setShowWaveInfo] = useState(false);
   const [showLookup, setShowLookup] = useState(false);
@@ -131,11 +131,6 @@ const Heat: React.FC = () => {
     };
     fetchAllData();
   }, [raceUuid, getRaces, getCategories, getRiders, races.length]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const currentRace = useMemo(() => races.find((r) => r.uuid === raceUuid), [races, raceUuid]);
 
@@ -356,6 +351,10 @@ const Heat: React.FC = () => {
   // Keep refs in sync every render so async callbacks see fresh data
   ridersRef.current = riders;
   handleRiderClickRef.current = handleRiderClick;
+  // Stable card callbacks (Task 5): cards are memoized, so these must not change identity
+  // every render. They delegate to the latest handler through the ref — never stale.
+  const tapCard = useCallback((r: RiderProps, at?: Date) => handleRiderClickRef.current?.(r, "click", at), []);
+  const openCard = useCallback((r: RiderProps) => setContextRider(r), []);
 
   // Drain the voice queue: process each pending bib in order, skip cooldown duplicates
   const processVoiceQueue = () => {
@@ -751,26 +750,25 @@ const Heat: React.FC = () => {
     }
   }, [detectedNumbers.length]);
 
-  const elapsedTime = useMemo(() => {
-    if (clearedWave) return "00:00:00";
-
+  // Wave clock (Task 5): the page computes only the start / stop moments; the ticking
+  // lives in <WaveClock>, so the whole Live page no longer re-renders every second.
+  const waveClock = useMemo(() => {
+    if (clearedWave) return { startMs: null, stopEnds: null };
     // Wave start = earliest actual rider start in this wave. Use timeStartRace
     // from ANY started rider (not just currently-running) so the clock survives
     // the wave being stopped, when every rider flips to "finished" (BUGS.md #14).
     const startMsList = filteredRiders
       .map((r) => parseClockTime(r.timeStartRace)?.getTime())
       .filter((t): t is number => t != null);
-    if (startMsList.length === 0) return "00:00:00";
-    const startMs = Math.min(...startMsList);
-
+    if (startMsList.length === 0) return { startMs: null, stopEnds: null };
     // If the wave has been stopped, FREEZE at the stop moment (the latest
     // category finishedAt) instead of resetting to 0.
-    const endMs = waveStopped
-      ? Math.max(...startedWaveCats.map((c) => c.finishedAt ?? now.getTime()))
-      : now.getTime();
-
-    return formatTimeWithLeadingZeroes(Math.max(0, endMs - startMs) / 1000);
-  }, [filteredRiders, now, clearedWave, waveStopped, startedWaveCats]);
+    return {
+      startMs: Math.min(...startMsList),
+      stopEnds: waveStopped ? startedWaveCats.map((c) => c.finishedAt ?? null) : null,
+    };
+  }, [filteredRiders, clearedWave, waveStopped, startedWaveCats]);
+  const elapsedTime = <WaveClock startMs={waveClock.startMs} stopEnds={waveClock.stopEnds} />;
 
   // Fastest / average lap for the wave (dopamine strip between the filter row
   // and the racing grid). Lap 1 is excluded on purpose: the start line rarely
@@ -1352,8 +1350,8 @@ const Heat: React.FC = () => {
                   isFlashing={flashingRiderId === rider.id}
                   isRecorded={pendingMoveSet.has(rider.id)}
                   raceEnded={isLeftOnTrack(rider)}
-                  onClick={(at) => handleRiderClick(rider, "click", at)}
-                  onDoubleClick={() => setContextRider(rider)}
+                  onClick={tapCard}
+                  onDoubleClick={openCard}
                   minLapMs={recap.active ? RECAP_MIN_LAP_SECONDS * 1000 : minLapMsFor(currentRace)}
                 />
               ))}

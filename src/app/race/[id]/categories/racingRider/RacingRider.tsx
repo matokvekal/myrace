@@ -24,9 +24,12 @@ interface Props {
    */
   isRecorded?: boolean;
   raceEnded?: boolean;
-  /** A single tap, with the moment it happened (the card waits 300 ms to rule out a double-tap). */
-  onClick: (tappedAt?: Date) => void;
-  onDoubleClick: () => void;
+  /**
+   * A single tap, with the moment it happened (the card waits 300 ms to rule out a double-tap).
+   * The card is memoized: pass STABLE callbacks (they receive the rider), not per-render closures.
+   */
+  onClick: (rider: RiderProps, tappedAt?: Date) => void;
+  onDoubleClick: (rider: RiderProps) => void;
   /** The minimum lap interval in force (race setting, or RECAP's): the card locks for it after a lap. */
   minLapMs?: number;
 }
@@ -174,8 +177,10 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
   const hasStarted = rider.raceStatus === "running" || rider.raceStatus === "finished";
   const onScreen = useOnScreen(cardRef);
   const [visibleAt, setVisibleAt] = useState(() => Date.now());
+  const wasOnScreen = useRef(onScreen);
   useEffect(() => {
-    if (onScreen) setVisibleAt(Date.now());
+    if (onScreen && !wasOnScreen.current) setVisibleAt(Date.now()); // back on screen: recompute now
+    wasOnScreen.current = onScreen;
   }, [onScreen]);
   const sinceArriveBaseline = parseClockTimeMs(rider.timeArrive) ?? parseClockTimeMs(rider.timeStartRace);
   const showsClock = hasStarted && sinceArriveBaseline != null;
@@ -272,14 +277,14 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = setTimeout(() => {
         if (clickCountRef.current === 1 && !coolingDown) {
-          onClick(tappedAt); // Single click (the new arrival resets the clock and the ring at once)
+          onClick(rider, tappedAt); // Single click (the new arrival resets the clock and the ring at once)
         }
         clickCountRef.current = 0;
       }, 300);
     } else if (clickCountRef.current === 2) {
       // Double click detected
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
-      onDoubleClick();
+      onDoubleClick(rider);
       clickCountRef.current = 0;
     }
   };
@@ -404,4 +409,34 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
   );
 };
 
-export default RacingRider;
+/** Same values, field by field: the ranking and the page hand over fresh copies of unchanged riders. */
+function sameRiderFields(a: RiderProps, b: RiderProps): boolean {
+  if (a === b) return true;
+  const ka = Object.keys(a) as (keyof RiderProps)[];
+  if (ka.length !== Object.keys(b).length) return false;
+  for (const k of ka) if (a[k] !== b[k]) return false;
+  return true;
+}
+const samePhase = (a?: RiderPhase, b?: RiderPhase) =>
+  a === b || (!!a && !!b && a.icon === b.icon && a.remaining === b.remaining && a.finishPhase === b.finishPhase && a.nextCrossingFinishes === b.nextCrossingFinishes);
+
+/**
+ * Task 5 (2026-11-15): a card re-renders only when what it shows changed. Every lap re-ranks
+ * the race (fresh rider copies for everyone) and the page used to re-render each card on
+ * every update; time-driven changes come from the card's own clocks (see liveTicker).
+ */
+export function sameCardProps(p: Props, n: Props): boolean {
+  return (
+    sameRiderFields(p.rider, n.rider) &&
+    samePhase(p.phase, n.phase) &&
+    p.color === n.color &&
+    p.isFlashing === n.isFlashing &&
+    p.isRecorded === n.isRecorded &&
+    p.raceEnded === n.raceEnded &&
+    p.minLapMs === n.minLapMs &&
+    p.onClick === n.onClick &&
+    p.onDoubleClick === n.onDoubleClick
+  );
+}
+
+export default React.memo(RacingRider, sameCardProps);

@@ -292,6 +292,14 @@ still open).
 - No infinite CSS animations on Live cards: the tip doesn't blink (green = on pace, red = overdue),
   the timer has no heartbeat glow, the ON TRACK pulses stop after 4 beats. Don't bring them back.
 
+### Live renders (1.2.1, Task 5)
+- The Live page does NOT re-render every second any more: the wave clock is `heat/[heatId]/WaveClock.tsx`
+  (ticks itself). Anything on Live that must change with time needs its own tick (`useTick`), never page state.
+- `RacingRider` is `React.memo` with `sameCardProps` (rider compared field by field: every re-ranking
+  hands over fresh copies). Its `onClick(rider, at)` / `onDoubleClick(rider)` must be STABLE
+  (`tapCard` / `openCard` in page.tsx delegate through `handleRiderClickRef`). Add new shown props to
+  `sameCardProps`, or the card won't update.
+
 ### Joker button (heat page) — unidentified-rider taps
 - Opt-in via a side-menu checkbox (`useJokerMode`, localStorage
   `commissaire.jokerEnabled`, default off — `HeaderMain.tsx`). Off means the

@@ -123,6 +123,7 @@ describe("rider card taps", () => {
     fireEvent.click(card);
     act(() => vi.advanceTimersByTime(300));
     expect(onClick).toHaveBeenCalledTimes(1);
-    expect((onClick.mock.calls[0][0] as Date).getTime()).toBe(tappedAt); // the tap, not the end of the 300 ms wait
+    expect(onClick.mock.calls[0][0]).toMatchObject({ bibNumber: 7 }); // the card hands over its rider (stable callbacks)
+    expect((onClick.mock.calls[0][1] as Date).getTime()).toBe(tappedAt); // the tap, not the end of the 300 ms wait
   });
 });
