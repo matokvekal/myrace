@@ -539,21 +539,10 @@
   padding: 7px 22px;
   text-shadow: 0 0 10px rgba(124, 232, 60, 0.5);
   box-shadow: 0 3px 10px rgba(10, 16, 30, 0.3);
-  /* Heartbeat: the glow breathes once every φ seconds — the screen feels alive */
-  animation: timerHeartbeat 1618ms ease-in-out infinite;
+  /* The "heartbeat" glow animation (an animated text-shadow, repainted every frame for
+     the whole race) was removed in Task 4; the clock ticking each second is the pulse. */
 }
 
-@keyframes timerHeartbeat {
-  0%,
-  100% {
-    text-shadow: 0 0 10px rgba(124, 232, 60, 0.5);
-  }
-  50% {
-    text-shadow:
-      0 0 16px rgba(124, 232, 60, 0.85),
-      0 0 32px rgba(124, 232, 60, 0.3);
-  }
-}
 
 /* PRO skin: real chronometer — chrome/gold bevel + a physical crown/button
    knob on top (the push-button on an actual stopwatch), deeper drop shadow
@@ -925,7 +914,7 @@
   font-weight: 900;
   letter-spacing: 0.02em;
   vertical-align: middle;
-  animation: onTrackTotalPulse 1.3s ease-in-out infinite;
+  animation: onTrackTotalPulse 1.3s ease-in-out 4;
 }
 
 @keyframes onTrackTotalPulse {

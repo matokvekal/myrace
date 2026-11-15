@@ -64,7 +64,8 @@
   text-align: center;
   padding: 2px 0;
   border-radius: 16px 16px 0 0;
-  animation: onTrackPulse 1.3s ease-in-out infinite;
+  /* Pulses a few times to catch the eye, then stays solid (no endless repaint). */
+  animation: onTrackPulse 1.3s ease-in-out 4;
 }
 
 @keyframes onTrackPulse {
@@ -326,31 +327,19 @@
   fill: #fff;
 }
 
-/* Tip marker: where "now" actually is on the pace trail */
+/* Tip marker: where "now" actually is on the pace trail. Solid, no blinking (Task 4,
+   2026-11-15): an infinite blink on every card repainted the whole board ~60 times a
+   second for the entire race. The position (updated every 30 s) and the colour carry the
+   meaning. */
 .paceMarkerCurrent {
-  animation: paceDotBlink 1s ease-in-out infinite;
+  opacity: 1;
 }
 
 /* Overdue: the ring itself stays fully solid (it never collapses) — only the
    tip marker, which lands back at the top-center start line once a rider is
-   overdue, turns red and blinks SLOWLY — a calm, low-attention "still
-   waiting for this rider to cross" cue for the commissaire (user req). */
-.paceMarkerWaiting {
-  animation: paceDotWaitingBlink 2.2s ease-in-out infinite;
-}
-
+   overdue, turns red: a calm "still waiting for this rider to cross" cue. */
 .paceMarkerWaiting .paceMarkerCircle {
   fill: #e02020;
-}
-
-@keyframes paceDotBlink {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.15; }
-}
-
-@keyframes paceDotWaitingBlink {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.4; }
 }
 
 /* Click/voice-confirm flash — one-shot bright glow that fades out */

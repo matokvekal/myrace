@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, { useRef, useState, useEffect, useMemo, useReducer } from "react";
 import BibBadge from "@/components/ui/BibBadge";
 import styles from "./racingRider.module.css";
 import { RiderProps } from "@/types/types";
@@ -9,6 +9,7 @@ import { Bell } from "lucide-react";
 import { toPhaseRider } from "@/utils/linkedGroups";
 import { riderPhase, NO_GROUP_PHASE, type RiderPhase } from "../../../../../shared/race/finishPhases";
 import { getColorLuminance } from "@/utils/colorUtils";
+import { useOnScreen, useTick } from "@/utils/liveTicker";
 
 interface Props {
   rider: RiderProps;
@@ -109,6 +110,20 @@ function roundedRectPathD(w: number, h: number, r: number): string {
 const PACE_RING_CARD_RADIUS = { classic: 16, gaming: 12 };
 const PACE_RING_INSET = 0;
 
+/** The pace ring / tip move every 30 s (they used to every 10 s); laps and visibility update them at once. */
+export const PACE_TICK_MS = 30_000;
+
+/**
+ * "Since arrive" clock: its own tiny component, so the once-a-second tick re-renders
+ * one text cell instead of the whole card — and only while the card is on screen.
+ */
+const SinceArrive: React.FC<{ baseline: number; active: boolean }> = ({ baseline, active }) => {
+  const tick = useTick(1000, active);
+  const now = active ? tick : Date.now();
+  // The shared tick can be up to 1 s older than a lap just recorded: never show a negative time.
+  return <>{formatTime(Math.max(0, now - baseline) / 1000)}</>;
+};
+
 const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlashing = false, isRecorded = false, raceEnded = false, onClick, onDoubleClick, minLapMs }) => {
   const clickCountRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,16 +169,16 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
 
   // Live ticking clock: how long since this rider last crossed (or since race start if never).
   // Only ticks once the race has actually started — before that the card shows a frozen 00:00.
+  // Off-screen cards don't tick at all (Task 4); everything is derived from timestamps, so
+  // the card is exact again the moment it scrolls back in.
   const hasStarted = rider.raceStatus === "running" || rider.raceStatus === "finished";
-  const [now, setNow] = useState(() => Date.now());
+  const onScreen = useOnScreen(cardRef);
+  const [visibleAt, setVisibleAt] = useState(() => Date.now());
   useEffect(() => {
-    if (!hasStarted) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [hasStarted]);
+    if (onScreen) setVisibleAt(Date.now());
+  }, [onScreen]);
   const sinceArriveBaseline = parseClockTimeMs(rider.timeArrive) ?? parseClockTimeMs(rider.timeStartRace);
-  const sinceArriveMs = hasStarted && sinceArriveBaseline != null ? now - sinceArriveBaseline : null;
-  const sinceArrive = sinceArriveMs != null ? formatTime(sinceArriveMs / 1000) : null;
+  const showsClock = hasStarted && sinceArriveBaseline != null;
 
   // Last completed lap's time — read straight from lapsDetails (the authoritative,
   // per-lap history) rather than the separately-tracked elapsedLastLap field, which
@@ -175,14 +190,10 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
 
   // Pace border (both skins): how far into an "expected" lap (paced off the rider's own
   // last lap) they are right now, traced clockwise around the card's edge starting
-  // top-center. Sampled on its own 10s tick — deliberately chunkier than the 1s
-  // "since arrival" tick above, which keeps driving the text row untouched.
-  const [paceNow, setPaceNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!hasStarted) return;
-    const t = setInterval(() => setPaceNow(Date.now()), 10000);
-    return () => clearInterval(t);
-  }, [hasStarted]);
+  // top-center. Sampled on a shared 30 s tick (all cards move together), and recomputed
+  // from timestamps at once when the card comes on screen or the rider crosses the line.
+  const paceTick = useTick(PACE_TICK_MS, hasStarted && onScreen);
+  const paceNow = Math.max(paceTick, visibleAt, sinceArriveBaseline ?? 0);
 
   const lastLapMs = lastLap ? new Date(lastLap.endTime).getTime() - new Date(lastLap.startTime).getTime() : null;
   const paceSinceArriveMs = hasStarted && sinceArriveBaseline != null ? paceNow - sinceArriveBaseline : null;
@@ -230,17 +241,27 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
   // single tap does nothing (no "wait" message) and the card holds its pressed
   // look (the :active style); double-tap (details) still works,
   // and the engine keeps its own check for bib entry / voice.
-  const cooldownLeftMs =
-    minLapMs && rider.timeArrive && rider.raceStatus === "running"
-      ? new Date(rider.timeArrive).getTime() + minLapMs - now
-      : 0;
-  const coolingDown = cooldownLeftMs > 0;
+  // Cooldown and cover are derived from the recorded arrival; the card re-renders once at
+  // each of their ends (a timer to that moment) instead of every second.
+  const [renderTick, rerender] = useReducer((x: number) => x + 1, 0);
+  const now = Date.now();
+  const arriveMs = rider.timeArrive ? new Date(rider.timeArrive).getTime() : null;
+  const running = rider.raceStatus === "running";
+  const cooldownUntil = minLapMs && arriveMs != null && running ? arriveMs + minLapMs : 0;
+  const coolingDown = cooldownUntil > now;
 
   // Card cover: also from the recorded arrival, so it survives a refresh and an
   // undo clears it. Keeps showing after the board hold has dropped the card.
   const coverMs = useBoardHold((s) => s.coverMs);
-  const covered =
-    !!rider.timeArrive && rider.raceStatus === "running" && now - new Date(rider.timeArrive).getTime() < coverMs;
+  const coverUntil = arriveMs != null && running ? arriveMs + coverMs : 0;
+  const covered = coverUntil > now;
+  useEffect(() => {
+    const t = Date.now();
+    const next = [cooldownUntil, coverUntil].filter((x) => x > t);
+    if (next.length === 0) return;
+    const h = setTimeout(rerender, Math.min(...next) - t + 15);
+    return () => clearTimeout(h);
+  }, [cooldownUntil, coverUntil, renderTick]);
 
   const handleClick = (e: React.MouseEvent) => {
     clickCountRef.current++;
@@ -251,8 +272,7 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = setTimeout(() => {
         if (clickCountRef.current === 1 && !coolingDown) {
-          onClick(tappedAt); // Single click
-          setNow(Date.now()); // snap the "since arrive" clock to 0 right away, don't wait for the next tick
+          onClick(tappedAt); // Single click (the new arrival resets the clock and the ring at once)
         }
         clickCountRef.current = 0;
       }, 300);
@@ -371,10 +391,12 @@ const RacingRider: React.FC<Props> = ({ rider, color, phase: groupPhase, isFlash
             <span className={styles.lapTimeCell}>00:00</span>
             <span className={styles.lapTimeCell}>00:00</span>
           </div>
-        ) : (lastLapTime || sinceArrive) && (
+        ) : (lastLapTime || showsClock) && (
           <div className={styles.lapTime}>
             <span className={styles.lapTimeCell}>{lastLapTime ?? "--:--"}</span>
-            <span className={styles.lapTimeCell}>{sinceArrive ?? "--:--"}</span>
+            <span className={styles.lapTimeCell}>
+              {showsClock ? <SinceArrive baseline={sinceArriveBaseline!} active={onScreen} /> : "--:--"}
+            </span>
           </div>
         )}
       </div>

@@ -283,6 +283,15 @@ still open).
   just work. `data-recorded` still means only "waiting for the hold"; the cover is
   `data-covered`, and the green ✓ stays with the hold.
 
+### Card clocks and pace ring (1.2.1, Task 4)
+- ONE shared interval per period for the whole board (`utils/liveTicker.ts` `useTick`), and one
+  shared IntersectionObserver (`useOnScreen`): off-screen cards don't tick or re-render.
+- The since-arrive clock is its own tiny component (`SinceArrive`) ticking every second; the pace
+  ring + tip move every 30 s (`PACE_TICK_MS`), and at once after a lap or when the card comes on
+  screen (everything is derived from timestamps). Cooldown / cover re-render once at their end.
+- No infinite CSS animations on Live cards: the tip doesn't blink (green = on pace, red = overdue),
+  the timer has no heartbeat glow, the ON TRACK pulses stop after 4 beats. Don't bring them back.
+
 ### Joker button (heat page) — unidentified-rider taps
 - Opt-in via a side-menu checkbox (`useJokerMode`, localStorage
   `commissaire.jokerEnabled`, default off — `HeaderMain.tsx`). Off means the
