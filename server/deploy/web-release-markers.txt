@@ -47,3 +47,5 @@ import-stage
 map-remember
 finish-race-progress
 pending_actions
+action-log-storage-full
+200px 0px
