@@ -8,12 +8,27 @@
  *  - Position changes compared only between genuine updates (useLiveTrend); rows glide to
  *    their new place (useRankFlip): primary movers with arrow + border, others silently.
  *  - Stale or ended feed → the last standings stay, dimmed, with when they're from.
+ *  - Every wave finished but the race not officially finished yet (RESULTS unpublished):
+ *    the last wave that ran stays on LIVE as its final, still provisional state (frozen
+ *    clock, FINISHED). Finish Race publishes RESULTS and LIVE goes back to its empty state.
  */
 import React, { useMemo, useRef, useState } from "react";
 import { AlertTriangle, Flag, Radio, Timer } from "lucide-react";
 import type { SharedCategory } from "../../../shared/race/state";
 import { STATUS_LABEL } from "@/utils/statusLabels";
 import { activeWaves, categoryKey, categoryLabel, nextWave, waveLabel, type WaveSummary } from "../waves/activeWaves";
+
+/**
+ * The wave LIVE keeps showing once nothing runs any more but the official RESULTS are not
+ * published yet (race not finished): the last wave that ran, when no wave is still to start.
+ * Derived from the feed only, so a reload shows the same thing.
+ */
+export function lastWaveBeforeResults(waves: WaveSummary[], raceFinished: boolean): WaveSummary | null {
+  if (raceFinished || activeWaves(waves).length > 0 || nextWave(waves)) return null;
+  const done = waves.filter((w) => w.state === "finished");
+  if (done.length === 0) return null;
+  return done.reduce((a, b) => ((b.finishedAt ?? 0) >= (a.finishedAt ?? 0) ? b : a));
+}
 import { RaceClock } from "../waves/raceClock";
 import type { FeedFreshness } from "../feedStatus";
 import { rankLive, type LiveEntry, type LiveMode } from "./liveRanking";
@@ -41,7 +56,8 @@ export function LiveTab(props: LiveTabProps) {
   const [mode, setMode] = useState<LiveMode>("overall");
   const [catChoice, setCatChoice] = useState("");
 
-  const wave = active.find((w) => w.key === waveChoice) ?? active[0] ?? null;
+  const wave = active.find((w) => w.key === waveChoice) ?? active[0] ?? lastWaveBeforeResults(waves, raceFinished);
+  const waveDone = wave?.state === "finished";
 
   if (!wave) return <NoActiveWave waves={waves} raceFinished={raceFinished} onOpenResults={onOpenResults} />;
 
@@ -52,7 +68,7 @@ export function LiveTab(props: LiveTabProps) {
     <div className={styles.live} data-testid="live-tab" data-freshness={freshness}>
       <p className={styles.provisional} role="note" data-testid="live-provisional">
         <b>PROVISIONAL</b>
-        <span>Live standings — not official results.</span>
+        <span>{waveDone ? "Last live standings — official results are published after the race is finished." : "Live standings — not official results."}</span>
       </p>
 
       {freshness !== "fresh" && (
@@ -86,11 +102,15 @@ export function LiveTab(props: LiveTabProps) {
         )}
       </div>
 
-      <section className={styles.waveHead} aria-label={`${waveLabel(wave.key)} ${STATUS_LABEL.running}`}>
-        <span className={styles.liveDot}><Radio size={12} aria-hidden="true" /> {STATUS_LABEL.running}</span>
+      <section className={styles.waveHead} aria-label={`${waveLabel(wave.key)} ${waveDone ? STATUS_LABEL.finished : STATUS_LABEL.running}`} data-testid="live-wave-head" data-state={wave.state}>
+        {waveDone ? (
+          <span className={styles.liveDot}><Flag size={12} aria-hidden="true" /> {STATUS_LABEL.finished}</span>
+        ) : (
+          <span className={styles.liveDot}><Radio size={12} aria-hidden="true" /> {STATUS_LABEL.running}</span>
+        )}
         <h2>{waveLabel(wave.key)}</h2>
         <span className={styles.waveCounts}>{wave.onCourse} on course · {wave.finished} finished</span>
-        <RaceClock startedAt={wave.startedAt} finishedAt={null} offsetMs={clockOffsetMs} className={styles.waveClock} testId="live-clock" />
+        <RaceClock startedAt={wave.startedAt} finishedAt={waveDone ? wave.finishedAt : null} offsetMs={clockOffsetMs} className={styles.waveClock} testId="live-clock" />
       </section>
 
       {wave.riders.length === 0 ? (

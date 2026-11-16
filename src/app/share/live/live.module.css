@@ -97,6 +97,8 @@
   letter-spacing: 0.08em;
 }
 .liveDot svg { animation: pulse 1.6s ease-in-out infinite; }
+/* The last wave kept on LIVE after it finished (results not published yet) is not live. */
+.waveHead[data-state="finished"] .liveDot svg { animation: none; }
 @keyframes pulse { 50% { opacity: 0.35; } }
 .waveCounts { font-size: 0.8rem; opacity: 0.85; }
 .waveClock {

@@ -216,6 +216,79 @@ describe("LIVE", () => {
   });
 });
 
+describe("LIVE lifecycle until official RESULTS (hotfix 1.2.1-rc.3)", () => {
+  /** Both waves with an actual start; each finished one has its own finish time. */
+  const lifecycleCats = (w1: string, w2: string) => [
+    { ...cats(w1, w2)[0], finishedAt: w1 === "finished" ? T0 + 3_000_000 : null },
+    { ...cats(w1, w2)[1], startedAt: w2 === "upcoming" ? null : T0 + 2_000_000, finishedAt: w2 === "finished" ? T0 + 2_400_000 : null },
+  ];
+  const kidsDone = () => [...baseRiders().filter((r) => r.uuid !== "k"), rider("k", 31, "Kids", [36], { raceStatus: "finished" })];
+  const remount = async (path: string) => {
+    cleanup();
+    mount(path);
+    await flush();
+  };
+
+  it("active wave → LIVE; finish it and start the next → LIVE switches to the new wave by itself (also after a reload)", async () => {
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    expect(screen.getByTestId("live-wave-head").textContent).toMatch(/RUNNING.*Wave 1/);
+    expect(rowLabels().some((l) => /bib 11/.test(l))).toBe(true);
+
+    const next = { cats: lifecycleCats("finished", "running"), riders: [...baseRiders().filter((r) => r.uuid !== "k"), rider("k", 31, "Kids", [], { raceStatus: "running" })] };
+    api.fetchPublicChanges.mockImplementationOnce(async () => ({ lastSeq: 8, serverTime: Date.now(), polling: polling(), categories: next.cats, riders: next.riders }));
+    await tick(20_000);
+    expect(screen.getByTestId("live-wave-head").textContent).toMatch(/RUNNING.*Wave 2/);
+    expect(rowLabels().every((l) => /bib 31/.test(l))).toBe(true); // only the new wave, wave 1's laps untouched in the feed
+    expect(screen.getByTestId("live-clock").getAttribute("data-running")).toBe("true");
+
+    api.fetchPublicRace.mockResolvedValue(snapshot(next));
+    await remount(`/share/${TOKEN}?tab=live`);
+    expect(screen.getByTestId("live-wave-head").textContent).toMatch(/RUNNING.*Wave 2/);
+  });
+
+  it("every wave finished, RESULTS not published → LIVE keeps the last wave's final standings, provisional; reload the same", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ cats: lifecycleCats("finished", "finished"), riders: kidsDone() }));
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    expect(screen.queryByTestId("live-no-active-wave")).toBeNull();
+    const head = screen.getByTestId("live-wave-head");
+    expect(head.getAttribute("data-state")).toBe("finished");
+    expect(head.textContent).toMatch(/FINISHED.*Wave 1/); // the wave that finished last
+    expect(screen.getByTestId("live-clock").getAttribute("data-running")).toBe("false");
+    expect(screen.getByTestId("live-provisional").textContent).toMatch(/PROVISIONAL.*not.*|official results are published after/);
+    expect(rowLabels().length).toBe(4); // laps, statuses (DNF) and waiting riders as last known
+    expect(rowLabels().some((l) => /bib 13/.test(l))).toBe(true);
+
+    fireEvent.click(screen.getByTestId("share-tab-results"));
+    await flush();
+    expect(screen.getByTestId("share-follow-live")).toBeTruthy(); // RESULTS still unpublished
+
+    await remount(`/share/${TOKEN}?tab=live`);
+    expect(screen.getByTestId("live-wave-head").getAttribute("data-state")).toBe("finished");
+  });
+
+  it("RESULTS published (Finish Race) → RESULTS as before; LIVE back to its finished state, never shown as results", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ cats: lifecycleCats("finished", "finished"), riders: kidsDone(), race: { status: "finished" }, open: false }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.queryByTestId("share-follow-live")).toBeNull();
+    expect(screen.getAllByTestId("share-results-category").length).toBeGreaterThan(0);
+
+    await remount(`/share/${TOKEN}?tab=live`);
+    expect(screen.getByTestId("live-no-active-wave").textContent).toMatch(/race is finished/);
+    expect(screen.getByTestId("live-open-results")).toBeTruthy();
+    expect(screen.queryAllByTestId("live-row")).toHaveLength(0);
+  });
+
+  it("between waves (a wave still to start) LIVE keeps today's behaviour: what starts next", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ cats: lifecycleCats("finished", "upcoming") }));
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    expect(screen.getByTestId("live-no-active-wave").textContent).toMatch(/Wave 2/);
+  });
+});
+
 describe("navigation", () => {
   it("tab changes are history entries: Back / Forward move between tabs", async () => {
     mount(`/share/${TOKEN}`);
