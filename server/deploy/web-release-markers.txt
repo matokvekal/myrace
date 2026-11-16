@@ -51,3 +51,4 @@ action-log-storage-full
 200px 0px
 live-wave-head
 live-wave-finished
+results-approve

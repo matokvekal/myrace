@@ -7,7 +7,7 @@
  */
 import React, { useMemo } from "react";
 import type { SharedCategory } from "../../../shared/race/state";
-import type { CategoryApprovalView } from "../../../shared/race/approval";
+import type { CategoryApprovalView, ResultsApprovalView } from "../../../shared/race/approval";
 import type { PublicRider } from "../usePublicRaceFeed";
 import { categoryKey, categoryLabel, isOutRider } from "../waves/activeWaves";
 import { filterResultCategories, filterResultRiders } from "../results/resultFilterRules";
@@ -31,9 +31,10 @@ interface ResultPage {
 }
 
 export function BroadcastResults(
-  props: BroadcastCommon & { categories: SharedCategory[]; ridersByCat: Map<string, PublicRider[]>; approvals: Map<string, CategoryApprovalView> },
+  props: BroadcastCommon & { categories: SharedCategory[]; ridersByCat: Map<string, PublicRider[]>; approvals: Map<string, CategoryApprovalView>; resultsApproval: ResultsApprovalView | null },
 ) {
-  const { race, categories, ridersByCat, approvals, clockOffsetMs, freshness, updatedAt, raceFinished } = props;
+  const { race, categories, ridersByCat, approvals, resultsApproval, clockOffsetMs, freshness, updatedAt, raceFinished } = props;
+  const official = resultsApproval?.status === "approved";
   const [listRef, rows] = useFitRows();
   const per = Math.max(3, rows - 1);
 
@@ -60,7 +61,7 @@ export function BroadcastResults(
       <BroadcastHeader
         race={race}
         status={headerStatus(freshness, raceFinished, props.waves.some((w) => w.state === "running"))}
-        tag={raceFinished ? "official" : null}
+        tag={raceFinished ? (official ? "official" : "provisional") : null}
         context={current ? null : race.date ?? null}
         contextCategories={current ? [current.category] : undefined}
         clock={{ kind: "text", label: "Race", text: raceFinished ? "Final" : "In progress" }}
@@ -105,7 +106,7 @@ export function BroadcastResults(
         )}
       </main>
       <BroadcastFooter
-        note={raceFinished ? "Official results · finishers" : "Results are published when the race is finished"}
+        note={raceFinished ? (official ? "Official results · finishers" : "Provisional results · awaiting approval · finishers") : "Results are published when the race is finished"}
         page={page}
         pages={pages.length}
         pageLabel={current ? `${categoryLabel(current.category)}${current.of > 1 ? ` ${current.index + 1}/${current.of}` : ""} · category ${current.catIndex + 1} of ${catCount}` : null}

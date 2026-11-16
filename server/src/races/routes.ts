@@ -10,15 +10,15 @@ import { authed, requireAuth } from "../auth/auth.js";
 import { db, tx } from "../db/pool.js";
 import { ApiError, randomCode, route } from "../lib/core.js";
 import { closeRace, refreshMemberSockets, refreshRaceSockets } from "../realtime/socket.js";
-import { canApproveCategory, categoryInScope, projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
+import { canApproveCategory, canApproveRaceResults, categoryInScope, projectCategory, projectRace, projectRider, projectState, waveInScope } from "../../../src/shared/race/access.js";
 import { APPROVAL_CONFIRM_WORD, approvalBlocker } from "../../../src/shared/race/approval.js";
-import { approvalViews, storeApproval } from "./approvals.js";
+import { approvalViews, resultsApprovalView, storeApproval, storeResultsApproval } from "./approvals.js";
 import { categoryOfRider, deriveRider, rankRiders } from "../../../src/shared/race/engine.js";
 import type { RaceState, SharedCategory, SharedRace, SharedRider } from "../../../src/shared/race/state.js";
 import { DEFAULT_MIN_LAP_SECONDS } from "../../../src/shared/race/state.js";
 import { accessSummary, isCreatorOf, loadMembership, raceNotFound, requireMember, requireOwner } from "./access.js";
 import { shareTokenFor } from "../public/shareToken.js";
-import { processActions } from "./actions.js";
+import { isOfficial, processActions } from "./actions.js";
 import { announceSeq, logServerEvent } from "./audit.js";
 import { insertRace, loadState } from "./repo.js";
 import { logAudit, raceAccountFor } from "../accounts/accounts.js";
@@ -468,7 +468,33 @@ racesRouter.get("/:raceUuid/approvals", route(async (req, res) => {
   const canApprove = Object.values(state.categories)
     .filter((c) => !c.ignored && visible(c.uuid) && canApproveCategory(m.access, c) && !approvalBlocker(state, c.uuid))
     .map((c) => c.uuid);
-  res.json({ approvals, canApprove });
+  // 1.2.1: the race-wide approval (status + who/when) and whether THIS member may approve now.
+  const resultsApproval = await resultsApprovalView(db, state);
+  const official = await isOfficial(db, m.raceUuid);
+  const canApproveResults = official && resultsApproval?.status !== "approved" && canApproveRaceResults({ ...m, trial: m.trialUntil !== null });
+  res.json({ approvals, canApprove, resultsApproval, finalized: official, canApproveResults });
+}));
+
+/**
+ * POST /races/:raceUuid/results-approval { confirm: "APPROVED" } (1.2.1) — the race-wide APPROVE
+ * RESULTS: PROVISIONAL → OFFICIAL. Owner or admin only (`canApproveRaceResults`), only after
+ * Finish Race (an official version exists). Audited (RaceAdmin resultsApproved). Any later change
+ * of the results withdraws it (invalidateChangedApprovals); approving again is allowed.
+ */
+racesRouter.post("/:raceUuid/results-approval", route(async (req, res) => {
+  const body = z.object({ confirm: z.string() }).parse(req.body);
+  if (body.confirm !== APPROVAL_CONFIRM_WORD) throw new ApiError(400, "invalid", `Type ${APPROVAL_CONFIRM_WORD} to approve`);
+  const m = await requireMember(db, raceUuidOf(req), authed(req).userId);
+  if (!canApproveRaceResults({ ...m, trial: m.trialUntil !== null })) throw new ApiError(403, "forbidden", "Only the race owner or an admin can approve the results");
+  const seq = await tx(async (d) => {
+    const state = await loadState(d, m.raceUuid, true); // race row lock: no result change can slip in between
+    if (!state) throw raceNotFound();
+    if (!(await isOfficial(d, m.raceUuid))) throw new ApiError(409, "not_finished", "Finish the race before approving its results");
+    return storeResultsApproval(d, state, m.userId);
+  });
+  await announceSeq(m.raceUuid, seq);
+  const state = await loadState(db, m.raceUuid);
+  res.status(201).json({ resultsApproval: await resultsApprovalView(db, state!) });
 }));
 
 /**

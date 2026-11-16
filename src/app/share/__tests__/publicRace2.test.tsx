@@ -45,10 +45,11 @@ const baseRiders = () => [
   rider("k", 31, "Kids", [], { raceStatus: "upcoming" }),
 ];
 const polling = (open = true) => ({ open, endsAt: open ? Date.now() + 3_600_000 : null, intervalMs: 10_000 });
-const snapshot = (over: { cats?: unknown[]; riders?: unknown[]; race?: Record<string, unknown>; open?: boolean; approvals?: unknown[] } = {}) => ({
+const snapshot = (over: { cats?: unknown[]; riders?: unknown[]; race?: Record<string, unknown>; open?: boolean; approvals?: unknown[]; resultsApproval?: unknown } = {}) => ({
   lastSeq: 5, serverTime: Date.now(), polling: polling(over.open ?? true),
   race: { uuid: "R", name: "Guest Cup", date: today(), time: "00:00", location: "Ben Shemen", status: "running", ...over.race },
   categories: over.cats ?? cats(), riders: over.riders ?? baseRiders(), ...(over.approvals ? { approvals: over.approvals } : {}),
+  ...(over.resultsApproval !== undefined ? { resultsApproval: over.resultsApproval } : {}),
 });
 
 let where = "";
@@ -307,6 +308,42 @@ describe("LIVE lifecycle until official RESULTS (hotfix 1.2.1-rc.3)", () => {
   });
 });
 
+describe("RESULTS status after Finish Race (1.2.1 race-wide approval)", () => {
+  const finishedRace = { cats: cats("finished", "finished"), open: false, race: { status: "finished" } };
+
+  it("PROVISIONAL until approved; OFFICIAL once approved; a withdrawn approval is PROVISIONAL again", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: null }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    const pending = screen.getByTestId("share-results-status");
+    expect(pending.getAttribute("data-status")).toBe("provisional");
+    expect(pending.textContent).toMatch(/Provisional.*Awaiting approval/);
+    expect(screen.getAllByTestId("share-results-category").length).toBeGreaterThan(0); // visible, as provisional
+    cleanup();
+
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: { status: "approved", approvedAt: new Date().toISOString() } }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    const official = screen.getByTestId("share-results-status");
+    expect(official.getAttribute("data-status")).toBe("official");
+    expect(official.textContent).toMatch(/Official.*Approved/);
+    cleanup();
+
+    // The server sends only a VALID approval; anything else counts as provisional.
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: { status: "invalidated", approvedAt: new Date().toISOString() } }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.getByTestId("share-results-status").getAttribute("data-status")).toBe("provisional");
+  });
+
+  it("before Finish Race RESULTS stay unavailable (no status shown)", async () => {
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.getByTestId("share-results-pending")).toBeTruthy();
+    expect(screen.queryByTestId("share-results-status")).toBeNull();
+  });
+});
+
 describe("navigation", () => {
   it("tab changes are history entries: Back / Forward move between tabs", async () => {
     mount(`/share/${TOKEN}`);
@@ -386,10 +423,18 @@ describe("TV broadcast mode", () => {
       r.uuid === "b" ? { ...r, status: "finished", raceStatus: "finished", position_category: 1, elapsedTimeFromStart: "20:00" }
         : r.uuid === "a" ? { ...r, status: "finished", raceStatus: "finished", position_category: 2, elapsedTimeFromStart: "21:00" }
           : r);
-    api.fetchPublicRace.mockResolvedValue(snapshot({
+    const finishedRace = {
       cats: cats("finished", "finished"), riders: finished, open: false, race: { status: "finished" },
       approvals: [{ categoryUuid: "c1", status: "approved", approvedAt: new Date().toISOString() }],
-    }));
+    };
+    // 1.2.1: finished but not approved yet -> PROVISIONAL.
+    api.fetchPublicRace.mockResolvedValue(snapshot(finishedRace));
+    mount(`/share/${TOKEN}?tab=results&view=tv`);
+    await flush();
+    expect(screen.getByTestId("tv-tag").textContent).toMatch(/Provisional/);
+    cleanup();
+
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: { status: "approved", approvedAt: new Date().toISOString() } }));
     mount(`/share/${TOKEN}?tab=results&view=tv`);
     await flush();
     expect(screen.getByTestId("tv-tag").textContent).toMatch(/Official results/);

@@ -19,7 +19,8 @@ import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { BadgeCheck, Calendar, ChevronDown, Clock, MapPin, Radio, RefreshCw, Trophy, Tv } from "lucide-react";
 import type { SharedCategory } from "../../shared/race/state";
-import type { CategoryApprovalView } from "../../shared/race/approval";
+import type { CategoryApprovalView, ResultsApprovalView } from "../../shared/race/approval";
+import { ResultsStatusBadge } from "./results/ResultsStatusBadge";
 import type { RiderProps } from "@/types/types";
 import RiderLapTable from "../race/[id]/results/RiderLapTable";
 import { STATUS_LABEL } from "@/utils/statusLabels";
@@ -151,6 +152,7 @@ function SpectatorRace({ token }: { token: string }) {
         ridersByCat={ridersByCat}
         categoriesByKey={categoriesByKey}
         approvals={feed.approvals}
+        resultsApproval={feed.resultsApproval}
         clockOffsetMs={feed.clockOffsetMs}
         freshness={freshness}
         updatedAt={updatedAt}
@@ -205,7 +207,7 @@ function SpectatorRace({ token }: { token: string }) {
       <main className={`${styles.content} ${tab === "live" ? liveStyles.wideContent : ""}`}>
         <div className={styles.stack}>
           {tab === "results" ? (
-            <ResultsTab categories={sortedCats} ridersByCat={ridersByCat} approvals={feed.approvals} raceFinished={finished} onOpenLive={() => selectTab("live")} />
+            <ResultsTab categories={sortedCats} ridersByCat={ridersByCat} approvals={feed.approvals} resultsApproval={feed.resultsApproval} raceFinished={finished} onOpenLive={() => selectTab("live")} />
           ) : tab === "live" ? (
             <LiveTab
               waves={waves}
@@ -240,12 +242,14 @@ function ResultsTab({
   categories,
   ridersByCat,
   approvals,
+  resultsApproval,
   raceFinished,
   onOpenLive,
 }: {
   categories: SharedCategory[];
   ridersByCat: Map<string, Rider[]>;
   approvals: Map<string, CategoryApprovalView>;
+  resultsApproval: ResultsApprovalView | null;
   raceFinished: boolean;
   onOpenLive: () => void;
 }) {
@@ -264,6 +268,7 @@ function ResultsTab({
 
   return (
     <>
+      <ResultsStatusBadge approval={resultsApproval} testId="share-results-status" />
       <ResultsFilters value={rf} waves={resultWaves(withRiders)} onChange={setRf} />
       <div className={styles.toolbar}>
         {visible.length > 1 && (

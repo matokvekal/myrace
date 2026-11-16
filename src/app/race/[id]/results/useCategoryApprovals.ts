@@ -7,17 +7,23 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isLiveRace } from "@/services/live/liveBridge";
-import type { CategoryApprovalView } from "../../../../shared/race/approval";
+import type { CategoryApprovalView, ResultsApprovalView } from "../../../../shared/race/approval";
 
 export interface CategoryApprovals {
   /** By category uuid. */
   byCategory: Map<string, CategoryApprovalView>;
   /** Category uuids this member may approve now (finished, permission, in scope). */
   canApprove: Set<string>;
+  /** 1.2.1: race-wide approval as the server sees it now (null = never approved). */
+  resultsApproval: ResultsApprovalView | null;
+  /** The server has the race finalized (Finish Race) — the RESULTS status applies. */
+  finalized: boolean;
+  /** THIS member may approve the race's results now (owner/admin, finalized, not approved). */
+  canApproveResults: boolean;
   reload: () => void;
 }
 
-const EMPTY: Omit<CategoryApprovals, "reload"> = { byCategory: new Map(), canApprove: new Set() };
+const EMPTY: Omit<CategoryApprovals, "reload"> = { byCategory: new Map(), canApprove: new Set(), resultsApproval: null, finalized: false, canApproveResults: false };
 
 export function useCategoryApprovals(raceUuid: string, resultsSignature: string): CategoryApprovals {
   const [state, setState] = useState(EMPTY);
@@ -31,7 +37,13 @@ export function useCategoryApprovals(raceUuid: string, resultsSignature: string)
       .then(({ team }) => team.approvals(raceUuid))
       .then((r) => {
         if (mine !== seq.current) return; // an older answer never overwrites a newer one
-        setState({ byCategory: new Map(r.approvals.map((a) => [a.categoryUuid, a])), canApprove: new Set(r.canApprove) });
+        setState({
+          byCategory: new Map(r.approvals.map((a) => [a.categoryUuid, a])),
+          canApprove: new Set(r.canApprove),
+          resultsApproval: r.resultsApproval ?? null,
+          finalized: !!r.finalized,
+          canApproveResults: !!r.canApproveResults,
+        });
       })
       .catch(() => {
         /* offline / older server: keep what we have; nothing is shown as approved by mistake */

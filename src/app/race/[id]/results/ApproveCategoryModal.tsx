@@ -1,6 +1,8 @@
 /**
  * 0.3.5 — "Approve official results" for one category. The judge must type APPROVED
  * exactly; the server checks the word again, the permission and that the category finished.
+ * 1.2.1 — without `categoryUuid` it is the race-wide APPROVE RESULTS (owner/admin, after
+ * Finish Race): PROVISIONAL → OFFICIAL. Same dialog, same typed word.
  */
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
@@ -17,7 +19,8 @@ export default function ApproveCategoryModal({
   onApproved,
 }: {
   raceUuid: string;
-  categoryUuid: string;
+  /** Omitted = approve the whole race's results. */
+  categoryUuid?: string;
   categoryName: string;
   onClose: () => void;
   onApproved: () => void;
@@ -34,7 +37,8 @@ export default function ApproveCategoryModal({
     setError(null);
     try {
       const { team } = await import("@/services/live/liveClient");
-      await team.approveCategory(raceUuid, categoryUuid, typed);
+      if (categoryUuid) await team.approveCategory(raceUuid, categoryUuid, typed);
+      else await team.approveResults(raceUuid, typed);
       onApproved();
       onClose();
     } catch (err) {
@@ -49,12 +53,19 @@ export default function ApproveCategoryModal({
       <form className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="approve-title" onClick={(e) => e.stopPropagation()} onSubmit={submit} data-testid="approve-modal">
         <button type="button" className={styles.close} onClick={onClose} aria-label="Close"><X size={18} /></button>
         <h3 id="approve-title" className={styles.title} dir="auto">
-          <BadgeCheck size={20} aria-hidden="true" /> Approve {categoryName}
+          <BadgeCheck size={20} aria-hidden="true" /> {categoryUuid ? <>Approve {categoryName}</> : "Approve Results"}
         </h3>
-        <p className={styles.text} dir="auto">
-          This makes the podium of <b>{categoryName}</b> official on the public results page, with your name and the time recorded.
-          Any later change to this category's results withdraws the approval automatically.
-        </p>
+        {categoryUuid ? (
+          <p className={styles.text} dir="auto">
+            This makes the podium of <b>{categoryName}</b> official on the public results page, with your name and the time recorded.
+            Any later change to this category's results withdraws the approval automatically.
+          </p>
+        ) : (
+          <p className={styles.text} dir="auto">
+            This marks the results of <b>{categoryName}</b> as <b>OFFICIAL</b> on the public results page, with your name and the time recorded.
+            Any later change to the results returns them to PROVISIONAL until they are approved again.
+          </p>
+        )}
         <label className={styles.label} htmlFor="approve-word">Type <b>{APPROVE_WORD}</b> to confirm</label>
         <input
           id="approve-word"

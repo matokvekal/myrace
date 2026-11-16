@@ -1,8 +1,10 @@
 # APPROVE RESULTS — official results published only after a judge's approval
 
-**Status:** backlog / specification only (2026-11-13). Nothing here is implemented; current
-production behaviour (public RESULTS appear once the race is finished — `race.status ===
-"finished"`, see "Public race page 2.0" in `CLAUDE.md`) is unchanged until this is built.
+**Status:** a SIMPLIFIED version is implemented (2026-11-16, see "Approve Results (1.2.1)" in
+`CLAUDE.md`): one race-wide approval, owner/admin only, after Finish Race; RESULTS are public as
+PROVISIONAL from Finish Race and OFFICIAL once approved; a later change withdraws it. Not built
+from this spec: the RACE-screen button, hiding RESULTS until approval, the approved snapshot,
+approval without Finish Race, a separate table. The text below is kept as the original proposal.
 
 ## 1. Business requirement
 

@@ -4,6 +4,7 @@ import {
   authorizeAction,
   can,
   delegationError,
+  canApproveRaceResults,
   effectiveAccess,
   projectRace,
   projectRider,
@@ -287,5 +288,18 @@ describe("admin delegation (0.2: only the current owner)", () => {
     expect(delegationError(false, { roles: ["counter"] }, { roles: ["start"] })).toBeNull();
     expect(delegationError(false, { roles: ["checkin"] }, null)).toBeNull();
     expect(delegationError(false, null, { roles: ["viewer"], permissions: { screens: { team: { view: true } } } })).toBeNull();
+  });
+});
+
+describe("race-wide APPROVE RESULTS (1.2.1)", () => {
+  const owner = effectiveAccess({ isOwner: true, roles: [], permissions: {} });
+  it("owner or a full-scope admin; never other judges, a wave-limited admin or a trial user", () => {
+    expect(canApproveRaceResults({ isOwner: true, roles: [], access: owner })).toBe(true);
+    expect(canApproveRaceResults({ isOwner: false, roles: ["admin"], access: member(["admin"]) })).toBe(true);
+    expect(canApproveRaceResults({ isOwner: false, roles: ["admin"], access: member(["admin"]), trial: true })).toBe(false);
+    expect(canApproveRaceResults({ isOwner: false, roles: ["admin"], access: member(["admin"], { waves: [1] }) })).toBe(false);
+    for (const roles of [["results"], ["start", "counter", "checkin"], ["viewer"]] as MemberRole[][]) {
+      expect(canApproveRaceResults({ isOwner: false, roles, access: member(roles) })).toBe(false);
+    }
   });
 });

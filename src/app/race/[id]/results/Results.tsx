@@ -11,6 +11,8 @@ import RiderLapTable from "./RiderLapTable";
 import ResultCorrection from "./ResultCorrection";
 import ApproveCategoryModal from "./ApproveCategoryModal";
 import { useCategoryApprovals } from "./useCategoryApprovals";
+import { ResultsStatusBadge } from "../../../share/results/ResultsStatusBadge";
+import useRaceStore from "@/stores/racesStore";
 import { buildSchedule, DEFAULT_WAVE_GAP_MINUTES, catWaveKey, withCategoryLaps } from "../schedule/Schedule";
 import { Trophy, SlidersHorizontal, ListFilter, Check, RefreshCw, BadgeCheck } from "lucide-react";
 import { refreshRaceData } from "@/services/live/liveRaceRoom";
@@ -179,6 +181,9 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defau
   );
   const approvals = useCategoryApprovals(raceUuid, resultsSignature);
   const [approving, setApproving] = useState<{ uuid: string; name: string } | null>(null);
+  // 1.2.1: race-wide APPROVE RESULTS — one status line + one discreet action (owner/admin, after Finish Race).
+  const raceName = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid)?.name ?? "this race");
+  const [approvingResults, setApprovingResults] = useState(false);
 
   const { waveNums, catWaveMap } = useMemo(() => {
     const schedule = buildSchedule(raceCategories, DEFAULT_WAVE_GAP_MINUTES);
@@ -534,6 +539,19 @@ const Results: React.FC<Props> = ({ raceUuid, defaultGroupBy = "category", defau
         </div>
       </div>
 
+      {approvals.finalized && (
+        <div className={styles.resultsStatusRow}>
+          <ResultsStatusBadge approval={approvals.resultsApproval} />
+          {approvals.canApproveResults && (
+            <button type="button" className={styles.approveResultsBtn} onClick={() => setApprovingResults(true)} data-testid="results-approve">
+              <BadgeCheck size={15} aria-hidden="true" /> {approvals.resultsApproval ? "Approve again" : "Approve Results"}
+            </button>
+          )}
+        </div>
+      )}
+      {approvingResults && (
+        <ApproveCategoryModal raceUuid={raceUuid} categoryName={raceName} onClose={() => setApprovingResults(false)} onApproved={approvals.reload} />
+      )}
       {approving && (
         <ApproveCategoryModal
           raceUuid={raceUuid}

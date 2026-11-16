@@ -342,6 +342,13 @@ const anyOf = (access: EffectiveAccess, needs: Need[]): boolean => needs.some(([
 export const canApproveCategory = (access: EffectiveAccess, category: SharedCategory | undefined): boolean =>
   !!category && anyOf(access, [["live", "update"], ["results", "update"]]) && categoryInScope(access, category);
 
+/**
+ * Race-wide APPROVE RESULTS (1.2.1): the owner, or an admin member whose writes are on (access
+ * already stripped otherwise) with the whole race in scope. Never other judges, never a trial user.
+ */
+export const canApproveRaceResults = (m: { isOwner: boolean; roles: readonly MemberRole[]; access: EffectiveAccess; trial?: boolean }): boolean =>
+  m.isOwner || (!m.trial && m.roles.includes("admin") && can(m.access, "results", "update") && m.access.waves === null && m.access.categories === null);
+
 const SCHEDULE_FIELDS = new Set(["startTime", "heat"]);
 const MAP_FIELDS = new Set<string>(RACE_MAP_FIELDS);
 

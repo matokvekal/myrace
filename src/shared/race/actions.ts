@@ -144,6 +144,9 @@ export type RaceAdminPayload =
   /** 0.3.5 official podium approval per category (typed APPROVED), and its automatic invalidation. */
   | { op: "categoryApproved"; categoryUuid: CategoryUuid; categoryName: string }
   | { op: "approvalInvalidated"; categoryUuid: CategoryUuid; categoryName: string; cause: string }
+  /** 1.2.1 race-wide APPROVE RESULTS (owner/admin, after Finish Race), and its automatic invalidation. */
+  | { op: "resultsApproved" }
+  | { op: "resultsApprovalInvalidated"; cause: string }
   /** Quick Trial Access (014): a link created / revoked by the owner, a trial user created by opening it. */
   | { op: "trialLinkCreated"; linkId: string; roles: MemberRole[]; maxUses: number; expiresAt: string; accessUntil: string }
   | { op: "trialLinkRevoked"; linkId: string; endedUsers: number }

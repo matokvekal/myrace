@@ -623,3 +623,15 @@
   min-height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid #1f7a33;
   background: none; color: #1f7a33; font-size: 12px; font-weight: 700; cursor: pointer;
 }
+
+/* 1.2.1 race-wide RESULTS status + the discreet Approve Results action (owner/admin). */
+.resultsStatusRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 8px; }
+.approveResultsBtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 32px; padding: 0 12px;
+  border: 1px solid #2e9e4f; border-radius: 999px;
+  background: transparent; color: #1f7a33;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer;
+}
+.approveResultsBtn:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+:global([data-theme="dark"]) .approveResultsBtn { color: #6ee08a; border-color: #6ee08a; }

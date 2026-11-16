@@ -46,3 +46,32 @@ export function approvalBlocker(state: RaceState, categoryUuid: CategoryUuid): s
   if (c.status !== "finished" || c.startedAt == null) return "Only a finished category can be approved";
   return null;
 }
+
+/**
+ * Race-wide APPROVE RESULTS (1.2.1). After Finish Race the results are PROVISIONAL until the
+ * owner or an admin approves them; then OFFICIAL. Any later change of any category's result
+ * (an amendment) withdraws the approval — same hash rule as the per-category approval, over
+ * every category. Stored as the race's own row in `category_approvals` (categoryUuid = race
+ * uuid), so it shares that table's audit and invalidation path; no migration.
+ */
+export type ResultsStatus = "provisional" | "official";
+
+export interface ResultsApprovalView {
+  status: ApprovalStatus;
+  approvedAt: string;
+  /** Members only (guests never get judge identity). */
+  approvedByName?: string | null;
+  invalidatedAt?: string | null;
+}
+
+/** Canonical text of every category's result (ignored categories left out). */
+export function raceResultFingerprint(state: RaceState): string {
+  const cats = Object.values(state.categories)
+    .filter((c) => !c.ignored)
+    .map((c) => c.uuid)
+    .sort();
+  return JSON.stringify(cats.map((u) => categoryResultFingerprint(state, u)));
+}
+
+/** The race's results are OFFICIAL only with a valid (unchanged) approval. */
+export const resultsStatusOf = (a: ResultsApprovalView | null | undefined): ResultsStatus => (a?.status === "approved" ? "official" : "provisional");

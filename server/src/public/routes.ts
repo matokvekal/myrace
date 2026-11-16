@@ -21,7 +21,7 @@ import { projectPublicState } from "../../../src/shared/race/access.js";
 import { GUEST_POLL_INTERVAL_MS, guestPollingEndsAt } from "../../../src/shared/race/guestPolling.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { raceUuidFromShareToken } from "./shareToken.js";
-import { approvalViews } from "../races/approvals.js";
+import { approvalViews, resultsApprovalView } from "../races/approvals.js";
 
 export const publicRouter = Router();
 // A guest page polls every 10 s; this leaves room for several open tabs behind one address.
@@ -53,7 +53,8 @@ const send = (res: Response, state: RaceState, body: Record<string, unknown>) =>
 publicRouter.get("/races/:token", route(async (req, res) => {
   const state = await stateOf(String(req.params.token));
   // 0.3.5: only VALID approvals (result unchanged since APPROVED), no judge identity.
-  send(res, state, { ...projectPublicState(state), approvals: await approvalViews(db, state, { guest: true }) });
+  // 1.2.1: race-wide approval → RESULTS OFFICIAL (valid only, no judge identity); null = PROVISIONAL.
+  send(res, state, { ...projectPublicState(state), approvals: await approvalViews(db, state, { guest: true }), resultsApproval: await resultsApprovalView(db, state, { guest: true }) });
 }));
 
 publicRouter.get("/races/:token/changes", route(async (req, res) => {
@@ -68,7 +69,8 @@ publicRouter.get("/races/:token/changes", route(async (req, res) => {
   );
   const pub = projectPublicState(state);
   const approvals = await approvalViews(db, state, { guest: true });
-  if (removed || state.race.lastSeq - afterSeq > 5000) return send(res, state, { full: true, ...pub, approvals });
+  const resultsApproval = await resultsApprovalView(db, state, { guest: true });
+  if (removed || state.race.lastSeq - afterSeq > 5000) return send(res, state, { full: true, ...pub, approvals, resultsApproval });
   const riders = new Set((await db.query<{ uuid: string }>(`SELECT uuid FROM riders WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [state.race.uuid, afterSeq])).map((r) => r.uuid));
   const cats = new Set((await db.query<{ uuid: string }>(`SELECT uuid FROM categories WHERE "raceUuid" = $1 AND "changedSeq" > $2`, [state.race.uuid, afterSeq])).map((c) => c.uuid));
   send(res, state, {
@@ -76,5 +78,6 @@ publicRouter.get("/races/:token/changes", route(async (req, res) => {
     categories: pub.categories.filter((c) => cats.has(c.uuid)),
     riders: pub.riders.filter((r) => r.uuid && riders.has(r.uuid)),
     approvals, // always the full list (small): an approval or invalidation changes no category row
+    resultsApproval,
   });
 }));

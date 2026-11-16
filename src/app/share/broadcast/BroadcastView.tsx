@@ -11,7 +11,7 @@
 import React, { useEffect } from "react";
 import { Maximize, Minimize, X } from "lucide-react";
 import type { SharedCategory, SharedRace } from "../../../shared/race/state";
-import type { CategoryApprovalView } from "../../../shared/race/approval";
+import type { CategoryApprovalView, ResultsApprovalView } from "../../../shared/race/approval";
 import type { PublicRider } from "../usePublicRaceFeed";
 import type { ShareTab } from "../publicRefresh";
 import type { WaveSummary } from "../waves/activeWaves";
@@ -45,6 +45,8 @@ export function BroadcastView(props: {
   ridersByCat: Map<string, PublicRider[]>;
   categoriesByKey: Map<string, SharedCategory>;
   approvals: Map<string, CategoryApprovalView>;
+  /** 1.2.1: valid race-wide approval → OFFICIAL; null → PROVISIONAL. */
+  resultsApproval: ResultsApprovalView | null;
   clockOffsetMs: number;
   freshness: FeedFreshness;
   updatedAt: number | null;
@@ -79,7 +81,7 @@ export function BroadcastView(props: {
       {tab === "live" ? (
         <BroadcastLive {...common} />
       ) : tab === "results" ? (
-        <BroadcastResults {...common} categories={props.categories} ridersByCat={props.ridersByCat} approvals={props.approvals} />
+        <BroadcastResults {...common} categories={props.categories} ridersByCat={props.ridersByCat} approvals={props.approvals} resultsApproval={props.resultsApproval} />
       ) : (
         <BroadcastRace {...common} />
       )}

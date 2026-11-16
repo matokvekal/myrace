@@ -904,6 +904,20 @@ still open).
 - Tests: `server/test/db/podium-approval.test.ts`, `src/shared/race/__tests__/approval.test.ts`,
   `results/__tests__/podiumApproval.test.tsx`, `ResultCorrection.test.tsx`, spectator tests.
 
+### Approve Results (1.2.1) — race-wide PROVISIONAL → OFFICIAL
+- After Finish Race, RESULTS (app + public + TV) are PROVISIONAL; the owner or a full-scope admin
+  (`canApproveRaceResults`, shared access.ts; members' writes on; never trial users or other judges)
+  taps "Approve Results" on Results (same dialog as the podium one, typed APPROVED) → OFFICIAL.
+- Server: `POST /races/:uuid/results-approval` (409 before Finish Race = no official version). Stored as
+  the race's OWN row in `category_approvals` (`categoryUuid` = race uuid, digest = `raceResultFingerprint`
+  over every category) — no migration; `approvalViews` skips it, `invalidateChangedApprovals` handles it
+  (audited `resultsApprovalInvalidated`), so any result change (an Amend) returns RESULTS to PROVISIONAL.
+  Audit: RaceAdmin `resultsApproved`. `GET /approvals` adds `resultsApproval`, `finalized`, `canApproveResults`.
+- Public payload `resultsApproval` = VALID approval only (time, no name), else null. UI: ONE indicator
+  `share/results/ResultsStatusBadge.tsx` (public RESULTS + app Results), TV tag Provisional/Official.
+- Corrections unchanged: after Finish Race they are held back and enter only through the owner's Amend.
+- Tests: `server/test/db/results-approval.test.ts`, `access.test.ts`, `podiumApproval.test.tsx`, `publicRace2.test.tsx`.
+
 ### Invited judges (0.3.6) — role defaults, `shared/race/access.ts` ROLE_DEFAULTS
 - Invited judge = start + counter + checkin (InviteJudges `JUDGE_ROLES`, member writes on). Rights come
   from the role defaults, so existing judges get them on the next access refresh — no data change.

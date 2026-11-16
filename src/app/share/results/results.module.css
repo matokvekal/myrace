@@ -100,3 +100,26 @@
   font-weight: 700;
 }
 :global([data-theme="dark"]) .check input { accent-color: #3b82f6; }
+
+/* 1.2.1 race-wide RESULTS status (ResultsStatusBadge): one quiet line, no box clutter. */
+.status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: rgba(240, 170, 40, 0.12);
+}
+.status b { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: #9a6400; }
+.status svg { color: #b7791f; flex-shrink: 0; }
+.status[data-status="official"] { background: rgba(46, 160, 67, 0.14); }
+.status[data-status="official"] b,
+.status[data-status="official"] svg { color: #1f7a33; }
+:global([data-theme="dark"]) .status b,
+:global([data-theme="dark"]) .status svg { color: #f0c05a; }
+:global([data-theme="dark"]) .status[data-status="official"] b,
+:global([data-theme="dark"]) .status[data-status="official"] svg { color: #6ee08a; }

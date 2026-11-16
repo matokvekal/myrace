@@ -9,10 +9,12 @@
  *    a changed category 'invalidated' with a RaceAdmin audit entry; every read re-checks the
  *    hash too, so no path can leave a stale approval on screen.
  *  - Guests see only valid approvals, without judge identity.
+ *  - 1.2.1: the race-wide APPROVE RESULTS is the race's own row here (categoryUuid = race uuid,
+ *    digest over every category): same lock, audit and invalidation path, no migration.
  */
 import { createHash } from "node:crypto";
 import type { Db } from "../db/pool.js";
-import { approvalBlocker, categoryResultFingerprint, type CategoryApprovalView } from "../../../src/shared/race/approval.js";
+import { approvalBlocker, categoryResultFingerprint, raceResultFingerprint, type CategoryApprovalView, type ResultsApprovalView } from "../../../src/shared/race/approval.js";
 import type { RaceState } from "../../../src/shared/race/state.js";
 import { logServerEvent } from "./audit.js";
 
@@ -44,6 +46,7 @@ async function rows(d: Db, raceUuid: string, lock = false): Promise<ApprovalRow[
 export async function approvalViews(d: Db, state: RaceState, opts: { guest?: boolean } = {}): Promise<CategoryApprovalView[]> {
   const out: CategoryApprovalView[] = [];
   for (const r of await rows(d, state.race.uuid)) {
+    if (r.categoryUuid === state.race.uuid) continue; // the race-wide approval (resultsApprovalView)
     const cat = state.categories[r.categoryUuid];
     if (!cat || cat.ignored) continue;
     const valid = r.status === "approved" && resultDigest(state, r.categoryUuid) === r.resultDigest;
@@ -71,14 +74,15 @@ export async function invalidateChangedApprovals(d: Db, state: RaceState, actorI
   let seq = 0;
   for (const r of await rows(d, state.race.uuid, true)) {
     if (r.status !== "approved") continue;
-    if (resultDigest(state, r.categoryUuid) === r.resultDigest) continue;
+    const race = r.categoryUuid === state.race.uuid;
+    if ((race ? raceDigest(state) : resultDigest(state, r.categoryUuid)) === r.resultDigest) continue;
     const reason = `Results changed after approval (${cause})`.slice(0, 300);
     await d.query(
       `UPDATE category_approvals SET status = 'invalidated', "invalidatedAt" = now(), "invalidatedBy" = $3, "invalidatedReason" = $4
        WHERE "raceUuid" = $1 AND "categoryUuid" = $2`,
       [state.race.uuid, r.categoryUuid, actorId, reason],
     );
-    seq = await logServerEvent(d, state.race.uuid, actorId, "RaceAdmin", {
+    seq = await logServerEvent(d, state.race.uuid, actorId, "RaceAdmin", race ? { op: "resultsApprovalInvalidated", cause: cause.slice(0, 200) } : {
       op: "approvalInvalidated", categoryUuid: r.categoryUuid, categoryName: state.categories[r.categoryUuid]?.name ?? "", cause: cause.slice(0, 200),
     });
   }
@@ -101,6 +105,40 @@ export async function storeApproval(d: Db, state: RaceState, categoryUuid: strin
        "approvedAt" = now(), "approvedSeq" = EXCLUDED."approvedSeq",
        "invalidatedAt" = NULL, "invalidatedBy" = NULL, "invalidatedReason" = NULL`,
     [state.race.uuid, categoryUuid, digest, userId, seq],
+  );
+  return seq;
+}
+
+// ---- Race-wide APPROVE RESULTS (1.2.1) ----------------------------------------------------
+
+export const raceDigest = (state: RaceState): string => createHash("sha256").update(raceResultFingerprint(state)).digest("hex");
+
+/** The race's approval re-checked against the result as it is now; null = never approved. Guests: only a valid one, no name. */
+export async function resultsApprovalView(d: Db, state: RaceState, opts: { guest?: boolean } = {}): Promise<ResultsApprovalView | null> {
+  const r = (await rows(d, state.race.uuid)).find((x) => x.categoryUuid === state.race.uuid);
+  if (!r) return null;
+  const valid = r.status === "approved" && raceDigest(state) === r.resultDigest;
+  const approvedAt = new Date(r.approvedAt).toISOString();
+  if (opts.guest) return valid ? { status: "approved", approvedAt } : null;
+  return {
+    status: valid ? "approved" : "invalidated",
+    approvedAt,
+    approvedByName: r.approvedByName,
+    invalidatedAt: valid ? null : r.invalidatedAt ? new Date(r.invalidatedAt).toISOString() : null,
+  };
+}
+
+/** Stores the race-wide approval (caller checked permission + Finish Race, holds the race row lock). Returns the audit seq. */
+export async function storeResultsApproval(d: Db, state: RaceState, userId: string): Promise<number> {
+  const seq = await logServerEvent(d, state.race.uuid, userId, "RaceAdmin", { op: "resultsApproved" });
+  await d.query(
+    `INSERT INTO category_approvals ("raceUuid", "categoryUuid", status, "resultDigest", "approvedBy", "approvedAt", "approvedSeq")
+     VALUES ($1, $1, 'approved', $2, $3, now(), $4)
+     ON CONFLICT ("raceUuid", "categoryUuid") DO UPDATE SET
+       status = 'approved', "resultDigest" = EXCLUDED."resultDigest", "approvedBy" = EXCLUDED."approvedBy",
+       "approvedAt" = now(), "approvedSeq" = EXCLUDED."approvedSeq",
+       "invalidatedAt" = NULL, "invalidatedBy" = NULL, "invalidatedReason" = NULL`,
+    [state.race.uuid, raceDigest(state), userId, seq],
   );
   return seq;
 }
