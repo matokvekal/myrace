@@ -53,6 +53,49 @@ export function sameRider(a: RiderProps, b: RiderProps): boolean {
   }
 }
 
+/** Per race: the latest `getRiders` load started, so an older answer never overwrites a newer one. */
+const loadSeq = new Map<string, number>();
+
+/**
+ * Local rider writes vs. an in-flight `getRiders` (rc.6 hotfix). A load reads IndexedDB (or the
+ * API) asynchronously; a write that lands meanwhile (lap, check-in, edit, remote change, delete)
+ * is newer than that snapshot. `getRiders` keeps the in-memory version of every rider written
+ * after the load started, or whose IndexedDB write hasn't finished yet.
+ */
+let writeClock = 0;
+const lastWrite = new Map<number, { at: number; deleted: boolean }>();
+const pendingWrites = new Map<number, number>();
+
+function beginWrite(ids: number[], deleted = false): () => void {
+  const at = ++writeClock;
+  for (const id of ids) {
+    lastWrite.set(id, { at, deleted });
+    pendingWrites.set(id, (pendingWrites.get(id) ?? 0) + 1);
+  }
+  return () => {
+    for (const id of ids) {
+      const n = (pendingWrites.get(id) ?? 1) - 1;
+      if (n > 0) pendingWrites.set(id, n);
+      else pendingWrites.delete(id);
+    }
+  };
+}
+
+/** `loaded` merged with this race's in-memory riders written since the load began at `since`. */
+function mergeLoad(raceUuid: string, loaded: RiderProps[], current: RiderProps[], since: number): RiderProps[] {
+  const touched = (id: number) => (lastWrite.get(id)?.at ?? 0) > since || pendingWrites.has(id);
+  const mem = new Map(current.filter((r) => r.raceUuid === raceUuid).map((r) => [r.id, r]));
+  const merged: RiderProps[] = [];
+  for (const r of loaded) {
+    if (!touched(r.id)) merged.push(r);
+    else if (mem.has(r.id)) merged.push(mem.get(r.id)!);
+    else if (!lastWrite.get(r.id)?.deleted) merged.push(r); // written to IDB only (not in memory)
+  }
+  const loadedIds = new Set(loaded.map((r) => r.id));
+  for (const r of mem.values()) if (!loadedIds.has(r.id) && touched(r.id)) merged.push(r);
+  return merged;
+}
+
 interface RiderState {
   riders: RiderProps[];
   lastFetchedRaceUuid: string;
@@ -137,35 +180,55 @@ const useRiderStore = create<RiderState>()(
 
           // ✅ Prevent redundant API calls
           if (riders.length > 0 && lastFetchedRaceUuid === raceUuid) {
-            return riders;
+            return riders.filter((r) => r.raceUuid === raceUuid);
           }
+
+          const load = (loadSeq.get(raceUuid) ?? 0) + 1;
+          loadSeq.set(raceUuid, load);
+          const since = writeClock;
+          // Replace ONLY this race's riders, never the other races' (rc.6 hotfix). This used to
+          // set `riders` to this race alone, so a background load of another race (My Races'
+          // account sync catches up every linked race and each catch-up calls getRiders) wiped
+          // the race on screen: "No riders yet" until a remount re-read it. A newer load of the
+          // same race that started after this one wins; this older answer is dropped. Riders
+          // written locally while it was in flight keep their in-memory version (`mergeLoad`).
+          const apply = (loaded: RiderProps[]): RiderProps[] => {
+            if (loadSeq.get(raceUuid) !== load) return get().riders.filter((r) => r.raceUuid === raceUuid);
+            let merged = loaded;
+            set((state) => {
+              merged = mergeLoad(raceUuid, loaded, state.riders, since);
+              return {
+                ...state,
+                riders: [...state.riders.filter((r) => r.raceUuid !== raceUuid), ...merged],
+                lastFetchedRaceUuid: raceUuid,
+              };
+            });
+            return merged;
+          };
 
           const db = await initIndexedDB();
           let storedRiders = await db.getAll("riders");
           storedRiders = storedRiders.filter((r) => r.raceUuid === raceUuid);
 
           if (storedRiders.length > 0) {
-            set((state) => ({
-              ...state,
-              riders: storedRiders,
-              lastFetchedRaceUuid: raceUuid,
-            }));
+            const result = apply(storedRiders);
             db.close();
-            return storedRiders;
+            return result;
           }
 
           const fetchedRiders = await fetchRidersFromAPI(raceUuid);
           if (fetchedRiders.length > 0) {
-            set((state) => ({
-              ...state,
-              riders: fetchedRiders,
-              lastFetchedRaceUuid: raceUuid,
-            }));
+            const result = apply(fetchedRiders);
+            // Never write a fetched row over a rider changed locally meanwhile.
+            const touchedAfter = (id: number) => (lastWrite.get(id)?.at ?? 0) > since || pendingWrites.has(id);
+            const toStore = fetchedRiders.filter((r) => !touchedAfter(r.id));
 
             const tx = db.transaction("riders", "readwrite");
             const store = tx.objectStore("riders");
-            await Promise.all(fetchedRiders.map((rider) => store.put(rider)));
+            await Promise.all(toStore.map((rider) => store.put(rider)));
             await tx.done;
+            db.close();
+            return result;
           }
 
           db.close();
@@ -193,6 +256,7 @@ const useRiderStore = create<RiderState>()(
       addNewRider: async (newRider) => {
         if (blockIfFinalized([newRider], "add")) return;
         if (liveBridge()?.beforeRiders("add", [], [newRider]) === false) return;
+        const done = beginWrite([newRider.id]);
         try {
           set((state) => ({
             ...state,
@@ -207,12 +271,15 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error inserting rider:", error);
+        } finally {
+          done();
         }
       },
 
       insertRiders: async (newRiders) => {
         if (blockIfFinalized(newRiders, "import")) return;
         if (liveBridge()?.beforeRiders("import", [], newRiders) === false) return;
+        const done = beginWrite(newRiders.map((r) => r.id));
         try {
           set((state) => ({
             ...state,
@@ -234,6 +301,8 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error inserting riders:", error);
+        } finally {
+          done();
         }
       },
 
@@ -241,6 +310,7 @@ const useRiderStore = create<RiderState>()(
         if (blockIfFinalized([updatedRider], "update")) return;
         const prev = get().riders.find((r) => r.id === updatedRider.id);
         if (prev && liveBridge()?.beforeRiders("update", [prev], [updatedRider]) === false) return;
+        const done = beginWrite([updatedRider.id]);
         try {
           set((state) => ({
             ...state,
@@ -257,6 +327,8 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error updating rider in IDB:", error);
+        } finally {
+          done();
         }
       },
 
@@ -288,6 +360,7 @@ const useRiderStore = create<RiderState>()(
         if (blockIfFinalized(updatedRiders, "patch")) return;
         if (!liveCheck(get().riders, updatedRiders)) return;
         const byId = new Map(updatedRiders.map((r) => [r.id, r]));
+        const done = beginWrite(updatedRiders.map((r) => r.id));
         set((state) => ({
           ...state,
           riders: state.riders.map((r) => byId.get(r.id) ?? r),
@@ -302,6 +375,8 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error patching riders in IDB:", error);
+        } finally {
+          done();
         }
       },
 
@@ -309,6 +384,7 @@ const useRiderStore = create<RiderState>()(
         if (blockIfFinalized(updatedRiders, "update")) return;
         if (!liveCheck(get().riders, updatedRiders)) return;
         const updatedIds = new Set(updatedRiders.map((r) => r.id));
+        const done = beginWrite([...updatedIds]);
         set((state) => ({
           ...state,
           riders: [
@@ -318,7 +394,10 @@ const useRiderStore = create<RiderState>()(
         }));
 
         const toWrite = persistIds ? updatedRiders.filter((r) => persistIds.has(r.id)) : updatedRiders;
-        if (toWrite.length === 0) return;
+        if (toWrite.length === 0) {
+          done();
+          return;
+        }
         try {
           const db = await initIndexedDB();
           const tx = db.transaction("riders", "readwrite");
@@ -328,6 +407,8 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error updating all riders in IDB:", error);
+        } finally {
+          done();
         }
       },
 
@@ -335,6 +416,7 @@ const useRiderStore = create<RiderState>()(
         const target = get().riders.find((r) => r.id === riderId);
         if (target && blockIfFinalized([target], "delete")) return;
         if (target && liveBridge()?.beforeRiders("delete", [target], []) === false) return;
+        const done = beginWrite([riderId], true);
         try {
           set((state) => ({
             ...state,
@@ -347,6 +429,8 @@ const useRiderStore = create<RiderState>()(
           db.close();
         } catch (error) {
           console.error("Error deleting rider:", error);
+        } finally {
+          done();
         }
       },
 
@@ -355,10 +439,14 @@ const useRiderStore = create<RiderState>()(
         // removes the race first, so by the time this runs as its cleanup step
         // the uuid is no longer finalized and the purge goes through.
         if (blockIfFinalized([{ raceUuid }], "bulk delete")) return;
+        // A load of this race still in flight must not bring the deleted riders back.
+        loadSeq.set(raceUuid, (loadSeq.get(raceUuid) ?? 0) + 1);
+        let done = () => {};
         try {
           const db = await initIndexedDB();
           const allRiders = await db.getAll("riders");
           const toDelete = allRiders.filter((r: RiderProps) => r.raceUuid === raceUuid);
+          done = beginWrite(toDelete.map((r: RiderProps) => r.id), true);
           if (toDelete.length > 0) {
             const tx = db.transaction("riders", "readwrite");
             const store = tx.objectStore("riders");
@@ -371,6 +459,8 @@ const useRiderStore = create<RiderState>()(
           }));
         } catch (error) {
           console.error("Error deleting riders by race:", error);
+        } finally {
+          done();
         }
       },
     }),
