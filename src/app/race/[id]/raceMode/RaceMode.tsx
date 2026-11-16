@@ -132,6 +132,13 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
   // Riders of ignored waves take no part in race operations (data kept).
   const storeRiders = useRiderStore((state) => state.riders);
   const storeCategories = useCategoryStore((state) => state.categories);
+  // Load THIS race's riders, like every other race screen (Check-In, Board, Live, Results).
+  // RACE never did: it showed whatever the store held — another race's riders when the app was
+  // still alive in the background, or nothing when the start-up IndexedDB hydration failed after
+  // the phone came back — so a judge opening the race by its link saw an empty race until a
+  // refresh or another tab loaded them. No-op when this race's riders are already loaded.
+  const getRiders = useRiderStore((state) => state.getRiders);
+  React.useEffect(() => { void getRiders(raceUuid); }, [raceUuid, getRiders]);
   const riders = useMemo(() => withoutIgnoredRiders(storeRiders, storeCategories), [storeRiders, storeCategories]);
   const raceRiders = useMemo(() => riders.filter((r) => r.raceUuid === raceUuid), [riders, raceUuid]);
   const race = useRaceStore((s) => s.races.find((r) => r.uuid === raceUuid));
