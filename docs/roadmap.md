@@ -11,6 +11,7 @@
 > | 0.2.0 release | Published (`release-047e47a`), **deployment pending** |
 > | Next | **Rapid Lap Entry** (`docs/v2/rapid-lap-entry.md`) |
 > | Deferred | Organizations UI, plans/limits, Super Admin, billing |
+> | Backlog (spec only, 2026-11-13) | **APPROVE RESULTS** — official public results only after a judge's approval, shown once every wave is WAVE FINISH, server-enforced (`docs/backlog/approve-results.md`) |
 
 
 **Last Updated:** 2026-07-25
