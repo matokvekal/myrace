@@ -81,7 +81,7 @@ function SpectatorRace({ token }: { token: string }) {
   const [params, setParams] = useSearchParams();
   const tab = shareTabFromParam(params.get("tab"));
   const tv = params.get("view") === "tv";
-  const feed = usePublicRaceFeed(token, { liveTab: tab === "live" });
+  const feed = usePublicRaceFeed(token, { liveTab: tab === "live", resultsTab: tab === "results" });
   const { race, categories, riders, error, offline, updatedAt, refreshing, live } = feed;
   // 2.0: a tab change is a history entry, so Back/Forward move between tabs.
   const setParam = (key: string, value: string | null) =>

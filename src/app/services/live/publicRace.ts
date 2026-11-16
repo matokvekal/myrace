@@ -61,3 +61,5 @@ async function get<T>(path: string): Promise<T> {
 const enc = encodeURIComponent;
 export const fetchPublicRace = (token: string) => get<PublicRace>(`/races/${enc(token)}`);
 export const fetchPublicChanges = (token: string, afterSeq: number) => get<PublicChanges>(`/races/${enc(token)}/changes?afterSeq=${afterSeq}`);
+/** 1.2.1: the race's lastSeq only (finished race: notice an approval / amendment cheaply). */
+export const fetchPublicSeq = (token: string) => get<{ lastSeq: number }>(`/races/${enc(token)}/seq`);

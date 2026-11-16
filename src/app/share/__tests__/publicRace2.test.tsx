@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 
 const TOKEN = "AAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB";
-const api = vi.hoisted(() => ({ fetchPublicRace: vi.fn(), fetchPublicChanges: vi.fn() }));
+const api = vi.hoisted(() => ({ fetchPublicRace: vi.fn(), fetchPublicChanges: vi.fn(), fetchPublicSeq: vi.fn() }));
 vi.mock("@/services/live/publicRace", async () => {
   class PublicApiError extends Error {
     constructor(readonly status: number, readonly code: string, message: string) {
@@ -87,6 +87,7 @@ beforeEach(() => {
   T0 = Date.now() - 2_527_000; // the wave started 42:07 ago
   api.fetchPublicRace.mockReset().mockImplementation(async () => snapshot());
   api.fetchPublicChanges.mockReset().mockImplementation(async () => ({ lastSeq: 5, serverTime: Date.now(), polling: polling(), unchanged: true }));
+  api.fetchPublicSeq.mockReset().mockImplementation(async () => ({ lastSeq: 5 }));
   localStorage.clear();
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
 });
@@ -334,6 +335,59 @@ describe("RESULTS status after Finish Race (1.2.1 race-wide approval)", () => {
     mount(`/share/${TOKEN}?tab=results`);
     await flush();
     expect(screen.getByTestId("share-results-status").getAttribute("data-status")).toBe("provisional");
+  });
+
+  it("an OPEN finished page follows approval and withdrawal by checking only lastSeq (hotfix 1.2.1-rc.5)", async () => {
+    const at = new Date().toISOString();
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: null }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.getByTestId("share-results-status").getAttribute("data-status")).toBe("provisional");
+    const loads = api.fetchPublicRace.mock.calls.length;
+
+    // Nothing changed: one tiny seq check a minute, no race reload, no /changes (polling closed).
+    await tick(60_000);
+    expect(api.fetchPublicSeq).toHaveBeenCalledTimes(1);
+    expect(api.fetchPublicRace).toHaveBeenCalledTimes(loads);
+    expect(api.fetchPublicChanges).not.toHaveBeenCalled();
+
+    // Approved on the server → seq moved → the race is reloaded once → OFFICIAL.
+    api.fetchPublicSeq.mockImplementation(async () => ({ lastSeq: 6 }));
+    api.fetchPublicRace.mockResolvedValue({ ...snapshot({ ...finishedRace, resultsApproval: { status: "approved", approvedAt: at } }), lastSeq: 6 });
+    await tick(60_000);
+    expect(api.fetchPublicRace).toHaveBeenCalledTimes(loads + 1);
+    expect(screen.getByTestId("share-results-status").getAttribute("data-status")).toBe("official");
+
+    // Withdrawn (an amendment) → PROVISIONAL again.
+    api.fetchPublicSeq.mockImplementation(async () => ({ lastSeq: 8 }));
+    api.fetchPublicRace.mockResolvedValue({ ...snapshot({ ...finishedRace, resultsApproval: null }), lastSeq: 8 });
+    await tick(60_000);
+    expect(screen.getByTestId("share-results-status").getAttribute("data-status")).toBe("provisional");
+  });
+
+  it("TV results follow the approval too; a hidden page does not check", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: null }));
+    mount(`/share/${TOKEN}?tab=results&view=tv`);
+    await flush();
+    expect(screen.getByTestId("tv-tag").textContent).toMatch(/Provisional/);
+
+    setVisibility("hidden");
+    await tick(3 * 60_000);
+    expect(api.fetchPublicSeq).not.toHaveBeenCalled();
+
+    api.fetchPublicSeq.mockImplementation(async () => ({ lastSeq: 6 }));
+    api.fetchPublicRace.mockResolvedValue({ ...snapshot({ ...finishedRace, resultsApproval: { status: "approved", approvedAt: new Date().toISOString() } }), lastSeq: 6 });
+    setVisibility("visible"); // back on screen: checked at once
+    await flush();
+    expect(screen.getByTestId("tv-tag").textContent).toMatch(/Official results/);
+  });
+
+  it("LIVE / RACE tabs of a finished race never check", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ ...finishedRace, resultsApproval: null }));
+    mount(`/share/${TOKEN}?tab=race`);
+    await flush();
+    await tick(3 * 60_000);
+    expect(api.fetchPublicSeq).not.toHaveBeenCalled();
   });
 
   it("before Finish Race RESULTS stay unavailable (no status shown)", async () => {

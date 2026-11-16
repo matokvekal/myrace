@@ -50,3 +50,4 @@ refresh answer replayed after a lost response
 bibsCorrectedAtImport
 identity_header
 results-approval
+races/:token/seq

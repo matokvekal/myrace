@@ -21,6 +21,12 @@ export const PUBLIC_REFRESH_LIVE_MS = 20_000;
 export const PUBLIC_MANUAL_REFRESH_MIN_MS = 10_000;
 /** Returning to the tab refreshes only when the data is older than this. */
 export const PUBLIC_FOCUS_REVALIDATE_MIN_MS = 15_000;
+/**
+ * 1.2.1: a FINISHED race (guest polling closed) open on RESULTS or TV checks only its lastSeq this
+ * often (`GET /public/races/:token/seq`, one row) and reloads the race when it moved: an approval,
+ * its withdrawal or an amendment. Paused while hidden; checked again on return.
+ */
+export const PUBLIC_RESULTS_STATUS_MS = 60_000;
 
 interface RaceLike { status?: string | null; date?: string | null; time?: string | null; createdAt?: string | null }
 interface CategoryLike { status?: string | null; startTime?: string | null }

@@ -10,6 +10,10 @@
  *                                         polling is open (guestPolling.ts): closed
  *                                         once the race is finished or 24 h after
  *                                         its scheduled start → 410 polling_closed.
+ *   GET /public/races/:token/seq          (1.2.1) the race's lastSeq only — one row, no race
+ *                                         state. A finished race's open RESULTS / TV page checks
+ *                                         it to notice an approval (or its withdrawal) or an
+ *                                         amendment, and reloads the race only when it moved.
  */
 import { Router, type Response } from "express";
 import rateLimit from "express-rate-limit";
@@ -55,6 +59,13 @@ publicRouter.get("/races/:token", route(async (req, res) => {
   // 0.3.5: only VALID approvals (result unchanged since APPROVED), no judge identity.
   // 1.2.1: race-wide approval → RESULTS OFFICIAL (valid only, no judge identity); null = PROVISIONAL.
   send(res, state, { ...projectPublicState(state), approvals: await approvalViews(db, state, { guest: true }), resultsApproval: await resultsApprovalView(db, state, { guest: true }) });
+}));
+
+publicRouter.get("/races/:token/seq", route(async (req, res) => {
+  const uuid = raceUuidFromShareToken(String(req.params.token));
+  const row = uuid ? await db.one<{ lastSeq: number }>(`SELECT "lastSeq" FROM races WHERE uuid = $1 AND "publishedAt" IS NOT NULL AND "deletedAt" IS NULL`, [uuid]) : null;
+  if (!row) throw linkNotFound();
+  res.json({ lastSeq: Number(row.lastSeq) });
 }));
 
 publicRouter.get("/races/:token/changes", route(async (req, res) => {

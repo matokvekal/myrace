@@ -86,6 +86,25 @@ describe("race-wide APPROVE RESULTS", () => {
     expect(rows).toHaveLength(1); // one current row per race
   });
 
+  it("guest seq (hotfix rc.5): lastSeq only; moves with an approval; published races only", async () => {
+    const race = await publishRace(owner, 1, 1, 1);
+    const r = race.raceUuid;
+    const token = (await api().put(`/api/v1/races/${r}/publication`).set(auth(owner.token)).send({ published: true })).body.token as string;
+    expect((await send(owner, r, action(r, "WaveStarted", { heat: 1 })))[0].applied).toBe(true);
+    expect((await api().post(`/api/v1/races/${r}/finalize`).set(auth(owner.token))).status).toBe(201);
+    const before = await api().get(`/api/v1/public/races/${token}/seq`);
+    expect(before.status).toBe(200);
+    expect(Object.keys(before.body)).toEqual(["lastSeq"]); // nothing else is exposed
+    expect((await api().get(`/api/v1/public/races/${token}/changes?afterSeq=0`)).status).toBe(410); // polling closed
+    expect((await approve(owner, r)).status).toBe(201);
+    const after = await api().get(`/api/v1/public/races/${token}/seq`);
+    expect(after.body.lastSeq).toBeGreaterThan(before.body.lastSeq);
+    expect((await api().get(`/api/v1/public/races/${token}`)).body.lastSeq).toBe(after.body.lastSeq);
+    await api().put(`/api/v1/races/${r}/publication`).set(auth(owner.token)).send({ published: false });
+    expect((await api().get(`/api/v1/public/races/${token}/seq`)).status).toBe(404);
+    expect((await api().get(`/api/v1/public/races/not-a-token/seq`)).status).toBe(404);
+  });
+
   it("members' writes off: an admin can no longer approve, the owner still can", async () => {
     const race = await publishRace(owner, 1, 1, 1);
     const r = race.raceUuid;

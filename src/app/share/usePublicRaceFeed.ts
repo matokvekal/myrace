@@ -13,18 +13,19 @@
  *    device clock (from each answer's `serverTime`), for the race clock.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchPublicChanges, fetchPublicRace, PublicApiError, type PublicPolling } from "@/services/live/publicRace";
+import { fetchPublicChanges, fetchPublicRace, fetchPublicSeq, PublicApiError, type PublicPolling } from "@/services/live/publicRace";
 import type { SharedCategory, SharedRace, SharedRider } from "../../shared/race/state";
 import type { CategoryApprovalView, ResultsApprovalView } from "../../shared/race/approval";
-import { PUBLIC_FOCUS_REVALIDATE_MIN_MS, PUBLIC_MANUAL_REFRESH_MIN_MS, publicRefreshDelay } from "./publicRefresh";
+import { PUBLIC_FOCUS_REVALIDATE_MIN_MS, PUBLIC_MANUAL_REFRESH_MIN_MS, PUBLIC_RESULTS_STATUS_MS, publicRefreshDelay } from "./publicRefresh";
 
 export type PublicRider = Partial<SharedRider>;
 
 /** Ignore clock-offset changes smaller than this (no re-render for network jitter). */
 const CLOCK_OFFSET_JITTER_MS = 250;
 
-export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean } = {}) {
+export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resultsTab?: boolean } = {}) {
   const liveTab = !!opts.liveTab;
+  const resultsTab = !!opts.resultsTab;
   const [race, setRace] = useState<Partial<SharedRace> | null>(null);
   const [categories, setCategories] = useState<Map<string, SharedCategory>>(new Map());
   const [riders, setRiders] = useState<Map<string, PublicRider>>(new Map());
@@ -168,6 +169,35 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean } = {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [delay, fetchNow, liveTab]);
+
+  // 1.2.1: finished race, polling closed, RESULTS/TV open → watch only lastSeq (approval, its
+  // withdrawal, an amendment) and reload the race once when it moved. Never while hidden.
+  const watchSeq = resultsTab && race?.status === "finished" && polling?.open === false;
+  useEffect(() => {
+    if (!watchSeq) return;
+    let stopped = false;
+    let lastCheck = Date.now();
+    const check = async () => {
+      if (stopped || document.visibilityState !== "visible" || inFlight.current) return;
+      lastCheck = Date.now();
+      try {
+        const { lastSeq } = await fetchPublicSeq(token);
+        if (!stopped && lastSeq !== seq.current) await fetchNow();
+      } catch {
+        /* offline / older server: keep what is shown */
+      }
+    };
+    const timer = setInterval(() => void check(), PUBLIC_RESULTS_STATUS_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastCheck >= PUBLIC_FOCUS_REVALIDATE_MIN_MS) void check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [watchSeq, token, fetchNow]);
 
   /** Refresh button: throttled, never overlapping. Returns false when ignored. */
   const refresh = useCallback((): boolean => {
