@@ -38,7 +38,7 @@
   "main.sortName": "Nom",
   "main.sortStatus": "Statut",
   "phase.setup": "Course",
-  "phase.race": "Départ",
+  "phase.race": "Horaire",
   "phase.live": "En direct",
   "phase.ariaLabel": "Phase de course",
   "heat.defaultRaceName": "Course",

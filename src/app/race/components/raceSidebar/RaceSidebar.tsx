@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, House, Flag, Radio, Sliders, Timer, Trophy, X, LayoutDashboard, Users } from "lucide-react";
+import { CalendarDays, ChevronDown, House, Flag, Radio, Timer, Trophy, X, LayoutDashboard, Users } from "lucide-react";
 import RaceSetupSettings, { useRaceSetupSummary } from "@/components/raceSetup/RaceSetupSettings";
 import { useRaceModeNav, type RaceMode } from "./useRaceModeNav";
 import { isJudgeOnly } from "@/services/live/liveBridge";
@@ -18,8 +18,8 @@ export function useModeItems() {
   const { t } = useTranslation();
   const { finalized, mode, raceUuid } = useRaceModeNav();
   const all: { key: RaceMode; label: string; icon: React.ReactNode }[] = [
-    { key: "setup", label: t("phase.setup", "Create"), icon: <Sliders aria-hidden="true" /> },
-    { key: "race", label: t("phase.race", "Race"), icon: <Flag aria-hidden="true" /> },
+    { key: "setup", label: t("phase.setup", "Race"), icon: <Flag aria-hidden="true" /> },
+    { key: "race", label: t("phase.race", "Schedule"), icon: <CalendarDays aria-hidden="true" /> },
     { key: "live", label: t("phase.live", "Live"), icon: <Radio aria-hidden="true" /> },
     { key: "results", label: t("phase.results", "Results"), icon: <Trophy aria-hidden="true" /> },
     { key: "board", label: t("phase.board", "Board"), icon: <LayoutDashboard aria-hidden="true" /> },

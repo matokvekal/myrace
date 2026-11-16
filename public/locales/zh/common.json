@@ -38,7 +38,7 @@
   "main.sortName": "名称",
   "main.sortStatus": "状态",
   "phase.setup": "比赛",
-  "phase.race": "起跑",
+  "phase.race": "日程",
   "phase.live": "实时",
   "phase.ariaLabel": "比赛阶段",
   "heat.defaultRaceName": "比赛",

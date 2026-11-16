@@ -38,7 +38,7 @@
   "main.sortName": "名前",
   "main.sortStatus": "ステータス",
   "phase.setup": "レース",
-  "phase.race": "スタート",
+  "phase.race": "スケジュール",
   "phase.live": "ライブ",
   "phase.ariaLabel": "レースフェーズ",
   "heat.defaultRaceName": "レース",
