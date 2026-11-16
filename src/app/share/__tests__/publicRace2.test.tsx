@@ -151,11 +151,11 @@ describe("LIVE", () => {
     expect(screen.getByTestId("live-board").textContent).toMatch(/Elite/);
   });
 
-  it("no active wave → elegant empty state, never old standings", async () => {
-    api.fetchPublicRace.mockResolvedValue(snapshot({ cats: cats("finished", "upcoming") }));
+  it("no wave started yet → elegant empty state", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ cats: cats("upcoming", "upcoming") }));
     mount(`/share/${TOKEN}?tab=live`);
     await flush();
-    expect(screen.getByTestId("live-no-active-wave").textContent).toMatch(/No Active Wave.*Wave 2.*11:00/);
+    expect(screen.getByTestId("live-no-active-wave").textContent).toMatch(/No Active Wave.*Wave 1/);
     expect(screen.queryAllByTestId("live-row")).toHaveLength(0);
   });
 
@@ -212,7 +212,7 @@ describe("LIVE", () => {
     api.fetchPublicChanges.mockImplementationOnce(async () => ({ lastSeq: 9, serverTime: Date.now(), polling: polling(), categories: [cats("finished")[0]] }));
     await tick(20_000);
     expect(screen.queryByTestId("live-stale")).toBeNull();
-    expect(screen.getByTestId("live-no-active-wave")).toBeTruthy();
+    expect(screen.getByTestId("live-wave-finished").textContent).toMatch(/Wave 1 has finished/);
   });
 });
 
@@ -281,11 +281,29 @@ describe("LIVE lifecycle until official RESULTS (hotfix 1.2.1-rc.3)", () => {
     expect(screen.queryAllByTestId("live-row")).toHaveLength(0);
   });
 
-  it("between waves (a wave still to start) LIVE keeps today's behaviour: what starts next", async () => {
+  it("between waves: 'Wave N has finished' message, never the old standings; the next wave's start brings LIVE back", async () => {
     api.fetchPublicRace.mockResolvedValue(snapshot({ cats: lifecycleCats("finished", "upcoming") }));
     mount(`/share/${TOKEN}?tab=live`);
     await flush();
-    expect(screen.getByTestId("live-no-active-wave").textContent).toMatch(/Wave 2/);
+    const msg = screen.getByTestId("live-wave-finished");
+    expect(msg.querySelector("h2")?.textContent).toBe("Wave 1 has finished");
+    expect(msg.textContent).toMatch(/Waiting for the next wave to start\./);
+    expect(msg.textContent).toMatch(/Official results will be available after the race is completed\./);
+    expect(screen.queryAllByTestId("live-row")).toHaveLength(0);
+    expect(screen.queryByTestId("live-wave-head")).toBeNull();
+
+    const next = { cats: lifecycleCats("finished", "running"), riders: [...baseRiders().filter((r) => r.uuid !== "k"), rider("k", 31, "Kids", [], { raceStatus: "running" })] };
+    api.fetchPublicChanges.mockImplementationOnce(async () => ({ lastSeq: 8, serverTime: Date.now(), polling: polling(), categories: next.cats, riders: next.riders }));
+    await tick(5 * 60_000); // between waves the page refreshes every 5 min
+    expect(screen.queryByTestId("live-wave-finished")).toBeNull();
+    expect(screen.getByTestId("live-wave-head").textContent).toMatch(/RUNNING.*Wave 2/);
+  });
+
+  it("TV between waves: the same finished-wave message", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ cats: lifecycleCats("finished", "upcoming") }));
+    mount(`/share/${TOKEN}?tab=live&view=tv`);
+    await flush();
+    expect(screen.getByTestId("tv-wave-finished").textContent).toMatch(/Wave 1 has finished.*Waiting for the next wave to start/);
   });
 });
 

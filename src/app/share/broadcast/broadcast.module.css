@@ -290,7 +290,7 @@
   inset: 0;
   border-radius: 0.35em;
   pointer-events: none;
-  animation: tvFlash 2.6s ease-out forwards;
+  animation: tvFlash 1.6s ease-out forwards;
 }
 .liveRow[data-moved="up"] .flash { background: rgba(61, 220, 132, 0.22); }
 .liveRow[data-moved="down"] .flash { background: rgba(255, 77, 85, 0.16); }
@@ -481,7 +481,7 @@
 .controls button:focus-visible { outline: 0.15em solid var(--tv-accent); outline-offset: 0.1em; }
 
 @keyframes tvPulse { 50% { opacity: 0.3; } }
-@keyframes tvFlash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes tvFlash { 0%, 62% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes tvFade { from { opacity: 0; transform: translateY(0.4em); } to { opacity: 1; transform: none; } }
 @keyframes tvTimer { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
@@ -505,11 +505,8 @@
   border: 0.12em solid currentColor;
   pointer-events: none;
   opacity: 0;
-  animation: tvRing 1.1s ease-out forwards;
+  animation: tvRing 1.6s ease-out forwards;
 }
 .ring[data-kind="gain"] { color: #3ddc84; }
 .ring[data-kind="loss"] { color: #ff4d55; }
-@keyframes tvRing { 0% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .ring { animation-delay: 0s !important; }
-}
+@keyframes tvRing { 0%, 62% { opacity: 1; } 100% { opacity: 0; } }

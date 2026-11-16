@@ -2,7 +2,8 @@
  * LIVE tab (public page 2.0): PROVISIONAL standings of the running wave(s), computed in the
  * browser from the public feed (liveRanking.ts). Not official results — RESULTS is.
  *
- *  - Only ACTIVE waves (activeWaves.ts). None → "No Active Wave" (never old standings).
+ *  - Only ACTIVE waves (activeWaves.ts). None → "No Active Wave" (never old standings);
+ *    between waves (one finished, another still to start) → "Wave N has finished · waiting".
  *  - Several active waves → a wave picker; waves are never mixed in one list.
  *  - Overall | By category; By category shows every category of the wave (sections) or one.
  *  - Position changes compared only between genuine updates (useLiveTrend); rows glide to
@@ -16,7 +17,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { AlertTriangle, Flag, Radio, Timer } from "lucide-react";
 import type { SharedCategory } from "../../../shared/race/state";
 import { STATUS_LABEL } from "@/utils/statusLabels";
-import { activeWaves, categoryKey, categoryLabel, nextWave, waveLabel, type WaveSummary } from "../waves/activeWaves";
+import { activeWaves, categoryKey, categoryLabel, finishedWaveBeforeNext, nextWave, waveLabel, type WaveSummary } from "../waves/activeWaves";
 
 /**
  * The wave LIVE keeps showing once nothing runs any more but the official RESULTS are not
@@ -190,6 +191,18 @@ const groupStart = (list: LiveEntry[], i: number) => i > 0 && list[i].group !== 
 function NoActiveWave({ waves, raceFinished, onOpenResults }: { waves: WaveSummary[]; raceFinished: boolean; onOpenResults?: () => void }) {
   const next = nextWave(waves);
   const allDone = waves.length > 0 && waves.every((w) => w.state === "finished");
+  const between = raceFinished ? null : finishedWaveBeforeNext(waves);
+  if (between) {
+    // Between waves: never the finished wave's standings, just where things stand.
+    return (
+      <section className={`${styles.emptyState} ${styles.betweenWaves}`} role="status" data-testid="live-wave-finished" data-wave={between.key}>
+        <span className={`${styles.emptyIcon} ${styles.betweenIcon}`} aria-hidden="true"><Flag size={26} /></span>
+        <h2>{waveLabel(between.key)} has finished</h2>
+        <p className={styles.betweenWait}>Waiting for the next wave to start.</p>
+        <p className={styles.betweenNote}>Official results will be available after the race is completed.</p>
+      </section>
+    );
+  }
   return (
     <section className={styles.emptyState} data-testid="live-no-active-wave">
       <span className={styles.emptyIcon} aria-hidden="true">{raceFinished || allDone ? <Flag size={26} /> : <Timer size={26} />}</span>

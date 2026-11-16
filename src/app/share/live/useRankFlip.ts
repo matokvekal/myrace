@@ -6,21 +6,32 @@
  * mount, view/filter change, page flip, tab switch or after a stale/reconnect period), each
  * row is played from its old place to its new one with the Web Animations API — transform and
  * opacity only, nothing that triggers layout:
- *   - primary mover (gain/loss): 1.4 s glide, lifted above the others, restrained stagger;
- *   - displaced rows: a plain 1.1 s glide, no stagger, no highlight;
+ *   - primary mover (gain/loss): highlighted at once (green / red, LiveRow), HELD in its old
+ *     place for HOLD_MS, then moved to its new one in MOVE_MS, lifted above the others; the
+ *     highlight fades after it lands (CSS). Every mover of one update moves together;
+ *   - displaced rows: the same hold + move, no highlight, so nothing slides under a held mover;
  *   - out (DNF/DSQ/DNS): slides sideways out of its old place, then settles in the status section;
  *   - a row that arrives from another TV page enters from the side it came from; a row that
  *     left the visible page fades out as a short-lived, inert copy ("ghost"), so nothing jumps.
  * `prefers-reduced-motion: reduce` → no movement at all (the CSS keeps a static highlight).
- * Positions in the DOM are always the current ranking; only transforms are animated.
+ * Positions in the DOM are always the current ranking; only transforms are animated, so the
+ * data is never delayed. A new update cancels whatever is still playing (no queue) and starts
+ * from the rows' layout places.
  */
 import { useLayoutEffect, useRef, type RefObject } from "react";
 import type { LiveTrend } from "./useLiveTrend";
 
-export const MOTION_MS = { primary: 1400, displaced: 1100, out: 1600, enter: 900, ghost: 800 } as const;
-export const STAGGER_MS = 90;
-export const MAX_STAGGER_STEPS = 5;
+/** Highlight shown in place before a row moves, then the move itself. */
+export const HOLD_MS = 700;
+export const MOVE_MS = 300;
+export const MOTION_MS = { primary: HOLD_MS + MOVE_MS, displaced: HOLD_MS + MOVE_MS, out: 1600, enter: 900, ghost: 800 } as const;
 const EASE = "cubic-bezier(0.22, 0.8, 0.24, 1)";
+/** Hold at the old place (linear: no motion), then ease into the new one. */
+const holdThenMove = (from: string): Keyframe[] => [
+  { transform: from, offset: 0, easing: "linear" },
+  { transform: from, offset: HOLD_MS / (HOLD_MS + MOVE_MS), easing: EASE },
+  { transform: "none", offset: 1 },
+];
 
 interface Snap {
   top: number;
@@ -55,8 +66,6 @@ function offsetWithin(el: HTMLElement, box: HTMLElement): { top: number; left: n
   const b = box.getBoundingClientRect();
   return { top: a.top - b.top, left: a.left - b.left };
 }
-
-const staggerOf = (order: number) => Math.min(order, MAX_STAGGER_STEPS) * STAGGER_MS;
 
 export function useRankFlip(containerRef: RefObject<HTMLElement | null>, trend: LiveTrend, opts: { stale?: boolean } = {}) {
   const snaps = useRef<Map<string, Snap>>(new Map());
@@ -124,8 +133,8 @@ export function useRankFlip(containerRef: RefObject<HTMLElement | null>, trend: 
           const primary = !!m; // "out" was handled above
           play(
             r.el,
-            [{ transform: `translateY(${dy}px)` }, { transform: "none" }],
-            { duration: primary ? MOTION_MS.primary : MOTION_MS.displaced, delay: primary ? staggerOf(m.order) : 0 },
+            holdThenMove(`translateY(${dy}px)`),
+            { duration: primary ? MOTION_MS.primary : MOTION_MS.displaced, easing: "linear" },
             primary ? lift(r.el) : undefined,
           );
         }
@@ -133,7 +142,7 @@ export function useRankFlip(containerRef: RefObject<HTMLElement | null>, trend: 
         // Arrived from another TV page: enter from the side it came from.
         const fromBelow = (m?.delta ?? delta ?? 0) > 0;
         const shift = Math.max(r.height, 1) * 1.5 * (fromBelow ? 1 : -1);
-        play(r.el, [{ transform: `translateY(${shift}px)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: MOTION_MS.enter, delay: m ? staggerOf(m.order) : 0 });
+        play(r.el, [{ transform: `translateY(${shift}px)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: MOTION_MS.enter, delay: m ? HOLD_MS : 0 });
       }
     }
 

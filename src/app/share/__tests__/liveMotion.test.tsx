@@ -10,7 +10,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { rankLive, type LiveEntry } from "../live/liveRanking";
 import { classifyMotion } from "../live/rankMotion";
-import { MOTION_MS, STAGGER_MS } from "../live/useRankFlip";
+import { HOLD_MS, MOTION_MS, MOVE_MS } from "../live/useRankFlip";
 import type { PublicRider } from "../usePublicRaceFeed";
 
 const TOKEN = "AAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB";
@@ -117,7 +117,7 @@ describe("classifyMotion (pure)", () => {
 });
 
 // ---------------------------------------------------------------------------- components
-type Call = { el: HTMLElement; frames: Keyframe[]; opts: KeyframeAnimationOptions };
+type Call = { el: HTMLElement; frames: Keyframe[]; opts: KeyframeAnimationOptions; cancelled?: boolean };
 let calls: Call[] = [];
 const callsFor = (uuid: string) => calls.filter((c) => c.el.dataset.uuid === uuid);
 const restore: (() => void)[] = [];
@@ -136,8 +136,9 @@ function stubLayout() {
   define("offsetParent", function () { return this.parentElement; });
   const animate = Element.prototype.animate;
   Element.prototype.animate = function (this: HTMLElement, frames: Keyframe[], opts: KeyframeAnimationOptions) {
-    calls.push({ el: this, frames, opts });
-    return { cancel() {}, onfinish: null, oncancel: null } as unknown as Animation;
+    const call: Call = { el: this, frames, opts };
+    calls.push(call);
+    return { cancel() { call.cancelled = true; }, onfinish: null, oncancel: null } as unknown as Animation;
   } as typeof Element.prototype.animate;
   restore.push(() => (Element.prototype.animate = animate));
 }
@@ -206,6 +207,13 @@ describe("LIVE tab motion", () => {
     const [up] = callsFor("a");
     expect(up.frames[0].transform).toBe("translateY(50px)"); // from row 2 to row 1
     expect(up.opts.duration).toBe(MOTION_MS.primary);
+    // highlight at once, held in the old place for 700 ms, then a 300 ms move
+    expect(HOLD_MS).toBe(700);
+    expect(MOVE_MS).toBe(300);
+    expect(MOTION_MS.primary).toBe(HOLD_MS + MOVE_MS);
+    expect(up.frames[1]).toMatchObject({ transform: "translateY(50px)", offset: HOLD_MS / (HOLD_MS + MOVE_MS) });
+    expect(up.frames[2].transform).toBe("none");
+    expect(up.opts.delay ?? 0).toBe(0);
 
     const b = row(12);
     expect(b.getAttribute("aria-label")).toMatch(/^Position 2, bib 12.*down 1 place$/); // still spoken
@@ -214,7 +222,7 @@ describe("LIVE tab motion", () => {
     expect(b.querySelector('[data-kind]')).toBeNull();
     const [down] = callsFor("b");
     expect(down.frames[0].transform).toBe("translateY(-50px)");
-    expect(down.opts).toMatchObject({ duration: MOTION_MS.displaced, delay: 0 });
+    expect(down.opts).toMatchObject({ duration: MOTION_MS.displaced });
   });
 
   it("downward: red arrow + glide down for the rider whose own data dropped it", async () => {
@@ -230,7 +238,7 @@ describe("LIVE tab motion", () => {
     expect(row(11).getAttribute("data-motion")).toBeNull(); // a is only displaced
   });
 
-  it("multiple movers animate independently with a restrained stagger", async () => {
+  it("multiple movers hold and move together", async () => {
     const field = [10, 11, 12, 13, 14].map((t, i) => rider(`p${i + 1}`, 20 + i, [5, 10 + t]));
     api.fetchPublicRace.mockImplementation(async () => snapshot(field));
     mount(`/share/${TOKEN}?tab=live`);
@@ -239,10 +247,12 @@ describe("LIVE tab motion", () => {
     await tick(20_000);
     expect(row(24).getAttribute("data-motion")).toBe("gain");
     expect(row(23).getAttribute("data-motion")).toBe("gain");
-    expect(callsFor("p5")[0].opts.delay).toBe(0);
-    expect(callsFor("p4")[0].opts.delay).toBe(STAGGER_MS);
+    for (const u of ["p5", "p4"]) {
+      expect(callsFor(u)[0].opts.duration).toBe(MOTION_MS.primary);
+      expect(callsFor(u)[0].opts.delay ?? 0).toBe(0);
+    }
     for (const u of ["p1", "p2", "p3"]) {
-      expect(callsFor(u)[0].opts).toMatchObject({ duration: MOTION_MS.displaced, delay: 0 });
+      expect(callsFor(u)[0].opts).toMatchObject({ duration: MOTION_MS.displaced });
       expect(callsFor(u)[0].frames[0].transform).toBe("translateY(-100px)"); // two rows down
     }
   });
@@ -294,6 +304,22 @@ describe("LIVE tab motion", () => {
     update([rider("b", 12, [10, 20, 30])]); // the next live update animates again (b back in front)
     await tick(20_000);
     expect(callsFor("b").length).toBeGreaterThan(0);
+  });
+
+  it("rapid consecutive updates: the ranking is never held back and animations never queue", async () => {
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    update([rider("a", 11, [10, 21, 31])]); // a passes b
+    await tick(20_000);
+    const first = [...calls];
+    expect(first.length).toBeGreaterThan(0);
+    update([rider("b", 12, [10, 20, 30])]); // next update arrives while a is still held/moving
+    await tick(20_000);
+    expect(row(12).getAttribute("aria-label")).toMatch(/^Position 1, bib 12/); // newest data at once
+    expect(first.every((c) => c.cancelled)).toBe(true); // the previous run was dropped …
+    const second = calls.slice(first.length);
+    expect(second.filter((c) => c.el.dataset.uuid === "b")).toHaveLength(1); // … one fresh run, no backlog
+    expect(second.filter((c) => c.el.dataset.uuid === "a")).toHaveLength(1);
   });
 
   it("prefers-reduced-motion: no movement, the arrow and position still show", async () => {
@@ -357,7 +383,7 @@ describe("TV broadcast motion across pages", () => {
     expect(String(enter.frames[0].transform)).toMatch(/^translateY\(-/);
 
     for (const u of ["r0", "r1", "r11", "r14"]) {
-      expect(callsFor(u)[0].opts).toMatchObject({ duration: MOTION_MS.displaced, delay: 0 });
+      expect(callsFor(u)[0].opts).toMatchObject({ duration: MOTION_MS.displaced });
       expect(screen.getAllByTestId("tv-row").find((r) => r.dataset.uuid === u)?.getAttribute("data-motion")).toBeNull();
     }
 

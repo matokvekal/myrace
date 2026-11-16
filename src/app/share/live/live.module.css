@@ -194,11 +194,12 @@
   inset: 0;
   pointer-events: none;
   border-radius: 6px;
-  animation: flash 2.4s ease-out forwards;
+  /* on at once, held through the 700 ms hold + 300 ms move (useRankFlip), then fades */
+  animation: flash 1.6s ease-out forwards;
 }
-.row[data-moved="up"] .flash { background: rgba(31, 157, 85, 0.16); }
-.row[data-moved="down"] .flash { background: rgba(214, 69, 69, 0.12); }
-@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+.row[data-moved="up"] .flash { background: rgba(31, 157, 85, 0.22); }
+.row[data-moved="down"] .flash { background: rgba(214, 69, 69, 0.18); }
+@keyframes flash { 0%, 62% { opacity: 1; } 100% { opacity: 0; } }
 
 .divider {
   padding: 8px 12px 4px;
@@ -321,7 +322,7 @@
 
 /* ---- Ranking motion (rankMotion.ts / useRankFlip.ts) -------------------------------------
    Rows are moved by transforms only; these rules only lift a travelling row above the others
-   and draw the brief arrival border of a primary mover (delay = its glide, set inline). */
+   and draw a primary mover's green / red border, shown with the highlight and faded with it. */
 .list { position: relative; }
 .row[data-motion-active] { z-index: 2; background: var(--bg-card); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); border-radius: 6px; }
 .ring {
@@ -331,11 +332,17 @@
   border: 2px solid currentColor;
   pointer-events: none;
   opacity: 0;
-  animation: ring 1s ease-out forwards;
+  animation: ring 1.6s ease-out forwards;
 }
 .ring[data-kind="gain"] { color: #1f9d55; }
 .ring[data-kind="loss"] { color: #d64545; }
-@keyframes ring { 0% { opacity: 0.95; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .ring { animation-delay: 0s !important; }
-}
+@keyframes ring { 0%, 62% { opacity: 0.95; } 100% { opacity: 0; } }
+
+/* Between waves: "Wave N has finished · Waiting for the next wave to start." Static, centred. */
+.betweenWaves { gap: 8px; padding: 40px 20px 36px; }
+.betweenWaves h2 { font-size: 1.35rem; font-weight: 800; }
+.betweenIcon { background: rgba(31, 157, 85, 0.12); color: #1f9d55; }
+.betweenWaves .betweenWait { color: var(--text-primary); font-size: 1rem; font-weight: 600; }
+.betweenWaves .betweenNote { font-size: 0.85rem; }
+:global([data-theme="dark"]) .betweenIcon,
+:global([data-theme="night"]) .betweenIcon { background: rgba(110, 224, 138, 0.14); color: #6ee08a; }

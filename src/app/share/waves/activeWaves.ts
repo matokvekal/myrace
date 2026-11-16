@@ -108,3 +108,15 @@ export function summarizeWaves(categories: SharedCategory[], byCategory: Map<str
 export const activeWaves = (waves: WaveSummary[]) => waves.filter((w) => w.state === "running");
 /** The next wave to start (first not-started wave in wave order), or null. */
 export const nextWave = (waves: WaveSummary[]) => waves.find((w) => w.state === "upcoming" && w.key !== NO_WAVE) ?? null;
+
+/**
+ * Between waves: the wave that finished last, while nothing runs and another wave is still to
+ * start (LIVE then says "Wave N has finished · waiting for the next wave"). Null otherwise —
+ * a running wave, no wave finished yet, or no wave left to start.
+ */
+export function finishedWaveBeforeNext(waves: WaveSummary[]): WaveSummary | null {
+  if (activeWaves(waves).length > 0 || !nextWave(waves)) return null;
+  const done = waves.filter((w) => w.state === "finished");
+  if (done.length === 0) return null;
+  return done.reduce((a, b) => ((b.finishedAt ?? 0) >= (a.finishedAt ?? 0) ? b : a));
+}

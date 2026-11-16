@@ -5,10 +5,10 @@
  */
 import React, { useMemo, useRef } from "react";
 import type { SharedCategory, SharedRace } from "../../../shared/race/state";
-import { activeWaves, nextWave, waveLabel, type WaveSummary } from "../waves/activeWaves";
+import { activeWaves, finishedWaveBeforeNext, nextWave, waveLabel, type WaveSummary } from "../waves/activeWaves";
 import { formatGap, formatRaceTime, lapsText, rankLive, type LiveEntry } from "../live/liveRanking";
 import { useLiveTrend } from "../live/useLiveTrend";
-import { ringDelayMs, trendLabel } from "../live/LiveRow";
+import { trendLabel } from "../live/LiveRow";
 import { showsArrow, type RankMotion } from "../live/rankMotion";
 import { useRankFlip } from "../live/useRankFlip";
 import { categoryLabel } from "../waves/activeWaves";
@@ -79,6 +79,7 @@ export function BroadcastLive(props: BroadcastCommon) {
 
   if (!current) {
     const next = nextWave(waves);
+    const between = raceFinished ? null : finishedWaveBeforeNext(waves);
     return (
       <>
         <BroadcastHeader
@@ -92,8 +93,16 @@ export function BroadcastLive(props: BroadcastCommon) {
         />
         <div className={styles.rule} aria-hidden="true" />
         <main className={styles.main} ref={boardRef}>
-          <div className={styles.panel} data-testid="tv-no-active-wave">
+          <div className={styles.panel} data-testid={between ? "tv-wave-finished" : "tv-no-active-wave"}>
             <div className={styles.panelKicker}>Live standings</div>
+            {between ? (
+              <>
+                <h2 className={styles.panelTitle}>{waveLabel(between.key)} has finished</h2>
+                <p className={styles.panelText}>Waiting for the next wave to start.</p>
+                <p className={styles.panelText}>Official results will be available after the race is completed.</p>
+              </>
+            ) : (
+            <>
             <h2 className={styles.panelTitle}>No Active Wave</h2>
             <p className={styles.panelText}>
               {raceFinished
@@ -102,6 +111,8 @@ export function BroadcastLive(props: BroadcastCommon) {
                   ? `Standings appear when ${waveLabel(next.key)} starts${next.scheduledStart ? ` · scheduled ${next.scheduledStart}` : ""}.`
                   : "Standings appear when a wave starts."}
             </p>
+            </>
+            )}
           </div>
         </main>
         <BroadcastFooter note="Provisional · live standings, not official results" page={0} pages={1} freshness={freshness} updatedAt={updatedAt} />
@@ -184,7 +195,7 @@ function TvLiveRow({ entry, delta, motion, version }: { entry: LiveEntry; delta?
       data-testid="tv-row"
     >
       {arrow ? <span key={version} className={styles.flash} aria-hidden="true" /> : null}
-      {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} style={{ animationDelay: `${ringDelayMs(motion!)}ms` }} aria-hidden="true" /> : null}
+      {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} aria-hidden="true" /> : null}
       <span className={styles.pos}>
         {position ?? "–"}
         {arrow ? <span className={styles.trend} data-trend={arrow > 0 ? "up" : "down"}>{arrow > 0 ? "▲" : "▼"}{Math.abs(arrow)}</span> : null}

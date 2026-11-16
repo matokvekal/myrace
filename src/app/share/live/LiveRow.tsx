@@ -10,7 +10,6 @@ import React, { memo } from "react";
 import { formatGap, formatRaceTime, lapsText, riderName, type LiveEntry } from "./liveRanking";
 import { categoryLabel } from "../waves/activeWaves";
 import { showsArrow, type RankMotion } from "./rankMotion";
-import { MAX_STAGGER_STEPS, MOTION_MS, STAGGER_MS } from "./useRankFlip";
 import styles from "./live.module.css";
 
 export function trendLabel(delta: number | undefined): string | null {
@@ -18,9 +17,6 @@ export function trendLabel(delta: number | undefined): string | null {
   const n = Math.abs(delta);
   return `${delta > 0 ? "up" : "down"} ${n} place${n === 1 ? "" : "s"}`;
 }
-
-/** When the arrival border of a primary mover starts: once its glide (and stagger) is nearly done. */
-export const ringDelayMs = (m: RankMotion) => Math.round(MOTION_MS.primary * 0.85) + Math.min(m.order, MAX_STAGGER_STEPS) * STAGGER_MS;
 
 /**
  * `delta` = places gained since the last genuine update (spoken for every rider: a fact);
@@ -60,7 +56,7 @@ function LiveRowImpl({ entry, delta, motion, version }: { entry: LiveEntry; delt
       data-testid="live-row"
     >
       {arrow ? <span key={version} className={styles.flash} aria-hidden="true" /> : null}
-      {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} style={{ animationDelay: `${ringDelayMs(motion!)}ms` }} aria-hidden="true" /> : null}
+      {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} aria-hidden="true" /> : null}
       <span className={styles.pos} aria-hidden="true">{position ?? "–"}</span>
       <span className={styles.bib} aria-hidden="true">{rider.bibNumber ?? "—"}</span>
       <span className={styles.main} aria-hidden="true">
