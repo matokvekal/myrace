@@ -9,6 +9,8 @@
  *    race's start time and its categories' start times (the race's local time
  *    zone, Asia/Jerusalem by default); a race without a date counts from when it
  *    was created.
+ *  - ALWAYS open while a category is running, whatever the date: a race demoed or run
+ *    on another day than its scheduled date used to stop updating spectators mid-wave.
  */
 export const GUEST_POLL_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const GUEST_POLL_INTERVAL_MS = 10_000;
@@ -22,6 +24,7 @@ interface RaceLike {
 }
 interface CategoryLike {
   startTime?: string | null;
+  status?: string | null;
 }
 
 const HHMM = /^(\d{1,2}):(\d{2})/;
@@ -62,11 +65,13 @@ export function scheduledStartMs(race: RaceLike, categories: CategoryLike[] = []
 }
 
 /** When guest polling closes (epoch ms): finished races are closed already (returns 0). */
-export function guestPollingEndsAt(race: RaceLike, categories: CategoryLike[] = []): number {
+export function guestPollingEndsAt(race: RaceLike, categories: CategoryLike[] = [], now = Date.now()): number {
   if (race.status === "finished") return 0;
   const start = scheduledStartMs(race, categories);
-  return start === null ? 0 : start + GUEST_POLL_WINDOW_MS;
+  const scheduled = start === null ? 0 : start + GUEST_POLL_WINDOW_MS;
+  // A running wave keeps it open (re-checked on every request), whatever the race date.
+  return categories.some((c) => c.status === "running") ? Math.max(scheduled, now + GUEST_POLL_WINDOW_MS) : scheduled;
 }
 
 export const guestPollingOpen = (race: RaceLike, categories: CategoryLike[], now: number): boolean =>
-  now < guestPollingEndsAt(race, categories);
+  now < guestPollingEndsAt(race, categories, now);

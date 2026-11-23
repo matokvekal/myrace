@@ -52,3 +52,5 @@ action-log-storage-full
 live-wave-head
 live-wave-finished
 results-approve
+commissaire.myRiders.v1.
+share-star

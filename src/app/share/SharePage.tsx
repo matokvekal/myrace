@@ -39,6 +39,7 @@ import { filterResultCategories, filterResultRiders, NO_RESULTS_FILTER, resultWa
 import resultStyles from "./results/results.module.css";
 import { rankRiders } from "./results/officialOrder";
 import { BroadcastView, enterFullscreen } from "./broadcast/BroadcastView";
+import { MyRidersContext, useMyRiders } from "./myRiders/myRiders";
 
 type Rider = PublicRider;
 const TABS: { key: ShareTab; label: string }[] = [
@@ -82,6 +83,8 @@ function SpectatorRace({ token }: { token: string }) {
   const tab = shareTabFromParam(params.get("tab"));
   const tv = params.get("view") === "tv";
   const feed = usePublicRaceFeed(token, { liveTab: tab === "live", resultsTab: tab === "results" });
+  // Hotfix: spectators star riders on LIVE to follow them (this browser only, per share link).
+  const myRiders = useMyRiders(token);
   const { race, categories, riders, error, offline, updatedAt, refreshing, live } = feed;
   // 2.0: a tab change is a history entry, so Back/Forward move between tabs.
   const setParam = (key: string, value: string | null) =>
@@ -164,6 +167,7 @@ function SpectatorRace({ token }: { token: string }) {
   const liveLabel = finished ? "Race finished" : live ? (offline ? "Reconnecting…" : "Live") : "Live updates ended";
 
   return (
+    <MyRidersContext.Provider value={myRiders}>
     <div className={styles.page} data-testid="share-page">
       <header className={styles.header}>
         <div className={styles.brand}>Commissaire</div>
@@ -228,6 +232,7 @@ function SpectatorRace({ token }: { token: string }) {
         </div>
       </main>
     </div>
+    </MyRidersContext.Provider>
   );
 }
 

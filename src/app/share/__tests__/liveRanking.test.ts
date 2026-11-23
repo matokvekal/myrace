@@ -267,7 +267,7 @@ describe("LIVE refresh rule", () => {
   const race = { status: "running", date: new Date().toISOString().slice(0, 10), time: "00:00" };
   it("20 s only with the LIVE tab and a running wave; other tabs unchanged", () => {
     expect(publicRefreshDelay(true, race, [{ status: "running" }], Date.now(), { liveTab: true })).toBe(PUBLIC_REFRESH_LIVE_MS);
-    expect(PUBLIC_REFRESH_LIVE_MS).toBe(20_000);
+    expect(PUBLIC_REFRESH_LIVE_MS).toBe(10_000);
     expect(publicRefreshDelay(true, race, [{ status: "running" }], Date.now())).toBe(PUBLIC_REFRESH_RUNNING_MS);
     expect(publicRefreshDelay(true, race, [{ status: "upcoming" }], Date.now(), { liveTab: true })).toBe(PUBLIC_REFRESH_IDLE_MS);
     expect(publicRefreshDelay(false, race, [{ status: "running" }], Date.now(), { liveTab: true })).toBeNull();

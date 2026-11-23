@@ -1,22 +1,27 @@
 /**
  * Spectator page refresh rule (0.3.4). Pure, so it is tested on its own.
  *
- *  - About every 60 s while a wave is RUNNING.
+ *  - About every 30 s while a wave is RUNNING.
  *  - Every 5 min while the race day is still open but nothing runs (between waves),
  *    so a spectator sees the next wave start without keeping a fast poll.
  *  - Nothing once guest polling is closed (race finished, or 24 h after its start —
  *    shared/race/guestPolling.ts, also enforced by the server with 410).
- *  - 2.0: about every 20 s while a wave is RUNNING and the LIVE tab is open (`liveTab`);
+ *  - 2.0: about every 10 s while a wave is RUNNING and the LIVE tab is open (`liveTab`);
  *    every other tab keeps the rule above.
  * The page pauses while the tab is hidden and revalidates when it comes back.
  * Anonymous spectators never open a WebSocket.
  */
 import { guestPollingOpen } from "../../shared/race/guestPolling";
 
-export const PUBLIC_REFRESH_RUNNING_MS = 60_000;
+export const PUBLIC_REFRESH_RUNNING_MS = 30_000;
 export const PUBLIC_REFRESH_IDLE_MS = 5 * 60_000;
 /** 2.0: LIVE tab open while a wave runs. */
-export const PUBLIC_REFRESH_LIVE_MS = 20_000;
+export const PUBLIC_REFRESH_LIVE_MS = 10_000;
+/**
+ * Hotfix 2026-11-23: after a 429 (public API limit per IP, 120/min — many phones behind one venue
+ * Wi-Fi / carrier NAT) the next automatic poll waits one full limit window instead of 10 s.
+ */
+export const PUBLIC_RATE_LIMITED_MS = 60_000;
 /** A manual Refresh is ignored when the last request is younger than this. */
 export const PUBLIC_MANUAL_REFRESH_MIN_MS = 10_000;
 /** Returning to the tab refreshes only when the data is older than this. */

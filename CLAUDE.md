@@ -856,9 +856,19 @@ still open).
   (`riderElapsedMs`, own lap-1 start → last crossing, laps sorted by number), bib, uuid; not crossed = no
   position/time; DNF→DSQ→DNS at the bottom; By category uses server `position_category` first.
   `useLiveTrend` compares only when new data makes a new ranking (view change resets).
-- Refresh: 20 s ONLY while the LIVE tab is open + a wave runs (`publicRefreshDelay(..., {liveTab})`); other
-  tabs keep 60 s / 5 min. Freshness (`share/feedStatus.ts`): offline or > 2 intervals + 10 s → stale (dimmed,
-  dated); polling ended on an unfinished race → "ended".
+- Refresh: 10 s ONLY while the LIVE tab is open + a wave runs (`publicRefreshDelay(..., {liveTab})`); other
+  tabs 30 s while a wave runs / 5 min between waves (hotfix 2026-11-23, was 20 s / 60 s).
+- Hotfix 2026-11-23: guest polling stays OPEN while any category is running, whatever the race date
+  (`guestPollingEndsAt`, server + page): a demo / race run on another day stopped updating spectators.
+- Hotfix 2026-11-23 tracking star: LIVE rows only (NOT RESULTS, NOT TV) get a ☆/★ (`share/myRiders/`,
+  localStorage `commissaire.myRiders.v1.<token>`, this browser only, never sent) and a subtle highlight
+  (`data-fav`). Ranking unchanged, every rider stays visible; no strip, filter, pinning or jump.
+- Hotfix 2026-11-23 scroll: `.live` has `overflow-anchor: none` (anchoring followed a moving row = jump);
+  `live/useStableScroll.ts` keeps the list being read at its screen position when content ABOVE it
+  changes height (scrolls only when it moved). After a 429 (public limit 120/min per IP) the next poll
+  waits 60 s (`PUBLIC_RATE_LIMITED_MS`).
+- Freshness (`share/feedStatus.ts`): offline or > 2 intervals + 10 s → stale (dimmed, dated); polling
+  ended on an unfinished race → "ended".
 - Clock: `waves/raceClock.tsx` — wave `startedAt` (server ms) + feed `clockOffsetMs` (server − device from
   each answer's `serverTime`); ticks in its own component only.
 - TV: font = min(100vh/54, 100vw/96), all sizes in em (1080p = 4K layout). `useFitRows` measures rows

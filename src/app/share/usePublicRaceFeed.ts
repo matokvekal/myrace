@@ -2,13 +2,13 @@
  * The spectator page's data (0.3.4): the public race + its refresh loop.
  * Plain GETs of the public endpoints only (no session, no socket, no IndexedDB).
  *
- *  - Refresh delay from publicRefresh.ts (≈60 s while a wave runs, 5 min between
+ *  - Refresh delay from publicRefresh.ts (≈30 s while a wave runs, 5 min between
  *    waves, none once guest polling has closed).
  *  - Never two requests at once: a refresh asked while one is in flight joins it.
  *  - Paused while the tab is hidden; returning revalidates if the data is older
  *    than 15 s. Manual Refresh is throttled (10 s).
  *  - 410 from /changes (window closed): load the race one last time, then stop.
- *  - 2.0: `liveTab` (LIVE tab open) refreshes every 20 s while a wave runs; switching to it
+ *  - 2.0: `liveTab` (LIVE tab open) refreshes every 10 s while a wave runs; switching to it
  *    revalidates at once when the data is older than that. `clockOffsetMs` = server clock −
  *    device clock (from each answer's `serverTime`), for the race clock.
  */
@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchPublicChanges, fetchPublicRace, fetchPublicSeq, PublicApiError, type PublicPolling } from "@/services/live/publicRace";
 import type { SharedCategory, SharedRace, SharedRider } from "../../shared/race/state";
 import type { CategoryApprovalView, ResultsApprovalView } from "../../shared/race/approval";
-import { PUBLIC_FOCUS_REVALIDATE_MIN_MS, PUBLIC_MANUAL_REFRESH_MIN_MS, PUBLIC_RESULTS_STATUS_MS, publicRefreshDelay } from "./publicRefresh";
+import { PUBLIC_FOCUS_REVALIDATE_MIN_MS, PUBLIC_MANUAL_REFRESH_MIN_MS, PUBLIC_RATE_LIMITED_MS, PUBLIC_RESULTS_STATUS_MS, publicRefreshDelay } from "./publicRefresh";
 
 export type PublicRider = Partial<SharedRider>;
 
@@ -52,6 +52,8 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resu
   const pollingOpen = useRef(false);
   const inFlight = useRef<Promise<void> | null>(null);
   const lastRequest = useRef(0);
+  /** The last answer was 429 (rate limit per IP): the next automatic poll waits a full window. */
+  const rateLimited = useRef(false);
 
   const loadAll = useCallback(async () => {
     const sentAt = Date.now();
@@ -110,10 +112,12 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resu
       try {
         if (loaded.current && pollingOpen.current) await loadChanges();
         else await loadAll();
+        rateLimited.current = false;
         setUpdatedAt(Date.now());
         setOffline(false);
         setError(null);
       } catch (e) {
+        rateLimited.current = e instanceof PublicApiError && e.status === 429;
         if (!loaded.current) {
           setError(e instanceof PublicApiError && e.status === 404 ? "This race link is not valid or the race was removed." : e instanceof Error ? e.message : String(e));
         } else setOffline(true); // keep showing the last results
@@ -144,7 +148,7 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resu
     let stopped = false;
     const schedule = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void run(), delay);
+      timer = setTimeout(() => void run(), rateLimited.current ? Math.max(delay, PUBLIC_RATE_LIMITED_MS) : delay);
     };
     const run = async () => {
       timer = null;
@@ -159,7 +163,7 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resu
         void run();
       } else if (!timer) schedule();
     };
-    // LIVE just opened (20 s rule) on data older than that: revalidate now, not 20 s later.
+    // LIVE just opened (10 s rule) on data older than that: revalidate now, not 10 s later.
     if (liveTab && loaded.current && Date.now() - lastRequest.current >= delay) void run();
     else schedule();
     document.addEventListener("visibilitychange", onVisible);

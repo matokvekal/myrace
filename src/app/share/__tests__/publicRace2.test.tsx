@@ -1,7 +1,7 @@
 /**
  * Public page 2.0 — components through the real SharePage with a mocked public API:
  * RACE active wave, LIVE (provisional, ranking, DNS/DNF bottom, position changes, stale,
- * wave transitions, 20 s refresh only on LIVE), Back/Forward, TV broadcast mode.
+ * wave transitions, 10 s refresh only on LIVE), Back/Forward, TV broadcast mode.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import React from "react";
@@ -161,12 +161,12 @@ describe("LIVE", () => {
     expect(screen.queryAllByTestId("live-row")).toHaveLength(0);
   });
 
-  it("refreshes every 20 s on LIVE only; RACE keeps 60 s; paused while hidden", async () => {
+  it("refreshes every 10 s on LIVE only; RACE keeps 30 s; paused while hidden", async () => {
     mount(`/share/${TOKEN}?tab=live`);
     await flush();
-    await tick(20_000);
+    await tick(10_000);
     expect(api.fetchPublicChanges).toHaveBeenCalledTimes(1);
-    await tick(20_000);
+    await tick(10_000);
     expect(api.fetchPublicChanges).toHaveBeenCalledTimes(2);
     act(() => setVisibility("hidden"));
     await tick(120_000);
@@ -177,9 +177,9 @@ describe("LIVE", () => {
 
     fireEvent.click(screen.getByTestId("share-tab-race"));
     await flush();
-    await tick(30_000);
-    expect(api.fetchPublicChanges).toHaveBeenCalledTimes(3); // 60 s rule again
-    await tick(30_000);
+    await tick(15_000);
+    expect(api.fetchPublicChanges).toHaveBeenCalledTimes(3); // 30 s rule again
+    await tick(15_000);
     expect(api.fetchPublicChanges).toHaveBeenCalledTimes(4);
   });
 
@@ -190,14 +190,14 @@ describe("LIVE", () => {
     api.fetchPublicChanges.mockImplementationOnce(async () => ({
       lastSeq: 6, serverTime: Date.now(), polling: polling(), riders: [rider("a", 11, "Elite", [10, 21, 31])],
     }));
-    await tick(20_000);
+    await tick(10_000);
     expect(rowLabels()[0]).toMatch(/^Position 1, bib 11.*up 1 place$/);
     expect(rowLabels()[1]).toMatch(/^Position 2, bib 12.*down 1 place$/);
     // a later update with no movement clears the arrows
     api.fetchPublicChanges.mockImplementationOnce(async () => ({
       lastSeq: 7, serverTime: Date.now(), polling: polling(), riders: [rider("d", 14, "Elite", [12])],
     }));
-    await tick(20_000);
+    await tick(10_000);
     expect(rowLabels()[0]).not.toMatch(/place$/);
   });
 
@@ -206,13 +206,13 @@ describe("LIVE", () => {
     mount(`/share/${TOKEN}?tab=live`);
     await flush();
     api.fetchPublicChanges.mockRejectedValueOnce(new PublicApiError(0, "offline", "No connection"));
-    await tick(20_000);
+    await tick(10_000);
     expect(screen.getByTestId("live-stale").textContent).toMatch(/Connection lost/);
     expect(screen.getByTestId("live-tab").getAttribute("data-freshness")).toBe("stale");
     expect(screen.getAllByTestId("live-row").length).toBeGreaterThan(0);
 
     api.fetchPublicChanges.mockImplementationOnce(async () => ({ lastSeq: 9, serverTime: Date.now(), polling: polling(), categories: [cats("finished")[0]] }));
-    await tick(20_000);
+    await tick(10_000);
     expect(screen.queryByTestId("live-stale")).toBeNull();
     expect(screen.getByTestId("live-wave-finished").textContent).toMatch(/Wave 1 has finished/);
   });
@@ -239,7 +239,7 @@ describe("LIVE lifecycle until official RESULTS (hotfix 1.2.1-rc.3)", () => {
 
     const next = { cats: lifecycleCats("finished", "running"), riders: [...baseRiders().filter((r) => r.uuid !== "k"), rider("k", 31, "Kids", [], { raceStatus: "running" })] };
     api.fetchPublicChanges.mockImplementationOnce(async () => ({ lastSeq: 8, serverTime: Date.now(), polling: polling(), categories: next.cats, riders: next.riders }));
-    await tick(20_000);
+    await tick(10_000);
     expect(screen.getByTestId("live-wave-head").textContent).toMatch(/RUNNING.*Wave 2/);
     expect(rowLabels().every((l) => /bib 31/.test(l))).toBe(true); // only the new wave, wave 1's laps untouched in the feed
     expect(screen.getByTestId("live-clock").getAttribute("data-running")).toBe("true");
@@ -460,7 +460,7 @@ describe("TV broadcast mode", () => {
     mount(`/share/${TOKEN}?tab=live&view=tv`);
     await flush();
     api.fetchPublicChanges.mockRejectedValueOnce(new PublicApiError(0, "offline", "No connection"));
-    await tick(20_000);
+    await tick(10_000);
     expect(screen.getByTestId("tv-stale").textContent).toMatch(/Data delayed/);
     expect(screen.getByTestId("tv-status").textContent).toBe("DATA DELAYED");
     expect(screen.getByTestId("tv-freshness").getAttribute("data-freshness")).toBe("stale");
@@ -505,5 +505,70 @@ describe("TV broadcast mode", () => {
     fireEvent.click(screen.getByTestId("tv-exit"));
     expect(where).toBe(`/share/${TOKEN}`);
     expect(screen.getByTestId("share-page")).toBeTruthy();
+  });
+});
+
+describe("tracking star (hotfix 2026-11-23)", () => {
+  const order = () => screen.getAllByTestId("live-row").map((r) => r.getAttribute("data-uuid"));
+
+  it("LIVE: ☆ → ★ with a subtle highlight; ranking unchanged; kept per link across a reload", async () => {
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    const before = order();
+    const rowOf = (uuid: string) => screen.getAllByTestId("live-row").find((r) => r.getAttribute("data-uuid") === uuid)!;
+    for (const u of ["a", "b", "d"]) fireEvent.click(within(rowOf(u)).getByTestId("share-star"));
+    expect(order()).toEqual(before);
+    expect(screen.getAllByTestId("live-row").filter((r) => r.getAttribute("data-fav") === "true").map((r) => r.getAttribute("data-uuid")).sort()).toEqual(["a", "b", "d"]);
+    expect(within(rowOf("a")).getByTestId("share-star").getAttribute("aria-pressed")).toBe("true");
+    expect(within(rowOf("c")).getByTestId("share-star").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByTestId("my-riders")).toBeNull(); // no strip / panel
+
+    // The stars follow the riders when the ranking changes.
+    api.fetchPublicChanges.mockImplementationOnce(async () => ({
+      lastSeq: 6, serverTime: Date.now(), polling: polling(), riders: [rider("d", 14, "Elite", [9, 19, 28])],
+    }));
+    await tick(10_000);
+    expect(order()[0]).toBe("d");
+    expect(rowOf("d").getAttribute("data-fav")).toBe("true");
+    expect(rowOf("c").getAttribute("data-fav")).toBeNull();
+
+    // Reload: same link keeps them; another link has its own (none).
+    cleanup();
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    expect(screen.getAllByTestId("live-row").filter((r) => r.getAttribute("data-fav") === "true")).toHaveLength(3);
+    cleanup();
+    mount(`/share/OTHERTOKENOTHERTOKEN00.CCCCCCCCCCCCCCCCCCCCCC?tab=live`);
+    await flush();
+    expect(screen.getAllByTestId("live-row").filter((r) => r.getAttribute("data-fav") === "true")).toHaveLength(0);
+  });
+
+  it("RESULTS and TV have no stars", async () => {
+    localStorage.setItem(`commissaire.myRiders.v1.${TOKEN}`, JSON.stringify(["a"]));
+    mount(`/share/${TOKEN}?tab=live&view=tv`);
+    await flush();
+    expect(screen.queryByTestId("share-star")).toBeNull();
+    cleanup();
+    api.fetchPublicRace.mockResolvedValue(snapshot({ race: { status: "finished" }, cats: cats("finished", "finished"), open: false }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.queryByTestId("share-star")).toBeNull();
+  });
+});
+
+describe("rate limit (hotfix 2026-11-23)", () => {
+  it("after a 429 the next poll waits a full minute, then 10 s again", async () => {
+    const { PublicApiError } = await import("@/services/live/publicRace");
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    api.fetchPublicChanges.mockRejectedValueOnce(new PublicApiError(429, "rate_limited", "Too many requests"));
+    await tick(10_000);
+    expect(api.fetchPublicChanges).toHaveBeenCalledTimes(1);
+    await tick(50_000);
+    expect(api.fetchPublicChanges).toHaveBeenCalledTimes(1);
+    await tick(10_000);
+    expect(api.fetchPublicChanges).toHaveBeenCalledTimes(2);
+    await tick(10_000);
+    expect(api.fetchPublicChanges).toHaveBeenCalledTimes(3);
   });
 });

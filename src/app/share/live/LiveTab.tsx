@@ -35,6 +35,7 @@ import type { FeedFreshness } from "../feedStatus";
 import { rankLive, type LiveEntry, type LiveMode } from "./liveRanking";
 import { useLiveTrend } from "./useLiveTrend";
 import { useRankFlip } from "./useRankFlip";
+import { useStableScroll } from "./useStableScroll";
 import { LiveHeaderRow, LiveRow } from "./LiveRow";
 import styles from "./live.module.css";
 
@@ -56,6 +57,8 @@ export function LiveTab(props: LiveTabProps) {
   const [waveChoice, setWaveChoice] = useState<string | null>(null);
   const [mode, setMode] = useState<LiveMode>("overall");
   const [catChoice, setCatChoice] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  useStableScroll(rootRef);
 
   const wave = active.find((w) => w.key === waveChoice) ?? active[0] ?? lastWaveBeforeResults(waves, raceFinished);
   const waveDone = wave?.state === "finished";
@@ -66,7 +69,7 @@ export function LiveTab(props: LiveTabProps) {
   const oneCat = mode === "category" && catChoice && waveCats.some((c) => c.uuid === catChoice) ? catChoice : "";
 
   return (
-    <div className={styles.live} data-testid="live-tab" data-freshness={freshness}>
+    <div ref={rootRef} className={styles.live} data-testid="live-tab" data-freshness={freshness}>
       <p className={styles.provisional} role="note" data-testid="live-provisional">
         <b>PROVISIONAL</b>
         <span>{waveDone ? "Last live standings — official results are published after the race is finished." : "Live standings — not official results."}</span>

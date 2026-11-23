@@ -4,6 +4,9 @@
 .wideContent { max-width: 1180px; }
 
 .live { display: flex; flex-direction: column; gap: 10px; }
+/* Hotfix: no browser scroll anchoring on LIVE (it followed a row in view when it moved, so the
+   page jumped). useStableScroll keeps the view put instead (all browsers alike). */
+.live, .live * { overflow-anchor: none; }
 
 .provisional {
   display: flex;
@@ -155,6 +158,11 @@
 }
 .main { grid-area: main; display: flex; flex-direction: column; min-width: 0; }
 .name { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Hotfix: tracking star before the name (compact, the row stays one line). */
+.nameLine { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.nameLine > button { width: 26px; height: 26px; margin-inline-start: -4px; }
+/* A starred rider: subtle highlight in its own row, position unchanged. */
+.row[data-fav="true"] { background: rgba(245, 179, 1, 0.08); box-shadow: inset 3px 0 0 rgba(245, 179, 1, 0.75); }
 .sub { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.75rem; color: var(--text-secondary); }
 .subCat { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subStatus { flex-shrink: 0; font-weight: 700; letter-spacing: 0.03em; }

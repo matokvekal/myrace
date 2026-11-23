@@ -11,6 +11,8 @@ import { formatGap, formatRaceTime, lapsText, riderName, type LiveEntry } from "
 import { categoryLabel } from "../waves/activeWaves";
 import { showsArrow, type RankMotion } from "./rankMotion";
 import styles from "./live.module.css";
+import { StarButton } from "../myRiders/StarButton";
+import { useMyRidersContext } from "../myRiders/myRiders";
 
 export function trendLabel(delta: number | undefined): string | null {
   if (!delta) return null;
@@ -31,6 +33,7 @@ function LiveRowImpl({ entry, delta, motion, version }: { entry: LiveEntry; delt
   const trend = trendLabel(delta);
   const arrow = showsArrow(motion) ? motion.delta : 0;
   const out = group === "out";
+  const fav = useMyRidersContext().has(entry.uuid);
   const label = [
     position != null ? `Position ${position}` : out ? entry.status : "No position yet",
     rider.bibNumber != null ? `bib ${rider.bibNumber}` : null,
@@ -52,6 +55,7 @@ function LiveRowImpl({ entry, delta, motion, version }: { entry: LiveEntry; delt
       data-moved={arrow ? (arrow > 0 ? "up" : "down") : undefined}
       data-motion={motion?.kind}
       data-uuid={entry.uuid}
+      data-fav={fav ? "true" : undefined}
       aria-label={label}
       data-testid="live-row"
     >
@@ -59,9 +63,12 @@ function LiveRowImpl({ entry, delta, motion, version }: { entry: LiveEntry; delt
       {arrow ? <span key={`r${version}`} className={styles.ring} data-kind={motion!.kind} aria-hidden="true" /> : null}
       <span className={styles.pos} aria-hidden="true">{position ?? "–"}</span>
       <span className={styles.bib} aria-hidden="true">{rider.bibNumber ?? "—"}</span>
-      <span className={styles.main} aria-hidden="true">
-        <span className={styles.name} dir="auto">{riderName(rider)}</span>
-        <span className={styles.sub}>
+      <span className={styles.main}>
+        <span className={styles.nameLine}>
+          <StarButton uuid={entry.uuid} name={riderName(rider)} />
+          <span className={styles.name} dir="auto" aria-hidden="true">{riderName(rider)}</span>
+        </span>
+        <span className={styles.sub} aria-hidden="true">
           <span className={styles.swatch} style={{ background: category?.color ?? "var(--border-card)" }} />
           <span dir="auto" className={styles.subCat}>{cat}</span>
           <span className={styles.subStatus} data-status={entry.status}>{entry.status}</span>

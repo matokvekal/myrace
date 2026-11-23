@@ -294,15 +294,15 @@ describe("LIVE tab motion", () => {
     expect(calls).toHaveLength(0);
 
     api.fetchPublicChanges.mockRejectedValueOnce(new PublicApiError(0, "offline", "No connection"));
-    await tick(20_000);
+    await tick(10_000);
     expect(screen.getByTestId("live-tab").getAttribute("data-freshness")).toBe("stale");
     update([rider("a", 11, [10, 21, 31])]); // reconnect: the result is shown, not replayed
-    await tick(20_000);
+    await tick(10_000);
     expect(row(11).getAttribute("aria-label")).toMatch(/^Position 1, bib 11/);
     expect(calls).toHaveLength(0);
 
     update([rider("b", 12, [10, 20, 30])]); // the next live update animates again (b back in front)
-    await tick(20_000);
+    await tick(10_000);
     expect(callsFor("b").length).toBeGreaterThan(0);
   });
 
@@ -366,8 +366,9 @@ describe("TV broadcast motion across pages", () => {
     await tick(16_000); // page 2 (indices 11–18) since 10 s
     expect(screen.getByTestId("tv-pager").textContent).toMatch(/Page 2 \/ 4/);
     // r15 (page 2) → 1st; r2 (3rd, pinned) → 4th, off screen; r10 (page 1) → 12th, onto this page
-    update([rider("r15", 115, [10, 21.5, 30])]);
     setVisibility("hidden");
+    await tick(10_000); // hidden: no poll (10 s LIVE rule) and no page flip
+    update([rider("r15", 115, [10, 21.5, 30])]);
     setVisibility("visible"); // returning with ≥ 15 s old data revalidates now, between page flips
     await flush();
     expect(screen.getByTestId("tv-pager").textContent).toMatch(/Page 2 \/ 4/);

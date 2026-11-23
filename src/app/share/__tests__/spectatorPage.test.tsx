@@ -214,16 +214,18 @@ describe("refresh", () => {
     expect(publicRefreshDelay(true, r, cats("upcoming"))).toBe(PUBLIC_REFRESH_IDLE_MS);
     expect(publicRefreshDelay(false, r, cats("running"))).toBeNull();
     expect(publicRefreshDelay(true, race({ status: "finished" }), cats("finished"))).toBeNull();
-    expect(publicRefreshDelay(true, race({ date: "2020-01-01" }), cats("running"))).toBeNull();
+    // Hotfix: a running wave keeps spectators updating whatever the race date (demo / other day).
+    expect(publicRefreshDelay(true, race({ date: "2020-01-01" }), cats("running"))).toBe(PUBLIC_REFRESH_RUNNING_MS);
+    expect(publicRefreshDelay(true, race({ date: "2020-01-01" }), cats("upcoming"))).toBeNull();
   });
 
-  it("polls about every 60 s (not 10 s), pauses while hidden and revalidates on return", async () => {
+  it("polls about every 30 s (not 10 s), pauses while hidden and revalidates on return", async () => {
     mount();
     await flush();
     expect(api.fetchPublicRace).toHaveBeenCalledTimes(1);
-    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
     expect(api.fetchPublicChanges).toHaveBeenCalledTimes(0);
-    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
     expect(api.fetchPublicChanges).toHaveBeenCalledTimes(1);
     expect(api.fetchPublicChanges).toHaveBeenLastCalledWith(TOKEN, 5);
 
@@ -271,7 +273,7 @@ describe("refresh", () => {
     mount();
     await flush();
     api.fetchPublicRace.mockResolvedValue(snapshot({ open: false }));
-    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     await flush();
     expect(api.fetchPublicRace).toHaveBeenCalledTimes(2);
     await act(async () => { await vi.advanceTimersByTimeAsync(10 * 60_000); });
