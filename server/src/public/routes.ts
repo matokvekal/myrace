@@ -47,7 +47,7 @@ async function stateOf(token: string): Promise<RaceState> {
 }
 
 const polling = (state: RaceState, now = Date.now()) => {
-  const endsAt = guestPollingEndsAt(state.race, Object.values(state.categories), now);
+  const endsAt = guestPollingEndsAt(state.race, Object.values(state.categories));
   return { open: now < endsAt, endsAt: endsAt || null, intervalMs: GUEST_POLL_INTERVAL_MS };
 };
 

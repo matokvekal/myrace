@@ -61,11 +61,11 @@ describe("guest polling window", () => {
     expect(guestPollingOpen(race, [], start + GUEST_POLL_WINDOW_MS)).toBe(false);
     expect(guestPollingOpen({ ...race, status: "finished" }, [], start)).toBe(false);
     expect(guestPollingOpen({ status: "running" }, [], Date.now())).toBe(false); // no date or creation time: closed
-    // Hotfix: a running category keeps it open long after the scheduled window (demo / race on another day)…
+    // A wave left running does NOT keep it open past the 24 h window (Race 8 stayed LIVE for 13 days).
     const late = start + 3 * GUEST_POLL_WINDOW_MS;
-    expect(guestPollingOpen(race, [{ status: "running" }], late)).toBe(true);
+    expect(guestPollingOpen(race, [{ status: "running" }], late)).toBe(false);
     expect(guestPollingOpen(race, [{ status: "finished" }], late)).toBe(false);
-    // …but never once the race is finished.
+    // Never once the race is finished either.
     expect(guestPollingOpen({ ...race, status: "finished" }, [{ status: "running" }], late)).toBe(false);
   });
 });

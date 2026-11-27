@@ -51,3 +51,4 @@ bibsCorrectedAtImport
 identity_header
 results-approval
 races/:token/seq
+liveWindowEndsAt

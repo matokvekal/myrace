@@ -57,9 +57,10 @@ const started = (c: SharedCategory) => c.status === "running" || c.startedAt != 
 
 // rankRiders (the RESULTS order) lives in results/officialOrder.ts, shared with the TV broadcast.
 
-type CatState = "upcoming" | "running" | "finished";
+type CatState = "upcoming" | "running" | "finished" | "unfinished";
 function categoryState(c: SharedCategory): CatState {
   if (c.status === "running") return "running";
+  if ((c.status as string | null) === "unfinished") return "unfinished";
   if (c.status === "finished" && c.startedAt != null) return "finished";
   return "upcoming";
 }
@@ -68,7 +69,7 @@ function categoryState(c: SharedCategory): CatState {
 function riderStatus(r: Rider, cat: CatState): string {
   if (isOut(r)) return String(r.status);
   if (r.raceStatus === "finished" || r.status === "finished") return STATUS_LABEL.finished;
-  if (r.raceStatus === "running") return STATUS_LABEL.running;
+  if (r.raceStatus === "running") return cat === "unfinished" ? STATUS_LABEL.unfinished : STATUS_LABEL.running;
   return cat === "upcoming" ? STATUS_LABEL.upcoming : STATUS_LABEL.standing;
 }
 
@@ -403,7 +404,7 @@ function RaceTab({ categories, ridersByCat }: { categories: SharedCategory[]; ri
       {waves.map(([wave, cats]) => {
         const starts = cats.map((c) => c.startTime).filter(Boolean).sort();
         const states = cats.map(categoryState);
-        const waveState: CatState = states.includes("running") ? "running" : states.every((s) => s === "finished") ? "finished" : "upcoming";
+        const waveState: CatState = states.includes("running") ? "running" : states.includes("unfinished") ? "unfinished" : states.every((s) => s === "finished") ? "finished" : "upcoming";
         return (
           <section key={wave} className={styles.card} data-wave-state={waveState} data-testid="share-wave">
             <h2 className={styles.cardTitle}>

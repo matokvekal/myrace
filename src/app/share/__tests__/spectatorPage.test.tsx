@@ -214,8 +214,8 @@ describe("refresh", () => {
     expect(publicRefreshDelay(true, r, cats("upcoming"))).toBe(PUBLIC_REFRESH_IDLE_MS);
     expect(publicRefreshDelay(false, r, cats("running"))).toBeNull();
     expect(publicRefreshDelay(true, race({ status: "finished" }), cats("finished"))).toBeNull();
-    // Hotfix: a running wave keeps spectators updating whatever the race date (demo / other day).
-    expect(publicRefreshDelay(true, race({ date: "2020-01-01" }), cats("running"))).toBe(PUBLIC_REFRESH_RUNNING_MS);
+    // The LIVE window is 24 h from the start: a wave left running past it no longer keeps spectators polling.
+    expect(publicRefreshDelay(true, race({ date: "2020-01-01" }), cats("running"))).toBeNull();
     expect(publicRefreshDelay(true, race({ date: "2020-01-01" }), cats("upcoming"))).toBeNull();
   });
 

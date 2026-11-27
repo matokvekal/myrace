@@ -21,6 +21,7 @@ import { canForRace } from "@/services/cloud/permissions";
 import { useCheckInChanges, type CheckInChange } from "@/stores/checkInChangesStore";
 import CheckInChanges from "./CheckInChanges";
 import WaveBlockedNotice from "./WaveBlockedNotice";
+import LiveWindowWarning from "./LiveWindowWarning";
 import { runningWaveOtherThan } from "@/utils/activeWave";
 
 const NO_CHANGES: CheckInChange[] = [];
@@ -211,6 +212,8 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
 
   return (
     <div className={styles.container}>
+      {/* The 24 h LIVE window is over and a wave is still running: finish it (never automatic) */}
+      <LiveWindowWarning race={race ? { status: race.status, date: race.date, time: race.time, finalized: race.finalized } : undefined} categories={categories} onOpenWave={(w) => navigate(`/race/${raceUuid}/heat/${w}`)} />
       {/* Bib problems anywhere in the race, before anyone reaches Start */}
       <BibWarning
         raceUuid={raceUuid}

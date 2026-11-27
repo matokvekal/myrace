@@ -23,6 +23,9 @@ export type PublicRider = Partial<SharedRider>;
 /** Ignore clock-offset changes smaller than this (no re-render for network jitter). */
 const CLOCK_OFFSET_JITTER_MS = 250;
 
+/** Status a running category shows once the LIVE window has expired (the data keeps "running"). */
+export const LIVE_ENDED_STATUS = "unfinished";
+
 export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resultsTab?: boolean } = {}) {
   const liveTab = !!opts.liveTab;
   const resultsTab = !!opts.resultsTab;
@@ -138,7 +141,13 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resu
     void fetchNow();
   }, [fetchNow]);
 
-  const categoryList = useMemo(() => [...categories.values()], [categories]);
+  // The LIVE window ran out (24 h after the start, server-decided) and the race was never finished:
+  // a wave still "running" in the data is shown as NOT FINISHED, never as active. Read-time only.
+  const liveEnded = !!polling && !polling.open && !!race && race.status !== "finished";
+  const categoryList = useMemo(
+    () => [...categories.values()].map((c) => (liveEnded && c.status === "running" ? ({ ...c, status: LIVE_ENDED_STATUS } as unknown as SharedCategory) : c)),
+    [categories, liveEnded],
+  );
   const delay = publicRefreshDelay(polling?.open, race, categoryList, Date.now(), { liveTab });
 
   // Automatic refresh: paused while hidden, revalidate on return.
@@ -210,7 +219,7 @@ export function usePublicRaceFeed(token: string, opts: { liveTab?: boolean; resu
     return true;
   }, [fetchNow]);
 
-  return { race, categories: categoryList, riders, approvals, resultsApproval, polling, error, offline, updatedAt, refreshing, live: delay != null, delayMs: delay, clockOffsetMs, refresh };
+  return { race, liveEnded, categories: categoryList, riders, approvals, resultsApproval, polling, error, offline, updatedAt, refreshing, live: delay != null, delayMs: delay, clockOffsetMs, refresh };
 }
 
 export type PublicRaceFeed = ReturnType<typeof usePublicRaceFeed>;

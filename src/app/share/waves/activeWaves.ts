@@ -12,7 +12,7 @@
 import type { SharedCategory } from "../../../shared/race/state";
 import type { PublicRider } from "../usePublicRaceFeed";
 
-export type CatState = "upcoming" | "running" | "finished";
+export type CatState = "upcoming" | "running" | "finished" | "unfinished";
 
 export const OUT_STATUSES = ["DNF", "DSQ", "DNS"] as const;
 export const isOutRider = (r: PublicRider) => (OUT_STATUSES as readonly string[]).includes(String(r.status));
@@ -28,6 +28,7 @@ export const waveLabel = (key: string) => (key === NO_WAVE ? "Not scheduled" : `
 
 export function categoryState(c: SharedCategory): CatState {
   if (c.status === "running") return "running";
+  if ((c.status as string | null) === "unfinished") return "unfinished"; // LIVE window over, wave never finished
   if (c.status === "finished" && c.startedAt != null) return "finished";
   return "upcoming";
 }
@@ -84,7 +85,7 @@ export function summarizeWaves(categories: SharedCategory[], byCategory: Map<str
         (a, b) => String(a.startTime ?? "").localeCompare(String(b.startTime ?? "")) || (a.importOrder ?? 0) - (b.importOrder ?? 0) || a.name.localeCompare(b.name),
       );
       const states = sorted.map(categoryState);
-      const state: CatState = states.includes("running") ? "running" : states.every((s) => s === "finished") ? "finished" : "upcoming";
+      const state: CatState = states.includes("running") ? "running" : states.includes("unfinished") ? "unfinished" : states.every((s) => s === "finished") ? "finished" : "upcoming";
       const riders = sorted.flatMap((c) => byCategory.get(categoryKey(c.name, c.subCategory)) ?? []);
       const starts = sorted.map((c) => c.startedAt).filter((t): t is number => typeof t === "number" && t > 0);
       const ends = sorted.map((c) => c.finishedAt).filter((t): t is number => typeof t === "number" && t > 0);

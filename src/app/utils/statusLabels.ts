@@ -9,6 +9,8 @@ export const STATUS_LABEL = {
   standing: "STANDING",
   running: "RUNNING",
   finished: "FINISHED",
+  /** Read-time only: started, never finished, and the 24 h LIVE window is over. */
+  unfinished: "NOT FINISHED",
 } as const;
 
 export type LabelledStatus = keyof typeof STATUS_LABEL;

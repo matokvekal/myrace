@@ -581,3 +581,74 @@ describe("rate limit (hotfix 2026-11-23)", () => {
     expect(api.fetchPublicChanges).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("LIVE window over (24 h after the start) — read-time only", () => {
+  const expired = (over: Record<string, unknown> = {}) =>
+    snapshot({ open: false, race: { date: "2020-01-01", status: "running" }, ...over });
+
+  it("a wave left running is NOT FINISHED, with no active-wave strip, no LIVE dot and no polling", async () => {
+    api.fetchPublicRace.mockImplementation(async () => expired());
+    mount(`/share/${TOKEN}`);
+    await flush();
+    expect(screen.queryByTestId("share-active-wave")).toBeNull();
+    expect(screen.queryByLabelText("wave running")).toBeNull();
+    expect(screen.getAllByTestId("share-wave")[0].getAttribute("data-wave-state")).toBe("unfinished");
+    expect(screen.getAllByTestId("share-wave")[0].textContent).toMatch(/NOT FINISHED/);
+    expect(screen.getByTestId("share-live-state").getAttribute("data-live")).toBe("off");
+    await tick(30 * 60_000);
+    expect(api.fetchPublicChanges).not.toHaveBeenCalled();
+    expect(api.fetchPublicRace).toHaveBeenCalledTimes(1);
+  });
+
+  it("approved results stay accessible after the window", async () => {
+    api.fetchPublicRace.mockImplementation(async () => expired({ approvals: [{ categoryUuid: "c1", status: "approved", approvedAt: new Date().toISOString() }] }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.queryByTestId("share-results-pending")).toBeNull();
+    expect(screen.getByTestId("share-approved")).toBeTruthy();
+    expect(screen.getAllByTestId("share-results-category")).toHaveLength(1);
+  });
+});
+
+describe("switching between spectator links in one browser", () => {
+  const TOKEN_B = "CCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDD";
+  const raceOf = (token: string) => (token === TOKEN_B ? "Race Eight" : "Guest Cup");
+
+  const title = () => document.querySelector("h1")?.textContent ?? "";
+  it("each link shows only its own race; the first race never leaks into the second", async () => {
+    api.fetchPublicRace.mockImplementation(async (token: string) =>
+      snapshot({ race: { name: raceOf(token) }, riders: token === TOKEN_B ? [rider("z", 99, "Elite", [10])] : baseRiders() }),
+    );
+    mount(`/share/${TOKEN}?tab=live`);
+    await flush();
+    expect(title()).toBe("Guest Cup");
+    expect(document.body.textContent).toMatch(/Rider R11/);
+
+    // Open the other race (e.g. from Other Bike Races): the page remounts per link, fetching ITS token.
+    api.fetchPublicRace.mockClear();
+    await act(async () => { nav(`/share/${TOKEN_B}?tab=live`); });
+    await flush();
+    expect(api.fetchPublicRace).toHaveBeenCalledWith(TOKEN_B);
+    expect(title()).toBe("Race Eight");
+    expect(document.body.textContent).toMatch(/Rider R99/);
+    expect(document.body.textContent).not.toMatch(/Rider R11/); // no rider of the first race
+
+    await act(async () => { nav(`/share/${TOKEN}?tab=live`); });
+    await flush();
+    expect(title()).toBe("Guest Cup");
+    expect(document.body.textContent).not.toMatch(/Rider R99/);
+  });
+
+  it("a link answered with an error shows the error, not the previous race", async () => {
+    api.fetchPublicRace.mockImplementation(async (token: string) => {
+      if (token === TOKEN_B) throw Object.assign(new Error("nf"), { status: 404, code: "not_found" });
+      return snapshot();
+    });
+    mount(`/share/${TOKEN}`);
+    await flush();
+    await act(async () => { nav(`/share/${TOKEN_B}`); });
+    await flush();
+    expect(document.querySelector("h1")?.textContent).not.toBe("Guest Cup");
+    expect(document.body.textContent).toMatch(/Race not available/);
+  });
+});
