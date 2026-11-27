@@ -45,6 +45,9 @@ export default function InvitePage() {
             >
               {googleClientId() ? t("live.signInEmail", "Sign in with email") : t("live.signIn", "Sign in")}
             </button>
+            <button className={styles.secondary} onClick={() => navigate(`/account?mode=register&next=${encodeURIComponent(`/invite/${token}`)}`)} data-testid="invite-register">
+              {t("live.createAccount", "New here? Create an account")}
+            </button>
           </div>
         </div>
       </div>

@@ -258,15 +258,19 @@ function ResultsTab({
   raceFinished: boolean;
   onOpenLive: () => void;
 }) {
-  const withRiders = categories.filter((c) => (ridersByCat.get(catKey(c.name, c.subCategory)) ?? []).length > 0);
+  // Before the race is officially finished only the categories the judges already APPROVED are published here;
+  // after Finish Race every category is shown (approved or provisional).
+  const withRiders = categories.filter(
+    (c) => (raceFinished || approvals.get(c.uuid)?.status === "approved") && (ridersByCat.get(catKey(c.name, c.subCategory)) ?? []).length > 0,
+  );
   const [filter, setFilter] = useState("");
   const [podium, setPodium] = useState(false);
   const [podiumSize, setPodiumSize] = useState<Record<string, 3 | 5>>({});
   const [openRider, setOpenRider] = useState<string | null>(null);
   const [rf, setRf] = useState<ResultsFilterState>(NO_RESULTS_FILTER);
 
-  // 2.0: RESULTS is official only — nothing before the race is officially finished (Finish Race).
-  if (!raceFinished) return <ResultsPending onOpenLive={onOpenLive} />;
+  // 2.0: RESULTS is official only — before Finish Race, just the approved categories (none yet = pending note).
+  if (!raceFinished && withRiders.length === 0) return <ResultsPending onOpenLive={onOpenLive} />;
   if (withRiders.length === 0) return <p className={styles.empty}>No results yet.</p>;
   const visible = filterResultCategories(withRiders, ridersByCat, rf);
   const shown = filter && visible.some((c) => c.uuid === filter) ? visible.filter((c) => c.uuid === filter) : visible;

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, LayoutDashboard, Radio, SkipForward, Trophy, X } from "lucide-react";
+import { AlertTriangle, BadgeCheck, CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardCheck, Clock, Crosshair, Flag, FlagTriangleRight, LayoutDashboard, Radio, SkipForward, Trophy, X } from "lucide-react";
 import type { CategoryProps, RiderProps } from "@/types/types";
 import { riderInCategory, toMinutes, normalizeTime } from "../schedule/Schedule";
 import { getCategoryBibIssues } from "@/utils/bibIssues";
@@ -78,6 +78,9 @@ const cardHeight = (it: Item, compact: boolean, hasActions: boolean) =>
       it.cats.length * CAT_ROW_PX +
       (hasActions ? ACTIONS_ROW_PX : 0);
 
+/** Results approval of a finished wave: approved | needs (this member may approve it) | not-approved (view only). */
+export type WaveApproval = "approved" | "needs" | "not-approved";
+
 interface Props {
   schedule: Map<number, Map<string, CategoryProps[]>>;
   states: Map<number, WaveState>;
@@ -94,6 +97,8 @@ interface Props {
   onAction?: (wave: number, action: WaveAction) => void;
   /** Check-In changes per wave, for the main commissaire. Empty = no warning button. */
   changeCounts?: Map<number, number>;
+  /** Approval state per finished wave (shared races). Missing = nothing to show. */
+  approvalByWave?: Map<number, WaveApproval>;
 }
 
 /**
@@ -101,7 +106,7 @@ interface Props {
  * time axis, a live "now" line, Now / Next / Active jumps. Presentation only —
  * selecting a wave just sets the shared selected wave.
  */
-const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current, onAction, changeCounts }) => {
+const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onSelect, date, compact = false, current, onAction, changeCounts, approvalByWave }) => {
   const [now, setNow] = useState(nowMinutes);
   useEffect(() => {
     const t = setInterval(() => setNow(nowMinutes()), 30_000);
@@ -309,6 +314,17 @@ const WaveTimeline: React.FC<Props> = ({ schedule, states, riders, selected, onS
                         )}
                         {it.state === "finished" ? (
                           <>
+                            {approvalByWave?.get(it.wave) === "needs" && (
+                              <button type="button" className={`${styles.act} ${styles.actTodo}`} onClick={() => onAction(it.wave, "results")} aria-label={`Needs approval, wave ${it.wave}`} title="Open Results to approve this wave" data-testid={`wave-act-approve-${it.wave}`}>
+                                <BadgeCheck size={13} /> Needs approval
+                              </button>
+                            )}
+                            {approvalByWave?.get(it.wave) === "not-approved" && (
+                              <span className={`${styles.act} ${styles.actTodo}`} data-testid={`wave-not-approved-${it.wave}`}>Not approved</span>
+                            )}
+                            {approvalByWave?.get(it.wave) === "approved" && (
+                              <span className={`${styles.act} ${styles.actDone}`} data-testid={`wave-approved-${it.wave}`}><BadgeCheck size={13} /> Approved</span>
+                            )}
                             <button type="button" className={styles.act} onClick={() => onAction(it.wave, "results")} aria-label={`Results, wave ${it.wave}`} data-testid={`wave-act-results-${it.wave}`}>
                               <Trophy size={13} /> Results
                             </button>

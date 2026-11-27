@@ -96,10 +96,10 @@ function PasswordInput(props: {
   );
 }
 
-export default function SignInForm({ next, reason = null }: { next: string | null; reason?: string | null }) {
+export default function SignInForm({ next, reason = null, initialMode = "signin" }: { next: string | null; reason?: string | null; initialMode?: "signin" | "register" }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");

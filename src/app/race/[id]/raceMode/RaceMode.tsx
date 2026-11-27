@@ -11,6 +11,8 @@ import { withoutIgnoredRiders } from "@/utils/ignoredWaves";
 import useUIStore from "@/stores/uiStore";
 import useRaceStore from "@/stores/racesStore";
 import WaveTimeline from "./WaveTimeline";
+import type { WaveApproval } from "./WaveTimeline";
+import { useCategoryApprovals } from "../results/useCategoryApprovals";
 import RaceSheet, { type SheetSize, type SheetView } from "./RaceSheet";
 import type { WaveAction } from "./WaveTimeline";
 import { useNavigate } from "react-router-dom";
@@ -174,6 +176,25 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startListSig]);
+  // Approval of each finished wave's results (shared races only). The commissaire who may approve gets a
+  // "Needs approval" button that opens Results; everyone else just sees "Not approved".
+  const approvalSig = useMemo(
+    () => categories.map((c) => `${c.uuid}:${c.status}`).join("|") + "#" + raceRiders.length,
+    [categories, raceRiders.length]
+  );
+  const approvals = useCategoryApprovals(raceUuid, approvalSig);
+  const approvalByWave = useMemo(() => {
+    const m = new Map<number, WaveApproval>();
+    if (!isLiveRace(raceUuid)) return m;
+    for (const [w, slots] of schedule) {
+      const cats = [...slots.values()].flat().filter((c) => c.uuid && c.status === "finished" && c.startedAt != null);
+      if (cats.length === 0) continue;
+      const open = cats.filter((c) => approvals.byCategory.get(c.uuid!)?.status !== "approved");
+      m.set(w, open.length === 0 ? "approved" : open.some((c) => approvals.canApprove.has(c.uuid!)) ? "needs" : "not-approved");
+    }
+    return m;
+  }, [schedule, approvals.byCategory, approvals.canApprove, raceUuid]);
+
   const changeCounts = useMemo(() => {
     const counts = new Map<number, number>();
     // Shared race: every judge with Check-In sees the race's changes (read-only); local: as before.
@@ -215,6 +236,7 @@ const RaceMode: React.FC<Props> = ({ raceUuid, categories }) => {
           current={selectedWave}
           onAction={onWaveAction}
           changeCounts={changeCounts}
+          approvalByWave={approvalByWave}
         />
       </div>
 

@@ -390,6 +390,15 @@ describe("RESULTS status after Finish Race (1.2.1 race-wide approval)", () => {
     expect(api.fetchPublicSeq).not.toHaveBeenCalled();
   });
 
+  it("before Finish Race an APPROVED category already shows on RESULTS", async () => {
+    api.fetchPublicRace.mockResolvedValue(snapshot({ approvals: [{ categoryUuid: "c1", status: "approved", approvedAt: new Date().toISOString() }] }));
+    mount(`/share/${TOKEN}?tab=results`);
+    await flush();
+    expect(screen.queryByTestId("share-results-pending")).toBeNull();
+    expect(screen.getAllByTestId("share-results-category").length).toBe(1);
+    expect(screen.getByTestId("share-approved")).toBeTruthy();
+  });
+
   it("before Finish Race RESULTS stay unavailable (no status shown)", async () => {
     mount(`/share/${TOKEN}?tab=results`);
     await flush();
